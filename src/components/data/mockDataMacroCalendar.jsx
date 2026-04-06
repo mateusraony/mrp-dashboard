@@ -1,0 +1,210 @@
+// ─── MACRO CALENDAR & VOLATILITY — Extended Mock Data ─────────────────────────
+
+// ─── EVENTOS MACRO EXPANDIDOS ─────────────────────────────────────────────────
+export const macroEvents = [
+  {
+    id: 'ev001', title: 'CPI (Consumer Price Index)', agency: 'BLS', tier: 1,
+    datetime_brt: new Date('2026-04-10T09:30:00'),
+    tags: ['inflation', 'CPI', 'Fed'],
+    expected: '+0.3% MoM',
+    previous: '+0.4% MoM',
+    description: 'Principal indicador de inflação. Acima do esperado → Fed hawkish → yields sobem → BTC pressão.',
+    btc_impact_hist_avg: -2.8,
+    alert_enabled: true,
+    alert_minutes_before: 30,
+  },
+  {
+    id: 'ev002', title: 'FOMC Meeting & Rate Decision', agency: 'Fed', tier: 1,
+    datetime_brt: new Date('2026-04-30T15:00:00'),
+    tags: ['FOMC', 'rates', 'Fed'],
+    expected: 'Hold (4.25–4.50%)',
+    previous: 'Hold',
+    description: 'Decisão de política monetária do Fed. O evento macro mais impactante para BTC historicamente.',
+    btc_impact_hist_avg: -4.1,
+    alert_enabled: true,
+    alert_minutes_before: 30,
+  },
+  {
+    id: 'ev003', title: 'Non-Farm Payroll (NFP)', agency: 'BLS', tier: 1,
+    datetime_brt: new Date('2026-05-02T09:30:00'),
+    tags: ['NFP', 'jobs', 'payroll'],
+    expected: '+185K',
+    previous: '+228K',
+    description: 'Criação de empregos fora da agricultura. Fraco = Fed dovish = bullish para ativos de risco.',
+    btc_impact_hist_avg: 1.9,
+    alert_enabled: false,
+    alert_minutes_before: 30,
+  },
+  {
+    id: 'ev004', title: 'PCE Price Index', agency: 'BEA', tier: 1,
+    datetime_brt: new Date('2026-04-25T09:30:00'),
+    tags: ['PCE', 'inflation', 'Fed'],
+    expected: '+0.3% MoM',
+    previous: '+0.3% MoM',
+    description: 'Medida de inflação preferida do Fed. Mais abrangente que CPI.',
+    btc_impact_hist_avg: -1.8,
+    alert_enabled: true,
+    alert_minutes_before: 30,
+  },
+  {
+    id: 'ev005', title: 'GDP Q1 2026 (Advance)', agency: 'BEA', tier: 1,
+    datetime_brt: new Date('2026-04-30T09:30:00'),
+    tags: ['GDP', 'growth'],
+    expected: '+1.8% ann.',
+    previous: '+2.4% ann.',
+    description: 'Crescimento econômico EUA. Abaixo do esperado pode sinalizar recessão.',
+    btc_impact_hist_avg: -0.9,
+    alert_enabled: false,
+    alert_minutes_before: 30,
+  },
+  {
+    id: 'ev006', title: 'Initial Jobless Claims', agency: 'BLS', tier: 2,
+    datetime_brt: new Date('2026-04-17T09:30:00'),
+    tags: ['jobs', 'unemployment'],
+    expected: '218K',
+    previous: '224K',
+    description: 'Pedidos semanais de seguro-desemprego. Indicador de alta frequência.',
+    btc_impact_hist_avg: 0.4,
+    alert_enabled: false,
+    alert_minutes_before: 30,
+  },
+  {
+    id: 'ev007', title: 'Fed Beige Book', agency: 'Fed', tier: 2,
+    datetime_brt: new Date('2026-04-16T14:00:00'),
+    tags: ['Fed', 'economia'],
+    expected: 'Relatório qualitativo',
+    previous: '—',
+    description: 'Relato regional sobre condições econômicas. Influencia percepção sobre próximo FOMC.',
+    btc_impact_hist_avg: -0.3,
+    alert_enabled: false,
+    alert_minutes_before: 30,
+  },
+  {
+    id: 'ev008', title: 'ISM Manufacturing PMI', agency: 'ISM', tier: 2,
+    datetime_brt: new Date('2026-05-01T11:00:00'),
+    tags: ['PMI', 'manufacturing'],
+    expected: '48.8',
+    previous: '47.8',
+    description: 'Atividade industrial EUA. Abaixo de 50 = contração.',
+    btc_impact_hist_avg: 0.6,
+    alert_enabled: false,
+    alert_minutes_before: 30,
+  },
+];
+
+// ─── VOLATILIDADE HISTÓRICA PRÉ/PÓS EVENTO ────────────────────────────────────
+// Dados: quantos % BTC se moveu nas janelas -2h, -1h, -30min, +1h, +4h, +24h
+export const eventVolatilityData = [
+  {
+    event: 'CPI Mar 2026',
+    date: '2026-03-12',
+    result_vs_expected: 'above', // above / below / inline
+    actual: '+0.4% MoM',
+    expected: '+0.3% MoM',
+    windows: [
+      { label: '-2h',   btc_move: -0.4 },
+      { label: '-1h',   btc_move: -0.8 },
+      { label: '-30m',  btc_move: -1.1 },
+      { label: '+1h',   btc_move: -3.2 },
+      { label: '+4h',   btc_move: -4.8 },
+      { label: '+24h',  btc_move: -6.2 },
+    ],
+    max_drawdown: -6.2,
+    iv_before: 61.2,
+    iv_after: 74.8,
+    vol_spike_pct: 22.2,
+  },
+  {
+    event: 'FOMC Feb 2026',
+    date: '2026-02-19',
+    result_vs_expected: 'inline',
+    actual: 'Hold 4.25–4.50%',
+    expected: 'Hold',
+    windows: [
+      { label: '-2h',   btc_move: 0.3 },
+      { label: '-1h',   btc_move: 0.1 },
+      { label: '-30m',  btc_move: -0.2 },
+      { label: '+1h',   btc_move: -1.4 },
+      { label: '+4h',   btc_move: -0.8 },
+      { label: '+24h',  btc_move: 2.1 },
+    ],
+    max_drawdown: -1.4,
+    iv_before: 58.4,
+    iv_after: 56.2,
+    vol_spike_pct: -3.8,
+  },
+  {
+    event: 'NFP Mar 2026',
+    date: '2026-03-07',
+    result_vs_expected: 'above',
+    actual: '+228K',
+    expected: '+190K',
+    windows: [
+      { label: '-2h',   btc_move: 0.2 },
+      { label: '-1h',   btc_move: 0.4 },
+      { label: '-30m',  btc_move: 0.6 },
+      { label: '+1h',   btc_move: -2.1 },
+      { label: '+4h',   btc_move: -3.4 },
+      { label: '+24h',  btc_move: -1.8 },
+    ],
+    max_drawdown: -3.4,
+    iv_before: 59.8,
+    iv_after: 67.4,
+    vol_spike_pct: 12.7,
+  },
+  {
+    event: 'PCE Feb 2026',
+    date: '2026-02-28',
+    result_vs_expected: 'below',
+    actual: '+0.2% MoM',
+    expected: '+0.3% MoM',
+    windows: [
+      { label: '-2h',   btc_move: -0.1 },
+      { label: '-1h',   btc_move: 0.2 },
+      { label: '-30m',  btc_move: 0.4 },
+      { label: '+1h',   btc_move: 1.8 },
+      { label: '+4h',   btc_move: 3.2 },
+      { label: '+24h',  btc_move: 4.9 },
+    ],
+    max_drawdown: 4.9,
+    iv_before: 62.1,
+    iv_after: 55.8,
+    vol_spike_pct: -10.1,
+  },
+  {
+    event: 'CPI Fev 2026',
+    date: '2026-02-12',
+    result_vs_expected: 'above',
+    actual: '+0.5% MoM',
+    expected: '+0.3% MoM',
+    windows: [
+      { label: '-2h',   btc_move: -0.6 },
+      { label: '-1h',   btc_move: -1.2 },
+      { label: '-30m',  btc_move: -1.8 },
+      { label: '+1h',   btc_move: -4.1 },
+      { label: '+4h',   btc_move: -5.9 },
+      { label: '+24h',  btc_move: -8.4 },
+    ],
+    max_drawdown: -8.4,
+    iv_before: 55.4,
+    iv_after: 78.2,
+    vol_spike_pct: 41.2,
+  },
+];
+
+// ─── MÉDIAS AGREGADAS (para o gráfico de volatilidade esperada) ────────────────
+export const avgVolatilityByEvent = [
+  { event: 'CPI',  above_exp: -5.8, below_exp: 3.4, inline: -0.8, color: '#ef4444' },
+  { event: 'FOMC', above_exp: -3.2, below_exp: 2.1, inline: -1.1, color: '#a78bfa' },
+  { event: 'NFP',  above_exp: -2.4, below_exp: 1.8, inline: 0.4,  color: '#60a5fa' },
+  { event: 'PCE',  above_exp: -2.1, below_exp: 2.8, inline: -0.5, color: '#10b981' },
+  { event: 'GDP',  above_exp: -1.4, below_exp: 1.2, inline: 0.2,  color: '#f59e0b' },
+];
+
+// ─── COUNTDOWN DATA ────────────────────────────────────────────────────────────
+export function getNextTier1Event() {
+  const now = new Date();
+  return macroEvents
+    .filter(e => e.tier === 1 && new Date(e.datetime_brt) > now)
+    .sort((a, b) => new Date(a.datetime_brt) - new Date(b.datetime_brt))[0];
+}

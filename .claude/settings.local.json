@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cat /Users/mateusfolder/WorkSpaceMRP/src/api/*.js)",
+      "Bash(cat /Users/mateusfolder/WorkSpaceMRP/src/api/*.jsx)",
+      "Bash(ls -la /Users/mateusfolder/WorkSpaceMRP/.env*)",
+      "mcp__claude_ai_Base44__get_app_preview_url",
+      "Bash(npm install:*)",
+      "Bash(npm run:*)",
+      "Read(//tmp/**)",
+      "Bash(jobs)",
+      "Bash(sudo chown:*)",
+      "Bash(curl -s http://localhost:5173)",
+      "Bash(pkill -f \"vite\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5173)",
+      "Bash(gh auth:*)",
+      "Bash(git -C /Users/mateusfolder/WorkSpaceMRP status)",
+      "Bash(git init:*)",
+      "Bash(git remote:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git branch:*)"
+    ]
+  }
+}
