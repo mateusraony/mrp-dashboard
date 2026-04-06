@@ -19,7 +19,10 @@
       "Bash(git remote:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git branch:*)"
+      "Bash(git branch:*)",
+      "Bash(git -C /Users/mateusfolder/WorkSpaceMRP add -A)",
+      "Bash(git -C /Users/mateusfolder/WorkSpaceMRP commit -m \"Remove Base44, limpar autenticação e configs\")",
+      "Bash(git -C /Users/mateusfolder/WorkSpaceMRP push)"
     ]
   }
 }
