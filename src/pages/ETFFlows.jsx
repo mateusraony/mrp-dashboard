@@ -41,7 +41,7 @@ function SummaryCard({ label, value, sub, color = '#e2e8f0' }) {
   );
 }
 
-export default function ETFFlows() {
+export function ETFContent() {
   const [sortBy, setSortBy] = useState('aum');
   const d = etfFlows;
 

@@ -47,59 +47,45 @@
  *
  * The mainPage value must match a key in the PAGES object exactly.
  */
-import Alerts from './pages/Alerts';
-import Calendar from './pages/Calendar';
+// ─── Páginas ativas (após merges) ─────────────────────────────────────────────
 import Dashboard from './pages/Dashboard';
-import Derivatives from './pages/Derivatives';
+import DerivativesPage from './pages/DerivativesPage';
+import InstitutionalFlows from './pages/InstitutionalFlows';
+import Opportunities from './pages/Opportunities';
+import AutomationsPage from './pages/AutomationsPage';
 import Macro from './pages/Macro';
-import News from './pages/News';
 import OnChain from './pages/OnChain';
 import Options from './pages/Options';
 import Settings from './pages/Settings';
 import SpotFlow from './pages/SpotFlow';
-import ETFFlows from './pages/ETFFlows';
 import NewsIntelligence from './pages/NewsIntelligence';
-import Strategies from './pages/Strategies';
 import Portfolio from './pages/Portfolio';
 import SmartAlerts from './pages/SmartAlerts';
-import StablecoinFlow from './pages/StablecoinFlow';
 import MarketRegime from './pages/MarketRegime';
-import Automations from './pages/Automations';
 import PredictivePanel from './pages/PredictivePanel';
-import DerivativesAdvanced from './pages/DerivativesAdvanced';
 import ExecutiveReport from './pages/ExecutiveReport';
-import ActionDashboard from './pages/ActionDashboard';
-import BotAutomations from './pages/BotAutomations';
 import MacroCalendar from './pages/MacroCalendar';
 import MarketSentiment from './pages/MarketSentiment';
 import GlobalMarkets from './pages/GlobalMarkets';
 import __Layout from './Layout.jsx';
 
-
 export const PAGES = {
-    "Alerts": Alerts,
-    "Calendar": Calendar,
     "Dashboard": Dashboard,
-    "Derivatives": Derivatives,
+    "Derivatives": DerivativesPage,
+    "InstitutionalFlows": InstitutionalFlows,
+    "Opportunities": Opportunities,
+    "Automations": AutomationsPage,
     "Macro": Macro,
-    "News": News,
     "OnChain": OnChain,
     "Options": Options,
     "Settings": Settings,
     "SpotFlow": SpotFlow,
-    "ETFFlows": ETFFlows,
     "NewsIntelligence": NewsIntelligence,
-    "Strategies": Strategies,
     "Portfolio": Portfolio,
     "SmartAlerts": SmartAlerts,
-    "StablecoinFlow": StablecoinFlow,
     "MarketRegime": MarketRegime,
-    "Automations": Automations,
     "PredictivePanel": PredictivePanel,
-    "DerivativesAdvanced": DerivativesAdvanced,
     "ExecutiveReport": ExecutiveReport,
-    "ActionDashboard": ActionDashboard,
-    "BotAutomations": BotAutomations,
     "MacroCalendar": MacroCalendar,
     "MarketSentiment": MarketSentiment,
     "GlobalMarkets": GlobalMarkets,

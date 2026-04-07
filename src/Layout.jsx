@@ -7,53 +7,44 @@ const NAV_GROUPS = [
   {
     label: 'VISÃO GERAL',
     items: [
-      { label: 'Overview',        icon: '◈',  page: 'Dashboard',       desc: 'Risk Score · BTC · AI' },
-      { label: 'Relatório Exec.', icon: '📊', page: 'ExecutiveReport',  desc: 'Consolidado · PDF · Email' },
-      { label: 'Preditivo',       icon: '🔮', page: 'PredictivePanel',  desc: 'BTC 24h · Cenários AI' },
+      { label: 'Overview',        icon: '◈',  page: 'Dashboard',        desc: 'Risk Score · BTC · AI' },
+      { label: 'Regime',          icon: '🎯', page: 'MarketRegime',      desc: 'Risk-On · Off · Neutral' },
+      { label: 'Relatório Exec.', icon: '📊', page: 'ExecutiveReport',   desc: 'Consolidado · PDF · Email' },
     ],
   },
   {
     label: 'CRIPTO — MERCADO',
     items: [
-      { label: 'Derivatives',      icon: '⟆',  page: 'Derivatives',         desc: 'Futuros · Funding · OI' },
-      { label: 'Deriv. Avançado',  icon: '⚗️', page: 'DerivativesAdvanced',  desc: 'Liq · OI Strike · Carry' },
-      { label: 'Spot Flow',        icon: '⟴',  page: 'SpotFlow',            desc: 'CVD · Volume · Taker' },
-      { label: 'Options',          icon: '◬',  page: 'Options',             desc: 'IV · Greeks · Skew' },
-      { label: 'ETF Flows',        icon: '🏦', page: 'ETFFlows',            desc: 'IBIT · FBTC · GBTC' },
-      { label: 'Stablecoin',       icon: '💧', page: 'StablecoinFlow',      desc: 'Mint · Burn · USDT/USDC' },
+      { label: 'Preditivo BTC',    icon: '🔮', page: 'PredictivePanel',    desc: 'BTC 24h · Cenários AI' },
+      { label: 'Derivatives',      icon: '⟆',  page: 'Derivatives',        desc: 'Overview · Avançado · Liq.' },
+      { label: 'Spot Flow',        icon: '⟴',  page: 'SpotFlow',           desc: 'CVD · Volume · Taker' },
+      { label: 'Options',          icon: '◬',  page: 'Options',            desc: 'IV · Greeks · Skew' },
+      { label: 'Fluxos Instit.',   icon: '🏦', page: 'InstitutionalFlows', desc: 'ETFs · Stablecoins' },
     ],
   },
   {
-    label: 'ON-CHAIN & REGIME',
+    label: 'ON-CHAIN & MACRO',
     items: [
-      { label: 'On-Chain',    icon: '⛓',  page: 'OnChain',      desc: 'NUPL · MVRV · Whales' },
-      { label: 'Regime',      icon: '🎯', page: 'MarketRegime', desc: 'Risk-On · Off · Neutral' },
-      { label: 'Estratégias', icon: '⚡', page: 'Strategies',   desc: 'Setups · Carry · Hedges' },
-    ],
-  },
-  {
-    label: 'MACRO & GLOBAL',
-    items: [
-      { label: 'Macro Board',    icon: '⊞',  page: 'Macro',         desc: 'S&P · DXY · Yields FRED' },
-      { label: 'Mercados Glob.', icon: '🌍', page: 'GlobalMarkets',  desc: 'FX · BRL · EUR · Ouro · Juros' },
-      { label: 'Calendário',     icon: '◷',  page: 'MacroCalendar',  desc: 'CPI · FOMC · NFP · Alertas' },
+      { label: 'On-Chain',         icon: '⛓',  page: 'OnChain',       desc: 'NUPL · MVRV · Whales' },
+      { label: 'Macro Board',      icon: '⊞',  page: 'Macro',         desc: 'S&P · DXY · Yields FRED' },
+      { label: 'Mercados Glob.',   icon: '🌍', page: 'GlobalMarkets',  desc: 'FX · BRL · EUR · Ouro' },
+      { label: 'Calendário',       icon: '◷',  page: 'MacroCalendar',  desc: 'CPI · FOMC · NFP · Horários' },
     ],
   },
   {
     label: 'INTELIGÊNCIA AI',
     items: [
-      { label: 'Notícias AI',  icon: '🧠', page: 'NewsIntelligence', desc: 'Institutional · NLP Score' },
-      { label: 'Sentimento',   icon: '🌐', page: 'MarketSentiment',  desc: 'X · Reddit · Word Cloud' },
+      { label: 'Notícias',     icon: '🧠', page: 'NewsIntelligence', desc: 'AI Score · Feed · Institucional' },
+      { label: 'Sentimento',   icon: '🌐', page: 'MarketSentiment',  desc: 'X · Reddit · Word Cloud · KOLs' },
     ],
   },
   {
-    label: 'AÇÕES & AUTOMAÇÕES',
+    label: 'AUTOMAÇÕES',
     items: [
-      { label: 'Ações AI',        icon: '⚡', page: 'ActionDashboard', desc: 'Oportunidades · Performance' },
-      { label: 'Bots & Webhooks', icon: '🤖', page: 'BotAutomations',  desc: 'Telegram · Discord · Push' },
-      { label: 'Automações',      icon: '⚙️', page: 'Automations',     desc: 'Rules · Triggers · Webhook' },
-      { label: 'Smart Alerts',    icon: '🔔', page: 'SmartAlerts',     desc: 'AI · Anomalias · Config' },
-      { label: 'Alerts',          icon: '◎',  page: 'Alerts',          desc: 'Histórico de alertas' },
+      { label: 'Oportunidades', icon: '⚡', page: 'Opportunities', desc: 'Ações AI · Estratégias' },
+      { label: 'Alertas',       icon: '🔔', page: 'SmartAlerts',   desc: 'AI · Config · Ciclo' },
+      { label: 'Automações',    icon: '🤖', page: 'Automations',   desc: 'Regras · Bots · Webhooks' },
+      { label: 'Portfolio',     icon: '💼', page: 'Portfolio',     desc: 'Posições · Greeks · Stress' },
     ],
   },
   {

@@ -226,7 +226,7 @@ function PerformancePanel() {
 // ─── TABS ─────────────────────────────────────────────────────────────────────
 const TABS = ['Oportunidades', 'Performance'];
 
-export default function ActionDashboard() {
+export function ActionsContent() {
   const [tab, setTab] = useState('Oportunidades');
   const [selected, setSelected] = useState(null);
   const [typeFilter, setTypeFilter] = useState('ALL');

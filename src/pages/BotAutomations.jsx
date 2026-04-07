@@ -232,7 +232,7 @@ function AddBotModal({ onClose, onAdd }) {
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 const TABS = ['Canais', 'Regras', 'Histórico'];
 
-export default function BotAutomations() {
+export function BotsContent() {
   const [tab, setTab] = useState('Canais');
   const [rules, setRules] = useState(automationRules);
   const [bots, setBots] = useState(botConnections);

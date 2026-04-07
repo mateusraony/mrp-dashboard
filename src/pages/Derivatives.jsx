@@ -106,7 +106,7 @@ function LiquidityHeatmap({ bins }) {
   );
 }
 
-export default function Derivatives() {
+export function DerivativesOverview() {
   const f = btcFutures;
   const fundingPos = f.funding_rate > 0;
   const nextFundHours = Math.round((f.next_funding_time - Date.now()) / 3600000);
@@ -364,3 +364,5 @@ export default function Derivatives() {
     </div>
   );
 }
+// ─── Wrapper com tab Avançado ─────────────────────────────────────────────────
+// Re-export como default com tabs (Overview + Avançado)

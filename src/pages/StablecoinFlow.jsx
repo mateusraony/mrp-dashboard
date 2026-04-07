@@ -106,7 +106,7 @@ function FlowTooltip({ active, payload, label }) {
 // ─── MAIN PAGE ───────────────────────────────────────────────────────────────
 const TABS = ['Visão Geral', 'Emissões', 'Por Rede', 'Correlação'];
 
-export default function StablecoinFlow() {
+export function StablecoinContent() {
   const [tab, setTab] = useState(0);
   const [tf, setTf] = useState(30);
   const snap = stablecoinSnapshot;

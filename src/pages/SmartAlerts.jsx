@@ -3,10 +3,65 @@
 // Usuário configura prioridade e tipo de alerta — sem gestão de portfólio
 import { useState } from 'react';
 import { defaultAlertRules, alertHistory, riskDashboard, ALERT_TYPES } from '../components/data/mockDataAlerts';
-import { ModeBadge } from '../components/ui/DataBadge';
+import { recentAlerts, globalRisk } from '../components/data/mockData';
+import { ModeBadge, GradeBadge } from '../components/ui/DataBadge';
 import { liquidationClusters } from '../components/data/mockDataExtended';
 import { formatDistanceToNow } from 'date-fns';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, Cell } from 'recharts';
+
+// ─── Componentes do Ciclo de Alertas ─────────────────────────────────────────
+const cycleTypeConfig = {
+  RISK_ON:      { emoji: '🟢', color: '#10b981', bg: 'rgba(16,185,129,0.1)',  border: 'rgba(16,185,129,0.25)' },
+  RISK_OFF:     { emoji: '🔴', color: '#ef4444', bg: 'rgba(239,68,68,0.1)',   border: 'rgba(239,68,68,0.25)' },
+  SQUEEZE_WATCH:{ emoji: '⚡', color: '#f59e0b', bg: 'rgba(245,158,11,0.1)',  border: 'rgba(245,158,11,0.25)' },
+  FLUSH_RISK:   { emoji: '🌊', color: '#ef4444', bg: 'rgba(239,68,68,0.1)',   border: 'rgba(239,68,68,0.25)' },
+  MACRO_EVENT:  { emoji: '📅', color: '#60a5fa', bg: 'rgba(59,130,246,0.1)', border: 'rgba(59,130,246,0.25)' },
+  OPTIONS_VOL:  { emoji: '📊', color: '#a78bfa', bg: 'rgba(139,92,246,0.1)', border: 'rgba(139,92,246,0.25)' },
+};
+
+function AlertCycleDetail({ alert }) {
+  const c = cycleTypeConfig[alert.type] || cycleTypeConfig.MACRO_EVENT;
+  return (
+    <div style={{ background: '#111827', border: `1px solid ${c.border}`, borderRadius: 12, padding: '16px 18px', marginBottom: 12, borderLeft: `3px solid ${c.color}` }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flex: 1, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 16 }}>{c.emoji}</span>
+          <span style={{ fontSize: 14, fontWeight: 700, color: '#e2e8f0' }}>{alert.title}</span>
+        </div>
+        <div style={{ fontSize: 11, color: '#4a5568', flexShrink: 0 }}>{formatDistanceToNow(alert.created_at, { addSuffix: true })}</div>
+      </div>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+        <ModeBadge mode="mock" />
+        <GradeBadge grade={alert.grade} />
+        <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 4, background: c.bg, color: c.color, border: `1px solid ${c.border}`, fontFamily: 'JetBrains Mono, monospace', fontWeight: 600 }}>{alert.type}</span>
+        <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 4, background: '#0D1421', color: '#4a5568', border: '1px solid #1e2d45', fontFamily: 'JetBrains Mono, monospace' }}>{alert.asset}</span>
+      </div>
+      <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', marginBottom: 10, padding: '8px 12px', borderRadius: 8, background: '#0D1421', border: '1px solid #1e2d45' }}>
+        {[['SCORE', alert.score, c.color, '/100'], ['PROB', `${Math.round(alert.prob * 100)}%`, '#e2e8f0', ''], ['CONF', `${Math.round(alert.conf * 100)}%`, '#8899a6', '']].map(([label, val, color, suffix]) => (
+          <div key={label}>
+            <div style={{ fontSize: 9, color: '#2a3f5f', marginBottom: 2 }}>{label}</div>
+            <div style={{ fontSize: 18, fontWeight: 800, fontFamily: 'JetBrains Mono, monospace', color }}>{val}<span style={{ fontSize: 11, color: '#4a5568', fontWeight: 400 }}>{suffix}</span></div>
+          </div>
+        ))}
+      </div>
+      {Object.keys(alert.metrics).length > 0 && (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+          {Object.entries(alert.metrics).map(([k, v]) => (
+            <div key={k} style={{ background: '#0D1421', border: '1px solid #1e2d45', borderRadius: 6, padding: '6px 10px' }}>
+              <div style={{ fontSize: 9, color: '#2a3f5f', marginBottom: 2, textTransform: 'uppercase' }}>{k}</div>
+              <div style={{ fontSize: 13, fontFamily: 'JetBrains Mono, monospace', color: '#8899a6', fontWeight: 600 }}>{v}</div>
+            </div>
+          ))}
+        </div>
+      )}
+      <div style={{ borderTop: '1px solid #1e2d45', paddingTop: 8, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 9, fontFamily: 'JetBrains Mono, monospace', color: '#2a3f5f' }}>run: {alert.run_id}</span>
+        <span style={{ fontSize: 9, fontFamily: 'JetBrains Mono, monospace', color: '#2a3f5f' }}>cooldown: {alert.cooldown_min}min</span>
+        <span style={{ fontSize: 9, fontFamily: 'JetBrains Mono, monospace', color: '#2a3f5f', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>key: {alert.dedupe_key}</span>
+      </div>
+    </div>
+  );
+}
 
 const SPOT_PRICE = 84298.70;
 
@@ -304,6 +359,7 @@ export default function SmartAlerts() {
     { id: 'active',   label: '🔔 Ativos',           badge: activeAlerts.length },
     { id: 'config',   label: '⚙️ Configurar',       badge: rules.filter(r => r.enabled).length },
     { id: 'history',  label: '📋 Histórico',        badge: null },
+    { id: 'cycle',    label: '🔄 Ciclo',            badge: null },
   ];
 
   return (
@@ -465,6 +521,36 @@ export default function SmartAlerts() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* ── CICLO ── */}
+      {tab === 'cycle' && (
+        <div style={{ maxWidth: 1100 }}>
+          <div style={{ marginBottom: 20, background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: 16 }}>
+            <div style={{ fontSize: 11, color: '#4a5568', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.07em' }}>Tipos de Alerta</div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {Object.entries(cycleTypeConfig).map(([type, c]) => (
+                <div key={type} style={{ padding: '4px 10px', borderRadius: 6, background: c.bg, color: c.color, border: `1px solid ${c.border}`, fontSize: 11, fontFamily: 'JetBrains Mono, monospace' }}>
+                  {c.emoji} {type}
+                </div>
+              ))}
+            </div>
+          </div>
+          <div style={{ marginBottom: 20, padding: '12px 16px', background: globalRisk.regime === 'NEUTRAL' ? 'rgba(245,158,11,0.06)' : 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.15)', borderRadius: 10 }}>
+            <div style={{ fontSize: 12, color: '#60a5fa', fontWeight: 600, marginBottom: 4 }}>
+              Estado Global: {globalRisk.regime} · Score {globalRisk.score}/100 · Prob {globalRisk.prob}%
+            </div>
+            <div style={{ fontSize: 11, color: '#4a5568' }}>
+              {globalRisk.score >= 65 ? 'RISK-ON threshold não atingido' : globalRisk.score <= 35 ? '🔴 RISK-OFF threshold atingido' : 'Zona neutra — monitorando'}{' '}
+              (RISKON ≥ 65, RISKOFF ≤ 35)
+            </div>
+          </div>
+          <div style={{ fontSize: 11, color: '#4a5568', marginBottom: 12 }}>Ciclo atual · {recentAlerts.length} alertas · Deduplicados · Anti-spam cooldown</div>
+          {recentAlerts.map(a => <AlertCycleDetail key={a.id} alert={a} />)}
+          <div style={{ marginTop: 16, padding: '10px 14px', background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.12)', borderRadius: 8, fontSize: 11, color: '#4a5568' }}>
+            <strong style={{ color: '#60a5fa' }}>Deduplicação:</strong> Cada alerta tem <span style={{ fontFamily: 'JetBrains Mono, monospace', color: '#8899a6' }}>dedupe_key</span> = (tipo + ativo + bucket). Cooldown padrão 60min previne spam.
+          </div>
         </div>
       )}
     </div>

@@ -483,7 +483,7 @@ function TermStructurePanel() {
 // ─── MAIN PAGE ─────────────────────────────────────────────────────────────────
 const TABS = ['Liq. Heatmap', 'OI por Strike', 'Carry Calculator', 'Term Structure'];
 
-export default function DerivativesAdvanced() {
+export function AdvancedContent() {
   const [tab, setTab] = useState(0);
 
   return (

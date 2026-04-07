@@ -2,6 +2,7 @@
 // Notícias institucionais com AI Sentiment Score + correlação BTC + Bull-Bear Index
 import { useState, useMemo } from 'react';
 import { institutionalNews, newsSentimentAggregate, impactCategoryConfig } from '../components/data/mockDataNews';
+import { topNews } from '../components/data/mockData';
 import { optionsTakerFlow } from '../components/data/mockDataExtended';
 import { ModeBadge, GradeBadge } from '../components/ui/DataBadge';
 import { formatDistanceToNow } from 'date-fns';
@@ -220,7 +221,37 @@ function NewsDetail({ news }) {
   );
 }
 
+// ─── NewsSimpleCard (absorvido de News.jsx) ───────────────────────────────────
+function NewsSimpleCard({ news, rank }) {
+  const sc = news.sentiment > 0.1 ? '#10b981' : news.sentiment < -0.1 ? '#ef4444' : '#f59e0b';
+  const sl = news.sentiment > 0.1 ? '▲ Bullish' : news.sentiment < -0.1 ? '▼ Bearish' : '◆ Neutral';
+  return (
+    <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 10, padding: '14px 16px', marginBottom: 10, display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+      <div style={{ width: 28, height: 28, borderRadius: 6, background: rank <= 2 ? 'rgba(59,130,246,0.15)' : '#0D1421', border: `1px solid ${rank <= 2 ? 'rgba(59,130,246,0.3)' : '#1e2d45'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, flexShrink: 0, color: rank <= 2 ? '#60a5fa' : '#4a5568', fontFamily: 'JetBrains Mono, monospace' }}>{rank}</div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <a href={news.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0', lineHeight: 1.5, marginBottom: 6 }}>{news.title}</div>
+        </a>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+          <span style={{ fontSize: 10, fontFamily: 'JetBrains Mono, monospace', color: '#60a5fa', background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: 4, padding: '1px 6px' }}>{news.source}</span>
+          <span style={{ fontSize: 10, color: sc, fontWeight: 600 }}>{sl}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <div style={{ height: 4, width: 40, borderRadius: 2, background: '#1e2d45', overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${Math.round(news.relevance * 100)}%`, background: '#3b82f6', borderRadius: 2 }} />
+            </div>
+            <span style={{ fontSize: 10, color: '#4a5568' }}>{Math.round(news.relevance * 100)}% rel</span>
+          </div>
+        </div>
+        <div style={{ marginTop: 6, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+          {news.tags.map(t => <span key={t} style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: '#0D1421', color: '#4a5568', border: '1px solid #1e2d45', fontFamily: 'JetBrains Mono, monospace' }}>{t}</span>)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function NewsIntelligence() {
+  const [mainTab, setMainTab] = useState('intelligence');
   const [selectedNews, setSelectedNews] = useState(null);
   const [sourceFilter, setSourceFilter] = useState('Todos');
   const [categoryFilter, setCategoryFilter] = useState('Todos');
@@ -243,6 +274,50 @@ export default function NewsIntelligence() {
 
   return (
     <div style={{ maxWidth: 1400, margin: '0 auto' }}>
+      {/* Tab switcher principal */}
+      <div style={{ display: 'flex', gap: 2, marginBottom: 20, background: '#0d1421', padding: 4, borderRadius: 8, border: '1px solid #1a2535', width: 'fit-content' }}>
+        {[{ id: 'intelligence', label: '🧠 Inteligência AI' }, { id: 'feed', label: '📰 Feed Geral' }].map(t => (
+          <button key={t.id} onClick={() => setMainTab(t.id)} style={{ padding: '7px 18px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: mainTab === t.id ? 800 : 500, background: mainTab === t.id ? 'rgba(59,130,246,0.18)' : 'transparent', color: mainTab === t.id ? '#60a5fa' : '#475569' }}>{t.label}</button>
+        ))}
+      </div>
+
+      {/* Feed Geral (de News.jsx) */}
+      {mainTab === 'feed' && (
+        <div style={{ maxWidth: 1000 }}>
+          <div style={{ marginBottom: 16, padding: '12px 16px', background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.15)', borderRadius: 10, fontSize: 12, color: '#4a5568', lineHeight: 1.6 }}>
+            <strong style={{ color: '#60a5fa' }}>Query GDELT:</strong> <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11 }}>(Bitcoin OR crypto OR "Federal Reserve" OR CPI OR inflation)</span> · sort=hybridrel
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#60a5fa', marginBottom: 12 }}>Top 5 — Hoje</div>
+              {topNews.map((n, i) => <NewsSimpleCard key={n.title} news={n} rank={i + 1} />)}
+            </div>
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#60a5fa', marginBottom: 12 }}>Top 5 — Semana</div>
+              {[...topNews].reverse().map((n, i) => <NewsSimpleCard key={n.title + '_w'} news={n} rank={i + 1} />)}
+            </div>
+          </div>
+          <div style={{ marginTop: 20, background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: 20 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 12 }}>Resumo de Sentimento</div>
+            <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'center' }}>
+              {[{ label: 'Bullish', count: topNews.filter(n => n.sentiment > 0.1).length, color: '#10b981' }, { label: 'Neutral', count: topNews.filter(n => Math.abs(n.sentiment) <= 0.1).length, color: '#f59e0b' }, { label: 'Bearish', count: topNews.filter(n => n.sentiment < -0.1).length, color: '#ef4444' }].map(s => (
+                <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ width: 10, height: 10, borderRadius: '50%', background: s.color }} />
+                  <span style={{ fontSize: 13, color: '#8899a6' }}>{s.label}:</span>
+                  <span style={{ fontSize: 16, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', color: s.color }}>{s.count}</span>
+                </div>
+              ))}
+              <div style={{ flex: 1, textAlign: 'right', fontSize: 11, color: '#4a5568' }}>
+                Avg sentimento: {(topNews.reduce((s, n) => s + n.sentiment, 0) / topNews.length).toFixed(3)}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Inteligência AI (conteúdo original) */}
+      {mainTab === 'intelligence' && (
+      <div style={{ maxWidth: 1400, margin: '0 auto' }}>
       {/* Header */}
       <div style={{ marginBottom: 20 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
@@ -358,6 +433,8 @@ export default function NewsIntelligence() {
           <NewsDetail news={selectedNews} />
         </div>
       </div>
+    </div>
+      )}
     </div>
   );
 }

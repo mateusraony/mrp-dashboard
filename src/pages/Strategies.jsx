@@ -270,7 +270,7 @@ function StrategyDetail({ strategy }) {
   );
 }
 
-export default function Strategies() {
+export function StrategiesContent() {
   const [selectedStrategy, setSelectedStrategy] = useState(strategies[0]);
   const [filter, setFilter] = useState('Todos');
   const mc = marketConditionsSummary;

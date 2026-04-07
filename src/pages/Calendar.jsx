@@ -320,7 +320,7 @@ function MarketHoursTable() {
 }
 
 // ─── CALENDAR PAGE ────────────────────────────────────────────────────────────
-export default function Calendar() {
+export function CalendarContent() {
   const now = new Date();
   const allUpcoming = econCalendar.filter(e => e.datetime_brt >= now).sort((a, b) => a.datetime_brt - b.datetime_brt);
   const todayEvents = allUpcoming.filter(e => differenceInHours(e.datetime_brt, now) <= 24);

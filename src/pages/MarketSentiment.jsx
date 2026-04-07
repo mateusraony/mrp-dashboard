@@ -10,7 +10,7 @@ import {
 } from '../components/data/mockDataSentiment';
 import { btcFutures } from '../components/data/mockData';
 import { ModeBadge } from '../components/ui/DataBadge';
-import { base44 } from '@/api/base44Client';
+// base44 removed
 
 // ─── Word Cloud Component ─────────────────────────────────────────────────────
 function WordCloud({ words }) {
@@ -118,22 +118,12 @@ export default function MarketSentiment() {
   const s = socialSentiment;
 
   const generateAIAnalysis = async () => {
+    // TODO: integrar com API real de AI (OpenAI/Claude) quando dados reais forem conectados
     setIsGenerating(true);
-    const result = await base44.integrations.Core.InvokeLLM({
-      prompt: `Analise o sentimento de mercado de criptomoedas com base nos seguintes dados:
-      - Social Fear/Greed Score: ${s.score}/100 (${s.classification})
-      - Score 24h atrás: ${s.prev_24h} (delta: ${s.delta_24h > 0 ? '+' : ''}${s.delta_24h})
-      - Twitter/X: ${s.sources.twitter_x.score} score, ${s.sources.twitter_x.bullish_pct}% bullish, ${s.sources.twitter_x.posts_24h.toLocaleString()} posts
-      - BTC preço atual: $${btcFutures.mark_price.toLocaleString()}
-      - Correlação social-preço: ${socialCorrelation.sentiment_vs_price_24h} (lag de ${socialCorrelation.lag_hours_optimal}h)
-      - Palavras mais mencionadas: Bitcoin, ETF, FOMC, Bull, Halving, Inflation, BlackRock
-      - Top trending: #Bitcoin (+18.4%), #FOMC (+84.2%), Halving (+42.1%)
-      
-      Forneça: 1) Análise do sentimento atual, 2) O que as redes sociais estão sinalizando, 3) Possível impacto no preço nas próximas 4-24h, 4) Recomendação de posicionamento.
-      Seja conciso e direto. Máximo 200 palavras em português.`,
-    });
-    setAiAnalysis(result);
-    setIsGenerating(false);
+    setTimeout(() => {
+      setAiAnalysis('Análise AI disponível após conexão com APIs reais. Configure VITE_AI_API_KEY para ativar.');
+      setIsGenerating(false);
+    }, 800);
   };
 
   return (
@@ -276,13 +266,21 @@ export default function MarketSentiment() {
             <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>☁️ Nuvem de Palavras Detalhada</div>
             <div style={{ fontSize: 9, color: '#334155', marginBottom: 10 }}>Hover para ver detalhes · Cores = sentimento</div>
             <WordCloud words={wordCloudData} />
-            <div style={{ marginTop: 12, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
-              {wordCloudData.slice(0, 6).map((w, i) => (
-                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 8px', background: '#0d1421', borderRadius: 5, border: '1px solid #0f1d2e' }}>
-                  <span style={{ fontSize: 9, color: w.color, fontWeight: 700 }}>{w.text}</span>
-                  <span style={{ fontSize: 8, color: '#334155', fontFamily: 'JetBrains Mono, monospace' }}>{w.value.toLocaleString()}</span>
-                </div>
-              ))}
+            <div style={{ marginTop: 12 }}>
+              <div style={{ fontSize: 10, color: '#334155', marginBottom: 6 }}>Top 15 por Menções</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                {wordCloudData.slice(0, 15).map((w, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', background: '#0d1421', borderRadius: 5, border: '1px solid #0f1d2e' }}>
+                    <span style={{ fontSize: 9, color: '#334155', width: 16, textAlign: 'right', fontFamily: 'JetBrains Mono, monospace' }}>#{i+1}</span>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: w.color, flex: 1 }}>{w.text}</span>
+                    <div style={{ flex: 2, height: 3, borderRadius: 2, background: '#1a2535' }}>
+                      <div style={{ height: '100%', borderRadius: 2, width: `${(w.value / wordCloudData[0].value) * 100}%`, background: w.color, opacity: 0.7 }} />
+                    </div>
+                    <span style={{ fontSize: 9, color: '#64748b', fontFamily: 'JetBrains Mono, monospace', width: 55, textAlign: 'right' }}>{w.value.toLocaleString()}</span>
+                    <span style={{ fontSize: 9, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', color: w.sentiment >= 0 ? '#10b981' : '#ef4444', width: 40, textAlign: 'right' }}>{w.sentiment >= 0 ? '+' : ''}{w.sentiment.toFixed(2)}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
