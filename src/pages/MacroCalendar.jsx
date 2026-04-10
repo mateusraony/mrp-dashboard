@@ -9,7 +9,7 @@ import { ModeBadge } from '../components/ui/DataBadge';
 import GoldenRule from '../components/ui/GoldenRule';
 import { format, differenceInHours, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { base44 } from '@/api/base44Client';
+import { sendNotificationEmail } from '@/lib/notificationClient';
 
 const AGENCY_COLOR = {
   BLS: '#3b82f6', Fed: '#a78bfa', BEA: '#10b981', ISM: '#f59e0b', default: '#64748b',
@@ -230,7 +230,7 @@ export default function MacroCalendar() {
 
   const sendTestAlert = async (event) => {
     showToast(`Enviando alerta de teste: ${event.title}...`, '#60a5fa');
-    await base44.integrations.Core.SendEmail({
+    await sendNotificationEmail({
       to: 'alerts@cryptowatch.io',
       subject: `🚨 [TESTE] Evento Macro em ${event.alert_minutes_before}min: ${event.title}`,
       body: `ALERTA MACRO — TESTE\n\nEvento: ${event.title}\nAgência: ${event.agency} · TIER-${event.tier}\nData: ${format(new Date(event.datetime_brt), "dd/MM/yyyy HH:mm")} BRT\nEsperado: ${event.expected}\nAnterior: ${event.previous}\n\nImpacto histórico médio BTC: ${event.btc_impact_hist_avg > 0 ? '+' : ''}${event.btc_impact_hist_avg}%\n\n— CryptoWatch Macro Calendar`,

@@ -10,7 +10,7 @@ import {
 } from '../components/data/mockDataSentiment';
 import { btcFutures } from '../components/data/mockData';
 import { ModeBadge } from '../components/ui/DataBadge';
-// base44 removed
+// Legacy provider removed
 
 // ─── Word Cloud Component ─────────────────────────────────────────────────────
 function WordCloud({ words }) {

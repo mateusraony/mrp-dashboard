@@ -6,7 +6,7 @@ import { automationRules, botConnections, recentBotMessages } from '../component
 import { globalRisk, fearGreed, btcFutures, stablecoinSupply } from '../components/data/mockData';
 import { marketRegime } from '../components/data/mockDataRegime';
 import { ModeBadge } from '../components/ui/DataBadge';
-import { base44 } from '@/api/base44Client';
+import { sendNotificationEmail } from '@/lib/notificationClient';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const PRIORITY_STYLE = {
@@ -252,7 +252,7 @@ export function BotsContent() {
   const testBot = async (bot) => {
     showToast(`Enviando teste para ${bot.name}...`, '#60a5fa');
     try {
-      await base44.integrations.Core.SendEmail({
+      await sendNotificationEmail({
         to: 'test@cryptowatch.io',
         subject: `[TESTE] CryptoWatch — ${bot.name}`,
         body: `Teste de conexão para o canal: ${bot.name}\nTipo: ${bot.type}\n\nRegime: ${globalRisk.regime} | Score: ${globalRisk.score}/100\nFunding: ${(btcFutures.funding_rate * 100).toFixed(4)}% | F&G: ${fearGreed.value}\n\n— CryptoWatch Bot`,
@@ -272,7 +272,7 @@ export function BotsContent() {
         .replace('{{rate}}', (btcFutures.funding_rate * 100).toFixed(4))
         .replace('{{ann}}', (btcFutures.funding_rate * 3 * 365 * 100).toFixed(1))
         .replace('{{signal}}', 'bullish');
-      await base44.integrations.Core.SendEmail({
+      await sendNotificationEmail({
         to: 'alerts@cryptowatch.io',
         subject: `[TESTE REGRA] ${rule.name} — CryptoWatch`,
         body: msg,
