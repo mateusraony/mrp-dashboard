@@ -18,7 +18,7 @@ import {
 import { liquidationClusters, futuresBasis, etfFlows, ivRank, termStructure, lthSthSupply, oiRatio } from '../components/data/mockDataExtended';
 import AIInsightPanel from '../components/ai/AIInsightPanel';
 import { ModeBadge } from '../components/ui/DataBadge';
-import { base44 } from '@/api/base44Client';
+import { sendNotificationEmail } from '@/lib/notificationClient';
 
 const TODAY = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
 
@@ -687,7 +687,7 @@ function EmailScheduler({ onClose }) {
   const handleSend = async () => {
     if (!email) return;
     setSending(true);
-    await base44.integrations.Core.SendEmail({
+    await sendNotificationEmail({
       to: email,
       subject: `📊 Relatório Executivo CryptoWatch — ${new Date().toLocaleDateString('pt-BR')}`,
       body: `
