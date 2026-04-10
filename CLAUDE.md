@@ -135,3 +135,16 @@ git add -A && git commit -m "..." && git push
 
 ## 📋 CHECKPOINT
 Ver `CHECKPOINT.md` na raiz para estado atual e próximos passos.
+
+---
+
+## 🧠 MEMÓRIA VIVA — PROTOCOLO FASE 1 (2026-04-10)
+
+### Instrução fixa do usuário (copiada literalmente)
+"siga exatamente sempre o que te instrui no começo do programa NUNCA SAIA DO QUE ESTA LA E FAÇA EXATAMENTE O QUE TE PEDIR, se tiver duvida ou coisa do tipo me pergunte e de a melhor opção."
+
+### Status de execução atual
+- Fase ativa: **FASE 1 — Análise profunda e diagnóstico**.
+- Sem API real nesta fase.
+- Mocks permanecem válidos nesta etapa.
+- Cálculos só entram no sistema principal após validação isolada em Python.
