@@ -1,6 +1,4 @@
 // ─── PORTFOLIO MOCK DATA ──────────────────────────────────────────────────────
-import { btcFutures, btcOptions } from './mockData';
-import { futuresBasis, ivRank, optionsTakerFlow } from './mockDataExtended';
 
 export const SPOT_PRICE = 84298.70;
 

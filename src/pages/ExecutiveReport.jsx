@@ -3,19 +3,18 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import {
-  AreaChart, Area, BarChart, Bar, RadarChart, Radar, PolarGrid, PolarAngleAxis,
-  LineChart, Line, ComposedChart, ResponsiveContainer, XAxis, YAxis, Tooltip,
-  CartesianGrid, Cell, ReferenceLine, PieChart, Pie, Legend,
+  AreaChart, Area, BarChart, Bar, RadarChart, Radar, PolarGrid, PolarAngleAxis, Line, ComposedChart, ResponsiveContainer, XAxis, YAxis, Tooltip,
+  CartesianGrid, Cell, ReferenceLine,
 } from 'recharts';
 import { dailyMintBurn, stablecoinSnapshot, stablecoinAnomalies, supplyByChain } from '../components/data/mockDataStablecoin';
 import { marketRegime } from '../components/data/mockDataRegime';
 import {
   btcFutures, fearGreed, globalRisk, macroBoard, stablecoinSupply,
   btcNUPL, btcSOPR, btcRealizedMetrics, btcExchangeNetflow, btcWhaleActivity,
-  btcCorrelations, btcOptions, btcOptionsExtended, oiByExchange,
+  btcCorrelations, btcOptions, btcOptionsExtended,
   liquidations24h, btcDominance, creditSpread, yieldCurveSpread,
 } from '../components/data/mockData';
-import { liquidationClusters, futuresBasis, etfFlows, ivRank, termStructure, lthSthSupply, oiRatio } from '../components/data/mockDataExtended';
+import { liquidationClusters, futuresBasis, etfFlows, lthSthSupply, oiRatio } from '../components/data/mockDataExtended';
 import AIInsightPanel from '../components/ai/AIInsightPanel';
 import { ModeBadge } from '../components/ui/DataBadge';
 import { sendNotificationEmail } from '@/lib/notificationClient';

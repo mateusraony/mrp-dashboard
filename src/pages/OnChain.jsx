@@ -1,7 +1,6 @@
 // ─── ON-CHAIN AVANÇADO ────────────────────────────────────────────────────────
 // NUPL · SOPR · Exchange Netflow · Whale Activity · Realized Price / MVRV
 // Hash Rate · Dificuldade · Mempool
-import { useState } from 'react';
 import {
   btcNUPL, btcSOPR, btcExchangeNetflow, btcWhaleActivity,
   btcRealizedMetrics, btcHashRate, onChain, fmtNum,
@@ -11,8 +10,8 @@ import { ModeBadge, GradeBadge } from '../components/ui/DataBadge';
 import { HelpIcon } from '../components/ui/Tooltip';
 import LthSthCard from '../components/onchain/LthSthCard';
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, ReferenceLine, Cell,
+  BarChart, Bar, XAxis, YAxis, Tooltip,
+  ResponsiveContainer,
 } from 'recharts';
 
 // ─── GLOSSÁRIO ────────────────────────────────────────────────────────────────

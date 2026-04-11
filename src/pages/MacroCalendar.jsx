@@ -1,7 +1,7 @@
 // ─── CALENDÁRIO MACRO — CPI · FOMC · NFP · Volatilidade Histórica · Alertas ──
 import { useState } from 'react';
 import {
-  ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip,
+  ComposedChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, Cell, BarChart, Legend,
 } from 'recharts';
 import { macroEvents, eventVolatilityData, avgVolatilityByEvent, getNextTier1Event } from '../components/data/mockDataMacroCalendar';
@@ -141,7 +141,7 @@ function VolatilityChart({ selectedEvent }) {
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(30,45,69,0.4)" vertical={false} />
           <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#475569' }} axisLine={false} tickLine={false} />
           <YAxis tick={{ fontSize: 9, fill: '#475569' }} axisLine={false} tickLine={false} tickFormatter={v => `${v}%`} />
-          <Tooltip contentStyle={{ background: '#0d1421', border: '1px solid #1a2535', fontSize: 10, borderRadius: 6 }} formatter={v => [`${v > 0 ? '+' : ''}${v.toFixed(2)}%`, 'BTC Move']} />
+          <Tooltip contentStyle={{ background: '#0d1421', border: '1px solid #1a2535', fontSize: 10, borderRadius: 6 }} formatter={v => { const n = Number(v); return [`${n > 0 ? '+' : ''}${n.toFixed(2)}%`, 'BTC Move']; }} />
           <ReferenceLine y={0} stroke="#1e2d45" />
           <Bar dataKey="btc_move" radius={[3, 3, 0, 0]} name="BTC Move">
             {selectedEvent.windows.map((w, i) => (
@@ -166,7 +166,7 @@ function AvgVolatilityChart() {
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(30,45,69,0.4)" vertical={false} />
           <XAxis dataKey="event" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
           <YAxis tick={{ fontSize: 9, fill: '#475569' }} axisLine={false} tickLine={false} tickFormatter={v => `${v}%`} />
-          <Tooltip contentStyle={{ background: '#0d1421', border: '1px solid #1a2535', fontSize: 10, borderRadius: 6 }} formatter={(v, n) => [`${v > 0 ? '+' : ''}${v}%`, n === 'above_exp' ? '▲ Acima Exp.' : n === 'below_exp' ? '▼ Abaixo Exp.' : '= Conforme']} />
+          <Tooltip contentStyle={{ background: '#0d1421', border: '1px solid #1a2535', fontSize: 10, borderRadius: 6 }} formatter={(v, n) => { const n2 = Number(v); return [`${n2 > 0 ? '+' : ''}${n2}%`, n === 'above_exp' ? '▲ Acima Exp.' : n === 'below_exp' ? '▼ Abaixo Exp.' : '= Conforme']; }} />
           <Legend wrapperStyle={{ fontSize: 9, color: '#475569' }} formatter={v => v === 'above_exp' ? '▲ Acima' : v === 'below_exp' ? '▼ Abaixo' : '= Conforme'} />
           <ReferenceLine y={0} stroke="#1e2d45" />
           <Bar dataKey="above_exp" fill="#ef4444" fillOpacity={0.8} radius={[2, 2, 0, 0]} />
@@ -211,7 +211,7 @@ function AlertPanel({ events, onToggleAlert, onSendTestAlert }) {
 }
 
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
-const TABS = ['Agenda', 'Volatilidade', 'Alertas'];
+const TABS = ['Agenda', 'Surpresa', 'Volatilidade', 'Alertas'];
 
 export default function MacroCalendar() {
   const [tab, setTab] = useState('Agenda');
@@ -307,6 +307,92 @@ export default function MacroCalendar() {
               <AvgVolatilityChart />
             </div>
             <GoldenRule compact />
+          </div>
+        </div>
+      )}
+
+      {/* TAB: Surpresa */}
+      {tab === 'Surpresa' && (
+        <div>
+          <div style={{ marginBottom: 14, padding: '10px 14px', background: 'rgba(96,165,250,0.05)', border: '1px solid rgba(96,165,250,0.15)', borderRadius: 8, fontSize: 11, color: '#475569' }}>
+            <strong style={{ color: '#60a5fa' }}>Surprise Layer:</strong>{' '}
+            Compara o resultado real (actual) vs a expectativa de consenso. A magnitude da surpresa é o motor principal da reação do BTC.
+          </div>
+
+          {/* Summary grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 16 }}>
+            {[
+              { label: 'Acima do Esperado', count: eventVolatilityData.filter(e => e.result_vs_expected === 'above').length, color: '#ef4444', icon: '▲', desc: 'Inflação/jobs > consenso → hawkish → BTC ↓' },
+              { label: 'Abaixo do Esperado', count: eventVolatilityData.filter(e => e.result_vs_expected === 'below').length, color: '#10b981', icon: '▼', desc: 'Dados fracos → dovish → BTC ↑' },
+              { label: 'Conforme Esperado',  count: eventVolatilityData.filter(e => e.result_vs_expected === 'inline').length, color: '#f59e0b', icon: '=', desc: 'Sem surpresa → vol cai · sell-the-news' },
+            ].map(s => (
+              <div key={s.label} style={{ background: '#111827', border: `1px solid ${s.color}20`, borderRadius: 10, padding: '14px 16px', borderLeft: `3px solid ${s.color}` }}>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+                  <span style={{ fontSize: 16, color: s.color, fontWeight: 900 }}>{s.icon}</span>
+                  <div style={{ fontSize: 9, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 700 }}>{s.label}</div>
+                </div>
+                <div style={{ fontSize: 32, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: s.color, lineHeight: 1 }}>{s.count}</div>
+                <div style={{ fontSize: 9, color: '#334155', marginTop: 6, lineHeight: 1.5 }}>{s.desc}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Surpresa table */}
+          <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, overflow: 'hidden', marginBottom: 16 }}>
+            <div style={{ padding: '12px 18px', borderBottom: '1px solid #1e2d45', fontSize: 12, fontWeight: 700, color: '#e2e8f0' }}>
+              Histórico de Surpresas — Actual vs Consenso vs Reação BTC
+            </div>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid #1e2d45' }}>
+                  {['Evento', 'Data', 'Esperado', 'Atual', 'Surpresa', 'BTC +1h', 'BTC +24h', 'IV Spike'].map((h, i) => (
+                    <th key={i} style={{ padding: '10px 14px', textAlign: i <= 1 ? 'left' : 'right', fontSize: 9, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 700, whiteSpace: 'nowrap' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {eventVolatilityData.map((ev, i) => {
+                  const rc = RESULT_COLOR[ev.result_vs_expected];
+                  const rl = RESULT_LABEL[ev.result_vs_expected];
+                  const move1h = ev.windows.find(w => w.label === '+1h')?.btc_move ?? 0;
+                  const move24h = ev.windows.find(w => w.label === '+24h')?.btc_move ?? 0;
+                  return (
+                    <tr key={i} style={{ borderBottom: '1px solid rgba(30,45,69,0.4)', transition: 'background 0.12s' }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'rgba(59,130,246,0.04)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                    >
+                      <td style={{ padding: '10px 14px', fontWeight: 700, color: '#e2e8f0' }}>{ev.event}</td>
+                      <td style={{ padding: '10px 14px', fontFamily: 'JetBrains Mono, monospace', color: '#64748b', fontSize: 10 }}>{ev.date}</td>
+                      <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'JetBrains Mono, monospace', color: '#94a3b8' }}>{ev.expected}</td>
+                      <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'JetBrains Mono, monospace', fontWeight: 700, color: rc }}>{ev.actual}</td>
+                      <td style={{ padding: '10px 14px', textAlign: 'right' }}>
+                        <span style={{ fontSize: 9, padding: '2px 7px', borderRadius: 4, background: `${rc}10`, color: rc, border: `1px solid ${rc}25`, fontWeight: 700 }}>
+                          {rl}
+                        </span>
+                      </td>
+                      <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'JetBrains Mono, monospace', fontWeight: 700, color: move1h >= 0 ? '#10b981' : '#ef4444' }}>
+                        {move1h >= 0 ? '+' : ''}{move1h.toFixed(1)}%
+                      </td>
+                      <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'JetBrains Mono, monospace', color: move24h >= 0 ? '#10b981' : '#ef4444' }}>
+                        {move24h >= 0 ? '+' : ''}{move24h.toFixed(1)}%
+                      </td>
+                      <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'JetBrains Mono, monospace', color: ev.vol_spike_pct > 0 ? '#ef4444' : '#10b981' }}>
+                        {ev.vol_spike_pct > 0 ? '+' : ''}{ev.vol_spike_pct.toFixed(1)}%
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Insight */}
+          <div style={{ background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.2)', borderRadius: 10, padding: '14px 16px', fontSize: 11, color: '#64748b', lineHeight: 1.8 }}>
+            <div style={{ fontWeight: 700, color: '#60a5fa', marginBottom: 6 }}>Regra Empírica — Macro Surpresa</div>
+            <div>• <strong style={{ color: '#ef4444' }}>Acima exp. (CPI/NFP quentes):</strong> BTC cai −3% a −6% em média nas 4h seguintes. IV sobe &gt;15%.</div>
+            <div>• <strong style={{ color: '#10b981' }}>Abaixo exp. (dados fracos):</strong> BTC sobe +2% a +5% em 24h. IV comprime.</div>
+            <div>• <strong style={{ color: '#f59e0b' }}>Inline/conforme:</strong> Reação mínima. IV cai (sell volatility pré-evento).</div>
+            <div style={{ marginTop: 6, fontSize: 9, color: '#334155' }}>⚠ N=5 eventos. Horizonte curto. Não usar isoladamente para decisões.</div>
           </div>
         </div>
       )}

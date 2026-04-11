@@ -7,7 +7,7 @@ import { ModeBadge, GradeBadge } from '../components/ui/DataBadge';
 import MiniTimeChart from '../components/dashboard/MiniTimeChart';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  ReferenceLine, Cell, Legend,
+  ReferenceLine, Legend,
 } from 'recharts';
 
 function SeriesCard({ s }) {
@@ -87,7 +87,7 @@ export default function Macro() {
     name: s.id,
     d1:  s.format === 'yield' ? parseFloat(s.delta_1d_bp.toFixed(1))   : parseFloat((s.delta_1d * 100).toFixed(2)),
     d1w: s.format === 'yield' ? parseFloat(s.delta_7d_bp.toFixed(1))   : parseFloat((s.delta_7d * 100).toFixed(2)),
-    d1m: s.format === 'yield' ? parseFloat(s.delta_30d_bp !== undefined ? s.delta_30d_bp.toFixed(1) : 0) : parseFloat((s.delta_30d !== undefined ? s.delta_30d * 100 : 0).toFixed(2)),
+    d1m: s.format === 'yield' ? parseFloat(s.delta_30d_bp !== undefined ? s.delta_30d_bp.toFixed(1) : '0') : parseFloat((s.delta_30d !== undefined ? s.delta_30d * 100 : 0).toFixed(2)),
     label: s.format === 'yield' ? 'bp' : '%',
   }));
 
@@ -161,7 +161,7 @@ export default function Macro() {
             <YAxis tick={{ fontSize: 9, fill: '#4a5568' }} tickLine={false} />
             <Tooltip
               contentStyle={{ background: '#111827', border: '1px solid #2a3f5f', borderRadius: 6, fontSize: 11 }}
-              formatter={(v, n, p) => [`${v > 0 ? '+' : ''}${v} ${p.payload.label}`, n === 'd1' ? 'Δ 1D' : n === 'd1w' ? 'Δ 1W' : 'Δ 1M']}
+              formatter={(v, n, p) => { const n2 = Number(v); return [`${n2 > 0 ? '+' : ''}${n2} ${p.payload.label}`, n === 'd1' ? 'Δ 1D' : n === 'd1w' ? 'Δ 1W' : 'Δ 1M']; }}
             />
             <Legend formatter={v => v === 'd1' ? 'Δ 1D' : v === 'd1w' ? 'Δ 1W' : 'Δ 1M'} wrapperStyle={{ fontSize: 10, color: '#8899a6' }} />
             <ReferenceLine y={0} stroke="#2a3f5f" />

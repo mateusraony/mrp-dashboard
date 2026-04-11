@@ -2,10 +2,9 @@
 // Setups operacionais baseados em IV Rank, Basis, Funding, Sentiment
 import { useState } from 'react';
 import { strategies, marketConditionsSummary } from '../components/data/mockDataStrategies';
-import { ModeBadge, GradeBadge } from '../components/ui/DataBadge';
+import { ModeBadge } from '../components/ui/DataBadge';
 import {
-  LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  BarChart, Bar, Cell, ReferenceLine,
+  LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine,
 } from 'recharts';
 
 const STATUS_CONFIG = {

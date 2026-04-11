@@ -365,7 +365,7 @@ export default function NewsIntelligence() {
             <YAxis tick={{ fontSize: 9, fill: '#475569' }} tickLine={false} domain={[-1, 1]} tickFormatter={v => v.toFixed(1)} />
             <Tooltip
               contentStyle={{ background: '#0d1421', border: '1px solid #2a3f5f', borderRadius: 6, fontSize: 11 }}
-              formatter={(v) => [v.toFixed(2), 'Score']}
+              formatter={(v) => [Number(v).toFixed(2), 'Score']}
             />
             <ReferenceLine y={0} stroke="#2a3f5f" />
             <Bar dataKey="score" radius={[3, 3, 0, 0]}>

@@ -206,5 +206,5 @@ export function getNextTier1Event() {
   const now = new Date();
   return macroEvents
     .filter(e => e.tier === 1 && new Date(e.datetime_brt) > now)
-    .sort((a, b) => new Date(a.datetime_brt) - new Date(b.datetime_brt))[0];
+    .sort((a, b) => new Date(a.datetime_brt).getTime() - new Date(b.datetime_brt).getTime())[0];
 }

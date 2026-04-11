@@ -5,9 +5,7 @@ import { useState } from 'react';
 import { defaultAlertRules, alertHistory, riskDashboard, ALERT_TYPES } from '../components/data/mockDataAlerts';
 import { recentAlerts, globalRisk } from '../components/data/mockData';
 import { ModeBadge, GradeBadge } from '../components/ui/DataBadge';
-import { liquidationClusters } from '../components/data/mockDataExtended';
 import { formatDistanceToNow } from 'date-fns';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, Cell } from 'recharts';
 
 // ─── Componentes do Ciclo de Alertas ─────────────────────────────────────────
 const cycleTypeConfig = {

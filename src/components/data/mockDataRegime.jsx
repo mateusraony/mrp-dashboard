@@ -2,7 +2,7 @@
 // Classifica o regime de mercado: Risk-On / Risk-Off / Neutral
 // Baseado em: Yield Curve (US10Y-US2Y), DXY trend, VIX, Funding, NUPL, Correlações
 
-import { macroBoard, btcFutures, btcNUPL, globalRisk } from './mockData';
+import { macroBoard, btcFutures, btcNUPL } from './mockData';
 
 // ─── COMPONENTES DO REGIME ────────────────────────────────────────────────────
 const us10y = macroBoard.series.find(s => s.id === 'US10Y');

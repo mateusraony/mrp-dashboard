@@ -4,9 +4,8 @@ import {
   scenarios24h, breakoutTable, institutionalPressure, pricePaths,
 } from '../components/data/mockDataPredictive';
 import { ModeBadge } from '../components/ui/DataBadge';
-import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, ReferenceLine, ComposedChart, Bar, Line, Legend,
+import { Area, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, ReferenceLine, ComposedChart, Line,
 } from 'recharts';
 
 const SPOT = 84298.70;

@@ -10,7 +10,6 @@ import {
   tradeOpportunities, performanceHistory, performanceStats, pnlChartData,
 } from '../components/data/mockDataActionDashboard';
 import { globalRisk, fearGreed, btcFutures } from '../components/data/mockData';
-import { marketRegime } from '../components/data/mockDataRegime';
 import AIInsightPanel from '../components/ai/AIInsightPanel';
 import { ModeBadge } from '../components/ui/DataBadge';
 
@@ -166,7 +165,7 @@ function PerformancePanel() {
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(30,45,69,0.4)" vertical={false} />
             <XAxis dataKey="date" tick={{ fontSize: 8, fill: '#334155' }} axisLine={false} tickLine={false} />
             <YAxis tick={{ fontSize: 8, fill: '#334155' }} axisLine={false} tickLine={false} />
-            <Tooltip contentStyle={{ background: '#0d1421', border: '1px solid #1a2535', fontSize: 9, borderRadius: 6 }} formatter={v => [`${v.toFixed(2)}%`, 'Cumul.']} />
+            <Tooltip contentStyle={{ background: '#0d1421', border: '1px solid #1a2535', fontSize: 9, borderRadius: 6 }} formatter={v => [`${Number(v).toFixed(2)}%`, 'Cumul.']} />
             <ReferenceLine y={0} stroke="#1e2d45" />
             <Area dataKey="cumulative" stroke="#10b981" fill="url(#pnlGrad)" strokeWidth={2} dot={false} />
           </AreaChart>
@@ -179,7 +178,7 @@ function PerformancePanel() {
         <ResponsiveContainer width="100%" height={80}>
           <BarChart data={pnlChartData} margin={{ top: 0, right: 4, left: -24, bottom: 0 }}>
             <XAxis dataKey="date" tick={{ fontSize: 8, fill: '#334155' }} axisLine={false} tickLine={false} />
-            <Tooltip contentStyle={{ background: '#0d1421', border: '1px solid #1a2535', fontSize: 9, borderRadius: 6 }} formatter={v => [`${v > 0 ? '+' : ''}${v.toFixed(2)}%`, 'P&L']} />
+            <Tooltip contentStyle={{ background: '#0d1421', border: '1px solid #1a2535', fontSize: 9, borderRadius: 6 }} formatter={v => { const n = Number(v); return [`${n > 0 ? '+' : ''}${n.toFixed(2)}%`, 'P&L']; }} />
             <ReferenceLine y={0} stroke="#1e2d45" />
             <Bar dataKey="pnl" radius={[3, 3, 0, 0]}>
               {pnlChartData.map((e, i) => <Cell key={i} fill={e.pnl >= 0 ? '#10b981' : '#ef4444'} fillOpacity={0.8} />)}

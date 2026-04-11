@@ -2,9 +2,8 @@
 // Curva de Volatilidade Implícita ATM por prazo de vencimento
 import { termStructure } from '../../components/data/mockDataExtended';
 import { ModeBadge, GradeBadge } from '../ui/DataBadge';
-import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, ReferenceLine, Area, AreaChart,
+import { XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, Area, AreaChart,
 } from 'recharts';
 
 const structureLabels = {
@@ -15,7 +14,7 @@ const structureLabels = {
   hump: { label: 'Hump', color: '#a78bfa', desc: 'Pico no médio prazo — evento específico precificado' },
 };
 
-function CustomTooltip({ active, payload, label }) {
+function CustomTooltip({ active = false, payload = [], label = '' }) {
   if (!active || !payload?.length) return null;
   const d = payload[0].payload;
   return (

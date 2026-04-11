@@ -2,7 +2,7 @@
 // Exibe: Regime atual · Probabilidade · Recomendação · Raciocínio
 // Preparado para integração futura com Supabase (campo module_id + snapshot)
 
-export default function AIInsightPanel({ moduleId, title, probability, regime, recommendation, reasoning, actions = [], compact = false }) {
+export default function AIInsightPanel({ moduleId, title = '', probability, regime, recommendation, reasoning, actions = [], compact = false }) {
   const regimeMap = {
     bullish:      { label: '▲ BULLISH',       color: '#10b981', bg: 'rgba(16,185,129,0.08)',  border: 'rgba(16,185,129,0.2)' },
     bearish:      { label: '▼ BEARISH',       color: '#ef4444', bg: 'rgba(239,68,68,0.08)',   border: 'rgba(239,68,68,0.2)' },

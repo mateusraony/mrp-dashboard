@@ -2,8 +2,8 @@
 // BTC Price Projection 24h · Breakout Probability · Institutional Pressure
 
 import { btcFutures, btcCorrelations, macroBoard } from './mockData';
-import { stablecoinSnapshot, mintVsBtcCorr } from './mockDataStablecoin';
-import { etfFlows, liquidationClusters } from './mockDataExtended';
+import { stablecoinSnapshot } from './mockDataStablecoin';
+import { etfFlows } from './mockDataExtended';
 import { marketRegime } from './mockDataRegime';
 
 const SPOT = 84298.70;

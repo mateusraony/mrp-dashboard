@@ -2,7 +2,6 @@
 // Spot-Futures basis annualized, carry trade signal, CME premium
 import { futuresBasis, fundingByExchange } from '../../components/data/mockDataExtended';
 import { ModeBadge, GradeBadge } from '../ui/DataBadge';
-import MiniTimeChart from '../dashboard/MiniTimeChart';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, Cell,
@@ -106,7 +105,7 @@ export default function BasisPanel() {
             <YAxis tick={{ fontSize: 9, fill: '#475569' }} tickLine={false} tickFormatter={v => v.toFixed(4) + '%'} />
             <Tooltip
               contentStyle={{ background: '#0d1421', border: '1px solid #2a3f5f', borderRadius: 6, fontSize: 11 }}
-              formatter={(v) => [(v * 100).toFixed(4) + '%', 'Funding 8h']}
+              formatter={(v) => [(Number(v) * 100).toFixed(4) + '%', 'Funding 8h']}
             />
             <ReferenceLine y={0.0005} stroke="#f59e0b" strokeDasharray="3 3" label={{ value: 'Ref', fill: '#f59e0b', fontSize: 8, position: 'right' }} />
             <Bar dataKey="rate" radius={[3, 3, 0, 0]}>
