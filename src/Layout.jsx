@@ -7,7 +7,7 @@ import {
   Link2, Globe, Globe2, CalendarDays,
   Newspaper, Brain,
   Zap, Bell, Bot, Briefcase,
-  Settings, ChevronLeft, ChevronRight, Menu, Bitcoin,
+  Settings, ChevronLeft, ChevronRight, Menu, Bitcoin, CandlestickChart,
 } from 'lucide-react';
 import { btcFutures } from '@/components/data/mockData';
 
@@ -28,7 +28,8 @@ const NAV_GROUPS = [
       { label: 'Derivatives',    icon: BarChart3,     page: 'Derivatives',        desc: 'Overview · Avançado · Liq.' },
       { label: 'Spot Flow',      icon: ArrowUpDown,   page: 'SpotFlow',           desc: 'CVD · Volume · Taker' },
       { label: 'Options',        icon: Sigma,         page: 'Options',            desc: 'IV · Greeks · Skew' },
-      { label: 'Fluxos Instit.', icon: Building2,     page: 'InstitutionalFlows', desc: 'ETFs · Stablecoins' },
+      { label: 'Fluxos Instit.', icon: Building2,          page: 'InstitutionalFlows', desc: 'ETFs · Stablecoins' },
+      { label: 'Altcoins',       icon: CandlestickChart,    page: 'Altcoins',           desc: 'Dominância · Alt Season · Rotação' },
     ],
   },
   {

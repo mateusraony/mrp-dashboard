@@ -1,6 +1,6 @@
 # CHECKPOINT.md — MRP Dashboard
 > Memória técnica viva do projeto. Atualizar ao final de cada bloco importante.
-> Última atualização: 2026-04-11 (Fase 1 — Análise Profunda Completa)
+> Última atualização: 2026-04-11 (Sprint 1 + Sprint 2 — Concluídos)
 
 ---
 
@@ -8,14 +8,37 @@
 
 | Aspecto | Status | Observação |
 |---------|--------|------------|
-| Build (`npm run build`) | ✅ PASSA | Bundle único 1.35MB — warning de chunk size |
-| Lint (`eslint . --quiet`) | ❌ FALHA | 17 erros em 8 arquivos (unused imports) |
-| TypeCheck (`tsc -p jsconfig.json`) | ❌ FALHA | 17+ erros em 12 arquivos |
+| Build (`npm run build`) | ✅ PASSA | 20 chunks (lazy loading por página), maior chunk 378KB (Recharts) |
+| Lint (`eslint . --quiet`) | ✅ PASSA | 0 erros — corrigidos 64 erros de unused imports |
+| TypeCheck (`tsc -p jsconfig.json`) | ✅ PASSA | 0 erros — corrigidos ~40 erros de tipo |
 | Deploy (Render) | ✅ ONLINE | https://mrp-dashboard.onrender.com |
-| Dados ao vivo | ❌ NENHUM | 100% mock data |
+| Dados ao vivo | ❌ NENHUM | 100% mock data (15 arquivos) |
 | Auth real | ❌ AUSENTE | Stub hardcoded (isAuthenticated: true) |
 | Supabase | ❌ NÃO INSTALADO | Apenas mencionado em Settings UI |
 | Serviços externos | ❌ ZERO | Nenhuma chamada HTTP/fetch real |
+
+### ─── SPRINT 1 — CONCLUÍDO (2026-04-11) ───
+| Item | Status |
+|------|--------|
+| S1.1 — Remove deps não usadas (Stripe, moment, three, leaflet, quill, confetti) | ✅ DONE |
+| S1.2 — Remover 4 arquivos órfãos mortos (Alerts, Calendar, News, SentimentSocial) | ✅ DONE |
+| S1.3 — Corrigir 64 erros de lint (unused imports) | ✅ DONE |
+| S1.4 — Corrigir ~40 erros de typecheck (Recharts, Date, props) | ✅ DONE |
+| S1.5 — Substituir emojis de nav por Lucide icons (Layout.jsx) | ✅ DONE |
+| S1.6 — BTC ticker conectado ao mock data (btcFutures.mark_price) | ✅ DONE |
+| S1.7 — Base44 favicon removido (inline SVG), app-params.js limpo | ✅ DONE |
+| S1.8 — Lazy loading por rota (React.lazy + Suspense) | ✅ DONE |
+| S1.9 — Build + lint + typecheck ✅ + commit pushed | ✅ DONE |
+
+### ─── SPRINT 2 — CONCLUÍDO (2026-04-11) ───
+| Item | Status |
+|------|--------|
+| S2.1 — Nova página Altcoins (Alt Season Index, dominância, top alts, rotação setorial) | ✅ DONE |
+| S2.2 — Portfolio Risk Pack: VaR 95%/99%, Sharpe, Max Drawdown, Beta vs BTC | ✅ DONE |
+| S2.3 — SpotFlow: análise por sessão (Ásia/Europa/EUA — CVD, volume, price move, taker%) | ✅ DONE |
+| S2.4 — MacroCalendar: nova tab "Surpresa" (actual vs consenso, histórico, insight) | ✅ DONE |
+| S2.5 — mockDataAltcoins.jsx criado (altSeasonIndex, ethDominance, topAltcoins, sectorRotation, spotSessions) | ✅ DONE |
+| S2.6 — Build + lint + typecheck ✅ + commit pushed | ✅ DONE |
 
 ---
 
@@ -150,10 +173,10 @@ src/components/data/
 - ErrorBoundary global
 - Lazy loading / code splitting
 - Variáveis de ambiente (`.env` file não encontrado)
-- Página **Altcoins** (mencionada no CLAUDE.md, nunca criada)
-- **Portfolio:** VaR, Sharpe Ratio, Max Drawdown, Beta vs BTC (apenas Greeks/stress mock)
-- **Spot Flow:** Análise por sessão (Ásia/Europa/EUA)
-- **Macro:** Surpresa vs Consenso + reação histórica estatística
+- ~~Página **Altcoins**~~ → ✅ CRIADA em Sprint 2 (Alt Season Index, dominância, top alts, rotação setorial)
+- ~~**Portfolio:** VaR, Sharpe Ratio, Max Drawdown, Beta vs BTC~~ → ✅ ADICIONADO em Sprint 2 (modelo paramétrico)
+- ~~**Spot Flow:** Análise por sessão (Ásia/Europa/EUA)~~ → ✅ ADICIONADO em Sprint 2 (CVD, volume, taker% por sessão)
+- ~~**Macro:** Surpresa vs Consenso + reação histórica~~ → ✅ ADICIONADO em Sprint 2 (tab "Surpresa" no MacroCalendar)
 - **Options:** GEX/Dealer positioning (Gamma Exposure, Max Pain dinâmico, charm/vanna)
 - **OnChain:** MVRV Z-score, Realized Cap HODL Waves, Coin Days Destroyed, Dormancy Flow
 - **Cross-venue:** Taker imbalance por exchange, funding/basis arbitrage spread
@@ -190,15 +213,17 @@ src/components/data/
 ### Pendentes de Autorização do Usuário
 
 **FASE 2 — Interface/Visual:**
-- [ ] Substituir emojis de navegação por Lucide icons (Layout.jsx)
-- [ ] Corrigir 17 erros de lint
-- [ ] Corrigir 17+ erros de typecheck
-- [ ] Implementar lazy loading nas rotas (code splitting)
-- [ ] Criar página Altcoins (nova)
-- [ ] Confirmar e limpar 12 arquivos órfãos de páginas
-- [ ] Conectar BTC ticker do topbar ao mock data (não hardcoded)
-- [ ] Remover Base44 favicon (trocar por ícone próprio)
-- [ ] Limpar `app-params.js` de params legados
+- [x] ~~Substituir emojis de navegação por Lucide icons (Layout.jsx)~~ ✅ Sprint 1
+- [x] ~~Corrigir 64 erros de lint~~ ✅ Sprint 1
+- [x] ~~Corrigir ~40 erros de typecheck~~ ✅ Sprint 1
+- [x] ~~Implementar lazy loading nas rotas (code splitting)~~ ✅ Sprint 1
+- [x] ~~Criar página Altcoins (nova)~~ ✅ Sprint 2
+- [x] ~~Confirmar e limpar 12 arquivos órfãos de páginas~~ ✅ Sprint 1 (4 removidos, 8 são usados em wrappers)
+- [x] ~~Conectar BTC ticker do topbar ao mock data (não hardcoded)~~ ✅ Sprint 1
+- [x] ~~Remover Base44 favicon (trocar por ícone próprio)~~ ✅ Sprint 1
+- [x] ~~Limpar `app-params.js` de params legados~~ ✅ Sprint 1
+- [ ] Portfolio Risk Pack visual com mock — modelo prod: Monte Carlo / histórico (Fase 4)
+- [ ] Remover deps Stripe do código (package.json limpo, código nunca usou) ✅ Sprint 1
 
 **FASE 3 — API com Mocks (estrutura):**
 - [ ] Criar `src/services/` com clients para: Binance, CoinGecko, Alternative.me, Deribit, FRED, Mempool, GDELT

@@ -4,6 +4,32 @@ import {
   defaultPositions, computePortfolioGreeks, computePositionPnL,
   stressTest, stressScenarios, SPOT_PRICE,
 } from '../components/data/mockDataPortfolio';
+
+// ─── RISK METRICS COMPUTATION ─────────────────────────────────────────────────
+// Usa aproximação paramétrica (normal). Produção: Monte Carlo ou histórico.
+function computeRiskMetrics(greeks) {
+  const BTC_DAILY_VOL = 0.042;   // ~4.2% vol diária BTC (mock)
+  const RISK_FREE_ANNUAL = 0.045; // 4.5% ao ano (T-bill)
+  const MOCK_ANNUAL_RETURN = 0.28; // 28% retorno anual simulado
+
+  // Exposição em USD ao BTC
+  const exposureUSD = Math.abs(greeks.delta_usd);
+  const portfolioUSD = greeks.total_value_usd;
+
+  // VaR paramétrico (1 dia, normal)
+  const dailyPortfolioVol = (exposureUSD / portfolioUSD) * BTC_DAILY_VOL * portfolioUSD;
+  const var95 = 1.645 * dailyPortfolioVol;
+  const var99 = 2.326 * dailyPortfolioVol;
+
+  // Sharpe anualizado
+  const annualPortfolioVol = dailyPortfolioVol * Math.sqrt(252) / portfolioUSD;
+  const sharpe = (MOCK_ANNUAL_RETURN - RISK_FREE_ANNUAL) / annualPortfolioVol;
+
+  // Beta vs BTC (razão entre delta pct e 100%)
+  const beta = greeks.delta_pct / 100;
+
+  return { var95, var99, sharpe, beta, annualVol: annualPortfolioVol * 100 };
+}
 import { ModeBadge } from '../components/ui/DataBadge';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -172,6 +198,12 @@ export default function Portfolio() {
   const [stressMove, setStressMove] = useState(null);
 
   const greeks = useMemo(() => computePortfolioGreeks(positions), [positions]);
+  const riskMetrics = useMemo(() => computeRiskMetrics(greeks), [greeks]);
+
+  const maxDrawdownUSD = useMemo(() => {
+    const stressVals = stressScenarios.map(s => stressTest(positions.filter(p => p.type !== 'cash'), s.pct));
+    return Math.min(...stressVals);
+  }, [positions]);
 
   const pnlData = useMemo(() => {
     return positions
@@ -256,6 +288,67 @@ export default function Portfolio() {
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, fontSize: 9, color: '#334155' }}>
           <span>−50% Short</span><span>Neutro 0%</span><span>+50% Long</span>
+        </div>
+      </div>
+
+      {/* ─── RISK PACK ─────────────────────────────────────────────────────── */}
+      <div style={{ background: 'linear-gradient(135deg, #0f1c2e 0%, #111827 100%)', border: '1px solid rgba(239,68,68,0.15)', borderRadius: 12, padding: '16px 18px', marginBottom: 16 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#e2e8f0', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 9, color: '#ef4444', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 4, padding: '2px 7px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em' }}>Risk Pack</span>
+          VaR · Sharpe · Drawdown · Beta
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10 }}>
+          {/* VaR 95% */}
+          <div style={{ background: '#0d1421', border: '1px solid rgba(239,68,68,0.15)', borderRadius: 10, padding: '12px 14px', borderLeft: '3px solid rgba(239,68,68,0.4)' }}>
+            <div style={{ fontSize: 9, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, marginBottom: 6 }}>VaR 95% (1 dia)</div>
+            <div style={{ fontSize: 20, fontWeight: 800, fontFamily: 'JetBrains Mono, monospace', color: '#ef4444', lineHeight: 1 }}>
+              -{fmtUSD(riskMetrics.var95)}
+            </div>
+            <div style={{ fontSize: 9, color: '#334155', marginTop: 5 }}>Perda máx. 95% confiança · 1 dia</div>
+          </div>
+          {/* VaR 99% */}
+          <div style={{ background: '#0d1421', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 10, padding: '12px 14px', borderLeft: '3px solid rgba(239,68,68,0.6)' }}>
+            <div style={{ fontSize: 9, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, marginBottom: 6 }}>VaR 99% (1 dia)</div>
+            <div style={{ fontSize: 20, fontWeight: 800, fontFamily: 'JetBrains Mono, monospace', color: '#ef4444', lineHeight: 1 }}>
+              -{fmtUSD(riskMetrics.var99)}
+            </div>
+            <div style={{ fontSize: 9, color: '#334155', marginTop: 5 }}>Cauda de risco extremo · normal</div>
+          </div>
+          {/* Sharpe */}
+          <div style={{ background: '#0d1421', border: `1px solid ${riskMetrics.sharpe >= 1 ? 'rgba(16,185,129,0.15)' : riskMetrics.sharpe >= 0 ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)'}`, borderRadius: 10, padding: '12px 14px', borderLeft: `3px solid ${riskMetrics.sharpe >= 1 ? 'rgba(16,185,129,0.5)' : riskMetrics.sharpe >= 0 ? 'rgba(245,158,11,0.5)' : 'rgba(239,68,68,0.5)'}` }}>
+            <div style={{ fontSize: 9, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, marginBottom: 6 }}>Sharpe Ratio</div>
+            <div style={{ fontSize: 20, fontWeight: 800, fontFamily: 'JetBrains Mono, monospace', color: riskMetrics.sharpe >= 1 ? '#10b981' : riskMetrics.sharpe >= 0 ? '#f59e0b' : '#ef4444', lineHeight: 1 }}>
+              {riskMetrics.sharpe.toFixed(2)}
+            </div>
+            <div style={{ fontSize: 9, color: '#334155', marginTop: 5 }}>Retorno ajustado ao risco · anual</div>
+          </div>
+          {/* Max Drawdown */}
+          <div style={{ background: '#0d1421', border: '1px solid rgba(245,158,11,0.15)', borderRadius: 10, padding: '12px 14px', borderLeft: '3px solid rgba(245,158,11,0.4)' }}>
+            <div style={{ fontSize: 9, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, marginBottom: 6 }}>Max Drawdown</div>
+            <div style={{ fontSize: 20, fontWeight: 800, fontFamily: 'JetBrains Mono, monospace', color: '#f59e0b', lineHeight: 1 }}>
+              {fmtUSD(maxDrawdownUSD)}
+            </div>
+            <div style={{ fontSize: 9, color: '#334155', marginTop: 5 }}>Cenário stress -20% BTC</div>
+          </div>
+          {/* Beta */}
+          <div style={{ background: '#0d1421', border: '1px solid rgba(96,165,250,0.15)', borderRadius: 10, padding: '12px 14px', borderLeft: '3px solid rgba(96,165,250,0.4)' }}>
+            <div style={{ fontSize: 9, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, marginBottom: 6 }}>Beta vs BTC</div>
+            <div style={{ fontSize: 20, fontWeight: 800, fontFamily: 'JetBrains Mono, monospace', color: '#60a5fa', lineHeight: 1 }}>
+              {riskMetrics.beta.toFixed(2)}x
+            </div>
+            <div style={{ fontSize: 9, color: '#334155', marginTop: 5 }}>Sensibilidade ao movimento do BTC</div>
+          </div>
+          {/* Vol Anualizada */}
+          <div style={{ background: '#0d1421', border: '1px solid rgba(167,139,250,0.15)', borderRadius: 10, padding: '12px 14px', borderLeft: '3px solid rgba(167,139,250,0.4)' }}>
+            <div style={{ fontSize: 9, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, marginBottom: 6 }}>Vol. Anualizada</div>
+            <div style={{ fontSize: 20, fontWeight: 800, fontFamily: 'JetBrains Mono, monospace', color: '#a78bfa', lineHeight: 1 }}>
+              {riskMetrics.annualVol.toFixed(1)}%
+            </div>
+            <div style={{ fontSize: 9, color: '#334155', marginTop: 5 }}>Volatilidade do portfólio · aprox.</div>
+          </div>
+        </div>
+        <div style={{ marginTop: 10, fontSize: 9, color: '#1e3048', lineHeight: 1.5 }}>
+          ⚠ Modelo paramétrico (distribuição normal). VaR subestima eventos de cauda (fat-tail). Produção: histórico ou Monte Carlo.
         </div>
       </div>
 

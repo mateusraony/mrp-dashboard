@@ -1,4 +1,5 @@
 import { btcSpotFlow, fmtNum, aiAnalysis } from '../components/data/mockData';
+import { spotSessions } from '../components/data/mockDataAltcoins';
 import { AIModuleCard } from '../components/ui/AIAnalysisPanel';
 import SectionHeader from '../components/ui/SectionHeader';
 import { ModeBadge } from '../components/ui/DataBadge';
@@ -155,6 +156,76 @@ export default function SpotFlow() {
               <Line yAxisId="price" type="monotone" dataKey="close" stroke="#3b82f6" dot={false} strokeWidth={1.5} />
             </ComposedChart>
           </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* ── SESSIONS ANÁLISE ── */}
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ marginBottom: 10 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 2 }}>Análise por Sessão de Mercado</div>
+          <div style={{ fontSize: 10, color: '#334155' }}>Ásia · Europa · EUA — CVD · Volume · Agressão por janela</div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+          {Object.values(spotSessions).map((sess) => {
+            const isBuy = sess.dominant_side === 'buy';
+            const cvdColor = sess.cvd > 0 ? '#10b981' : '#ef4444';
+            const moveColor = sess.price_move_pct > 0 ? '#10b981' : '#ef4444';
+            return (
+              <div key={sess.label} style={{
+                background: '#111827', border: `1px solid ${sess.color}20`,
+                borderTop: `3px solid ${sess.color}`,
+                borderRadius: 12, padding: '14px 16px',
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: '#e2e8f0' }}>{sess.label}</div>
+                    <div style={{ fontSize: 9, color: '#334155', fontFamily: 'JetBrains Mono, monospace', marginTop: 2 }}>
+                      {sess.utc} UTC · {sess.brt} BRT
+                    </div>
+                  </div>
+                  <div style={{
+                    fontSize: 10, padding: '3px 8px', borderRadius: 5, fontWeight: 700,
+                    background: isBuy ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)',
+                    color: isBuy ? '#10b981' : '#ef4444',
+                    border: `1px solid ${isBuy ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)'}`,
+                  }}>
+                    {isBuy ? '▲ BUY' : '▼ SELL'}
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
+                  <div style={{ background: '#0d1421', borderRadius: 7, padding: '8px 10px' }}>
+                    <div style={{ fontSize: 8, color: '#334155', marginBottom: 2 }}>CVD</div>
+                    <div style={{ fontSize: 14, fontWeight: 800, fontFamily: 'JetBrains Mono, monospace', color: cvdColor }}>
+                      {sess.cvd > 0 ? '+' : ''}{(sess.cvd / 1000).toFixed(0)}K
+                    </div>
+                  </div>
+                  <div style={{ background: '#0d1421', borderRadius: 7, padding: '8px 10px' }}>
+                    <div style={{ fontSize: 8, color: '#334155', marginBottom: 2 }}>Price Move</div>
+                    <div style={{ fontSize: 14, fontWeight: 800, fontFamily: 'JetBrains Mono, monospace', color: moveColor }}>
+                      {sess.price_move_pct > 0 ? '+' : ''}{sess.price_move_pct.toFixed(2)}%
+                    </div>
+                  </div>
+                  <div style={{ background: '#0d1421', borderRadius: 7, padding: '8px 10px' }}>
+                    <div style={{ fontSize: 8, color: '#334155', marginBottom: 2 }}>Volume</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', color: '#94a3b8' }}>
+                      ${sess.volume_usd_b.toFixed(2)}B
+                    </div>
+                  </div>
+                  <div style={{ background: '#0d1421', borderRadius: 7, padding: '8px 10px' }}>
+                    <div style={{ fontSize: 8, color: '#334155', marginBottom: 2 }}>Taker Buy%</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', color: sess.taker_buy_pct > 50 ? '#10b981' : '#ef4444' }}>
+                      {sess.taker_buy_pct.toFixed(1)}%
+                    </div>
+                  </div>
+                </div>
+                {/* Taker buy bar */}
+                <div style={{ height: 4, borderRadius: 2, background: '#1e2d45', overflow: 'hidden', marginBottom: 8 }}>
+                  <div style={{ height: '100%', width: `${sess.taker_buy_pct}%`, background: sess.taker_buy_pct > 50 ? '#10b981' : '#ef4444', borderRadius: 2 }} />
+                </div>
+                <div style={{ fontSize: 9, color: '#334155', lineHeight: 1.5 }}>{sess.signal}</div>
+              </div>
+            );
+          })}
         </div>
       </div>
 

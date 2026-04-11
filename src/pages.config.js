@@ -30,6 +30,7 @@ export const PAGES = {
   MacroCalendar:      lazy(() => import('./pages/MacroCalendar')),
   MarketSentiment:    lazy(() => import('./pages/MarketSentiment')),
   GlobalMarkets:      lazy(() => import('./pages/GlobalMarkets')),
+  Altcoins:           lazy(() => import('./pages/Altcoins')),
 };
 
 export const pagesConfig = {
