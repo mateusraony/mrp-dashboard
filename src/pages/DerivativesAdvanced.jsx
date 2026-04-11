@@ -1,9 +1,9 @@
 // ─── DERIVATIVES ADVANCED — Liquidation Heatmap · OI by Strike · Carry Calculator
 import { useState } from 'react';
 import {
-  liquidationClusters, futuresBasis, termStructure, fundingByExchange,
+  liquidationClusters, futuresBasis, termStructure,
 } from '../components/data/mockDataExtended';
-import { btcOptions, btcOptionsExtended, macroBoard } from '../components/data/mockData';
+import { btcOptionsExtended } from '../components/data/mockData';
 import { ModeBadge, GradeBadge } from '../components/ui/DataBadge';
 import AIInsightPanel from '../components/ai/AIInsightPanel';
 import {
@@ -282,7 +282,7 @@ function OIByStrike() {
           <YAxis tick={{ fontSize: 8, fill: '#334155' }} axisLine={false} tickLine={false} tickFormatter={v => `${Math.abs(v / 1000).toFixed(0)}K`} />
           <Tooltip
             contentStyle={{ background: '#0d1421', border: '1px solid #2a3f5f', borderRadius: 8, fontSize: 10 }}
-            formatter={(v, name) => [Math.abs(v).toLocaleString(), name === 'call_oi' ? 'Call OI' : 'Put OI']}
+            formatter={(v, name) => [Math.abs(Number(v)).toLocaleString(), name === 'call_oi' ? 'Call OI' : 'Put OI']}
           />
           <ReferenceLine y={0} stroke="#2a3f5f" strokeWidth={1.5} />
           <ReferenceLine x={`$${(maxPain / 1000).toFixed(0)}K`} stroke="rgba(239,68,68,0.5)" strokeDasharray="4 4" label={{ value: 'Max Pain', fill: '#ef4444', fontSize: 8, position: 'insideTopRight' }} />
@@ -343,8 +343,8 @@ function CarryCalculator() {
         <ComposedChart data={chartData} margin={{ top: 4, right: 4, left: -18, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(30,45,69,0.5)" vertical={false} />
           <XAxis dataKey="expiry" tick={{ fontSize: 9, fill: '#475569' }} axisLine={false} tickLine={false} />
-          <YAxis tick={{ fontSize: 8, fill: '#334155' }} axisLine={false} tickLine={false} tickFormatter={v => `${v.toFixed(1)}%`} />
-          <Tooltip contentStyle={{ background: '#0d1421', border: '1px solid #2a3f5f', borderRadius: 8, fontSize: 10 }} formatter={(v) => [`${v.toFixed(2)}%`, '']} />
+          <YAxis tick={{ fontSize: 8, fill: '#334155' }} axisLine={false} tickLine={false} tickFormatter={v => `${Number(v).toFixed(1)}%`} />
+          <Tooltip contentStyle={{ background: '#0d1421', border: '1px solid #2a3f5f', borderRadius: 8, fontSize: 10 }} formatter={(v) => [`${Number(v).toFixed(2)}%`, '']} />
           <ReferenceLine y={US10Y} stroke="#f59e0b" strokeDasharray="4 4" label={{ value: `US10Y ${US10Y}%`, fill: '#f59e0b', fontSize: 9, position: 'right' }} />
           <Bar dataKey="basis" name="Basis ann." radius={[3,3,0,0]}>
             {chartData.map((entry, i) => (

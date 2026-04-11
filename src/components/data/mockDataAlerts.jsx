@@ -1,6 +1,6 @@
 // ─── SMART ALERTS MOCK DATA ───────────────────────────────────────────────────
 import { btcFutures } from './mockData';
-import { futuresBasis, liquidationClusters } from './mockDataExtended';
+import { futuresBasis } from './mockDataExtended';
 import { newsSentimentAggregate } from './mockDataNews';
 
 export const SPOT_PRICE = 84298.70;

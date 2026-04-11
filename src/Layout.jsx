@@ -1,59 +1,72 @@
 import { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
+import {
+  LayoutDashboard, Activity, FileBarChart2,
+  TrendingUp, BarChart3, ArrowUpDown, Sigma, Building2,
+  Link2, Globe, Globe2, CalendarDays,
+  Newspaper, Brain,
+  Zap, Bell, Bot, Briefcase,
+  Settings, ChevronLeft, ChevronRight, Menu, Bitcoin,
+} from 'lucide-react';
+import { btcFutures } from '@/components/data/mockData';
 
-// Agrupamento de nav para melhor hierarquia visual
+// ─── NAVEGAÇÃO ─────────────────────────────────────────────────────────────────
 const NAV_GROUPS = [
   {
     label: 'VISÃO GERAL',
     items: [
-      { label: 'Overview',        icon: '◈',  page: 'Dashboard',        desc: 'Risk Score · BTC · AI' },
-      { label: 'Regime',          icon: '🎯', page: 'MarketRegime',      desc: 'Risk-On · Off · Neutral' },
-      { label: 'Relatório Exec.', icon: '📊', page: 'ExecutiveReport',   desc: 'Consolidado · PDF · Email' },
+      { label: 'Overview',        icon: LayoutDashboard,  page: 'Dashboard',        desc: 'Risk Score · BTC · AI' },
+      { label: 'Regime',          icon: Activity,          page: 'MarketRegime',     desc: 'Risk-On · Off · Neutral' },
+      { label: 'Relatório Exec.', icon: FileBarChart2,     page: 'ExecutiveReport',  desc: 'Consolidado · PDF · Email' },
     ],
   },
   {
     label: 'CRIPTO — MERCADO',
     items: [
-      { label: 'Preditivo BTC',    icon: '🔮', page: 'PredictivePanel',    desc: 'BTC 24h · Cenários AI' },
-      { label: 'Derivatives',      icon: '⟆',  page: 'Derivatives',        desc: 'Overview · Avançado · Liq.' },
-      { label: 'Spot Flow',        icon: '⟴',  page: 'SpotFlow',           desc: 'CVD · Volume · Taker' },
-      { label: 'Options',          icon: '◬',  page: 'Options',            desc: 'IV · Greeks · Skew' },
-      { label: 'Fluxos Instit.',   icon: '🏦', page: 'InstitutionalFlows', desc: 'ETFs · Stablecoins' },
+      { label: 'Preditivo BTC',  icon: TrendingUp,   page: 'PredictivePanel',    desc: 'BTC 24h · Cenários AI' },
+      { label: 'Derivatives',    icon: BarChart3,     page: 'Derivatives',        desc: 'Overview · Avançado · Liq.' },
+      { label: 'Spot Flow',      icon: ArrowUpDown,   page: 'SpotFlow',           desc: 'CVD · Volume · Taker' },
+      { label: 'Options',        icon: Sigma,         page: 'Options',            desc: 'IV · Greeks · Skew' },
+      { label: 'Fluxos Instit.', icon: Building2,     page: 'InstitutionalFlows', desc: 'ETFs · Stablecoins' },
     ],
   },
   {
     label: 'ON-CHAIN & MACRO',
     items: [
-      { label: 'On-Chain',         icon: '⛓',  page: 'OnChain',       desc: 'NUPL · MVRV · Whales' },
-      { label: 'Macro Board',      icon: '⊞',  page: 'Macro',         desc: 'S&P · DXY · Yields FRED' },
-      { label: 'Mercados Glob.',   icon: '🌍', page: 'GlobalMarkets',  desc: 'FX · BRL · EUR · Ouro' },
-      { label: 'Calendário',       icon: '◷',  page: 'MacroCalendar',  desc: 'CPI · FOMC · NFP · Horários' },
+      { label: 'On-Chain',       icon: Link2,         page: 'OnChain',       desc: 'NUPL · MVRV · Whales' },
+      { label: 'Macro Board',    icon: Globe,         page: 'Macro',         desc: 'S&P · DXY · Yields FRED' },
+      { label: 'Mercados Glob.', icon: Globe2,        page: 'GlobalMarkets', desc: 'FX · BRL · EUR · Ouro' },
+      { label: 'Calendário',     icon: CalendarDays,  page: 'MacroCalendar', desc: 'CPI · FOMC · NFP · Horários' },
     ],
   },
   {
     label: 'INTELIGÊNCIA AI',
     items: [
-      { label: 'Notícias',     icon: '🧠', page: 'NewsIntelligence', desc: 'AI Score · Feed · Institucional' },
-      { label: 'Sentimento',   icon: '🌐', page: 'MarketSentiment',  desc: 'X · Reddit · Word Cloud · KOLs' },
+      { label: 'Notícias',   icon: Newspaper, page: 'NewsIntelligence', desc: 'AI Score · Feed · Institucional' },
+      { label: 'Sentimento', icon: Brain,     page: 'MarketSentiment',  desc: 'X · Reddit · Word Cloud · KOLs' },
     ],
   },
   {
     label: 'AUTOMAÇÕES',
     items: [
-      { label: 'Oportunidades', icon: '⚡', page: 'Opportunities', desc: 'Ações AI · Estratégias' },
-      { label: 'Alertas',       icon: '🔔', page: 'SmartAlerts',   desc: 'AI · Config · Ciclo' },
-      { label: 'Automações',    icon: '🤖', page: 'Automations',   desc: 'Regras · Bots · Webhooks' },
-      { label: 'Portfolio',     icon: '💼', page: 'Portfolio',     desc: 'Posições · Greeks · Stress' },
+      { label: 'Oportunidades', icon: Zap,      page: 'Opportunities', desc: 'Ações AI · Estratégias' },
+      { label: 'Alertas',       icon: Bell,     page: 'SmartAlerts',   desc: 'AI · Config · Ciclo' },
+      { label: 'Automações',    icon: Bot,      page: 'Automations',   desc: 'Regras · Bots · Webhooks' },
+      { label: 'Portfolio',     icon: Briefcase,page: 'Portfolio',     desc: 'Posições · Greeks · Stress' },
     ],
   },
   {
     label: '',
     items: [
-      { label: 'Settings', icon: '⚙', page: 'Settings', desc: '' },
+      { label: 'Settings', icon: Settings, page: 'Settings', desc: '' },
     ],
   },
 ];
+
+// ─── BTC TICKER — usa mock data dinâmico ────────────────────────────────────
+const btcPrice = btcFutures.mark_price;
+const btcDelta = btcFutures.oi_delta_pct;
 
 export default function Layout({ children, currentPageName }) {
   const [collapsed, setCollapsed] = useState(false);
@@ -92,7 +105,6 @@ export default function Layout({ children, currentPageName }) {
         height: '100vh',
         overflowY: 'auto',
         overflowX: 'hidden',
-        // Mobile: hidden unless open
         transform: isMobile && !mobileOpen ? 'translateX(-100%)' : 'translateX(0)',
       }}>
         {/* Logo */}
@@ -106,8 +118,10 @@ export default function Layout({ children, currentPageName }) {
             width: 30, height: 30, borderRadius: 8, flexShrink: 0,
             background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 15, boxShadow: '0 0 14px rgba(59,130,246,0.35)',
-          }}>⬡</div>
+            boxShadow: '0 0 14px rgba(59,130,246,0.35)',
+          }}>
+            <Bitcoin size={16} color="#fff" />
+          </div>
           {!collapsed && (
             <div style={{ overflow: 'hidden' }}>
               <div style={{ fontSize: 13, fontWeight: 800, color: '#f1f5f9', letterSpacing: '-0.02em', whiteSpace: 'nowrap' }}>
@@ -129,7 +143,7 @@ export default function Layout({ children, currentPageName }) {
               border: '1px solid rgba(245,158,11,0.2)',
               borderRadius: 4, padding: '2px 7px', letterSpacing: '0.07em', fontWeight: 700,
             }}>
-              🧪 MOCK DATA
+              MOCK DATA
             </span>
           </div>
         )}
@@ -152,7 +166,7 @@ export default function Layout({ children, currentPageName }) {
                 <div style={{ height: 1, background: '#162032', margin: '6px 4px' }} />
               )}
               {/* Nav items */}
-              {group.items.map(({ label, icon, page, desc }) => {
+              {group.items.map(({ label, icon: Icon, page, desc }) => {
                 const active = currentPageName === page;
                 return (
                   <Link
@@ -177,7 +191,7 @@ export default function Layout({ children, currentPageName }) {
                     onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'rgba(59,130,246,0.05)'; e.currentTarget.style.color = active ? '#60a5fa' : '#8aa5c0'; }}
                     onMouseLeave={e => { e.currentTarget.style.background = active ? 'rgba(59,130,246,0.1)' : 'transparent'; e.currentTarget.style.color = active ? '#60a5fa' : '#4a6580'; }}
                   >
-                    <span style={{ fontSize: 14, flexShrink: 0, width: collapsed ? 'auto' : 18, textAlign: 'center' }}>{icon}</span>
+                    <Icon size={14} style={{ flexShrink: 0 }} />
                     {!collapsed && (
                       <div style={{ minWidth: 0 }}>
                         <div style={{ fontSize: 12, fontWeight: active ? 700 : 500, whiteSpace: 'nowrap' }}>{label}</div>
@@ -210,7 +224,7 @@ export default function Layout({ children, currentPageName }) {
           onMouseEnter={e => { e.currentTarget.style.borderColor = '#2a4060'; e.currentTarget.style.color = '#475569'; }}
           onMouseLeave={e => { e.currentTarget.style.borderColor = '#162032'; e.currentTarget.style.color = '#2a4060'; }}
         >
-          <span style={{ fontSize: 10 }}>{collapsed ? '▶' : '◀'}</span>
+          {collapsed ? <ChevronRight size={12} /> : <ChevronLeft size={12} />}
           {!collapsed && <span>Recolher</span>}
         </button>
       </aside>
@@ -235,10 +249,10 @@ export default function Layout({ children, currentPageName }) {
               style={{
                 background: 'transparent', border: '1px solid #162032',
                 color: '#4a6580', cursor: 'pointer', borderRadius: 6,
-                padding: '5px 9px', fontSize: 16, flexShrink: 0,
+                padding: '5px 9px', display: 'flex', alignItems: 'center',
               }}
             >
-              ☰
+              <Menu size={16} />
             </button>
           )}
 
@@ -255,15 +269,19 @@ export default function Layout({ children, currentPageName }) {
           {/* Separator */}
           <div style={{ width: 1, height: 20, background: '#162032' }} />
 
-          {/* BTC ticker */}
+          {/* BTC ticker — conectado ao mock data dinâmico */}
           <div style={{
             display: 'flex', alignItems: 'center', gap: 6,
             background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.15)',
             borderRadius: 7, padding: '4px 10px',
           }}>
             <span style={{ fontSize: 11, color: '#2a4060', fontWeight: 700 }}>₿</span>
-            <span style={{ fontSize: 13, fontFamily: 'JetBrains Mono, monospace', color: '#60a5fa', fontWeight: 700 }}>$84,312</span>
-            <span style={{ fontSize: 10, color: '#10b981', fontFamily: 'JetBrains Mono, monospace', fontWeight: 600 }}>+2.15%</span>
+            <span style={{ fontSize: 13, fontFamily: 'JetBrains Mono, monospace', color: '#60a5fa', fontWeight: 700 }}>
+              ${btcPrice.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+            </span>
+            <span style={{ fontSize: 10, color: btcDelta >= 0 ? '#10b981' : '#ef4444', fontFamily: 'JetBrains Mono, monospace', fontWeight: 600 }}>
+              {btcDelta >= 0 ? '+' : ''}{btcDelta.toFixed(2)}%
+            </span>
           </div>
 
           {/* Status */}

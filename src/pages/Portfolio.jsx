@@ -7,7 +7,7 @@ import {
 import { ModeBadge } from '../components/ui/DataBadge';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  ReferenceLine, Cell, LineChart, Line, CartesianGrid,
+  ReferenceLine, Cell, CartesianGrid,
 } from 'recharts';
 
 const POSITION_TYPES = [
@@ -346,7 +346,7 @@ export default function Portfolio() {
               <XAxis dataKey="name" tick={{ fontSize: 8, fill: '#475569' }} tickLine={false} angle={-25} textAnchor="end" />
               <YAxis tick={{ fontSize: 9, fill: '#475569' }} tickLine={false} tickFormatter={v => v >= 1000 ? `$${(v/1000).toFixed(0)}K` : `$${v}`} />
               <Tooltip contentStyle={{ background: '#0d1421', border: '1px solid #2a3f5f', borderRadius: 6, fontSize: 11 }}
-                formatter={v => [`$${v.toFixed(0)}`, 'P&L']} />
+                formatter={v => [`$${Number(v).toFixed(0)}`, 'P&L']} />
               <ReferenceLine y={0} stroke="#2a3f5f" />
               <Bar dataKey="pnl" radius={[3, 3, 0, 0]}>
                 {pnlData.map((entry, i) => <Cell key={i} fill={entry.pnl >= 0 ? '#10b981' : '#ef4444'} />)}
@@ -365,7 +365,7 @@ export default function Portfolio() {
               <XAxis dataKey="label" tick={{ fontSize: 9, fill: '#475569' }} tickLine={false} />
               <YAxis tick={{ fontSize: 9, fill: '#475569' }} tickLine={false} tickFormatter={v => v >= 1000 ? `$${(v/1000).toFixed(0)}K` : v < -1000 ? `-$${(-v/1000).toFixed(0)}K` : `$${v}`} />
               <Tooltip contentStyle={{ background: '#0d1421', border: '1px solid #2a3f5f', borderRadius: 6, fontSize: 11 }}
-                formatter={v => [`$${v.toFixed(0)}`, 'P&L Estimado']} />
+                formatter={v => [`$${Number(v).toFixed(0)}`, 'P&L Estimado']} />
               <ReferenceLine y={0} stroke="#2a3f5f" />
               <Bar dataKey="pnl" radius={[3, 3, 0, 0]}>
                 {stressData.map((entry, i) => <Cell key={i} fill={entry.pnl >= 0 ? '#10b981' : '#ef4444'} />)}

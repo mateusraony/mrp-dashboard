@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import { THRESHOLDS, sourceHealth } from '../components/data/mockData';
-import SectionHeader from '../components/ui/SectionHeader';
 import { ModeBadge, GradeBadge } from '../components/ui/DataBadge';
 
-function SettingRow({ label, value, description, type = 'text', options }) {
+function SettingRow({ label, value, description, type = 'text', options = undefined }) {
   const [v, setV] = useState(value);
   const [saved, setSaved] = useState(false);
 
@@ -144,7 +143,7 @@ export default function Settings() {
           ['ENABLE_FEAR_GREED', true, 'Alternative.me Fear & Greed Index'],
           ['ENABLE_COINMETRICS', false, 'CoinMetrics community (optional, may be slow)'],
         ].map(([k, v, d]) => (
-          <SettingRow key={k} label={k} value={v} type="toggle" description={d} />
+          <SettingRow key={String(k)} label={String(k)} value={v} type="toggle" description={String(d)} />
         ))}
       </Section>
 

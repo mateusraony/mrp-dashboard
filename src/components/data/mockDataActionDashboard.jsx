@@ -1,7 +1,5 @@
 // ─── MOCK DATA — Dashboard de Ações & Automações ─────────────────────────────
 
-import { btcFutures, fearGreed, globalRisk, stablecoinSupply, btcNUPL } from './mockData';
-import { marketRegime } from './mockDataRegime';
 
 // ─── OPORTUNIDADES DE TRADING ─────────────────────────────────────────────────
 export const tradeOpportunities = [

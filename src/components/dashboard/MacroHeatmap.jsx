@@ -2,7 +2,6 @@
 // Grade de correlação BTC × ativos globais com timeframes 1M / 3M / 6M
 // Inclui períodos de stress histórico para referência
 import { useState, useMemo } from 'react';
-import { btcCorrelations } from '../data/mockData';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine,
@@ -262,7 +261,7 @@ export default function MacroHeatmap() {
                 <ReferenceLine y={0.7} stroke="rgba(16,185,129,0.2)" strokeDasharray="2 4" />
                 <ReferenceLine y={-0.7} stroke="rgba(239,68,68,0.2)" strokeDasharray="2 4" />
                 <Tooltip contentStyle={{ background: '#0d1421', border: '1px solid #2a3f5f', borderRadius: 8, fontSize: 11 }}
-                  formatter={(v, name) => [`${v >= 0 ? '+' : ''}${v?.toFixed(2)}`, name]} />
+                  formatter={(v, name) => { const n = Number(v); return [`${n >= 0 ? '+' : ''}${n.toFixed(2)}`, name]; }} />
                 {displayPairs.map(p => (
                   <Line key={p.key} type="monotone" dataKey={p.key} name={p.label} stroke={p.color}
                     strokeWidth={selectedPair === p.key ? 2.5 : 1.5} dot={false} activeDot={{ r: 4 }} />

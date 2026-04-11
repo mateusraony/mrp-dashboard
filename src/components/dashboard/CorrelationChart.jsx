@@ -1,6 +1,6 @@
 // Correlation Chart — interativo: seleção de pares, janela 1D/1W/1M
 import { useState, useMemo } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip, ReferenceLine, ResponsiveContainer, Legend } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip, ReferenceLine, ResponsiveContainer } from 'recharts';
 import { btcCorrelations } from '../data/mockData';
 import { HelpIcon } from '../ui/Tooltip';
 
@@ -12,7 +12,7 @@ const X_LABELS = {
   '1m': (i) => `${i+1}`,
 };
 
-function CustomTooltip({ active, payload, label, window }) {
+function CustomTooltip({ active = false, payload = [], label = 0, window }) {
   if (!active || !payload?.length) return null;
   return (
     <div style={{ background: '#0d1421', border: '1px solid #2a3f5f', borderRadius: 8, padding: '10px 14px', fontSize: 11 }}>

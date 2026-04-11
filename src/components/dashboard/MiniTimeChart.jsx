@@ -5,7 +5,7 @@ import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceL
 const WINDOWS = ['1d', '1w', '1m'];
 const WINDOW_LABELS = { '1d': '1D', '1w': '1W', '1m': '1M' };
 
-function CustomTooltip({ active, payload, formatter }) {
+function CustomTooltip({ active = false, payload = [], formatter }) {
   if (!active || !payload?.length) return null;
   const val = payload[0]?.value;
   return (
@@ -22,7 +22,7 @@ export default function MiniTimeChart({
   color = '#60a5fa',
   height = 80,
   formatter,   // (val) => string
-  refValue,    // linha de referência horizontal (optional)
+  refValue = undefined,    // linha de referência horizontal (optional)
   inverted = false, // se true, cor positiva é ruim (ex: VIX, credit spread)
 }) {
   const [win, setWin] = useState('1w');

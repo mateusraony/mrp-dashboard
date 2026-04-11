@@ -1,5 +1,5 @@
 // ─── STABLECOIN FLOW TRACKER ─────────────────────────────────────────────────
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import {
   dailyMintBurn, stablecoinSnapshot, largeMintEvents, largeBurnEvents,
   stablecoinAnomalies, supplyByChain, mintVsBtcCorr,
@@ -7,7 +7,7 @@ import {
 import { ModeBadge } from '../components/ui/DataBadge';
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, ReferenceLine, Legend, PieChart, Pie, Cell, AreaChart, Area,
+  ResponsiveContainer, ReferenceLine, PieChart, Pie, Cell,
 } from 'recharts';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -89,7 +89,7 @@ function EventRow({ ev, type }) {
 }
 
 // ─── CUSTOM TOOLTIP ──────────────────────────────────────────────────────────
-function FlowTooltip({ active, payload, label }) {
+function FlowTooltip({ active = false, payload = [], label = '' }) {
   if (!active || !payload?.length) return null;
   return (
     <div style={{ background: '#0d1421', border: '1px solid #2a3f5f', borderRadius: 8, padding: '10px 13px', fontSize: 11 }}>
@@ -266,7 +266,7 @@ export function StablecoinContent() {
                 <Pie data={supplyByChain} dataKey="total_b" nameKey="chain" cx={80} cy={80} outerRadius={70} innerRadius={40} paddingAngle={2}>
                   {supplyByChain.map((entry, i) => <Cell key={i} fill={CHAIN_COLORS[i]} />)}
                 </Pie>
-                <Tooltip formatter={(v) => [`$${v.toFixed(1)}B`, '']} contentStyle={{ background: '#0d1421', border: '1px solid #2a3f5f', borderRadius: 6, fontSize: 11 }} />
+                <Tooltip formatter={(v) => [`$${Number(v).toFixed(1)}B`, '']} contentStyle={{ background: '#0d1421', border: '1px solid #2a3f5f', borderRadius: 6, fontSize: 11 }} />
               </PieChart>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {supplyByChain.map((c, i) => (

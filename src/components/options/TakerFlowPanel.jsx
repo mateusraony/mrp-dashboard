@@ -3,8 +3,8 @@
 import { optionsTakerFlow } from '../../components/data/mockDataExtended';
 import { ModeBadge, GradeBadge } from '../ui/DataBadge';
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, Cell, AreaChart, Area,
+  BarChart, Bar, XAxis, YAxis, Tooltip,
+  ResponsiveContainer, Cell,
 } from 'recharts';
 
 function fmt(v) { return `$${v.toFixed(1)}M`; }
@@ -115,7 +115,7 @@ export default function TakerFlowPanel() {
             <YAxis hide />
             <Tooltip
               contentStyle={{ background: '#0d1421', border: '1px solid #2a3f5f', borderRadius: 6, fontSize: 11 }}
-              formatter={(v, n, props) => [`${props.payload.raw > 0 ? '+' : '-'}$${v.toFixed(1)}M`, 'Net Premium']}
+              formatter={(v, n, props) => [`${props.payload.raw > 0 ? '+' : '-'}$${Number(v).toFixed(1)}M`, 'Net Premium']}
             />
             <Bar dataKey="value" radius={[3, 3, 0, 0]}>
               {comboData.map((entry, index) => (

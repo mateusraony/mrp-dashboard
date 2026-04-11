@@ -5,7 +5,7 @@ import { etfFlows } from '../components/data/mockDataExtended';
 import { ModeBadge, GradeBadge } from '../components/ui/DataBadge';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, ReferenceLine, Cell, LineChart, Line, Legend,
+  ResponsiveContainer, ReferenceLine, Cell,
 } from 'recharts';
 
 function fmt(v, decimals = 1) {
@@ -132,7 +132,7 @@ export function ETFContent() {
             <YAxis tick={{ fontSize: 9, fill: '#475569' }} tickLine={false} tickFormatter={v => `$${v}M`} />
             <Tooltip
               contentStyle={{ background: '#0d1421', border: '1px solid #2a3f5f', borderRadius: 8, fontSize: 11 }}
-              formatter={(v, n) => [`$${Math.abs(v).toFixed(1)}M`, n === 'inflow' ? 'Entrada' : n === 'outflow' ? 'Saída' : 'Net']}
+              formatter={(v, n) => [`$${Math.abs(Number(v)).toFixed(1)}M`, n === 'inflow' ? 'Entrada' : n === 'outflow' ? 'Saída' : 'Net']}
             />
             <ReferenceLine y={0} stroke="#2a3f5f" />
             <Bar dataKey="net" radius={[2, 2, 0, 0]}>

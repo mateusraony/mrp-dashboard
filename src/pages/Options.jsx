@@ -7,7 +7,7 @@ import IVRankPanel from '../components/options/IVRankPanel';
 import TakerFlowPanel from '../components/options/TakerFlowPanel';
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, ReferenceLine, Cell,
+  ResponsiveContainer, ReferenceLine,
 } from 'recharts';
 
 const regimeLabels = {
@@ -83,7 +83,7 @@ export default function Options() {
                 tickFormatter={v => v.toFixed(0) + '%'} domain={['auto', 'auto']} />
               <Tooltip
                 contentStyle={{ background: '#111827', border: '1px solid #2a3f5f', borderRadius: 6, fontSize: 11 }}
-                formatter={(v, n) => [v.toFixed(2) + '%', n === 'call' ? 'Call IV' : 'Put IV']}
+                formatter={(v, n) => [Number(v).toFixed(2) + '%', n === 'call' ? 'Call IV' : 'Put IV']}
               />
               <ReferenceLine x={`${Math.round(o.spot / 1000)}K`} stroke="#2a3f5f" strokeDasharray="4 4" label={{ value: 'ATM', fill: '#4a5568', fontSize: 10 }} />
               <Line type="monotone" dataKey="call" stroke="#10b981" strokeWidth={2} dot={{ fill: '#10b981', r: 3 }} name="call" />
@@ -111,7 +111,7 @@ export default function Options() {
                 tickFormatter={v => v.toFixed(1) + '%'} />
               <Tooltip
                 contentStyle={{ background: '#111827', border: '1px solid #2a3f5f', borderRadius: 6, fontSize: 11 }}
-                formatter={(v) => [v.toFixed(2) + '%', 'Skew (Put-Call)']}
+                formatter={(v) => [Number(v).toFixed(2) + '%', 'Skew (Put-Call)']}
               />
               <ReferenceLine y={0} stroke="#2a3f5f" strokeDasharray="4 4" />
               <Line type="monotone" dataKey="skew" stroke="#a78bfa" strokeWidth={2} dot={{ fill: '#a78bfa', r: 3 }} />

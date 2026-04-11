@@ -8,7 +8,7 @@ import { ModeBadge } from '../components/ui/DataBadge';
 import {
   RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
   ResponsiveContainer, Tooltip, AreaChart, Area, XAxis, YAxis,
-  CartesianGrid, ReferenceLine, Legend,
+  CartesianGrid, ReferenceLine,
 } from 'recharts';
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
@@ -98,7 +98,7 @@ function SuggestionCard({ s }) {
 }
 
 // ─── RADAR CUSTOM TOOLTIP ─────────────────────────────────────────────────────
-function RadarTooltip({ active, payload }) {
+function RadarTooltip({ active = false, payload = [] }) {
   if (!active || !payload?.length) return null;
   const { metric, value } = payload[0]?.payload || {};
   const label = value >= 65 ? 'Risk-On' : value >= 40 ? 'Neutral' : 'Risk-Off';
@@ -113,7 +113,7 @@ function RadarTooltip({ active, payload }) {
 }
 
 // ─── HISTORY CHART TOOLTIP ────────────────────────────────────────────────────
-function HistTooltip({ active, payload, label }) {
+function HistTooltip({ active = false, payload = [], label = '' }) {
   if (!active || !payload?.length) return null;
   const score = payload[0]?.value;
   const regime = score >= 62 ? 'Risk-On' : score <= 38 ? 'Risk-Off' : 'Neutral';

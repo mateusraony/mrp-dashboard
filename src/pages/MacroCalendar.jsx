@@ -1,7 +1,7 @@
 // ─── CALENDÁRIO MACRO — CPI · FOMC · NFP · Volatilidade Histórica · Alertas ──
 import { useState } from 'react';
 import {
-  ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip,
+  ComposedChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, Cell, BarChart, Legend,
 } from 'recharts';
 import { macroEvents, eventVolatilityData, avgVolatilityByEvent, getNextTier1Event } from '../components/data/mockDataMacroCalendar';
@@ -141,7 +141,7 @@ function VolatilityChart({ selectedEvent }) {
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(30,45,69,0.4)" vertical={false} />
           <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#475569' }} axisLine={false} tickLine={false} />
           <YAxis tick={{ fontSize: 9, fill: '#475569' }} axisLine={false} tickLine={false} tickFormatter={v => `${v}%`} />
-          <Tooltip contentStyle={{ background: '#0d1421', border: '1px solid #1a2535', fontSize: 10, borderRadius: 6 }} formatter={v => [`${v > 0 ? '+' : ''}${v.toFixed(2)}%`, 'BTC Move']} />
+          <Tooltip contentStyle={{ background: '#0d1421', border: '1px solid #1a2535', fontSize: 10, borderRadius: 6 }} formatter={v => { const n = Number(v); return [`${n > 0 ? '+' : ''}${n.toFixed(2)}%`, 'BTC Move']; }} />
           <ReferenceLine y={0} stroke="#1e2d45" />
           <Bar dataKey="btc_move" radius={[3, 3, 0, 0]} name="BTC Move">
             {selectedEvent.windows.map((w, i) => (
@@ -166,7 +166,7 @@ function AvgVolatilityChart() {
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(30,45,69,0.4)" vertical={false} />
           <XAxis dataKey="event" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
           <YAxis tick={{ fontSize: 9, fill: '#475569' }} axisLine={false} tickLine={false} tickFormatter={v => `${v}%`} />
-          <Tooltip contentStyle={{ background: '#0d1421', border: '1px solid #1a2535', fontSize: 10, borderRadius: 6 }} formatter={(v, n) => [`${v > 0 ? '+' : ''}${v}%`, n === 'above_exp' ? '▲ Acima Exp.' : n === 'below_exp' ? '▼ Abaixo Exp.' : '= Conforme']} />
+          <Tooltip contentStyle={{ background: '#0d1421', border: '1px solid #1a2535', fontSize: 10, borderRadius: 6 }} formatter={(v, n) => { const n2 = Number(v); return [`${n2 > 0 ? '+' : ''}${n2}%`, n === 'above_exp' ? '▲ Acima Exp.' : n === 'below_exp' ? '▼ Abaixo Exp.' : '= Conforme']; }} />
           <Legend wrapperStyle={{ fontSize: 9, color: '#475569' }} formatter={v => v === 'above_exp' ? '▲ Acima' : v === 'below_exp' ? '▼ Abaixo' : '= Conforme'} />
           <ReferenceLine y={0} stroke="#1e2d45" />
           <Bar dataKey="above_exp" fill="#ef4444" fillOpacity={0.8} radius={[2, 2, 0, 0]} />

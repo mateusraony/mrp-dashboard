@@ -1,8 +1,7 @@
 // ─── MERCADOS GLOBAIS — FX · Commodities · Índices · Bancos Centrais · BRL ───
 import { useState } from 'react';
 import {
-  RadarChart, Radar, PolarGrid, PolarAngleAxis,
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
+  BarChart, Bar, XAxis, YAxis, Tooltip,
   ResponsiveContainer, Cell, ReferenceLine,
 } from 'recharts';
 import { fxRates, commodities, globalIndices, centralBankRates, btcCorrelationMatrix, brlMacroAnalysis } from '../components/data/mockDataGlobalMarkets';
@@ -89,7 +88,7 @@ function CorrelationChart({ data, period }) {
       <BarChart data={sorted} layout="vertical" margin={{ top: 0, right: 10, left: 0, bottom: 0 }}>
         <XAxis type="number" domain={[-1, 1]} tick={{ fontSize: 8, fill: '#475569' }} axisLine={false} tickLine={false} tickFormatter={v => v.toFixed(1)} />
         <YAxis type="category" dataKey="asset" tick={{ fontSize: 9, fill: '#64748b' }} axisLine={false} tickLine={false} width={88} />
-        <Tooltip contentStyle={{ background: '#0d1421', border: '1px solid #1a2535', fontSize: 9, borderRadius: 6 }} formatter={v => [`${v > 0 ? '+' : ''}${v.toFixed(2)}`, `Corr ${period}`]} />
+        <Tooltip contentStyle={{ background: '#0d1421', border: '1px solid #1a2535', fontSize: 9, borderRadius: 6 }} formatter={v => { const n = Number(v); return [`${n > 0 ? '+' : ''}${n.toFixed(2)}`, `Corr ${period}`]; }} />
         <ReferenceLine x={0} stroke="#1e2d45" />
         <Bar dataKey={key} radius={[0, 3, 3, 0]}>
           {sorted.map((d, i) => <Cell key={i} fill={d[key] > 0.3 ? '#10b981' : d[key] < -0.3 ? '#ef4444' : '#f59e0b'} fillOpacity={0.8} />)}

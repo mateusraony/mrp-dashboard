@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import {
   btcFutures, liquidityBins, oiByExchange, fmtNum, fmtPct, aiAnalysis,
 } from '../components/data/mockData';
@@ -8,8 +7,7 @@ import SectionHeader from '../components/ui/SectionHeader';
 import { ModeBadge } from '../components/ui/DataBadge';
 import LiquidationHeatmap from '../components/derivatives/LiquidationHeatmap';
 import BasisPanel from '../components/derivatives/BasisPanel';
-import {
-  AreaChart, Area, BarChart, Bar, XAxis, YAxis,
+import { BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine,
 } from 'recharts';
 import { format } from 'date-fns';
@@ -52,7 +50,7 @@ function FundingChart({ data }) {
         <YAxis tick={{ fontSize: 9, fill: '#4a5568' }} tickLine={false} />
         <Tooltip
           contentStyle={{ background: '#111827', border: '1px solid #2a3f5f', borderRadius: 6, fontSize: 11 }}
-          formatter={(v) => [v.toFixed(4) + '%', 'Funding']}
+          formatter={(v) => [Number(v).toFixed(4) + '%', 'Funding']}
         />
         <ReferenceLine y={0} stroke="#2a3f5f" />
         <Bar dataKey="rate" radius={[2,2,0,0]}
@@ -109,7 +107,7 @@ function LiquidityHeatmap({ bins }) {
 export function DerivativesOverview() {
   const f = btcFutures;
   const fundingPos = f.funding_rate > 0;
-  const nextFundHours = Math.round((f.next_funding_time - Date.now()) / 3600000);
+  const nextFundHours = Math.round((f.next_funding_time.getTime() - Date.now()) / 3600000);
 
   const riskColor = f.risk_score > 75 ? COLORS.negative : f.risk_score > 50 ? COLORS.neutral : COLORS.positive;
   const directionLabel = f.risk_direction === 'long_flush' ? '⬇️ Long Flush' : '⬆️ Short Squeeze';
@@ -208,7 +206,6 @@ export function DerivativesOverview() {
               <div style={{ height: 8, borderRadius: 4, background: 'linear-gradient(90deg, #10b981 0%, #f59e0b 50%, #ef4444 100%)', marginBottom: 12 }}>
                 <div style={{
                   position: 'relative',
-                  '::after': { content: '""' },
                 }} />
               </div>
               <div style={{ fontSize: 11, color: '#4a5568' }}>

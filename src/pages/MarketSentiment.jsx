@@ -2,13 +2,12 @@
 import { useState } from 'react';
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, ReferenceLine, Cell, BarChart, AreaChart, Area,
+  ResponsiveContainer, ReferenceLine, Cell, BarChart,
 } from 'recharts';
 import {
   socialSentiment, wordCloudData, sentimentHistory7d,
   socialCorrelation, trendingTopics, kolSentiment, mentionsHourly,
 } from '../components/data/mockDataSentiment';
-import { btcFutures } from '../components/data/mockData';
 import { ModeBadge } from '../components/ui/DataBadge';
 // Legacy provider removed
 
@@ -30,8 +29,8 @@ function WordCloud({ words }) {
             fontFamily: 'JetBrains Mono, monospace',
             letterSpacing: '-0.01em',
           }}
-            onMouseEnter={e => e.target.style.opacity = 1}
-            onMouseLeave={e => e.target.style.opacity = opacity}
+            onMouseEnter={e => { const t = e.target; if (t instanceof HTMLElement) t.style.opacity = '1'; }}
+            onMouseLeave={e => { const t = e.target; if (t instanceof HTMLElement) t.style.opacity = String(opacity); }}
           >
             {w.text}
           </span>
@@ -304,7 +303,7 @@ export default function MarketSentiment() {
               <BarChart data={kolSentiment} layout="vertical" margin={{ top: 0, right: 10, left: 0, bottom: 0 }}>
                 <XAxis type="number" domain={[-1, 1]} tick={{ fontSize: 8, fill: '#475569' }} axisLine={false} tickLine={false} tickFormatter={v => v.toFixed(1)} />
                 <YAxis type="category" dataKey="name" tick={{ fontSize: 9, fill: '#64748b' }} axisLine={false} tickLine={false} width={90} />
-                <Tooltip contentStyle={{ background: '#0d1421', border: '1px solid #1a2535', fontSize: 9, borderRadius: 6 }} formatter={v => [`${v > 0 ? '+' : ''}${v.toFixed(2)}`, 'Sentimento']} />
+                <Tooltip contentStyle={{ background: '#0d1421', border: '1px solid #1a2535', fontSize: 9, borderRadius: 6 }} formatter={v => { const n = Number(v); return [`${n > 0 ? '+' : ''}${n.toFixed(2)}`, 'Sentimento']; }} />
                 <ReferenceLine x={0} stroke="#1e2d45" />
                 <Bar dataKey="sentiment" radius={[0, 3, 3, 0]}>
                   {kolSentiment.map((k, i) => <Cell key={i} fill={k.sentiment > 0 ? '#10b981' : '#ef4444'} fillOpacity={0.8} />)}

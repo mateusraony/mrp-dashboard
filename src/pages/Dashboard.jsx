@@ -5,7 +5,7 @@ import {
 } from '../components/data/mockData';
 import RiskMeter from '../components/ui/RiskMeter';
 import GoldenRule from '../components/ui/GoldenRule';
-import { ModeBadge, GradeBadge, SourceRow } from '../components/ui/DataBadge';
+import { ModeBadge, SourceRow } from '../components/ui/DataBadge';
 import AIAnalysisPanel from '../components/ui/AIAnalysisPanel';
 import { HelpIcon } from '../components/ui/Tooltip';
 import ExtraSignals from '../components/dashboard/ExtraSignals';
@@ -42,7 +42,7 @@ function DeltaPill({ value, suffix = '%', isYield = false, compact = false }) {
 }
 
 // ─── SECTION TITLE ────────────────────────────────────────────────────────────
-function SectionTitle({ icon, label, sub, action }) {
+function SectionTitle({ icon, label, sub = '', action = null }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -152,7 +152,7 @@ function BTCSnapshot() {
       {/* Key metrics grid */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 16px' }}>
         <Stat label="Funding Rate" value={fmtPct(fr.funding_rate, 4)} color={fundingColor} big
-          sub={`${fr.funding_rate > 0 ? 'Longs pagam' : 'Shorts pagam'} · ${Math.round((fr.next_funding_time - Date.now()) / 3600000)}h`}
+          sub={`${fr.funding_rate > 0 ? 'Longs pagam' : 'Shorts pagam'} · ${Math.round((fr.next_funding_time.getTime() - Date.now()) / 3600000)}h`}
           help={{ title: 'Funding Rate', content: 'Taxa paga entre longs e shorts a cada 8h. Acima de +0.07% = mercado sobrecomprado — sinal de risco para flush.' }} />
         <Stat label="Open Interest" value={`$${(fr.open_interest_usdt/1e9).toFixed(2)}B`} big
           sub={<span style={{ display: 'flex', gap: 4, marginTop: 2 }}>
@@ -193,7 +193,7 @@ function MacroRow() {
             borderTop: `3px solid ${color}`,
             borderRadius: 10, padding: '12px 13px',
           }}>
-            <div style={{ fontSize: 10, color: '#64748b', marginBottom: 5, display: 'flex', align: 'center', gap: 4 }}>
+            <div style={{ fontSize: 10, color: '#64748b', marginBottom: 5, display: 'flex', alignItems: 'center', gap: 4 }}>
               <span>{s.icon}</span> {s.name}
             </div>
             <div style={{ fontSize: 16, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: '#f1f5f9', letterSpacing: '-0.02em', marginBottom: 5 }}>

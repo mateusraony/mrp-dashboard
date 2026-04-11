@@ -1,6 +1,6 @@
 import { ModeBadge, GradeBadge } from './DataBadge';
 
-export default function SectionHeader({ title, subtitle, mode = 'mock', grade, icon, children, accent }) {
+export default function SectionHeader({ title, subtitle, mode = 'mock', grade = undefined, icon = undefined, children = undefined, accent = undefined }) {
   return (
     <div style={{
       display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',

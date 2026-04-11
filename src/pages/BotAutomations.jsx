@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { automationRules, botConnections, recentBotMessages } from '../components/data/mockDataActionDashboard';
-import { globalRisk, fearGreed, btcFutures, stablecoinSupply } from '../components/data/mockData';
+import { globalRisk, fearGreed, btcFutures } from '../components/data/mockData';
 import { marketRegime } from '../components/data/mockDataRegime';
 import { ModeBadge } from '../components/ui/DataBadge';
 import { sendNotificationEmail } from '@/lib/notificationClient';
@@ -415,7 +415,7 @@ export function BotsContent() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {messages.map(m => {
                 const s = CHANNEL_STYLE[m.channel] || CHANNEL_STYLE.webhook;
-                const minsAgo = Math.round((Date.now() - m.sent_at) / 60000);
+                const minsAgo = Math.round((Date.now() - Number(m.sent_at)) / 60000);
                 return (
                   <div key={m.id} style={{ display: 'flex', gap: 10, padding: '10px 12px', background: '#0d1421', border: '1px solid #1a2535', borderRadius: 8 }}>
                     <span style={{ fontSize: 16, flexShrink: 0 }}>{s.icon}</span>
