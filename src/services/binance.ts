@@ -238,3 +238,71 @@ export async function fetchKlines(
   const raw = await res.json() as unknown[][];
   return raw.map(k => KlineSchema.parse(k));
 }
+
+// ─── Liquidações ──────────────────────────────────────────────────────────────
+
+export interface LiquidationEntry {
+  symbol:     string;
+  side:       'BUY' | 'SELL';       // BUY = short foi liquidado, SELL = long foi liquidado
+  qty:        number;
+  price:      number;
+  usd_value:  number;
+  timestamp:  number;
+}
+
+const LiquidationItemSchema = z.object({
+  o: z.object({
+    s:   z.string(),                // symbol
+    S:   z.enum(['BUY', 'SELL']),   // side
+    q:   z.coerce.number(),         // quantidade
+    p:   z.coerce.number(),         // preço médio
+    ap:  z.coerce.number().optional(), // preço médio de execução
+    T:   z.coerce.number(),         // timestamp
+  }),
+});
+
+const LiquidationsResponseSchema = z.array(LiquidationItemSchema);
+
+function mockLiquidations(): LiquidationEntry[] {
+  const sides: Array<'BUY' | 'SELL'> = ['BUY', 'SELL', 'SELL', 'BUY', 'SELL'];
+  const price = 84_200;
+  return Array.from({ length: 20 }, (_, i) => {
+    const side  = sides[i % sides.length];
+    const qty   = parseFloat((Math.random() * 2 + 0.1).toFixed(3));
+    const p     = price + (Math.random() - 0.5) * 800;
+    return {
+      symbol:    'BTCUSDT',
+      side,
+      qty,
+      price:     parseFloat(p.toFixed(1)),
+      usd_value: parseFloat((qty * p).toFixed(0)),
+      timestamp: Date.now() - i * 60_000 * Math.random() * 30,
+    };
+  });
+}
+
+/**
+ * fetchLiquidations — liquidações forçadas recentes de BTCUSDT (Binance Futures)
+ *
+ * Endpoint público: GET /fapi/v1/forceOrders?symbol=BTCUSDT&limit=50
+ * Sem API key. Retorna as últimas 50 ordens de liquidação.
+ */
+export async function fetchLiquidations(symbol = 'BTCUSDT', limit = 50): Promise<LiquidationEntry[]> {
+  if (DATA_MODE === 'mock') return mockLiquidations();
+
+  const url = `${FUTURES_BASE}/fapi/v1/forceOrders?symbol=${symbol}&limit=${limit}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Binance Liquidations error ${res.status}`);
+
+  const raw = await res.json();
+  const parsed = LiquidationsResponseSchema.parse(raw);
+
+  return parsed.map(item => ({
+    symbol:    item.o.s,
+    side:      item.o.S,
+    qty:       item.o.q,
+    price:     item.o.ap ?? item.o.p,
+    usd_value: item.o.q * (item.o.ap ?? item.o.p),
+    timestamp: item.o.T,
+  }));
+}

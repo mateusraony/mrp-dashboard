@@ -342,6 +342,7 @@ export const btcHashRate = {
   signal: 'Hash rate em ATH — mineradores expandindo. Dificuldade +4.8% no último ajuste.',
   quality: 'A',
   history: {
+    '1d': Array.from({length: 24}, (_, i) => ({ t: i, v: parseFloat((838 + i*0.22 + (Math.random()-0.5)*3).toFixed(1)) })),
     '1w': Array.from({length: 7},  (_, i) => ({ t: i, v: parseFloat((798.5 + i*6.3 + (Math.random()-0.5)*8).toFixed(1)) })),
     '1m': Array.from({length: 30}, (_, i) => ({ t: i, v: parseFloat((750 + i*3.1 + (Math.random()-0.5)*10).toFixed(1)) })),
   },

@@ -2,11 +2,18 @@ import React, { createContext, useContext } from 'react';
 
 const AuthContext = createContext();
 
+/**
+ * AuthProvider — stub de acesso anônimo.
+ *
+ * isAuthenticated: false — estado correto para acesso anônimo.
+ * A aplicação funciona completamente sem auth (portfólio/alertas livres por ora).
+ * Auth real (Supabase Auth) será implementado em sprint futuro, quando o usuário autorizar.
+ */
 export const AuthProvider = ({ children }) => {
   return (
     <AuthContext.Provider value={{
       user: null,
-      isAuthenticated: true,
+      isAuthenticated: false,
       isLoadingAuth: false,
       isLoadingPublicSettings: false,
       authError: null,

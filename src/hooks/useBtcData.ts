@@ -11,7 +11,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { IS_LIVE } from '@/lib/env';
-import { fetchBtcTicker, fetchOiByExchange, fetchKlines, type BtcTickerData } from '@/services/binance';
+import { fetchBtcTicker, fetchOiByExchange, fetchKlines, fetchLiquidations, type BtcTickerData } from '@/services/binance';
 import { fetchDominance, fetchTopAltcoins } from '@/services/coingecko';
 import { fetchFearGreed } from '@/services/alternative';
 
@@ -106,6 +106,19 @@ export function useTopAltcoins(limit = 20) {
     queryFn:  () => fetchTopAltcoins(limit),
     staleTime: 290_000,
     refetchInterval: DOM_INTERVAL,
+  });
+}
+
+/**
+ * useLiquidations — liquidações forçadas recentes de BTCUSDT
+ * Atualiza a cada 30s em modo live.
+ */
+export function useLiquidations(limit = 50) {
+  return useQuery({
+    queryKey: ['btc', 'liquidations', limit],
+    queryFn:  () => fetchLiquidations('BTCUSDT', limit),
+    staleTime: 25_000,
+    refetchInterval: OI_INTERVAL,
   });
 }
 
