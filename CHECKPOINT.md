@@ -1,6 +1,6 @@
 # CHECKPOINT.md — MRP Dashboard
 > Memória técnica viva do projeto. Atualizar ao final de cada bloco importante.
-> Última atualização: 2026-04-11 (Sprint 1 + Sprint 2 — Concluídos)
+> Última atualização: 2026-04-12 (Fase 3 — Sprints 3.1 a 3.7 concluídos)
 
 ---
 
@@ -8,271 +8,262 @@
 
 | Aspecto | Status | Observação |
 |---------|--------|------------|
-| Build (`npm run build`) | ✅ PASSA | 20 chunks (lazy loading por página), maior chunk 378KB (Recharts) |
-| Lint (`eslint . --quiet`) | ✅ PASSA | 0 erros — corrigidos 64 erros de unused imports |
-| TypeCheck (`tsc -p jsconfig.json`) | ✅ PASSA | 0 erros — corrigidos ~40 erros de tipo |
+| Build (`npm run build`) | ✅ PASSA | 20 chunks lazy loading, maior chunk 378KB (Recharts) |
+| Lint (`eslint . --quiet`) | ✅ PASSA | 0 erros |
+| TypeCheck (`tsc -p jsconfig.json`) | ✅ PASSA | 0 erros |
 | Deploy (Render) | ✅ ONLINE | https://mrp-dashboard.onrender.com |
-| Dados ao vivo | ❌ NENHUM | 100% mock data (15 arquivos) |
-| Auth real | ❌ AUSENTE | Stub hardcoded (isAuthenticated: true) |
-| Supabase | ❌ NÃO INSTALADO | Apenas mencionado em Settings UI |
-| Serviços externos | ❌ ZERO | Nenhuma chamada HTTP/fetch real |
+| Dados ao vivo | ⚠️ PRONTO / NÃO ATIVO | DATA_MODE=mock (serviços criados, `.env.local` pendente) |
+| Serviços externos | ✅ ESTRUTURADO | 6 services em `src/services/` (binance, coingecko, alternative, deribit, fred, mempool, supabase) |
+| Auth real | ❌ AUSENTE | Stub hardcoded — aguarda Fase futura |
+| Supabase | ✅ INSTALADO + SCHEMA | Instalado, service criado, migração SQL pronta |
+| TanStack Query Hooks | ✅ PRONTOS | `src/hooks/useBtcData.ts` — 6 hooks (ticker, OI, klines, dominance, altcoins, fear&greed) |
+| Navegação performance | ✅ CORRIGIDA | Suspense dentro de LayoutWrapper; hover prefetch nas rotas |
 
-### ─── SPRINT 1 — CONCLUÍDO (2026-04-11) ───
+---
+
+## 🧭 MAPA DE FASES
+
+| Fase | Status | Data |
+|------|--------|------|
+| Fase 1 — Análise Profunda | ✅ CONCLUÍDA | 2026-04-11 |
+| Fase 2 — Interface/Visual (Sprints 1+2) | ✅ CONCLUÍDA | 2026-04-11 |
+| Fase 3 — API com Mocks (Sprints 3.1–3.7) | ✅ CONCLUÍDA | 2026-04-12 |
+| Fase 4 — Cálculos Python | ⏳ AGUARDA AUTORIZAÇÃO | — |
+
+---
+
+## ✅ SPRINTS CONCLUÍDOS
+
+### ─── SPRINT 1 (2026-04-11) ───
 | Item | Status |
 |------|--------|
 | S1.1 — Remove deps não usadas (Stripe, moment, three, leaflet, quill, confetti) | ✅ DONE |
-| S1.2 — Remover 4 arquivos órfãos mortos (Alerts, Calendar, News, SentimentSocial) | ✅ DONE |
+| S1.2 — Remover 4 arquivos órfãos mortos | ✅ DONE |
 | S1.3 — Corrigir 64 erros de lint (unused imports) | ✅ DONE |
-| S1.4 — Corrigir ~40 erros de typecheck (Recharts, Date, props) | ✅ DONE |
-| S1.5 — Substituir emojis de nav por Lucide icons (Layout.jsx) | ✅ DONE |
-| S1.6 — BTC ticker conectado ao mock data (btcFutures.mark_price) | ✅ DONE |
-| S1.7 — Base44 favicon removido (inline SVG), app-params.js limpo | ✅ DONE |
+| S1.4 — Corrigir ~40 erros de typecheck | ✅ DONE |
+| S1.5 — Substituir emojis de nav por Lucide icons | ✅ DONE |
+| S1.6 — BTC ticker conectado ao mock data | ✅ DONE |
+| S1.7 — Base44 favicon/app-params removidos | ✅ DONE |
 | S1.8 — Lazy loading por rota (React.lazy + Suspense) | ✅ DONE |
-| S1.9 — Build + lint + typecheck ✅ + commit pushed | ✅ DONE |
 
-### ─── SPRINT 2 — CONCLUÍDO (2026-04-11) ───
+### ─── SPRINT 2 (2026-04-11) ───
 | Item | Status |
 |------|--------|
-| S2.1 — Nova página Altcoins (Alt Season Index, dominância, top alts, rotação setorial) | ✅ DONE |
+| S2.1 — Página Altcoins (Alt Season Index, dominância, top alts, rotação setorial) | ✅ DONE |
 | S2.2 — Portfolio Risk Pack: VaR 95%/99%, Sharpe, Max Drawdown, Beta vs BTC | ✅ DONE |
-| S2.3 — SpotFlow: análise por sessão (Ásia/Europa/EUA — CVD, volume, price move, taker%) | ✅ DONE |
-| S2.4 — MacroCalendar: nova tab "Surpresa" (actual vs consenso, histórico, insight) | ✅ DONE |
-| S2.5 — mockDataAltcoins.jsx criado (altSeasonIndex, ethDominance, topAltcoins, sectorRotation, spotSessions) | ✅ DONE |
-| S2.6 — Build + lint + typecheck ✅ + commit pushed | ✅ DONE |
+| S2.3 — SpotFlow: análise por sessão (Ásia/Europa/EUA — CVD, volume, taker%) | ✅ DONE |
+| S2.4 — MacroCalendar: tab "Surpresa" (actual vs consenso, histórico) | ✅ DONE |
+| S2.5 — mockDataAltcoins.jsx criado | ✅ DONE |
+
+### ─── SPRINT 3.1–3.3 (2026-04-12) — commit 1ce2c74 ───
+| Item | Status |
+|------|--------|
+| Layout.jsx redesign completo — glassmorphism sidebar, nav gradiente, mobile bottom nav (5 tabs), drawer full-screen | ✅ DONE |
+| src/index.css — animações (pulse-live, shimmer, fade-in, slide-up), scrollbar custom, mobile utilities | ✅ DONE |
+| src/lib/env.ts — Zod validation de variáveis de ambiente, exports: `env`, `DATA_MODE`, `IS_LIVE` | ✅ DONE |
+| src/lib/errorBoundary.tsx — ErrorBoundary global com DefaultErrorFallback e botão "Tentar novamente" | ✅ DONE |
+| src/App.jsx — Wrapped com ErrorBoundary | ✅ DONE |
+| src/lib/query-client.js — staleTime, retry exponencial, refetchOnWindowFocus: false | ✅ DONE |
+| .env.example — template com VITE_DATA_MODE, VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, VITE_FRED_API_KEY | ✅ DONE |
+| src/services/binance.ts — fetchBtcTicker, fetchOiByExchange, fetchKlines (Zod coerce, res.ok, mock rule) | ✅ DONE |
+| src/services/coingecko.ts — fetchDominance, fetchTopAltcoins | ✅ DONE |
+| src/services/alternative.ts — fetchFearGreed (30d history) | ✅ DONE |
+| src/hooks/useBtcData.ts — 6 hooks TanStack Query (refetchInterval só em IS_LIVE) | ✅ DONE |
+
+### ─── SPRINT 3.4–3.7 (2026-04-12) — commit 90046b8 ───
+| Item | Status |
+|------|--------|
+| **Performance:** Suspense movido para LayoutWrapper (sidebar nunca pisca na navegação) | ✅ DONE |
+| **Performance:** Shimmer skeleton como fallback de página (não full-screen) | ✅ DONE |
+| **Performance:** Hover prefetch em todos os itens de nav via `PAGE_IMPORTS` | ✅ DONE |
+| pages.config.js — exporta `PAGE_IMPORTS` separado de `PAGES` (lazy) | ✅ DONE |
+| src/services/deribit.ts — fetchOptionsData (IV, term structure, chain, GEX, max pain, PCR) + fetchDvolHistory | ✅ DONE |
+| src/services/fred.ts — fetchMacroBoard (S&P, DXY, Gold, VIX, US10Y, US2Y) + fetchYieldCurve | ✅ DONE |
+| src/services/mempool.ts — fetchMempoolState, fetchHashrate (3M history), fetchMiningPools, fetchOnChainAdvanced | ✅ DONE |
+| src/services/supabase.ts — CRUD: alert_rules, portfolio_positions, user_settings (+ isSupabaseConfigured) | ✅ DONE |
+| supabase/migrations/20260412000000_create_core_tables.sql — 3 tabelas, RLS, índices, triggers updated_at | ✅ DONE |
 
 ---
 
-## ✅ O QUE FOI CONCLUÍDO
+## 🏗 ARQUITETURA ATUAL (2026-04-12)
 
-- [x] Base44 SDK removido completamente do runtime
-- [x] Build funcionando (`npm run build` passa)
-- [x] Repositório GitHub criado: https://github.com/mateusraony/mrp-dashboard
-- [x] Deploy no Render: https://mrp-dashboard.onrender.com
-- [x] CLAUDE.md criado com regras do projeto
-- [x] Remoção de referências Base44 em runtime
-- [x] Criação de fallback `notificationClient`
-- [x] Ajuste de parâmetros legados (`app_*`, `VITE_APP_*`)
-- [x] Merge de páginas duplicadas (pages.config.js atualizado com 19 páginas)
-- [x] Redesign de navegação (5 grupos + settings, emojis ainda presentes)
-- [x] **FASE 1 — Análise Profunda Completa** (2026-04-11)
-
----
-
-## 🔄 EM PROGRESSO
-
-- [ ] Fase 1: Atualização de CLAUDE.md e CHECKPOINT.md com memória técnica (em andamento)
-
----
-
-## 🗺 MAPA COMPLETO DO PROJETO (Estado Real — 2026-04-11)
-
-### Arquivos de Página (31 total)
-**19 ROTEADOS** (em `pages.config.js`):
-- Dashboard, DerivativesPage (wrapper), InstitutionalFlows (wrapper), Opportunities (wrapper)
-- AutomationsPage (wrapper), Macro, OnChain, Options, Settings
-- SpotFlow, NewsIntelligence, Portfolio, SmartAlerts, MarketRegime
-- PredictivePanel, ExecutiveReport, MacroCalendar, MarketSentiment, GlobalMarkets
-
-**12 ÓRFÃOS** (em `src/pages/` mas fora do `pages.config.js`):
-- ActionDashboard.jsx (21KB) — conteúdo possivelmente dentro de Opportunities wrapper
-- Alerts.jsx (8.6KB) — conteúdo possivelmente dentro de SmartAlerts
-- Automations.jsx (28KB) — conteúdo possivelmente dentro de AutomationsPage wrapper
-- BotAutomations.jsx (28KB) — conteúdo possivelmente dentro de AutomationsPage wrapper
-- Calendar.jsx (23KB) — substituído por MacroCalendar
-- DerivativesAdvanced.jsx (31KB) — possivelmente dentro de DerivativesPage wrapper
-- Derivatives.jsx (20KB) — possivelmente dentro de DerivativesPage wrapper
-- ETFFlows.jsx (13KB) — possivelmente dentro de InstitutionalFlows wrapper
-- News.jsx (6.9KB) — substituído por NewsIntelligence
-- SentimentSocial.jsx (24KB) — substituído por MarketSentiment
-- StablecoinFlow.jsx — possivelmente dentro de InstitutionalFlows wrapper
-- Strategies.jsx (21KB) — possivelmente dentro de Opportunities wrapper
-
-**AÇÃO PENDENTE:** Confirmar quais órfãos são importados dentro dos wrappers vs. quais são realmente dead code. Só executar remoção com autorização.
-
-### Mock Data (14 arquivos — 100% dos dados)
 ```
-src/components/data/
-  mockData.jsx              — Principal (BTC futures, spot, sourceHealth, THRESHOLDS)
-  mockDataActionDashboard.jsx
-  mockDataAlerts.jsx
-  mockDataAutomations.jsx
-  mockDataExtended.jsx
-  mockDataGlobalMarkets.jsx
-  mockDataMacroCalendar.jsx
-  mockDataNews.jsx
-  mockDataPortfolio.jsx
-  mockDataPredictive.jsx
-  mockDataRegime.jsx
-  mockDataSentiment.jsx
-  mockDataStablecoin.jsx
-  mockDataStrategies.jsx
+src/
+  pages/          → 20 páginas roteadas (19 originais + Altcoins)
+  components/
+    ui/           → 40+ componentes Shadcn/Radix
+    data/         → 15 arquivos mock (TEMPORÁRIO — eliminação gradual pela Fase 3)
+    dashboard/    → 4 componentes
+    derivatives/  → 2 componentes
+    onchain/      → 1 componente
+    options/      → 3 componentes
+    ai/           → 1 componente AI
+  hooks/
+    use-mobile.jsx
+    useBtcData.ts      ← NOVO (Sprint 3.3)
+  lib/
+    env.ts             ← NOVO (Sprint 3.1)
+    errorBoundary.tsx  ← NOVO (Sprint 3.1)
+    AuthContext.jsx    (stub — ainda hardcoded)
+    query-client.js    (atualizado Sprint 3.1)
+    utils, app-params, notificationClient
+  services/            ← CRIADO (Fase 3)
+    binance.ts         ← Sprint 3.1
+    coingecko.ts       ← Sprint 3.1
+    alternative.ts     ← Sprint 3.1
+    deribit.ts         ← Sprint 3.4
+    fred.ts            ← Sprint 3.5
+    mempool.ts         ← Sprint 3.6
+    supabase.ts        ← Sprint 3.7
+  utils/
+    index.ts
+  App.jsx              (atualizado Sprint 3.1 — ErrorBoundary)
+  Layout.jsx           (redesenhado Sprint 3.2)
+  pages.config.js      (atualizado Sprint 3.4 — PAGE_IMPORTS para prefetch)
+
+supabase/
+  migrations/
+    20260412000000_create_core_tables.sql  ← Sprint 3.7
+
+.env.example           ← Sprint 3.3
 ```
 
 ---
 
-## 🔴 PROBLEMAS CONFIRMADOS NO CÓDIGO
+## 🔑 PADRÃO DE API (OBRIGATÓRIO — definido pelo usuário)
 
-### CRÍTICOS
-| # | Arquivo | Problema | Causa Raiz | Impacto |
-|---|---------|---------|------------|---------|
-| C1 | `src/services/` (inexistente) | Camada de serviços ausente | Não criada | Sem integração real possível |
-| C2 | `package.json` | `@supabase/supabase-js` não instalado | Nunca adicionado | Sem persistência real |
-| C3 | `src/lib/AuthContext.jsx` | Auth stub, `isAuthenticated: true` hardcoded | Legado Base44 | Qualquer usuário acessa tudo |
-| C4 | `src/App.jsx` | Sem ErrorBoundary global | Nunca implementado | Crash sem tratamento |
+Todo service deve seguir este contrato:
 
-### ALTA SEVERIDADE
-| # | Arquivo | Problema | Causa Raiz | Impacto |
-|---|---------|---------|------------|---------|
-| A1 | `vite.config.js` | Bundle único de 1.35MB | Sem code splitting/lazy loading | Performance no primeiro load |
-| A2 | 12 arquivos | TypeCheck falha (17+ erros) | Props faltando, tipos incorretos em Recharts tooltips | Type safety comprometida |
-| A3 | `src/Layout.jsx:265` | Preço BTC hardcoded (`$84,312 +2.15%`) | Não conectado nem ao mock data | Dado completamente estático |
-| A4 | Projeto inteiro | Zero testes | Nunca implementados | Sem rede de segurança para refactoring |
+```typescript
+// 1. Schemas com z.coerce.number() (Binance retorna strings)
+const Schema = z.object({ value: z.coerce.number() });
 
-### MÉDIA SEVERIDADE
-| # | Arquivo | Problema | Causa Raiz | Impacto |
-|---|---------|---------|------------|---------|
-| M1 | 8 arquivos | Lint falha (17 erros de unused imports) | Imports não limpos | Qualidade de código |
-| M2 | `src/Layout.jsx` | Emojis como ícones de navegação | CLAUDE.md exige Lucide | Inconsistência com design system |
-| M3 | `src/Layout.jsx:2` | `useLocation` importado mas nunca usado | Import esquecido | Contribui para falha de lint |
-| M4 | `src/pages/` | 12 arquivos órfãos | Merges incompletos | Bundle inflado, confusão estrutural |
-| M5 | `package.json` | Stripe instalado sem uso aparente | Legado ou futuro não implementado | Dependência desnecessária no bundle |
+// 2. res.ok check ANTES do parse
+const res = await fetch(url);
+if (!res.ok) throw new Error(`API error ${res.status}: ${url}`);
 
-### BAIXA SEVERIDADE
-| # | Arquivo | Problema | Causa Raiz | Impacto |
-|---|---------|---------|------------|---------|
-| B1 | `index.html:5` | Favicon aponta para `base44.com/logo_v2.svg` | Nunca trocado | Referência CDN externa de ex-plataforma |
-| B2 | `src/lib/app-params.js` | Parâmetros `app_id`, `VITE_APP_*` legados | Nunca removidos | Confusão de config |
-| B3 | `package.json` | `moment` + `date-fns` instalados juntos | Duplicidade de biblioteca de datas | 70KB a mais no bundle |
-| B4 | `src/lib/query-client.js` | TanStack Query configurado mas sem queries | Infraestrutura pronta, não usada | Não é bug, mas peso morto |
+// 3. refetchInterval só em IS_LIVE
+refetchInterval: IS_LIVE ? 5_000 : false,
+
+// 4. select para transformações de UI (opcional)
+select: (data) => ({ ...data, formatted: data.value.toFixed(2) }),
+
+// 5. REGRA ABSOLUTA: Mock NÃO substitui live com falha
+// DATA_MODE=mock  → retorna mock instantaneamente
+// DATA_MODE=live  → chama API; se falhar → lança erro (UI mostra error state)
+// Mock NUNCA é fallback silencioso de dado live com falha
+```
 
 ---
 
-## 🟡 O QUE ESTÁ MOCKADO (100% dos dados de mercado)
+## 🔴 PROBLEMAS AINDA PRESENTES
 
-- Preço, funding rate, OI, long/short ratio do BTC
-- Fear & Greed Index
-- Liquidações, basis, IV, skew, term structure
-- NUPL, MVRV, whale netflow, on-chain metrics
-- S&P 500, DXY, yields, inflação (tudo FRED mock)
-- FX rates, commodities, bancos centrais
-- Notícias, sentimento, word cloud
-- Alertas, automações, strategies, portfolio Greeks
-- Calendar de eventos macro
-- sourceHealth (tracking de fontes "ao vivo" completamente simulado)
-- **Preço BTC no topbar: hardcoded no Layout.jsx (não usa nem o mock data)**
+### Críticos
+| # | Arquivo | Problema | Ação |
+|---|---------|---------|------|
+| C1 | `src/lib/AuthContext.jsx` | Auth stub, `isAuthenticated: true` hardcoded | Aguarda Fase futura (Supabase Auth) |
+| C2 | `.env.local` (não existe) | VITE_FRED_API_KEY, VITE_SUPABASE_* não configuradas | Usuário deve criar .env.local |
 
----
+### Alta Severidade
+| # | Arquivo | Problema | Ação |
+|---|---------|---------|------|
+| A1 | Projeto inteiro | Zero testes | Aguarda Fase 4+ |
+| A2 | `src/components/data/` | 15 arquivos mock ainda ativos | Eliminar gradualmente ao ligar APIs |
 
-## 🔵 O QUE ESTÁ AUSENTE (Não existe no código)
-
-- `src/services/` — camada de integração com APIs externas
-- `@supabase/supabase-js` — cliente Supabase
-- Auth real — qualquer provider (Supabase Auth, Auth0, etc.)
-- Schemas Zod para validação de responses de API
-- Testes (nenhum arquivo `.test.` ou `.spec.` encontrado)
-- ErrorBoundary global
-- Lazy loading / code splitting
-- Variáveis de ambiente (`.env` file não encontrado)
-- ~~Página **Altcoins**~~ → ✅ CRIADA em Sprint 2 (Alt Season Index, dominância, top alts, rotação setorial)
-- ~~**Portfolio:** VaR, Sharpe Ratio, Max Drawdown, Beta vs BTC~~ → ✅ ADICIONADO em Sprint 2 (modelo paramétrico)
-- ~~**Spot Flow:** Análise por sessão (Ásia/Europa/EUA)~~ → ✅ ADICIONADO em Sprint 2 (CVD, volume, taker% por sessão)
-- ~~**Macro:** Surpresa vs Consenso + reação histórica~~ → ✅ ADICIONADO em Sprint 2 (tab "Surpresa" no MacroCalendar)
-- **Options:** GEX/Dealer positioning (Gamma Exposure, Max Pain dinâmico, charm/vanna)
-- **OnChain:** MVRV Z-score, Realized Cap HODL Waves, Coin Days Destroyed, Dormancy Flow
-- **Cross-venue:** Taker imbalance por exchange, funding/basis arbitrage spread
-- **Governança:** Data lineage, replay de sinais, policy de fallback por fonte
+### Média Severidade
+| # | Arquivo | Problema | Ação |
+|---|---------|---------|------|
+| M1 | `src/hooks/useBtcData.ts` | Hooks criados mas não usados nas páginas ainda | Conectar páginas na Fase 3 next |
+| M2 | `src/services/mempool.ts` | `fetchOnChainAdvanced` sempre retorna mock (sem API pública) | Integrar Glassnode/CryptoQuant quando autorizado |
 
 ---
 
-## 📊 GAPS PRIORITÁRIOS (Por Horizonte Temporal)
+## 📊 STATUS DAS APIs
 
-### Diário (impacto imediato no uso)
-- [ ] Microstructure: perp/options dealer flow por exchange
-- [ ] Flows por cohort (whale, miner, ETF custodian, market maker)
-- [ ] Surpresa macro do dia vs consenso
+| Serviço | Arquivo | DATA_MODE=mock | DATA_MODE=live | API Key? |
+|---------|---------|----------------|----------------|----------|
+| Binance Futures/Spot | `binance.ts` | ✅ Mock | ✅ Pronto | Não |
+| CoinGecko | `coingecko.ts` | ✅ Mock | ✅ Pronto | Não |
+| Alternative.me (F&G) | `alternative.ts` | ✅ Mock | ✅ Pronto | Não |
+| Deribit Options | `deribit.ts` | ✅ Mock | ✅ Pronto | Não |
+| FRED (macro) | `fred.ts` | ✅ Mock | ✅ Pronto | ⚠️ `VITE_FRED_API_KEY` |
+| Mempool.space | `mempool.ts` | ✅ Mock | ✅ Pronto | Não |
+| Supabase | `supabase.ts` | ✅ Fallback | ✅ Pronto | ⚠️ `VITE_SUPABASE_*` |
 
-### Semanal (rotação de posições)
-- [ ] Rotação de fluxo (ETF/stablecoin/cohorts)
-- [ ] Correlação dinâmica de risco cross-asset
-- [ ] Liquidez global (Fed balance sheet, RRP, TGA, dólar offshore)
-
-### Mensal (leitura de ciclo)
-- [ ] Métricas de ciclo onchain: MVRV Z-score, HODL Waves
-- [ ] Regime macro completo
-- [ ] Real yields + term premium completo (2s10s, 3m10y, breakevens)
-
-### Anual (framework de ciclo)
-- [ ] Stress tests completos
-- [ ] Governança + auditoria (data lineage, replay de sinal)
-- [ ] Framework de ciclo BTC completo
+**Para ativar dados live:** criar `.env.local` com:
+```
+VITE_DATA_MODE=live
+VITE_FRED_API_KEY=sua_key
+VITE_SUPABASE_URL=https://xxx.supabase.co
+VITE_SUPABASE_ANON_KEY=sua_anon_key
+```
 
 ---
 
-## 📋 PRÓXIMOS PASSOS (Ordem de Implementação Sugerida)
+## 🗺 PRÓXIMOS PASSOS
 
-### Pendentes de Autorização do Usuário
+### Autorização necessária (Fase 3 continuation)
 
-**FASE 2 — Interface/Visual:**
-- [x] ~~Substituir emojis de navegação por Lucide icons (Layout.jsx)~~ ✅ Sprint 1
-- [x] ~~Corrigir 64 erros de lint~~ ✅ Sprint 1
-- [x] ~~Corrigir ~40 erros de typecheck~~ ✅ Sprint 1
-- [x] ~~Implementar lazy loading nas rotas (code splitting)~~ ✅ Sprint 1
-- [x] ~~Criar página Altcoins (nova)~~ ✅ Sprint 2
-- [x] ~~Confirmar e limpar 12 arquivos órfãos de páginas~~ ✅ Sprint 1 (4 removidos, 8 são usados em wrappers)
-- [x] ~~Conectar BTC ticker do topbar ao mock data (não hardcoded)~~ ✅ Sprint 1
-- [x] ~~Remover Base44 favicon (trocar por ícone próprio)~~ ✅ Sprint 1
-- [x] ~~Limpar `app-params.js` de params legados~~ ✅ Sprint 1
-- [ ] Portfolio Risk Pack visual com mock — modelo prod: Monte Carlo / histórico (Fase 4)
-- [ ] Remover deps Stripe do código (package.json limpo, código nunca usou) ✅ Sprint 1
+**Sprint 3.8 — Conectar páginas aos hooks reais:**
+- [ ] Dashboard.jsx → usar `useBtcTicker()`, `useFearGreed()`, `useDominance()`
+- [ ] Derivatives.jsx → usar `useBtcTicker()`, `useOiByExchange()`, `useKlines()`
+- [ ] Options.jsx → usar hook `useOptionsData()` (criar em useDeribit.ts)
+- [ ] Macro.jsx → usar hook `useMacroBoard()` (criar em useFred.ts)
+- [ ] OnChain.jsx → usar hooks `useMempoolState()`, `useHashrate()` (criar em useMempool.ts)
+- [ ] Portfolio.jsx → usar `fetchPortfolioPositions()` via TanStack Query
+- [ ] SmartAlerts.jsx → usar `fetchAlertRules()` via TanStack Query
 
-**FASE 3 — API com Mocks (estrutura):**
-- [ ] Criar `src/services/` com clients para: Binance, CoinGecko, Alternative.me, Deribit, FRED, Mempool, GDELT
-- [ ] Instalar e configurar `@supabase/supabase-js`
-- [ ] Criar schemas Zod para todos os contratos de API
-- [ ] Implementar TanStack Query hooks para substituir mock imports
-- [ ] Criar ErrorBoundary global em App.jsx
-- [ ] Implementar auth real via Supabase Auth
+**Sprint 3.9 — Toggle DATA_MODE na página Settings:**
+- [ ] UI switch mock ↔ live com persistência em user_settings (Supabase)
+- [ ] Indicador de status por fonte no topbar (sourceHealth real)
 
-**FASE 4 — Cálculos (Python isolado primeiro):**
-- [ ] Script Python: Risk Score composto
-- [ ] Script Python: VaR, Sharpe, Max Drawdown, Beta
+### Aguarda Fase 4
+- [ ] Script Python: Risk Score composto (BTC, funding, IV, on-chain)
+- [ ] Script Python: VaR paramétrico vs histórico vs Monte Carlo
+- [ ] Script Python: GEX/Dealer positioning formula validation
 - [ ] Script Python: Macro Surprise Index
-- [ ] Script Python: GEX/Dealer positioning
+
+### Gaps de produto ainda presentes
+- [ ] Spot Sessions Analytics — CVD intraday por sessão Ásia/Europa/EUA
+- [ ] Crypto Institutional Upgrade — GEX live, cohort flow por exchange
+- [ ] OnChain Cycle Pack — MVRV Z-score live, HODL Waves (requer Glassnode pago)
+- [ ] Cross-venue microstructure — taker imbalance, funding/basis arbitrage
+- [ ] Auth real — Supabase Auth (email ou OAuth) para proteger portfólio/alertas do usuário
 
 ---
 
-## 🏦 APIs GRATUITAS MAPEADAS (Para Fase 3)
+## 📝 DECISÕES PENDENTES
 
-| Dado | API | Limite Free | Notas |
-|------|-----|-------------|-------|
-| BTC price, funding, OI | Binance (público) | Sem limite | WebSocket disponível |
-| Fear & Greed | alternative.me | Sem limite | JSON simples |
-| Price, market cap | CoinGecko | 30 req/min | Free tier generoso |
-| Options IV, term | Deribit (público) | Sem limite | WebSocket disponível |
-| Macro: yields, VIX, FRED | FRED API | 120 req/min | API Key gratuita |
-| On-Chain básico | Mempool.space | Sem limite | REST + WebSocket |
-| News AI | CryptoPanic | Free tier | Sentiment básico |
-| Stablecoin | CoinGlass (público) | Limitado | Verificar rate limit |
-| Exchange flows | Glassnode | ❌ Pago | Alternativa: CryptoQuant free tier limitado |
-| MVRV Z-score | Glassnode / LookIntoBitcoin | ❌ Pago / Free com limitação | Verificar viabilidade |
-| Persistência user | Supabase free | 500MB DB, 2GB bandwidth | Suficiente para início |
+1. **Avançar para Sprint 3.8** — Conectar páginas aos hooks (eliminar mock imports gradualmente)?
+2. **Sprint 3.9** — Toggle DATA_MODE em Settings?
+3. **Glassnode/CryptoQuant** — autorizar integração paga para NUPL/MVRV/Netflow live?
+4. **Fase 4** — Autorizar scripts Python de cálculo?
 
 ---
 
-## 🔐 SEGURANÇA — ITENS CRÍTICOS PRÉ-PRODUÇÃO
+## 🏦 APIs GRATUITAS MAPEADAS
 
-1. `@supabase/supabase-js` e chaves nunca commitadas em código (usar `.env` + Render env vars)
-2. `AuthContext` precisa de auth real antes do deploy com dados sensíveis do usuário
-3. Rate limiting nas chamadas de API externas (evitar ban por excesso)
-4. CORS: todas as APIs listadas acima suportam chamadas diretas do browser (público)
-5. Stripe: avaliar se será usado; se não, remover da dependência para reduzir bundle
+| Dado | API | Limite Free | Status |
+|------|-----|-------------|--------|
+| BTC price, funding, OI | Binance Futures/Spot | Sem limite | ✅ Service pronto |
+| Fear & Greed | alternative.me | Sem limite | ✅ Service pronto |
+| Price, dominance, altcoins | CoinGecko | 30 req/min | ✅ Service pronto |
+| Options IV, term structure | Deribit | Sem limite | ✅ Service pronto |
+| Macro: yields, VIX, S&P | FRED API | 120 req/min | ✅ Service pronto (key free) |
+| On-Chain básico, hashrate | Mempool.space | Sem limite | ✅ Service pronto |
+| Persistência usuário | Supabase free | 500MB DB | ✅ Service + schema prontos |
+| NUPL, MVRV, Netflow | Glassnode | ❌ Pago | ⚠️ Mock permanente até autorização |
+| Exchange flows | CryptoQuant | ❌ Pago | ⚠️ Mock permanente até autorização |
 
 ---
 
-## 📝 DECISÕES PENDENTES — AGUARDAM AUTORIZAÇÃO DO USUÁRIO
+## 🔐 SEGURANÇA — CHECKLIST PRÉ-PRODUÇÃO
 
-1. **Avançar para Fase 2 (visual)?** → Apresentar plano antes.
-2. **Remover arquivos órfãos de páginas?** → Confirmar quais são dead code vs. usados em wrappers.
-3. **Remover Stripe do package.json?** → Se não há plano de monetização imediato.
-4. **Substituir moment por date-fns** (já instalado) para reduzir bundle?
-5. **Ordem exata de implementação dos gaps** → Portfolio Risk Pack vs. Altcoins vs. Spot Sessions.
+- [x] Zod validation em todos os inputs externos (API responses)
+- [x] `res.ok` check antes de qualquer JSON.parse
+- [x] ErrorBoundary global em App.jsx
+- [x] Variáveis de ambiente tipadas via env.ts (nunca `import.meta.env.X` direto)
+- [ ] Auth real antes de expor portfólio/alertas do usuário
+- [ ] VITE_SUPABASE_ANON_KEY nunca commitada (está em .gitignore via .env.local)
+- [ ] VITE_FRED_API_KEY nunca commitada
+- [ ] Rate limiting client-side para CoinGecko (30 req/min free tier)
