@@ -6,32 +6,8 @@ import {
   stressTest, stressScenarios, SPOT_PRICE,
 } from '../components/data/mockDataPortfolio';
 import { usePortfolioPositions, useUpsertPosition, useDeletePosition } from '@/hooks/useSupabase';
-
-// ─── RISK METRICS COMPUTATION ─────────────────────────────────────────────────
-// Usa aproximação paramétrica (normal). Produção: Monte Carlo ou histórico.
-function computeRiskMetrics(greeks) {
-  const BTC_DAILY_VOL = 0.042;   // ~4.2% vol diária BTC (mock)
-  const RISK_FREE_ANNUAL = 0.045; // 4.5% ao ano (T-bill)
-  const MOCK_ANNUAL_RETURN = 0.28; // 28% retorno anual simulado
-
-  // Exposição em USD ao BTC
-  const exposureUSD = Math.abs(greeks.delta_usd);
-  const portfolioUSD = greeks.total_value_usd;
-
-  // VaR paramétrico (1 dia, normal)
-  const dailyPortfolioVol = (exposureUSD / portfolioUSD) * BTC_DAILY_VOL * portfolioUSD;
-  const var95 = 1.645 * dailyPortfolioVol;
-  const var99 = 2.326 * dailyPortfolioVol;
-
-  // Sharpe anualizado
-  const annualPortfolioVol = dailyPortfolioVol * Math.sqrt(252) / portfolioUSD;
-  const sharpe = (MOCK_ANNUAL_RETURN - RISK_FREE_ANNUAL) / annualPortfolioVol;
-
-  // Beta vs BTC (razão entre delta pct e 100%)
-  const beta = greeks.delta_pct / 100;
-
-  return { var95, var99, sharpe, beta, annualVol: annualPortfolioVol * 100 };
-}
+import { useBtcTicker, useKlines } from '@/hooks/useBtcData';
+import { computeLiveRiskMetrics } from '@/utils/riskCalculations';
 import { ModeBadge } from '../components/ui/DataBadge';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -195,6 +171,10 @@ const inputStyle = { width: '100%', background: '#0d1421', border: '1px solid #1
 const selectStyle = { ...inputStyle, cursor: 'pointer' };
 
 export default function Portfolio() {
+  // Dados live de mercado para métricas de risco calculadas
+  const { data: ticker }   = useBtcTicker();
+  const { data: klines1d } = useKlines('1d', 30);
+
   // Carrega posições do Supabase (ou mock se não configurado)
   const { data: savedPositions } = usePortfolioPositions();
   const { mutate: persistPosition } = useUpsertPosition();
@@ -209,11 +189,47 @@ export default function Portfolio() {
       setPositions(savedPositions.map(p => ({ ...p, id: p.id ?? crypto.randomUUID(), current_price: p.entry_price })));
     }
   }, [savedPositions]);
+
+  // Atualiza current_price das posições com o preço live do BTC
+  useEffect(() => {
+    if (ticker?.mark_price) {
+      setPositions(prev => prev.map(p =>
+        p.type !== 'cash' && (p.type === 'spot' || p.type.startsWith('futures'))
+          ? { ...p, current_price: ticker.mark_price }
+          : p,
+      ));
+    }
+  }, [ticker?.mark_price]);
+
   const [showAddForm, setShowAddForm] = useState(false);
   const [stressMove, setStressMove] = useState(null);
 
   const greeks = useMemo(() => computePortfolioGreeks(positions), [positions]);
-  const riskMetrics = useMemo(() => computeRiskMetrics(greeks), [greeks]);
+
+  // Preços históricos BTC para cálculo de vol real (close prices dos klines diários)
+  const btcPriceHistory = useMemo(() => {
+    if (klines1d && klines1d.length > 0) {
+      return klines1d.map(k => k.close);  // campo close da transformação select
+    }
+    // Fallback: sem histórico, VaR usa vol zero (retorna 0 conservador)
+    return [];
+  }, [klines1d]);
+
+  // Risk metrics LIVE — usa vol histórica real + posições atualizadas com preço live
+  const riskMetrics = useMemo(() => {
+    const liveResult = computeLiveRiskMetrics(positions, btcPriceHistory);
+    // Retrocompatibilidade com o shape esperado pelo JSX:
+    return {
+      var95:     Math.abs(liveResult.var_95_1d),
+      var99:     Math.abs(liveResult.var_99_1d),
+      sharpe:    liveResult.sharpe_ratio,
+      beta:      liveResult.beta_vs_btc,
+      annualVol: liveResult.annual_vol_pct,
+      // Campos adicionais (live)
+      cvar95:    Math.abs(liveResult.cvar_95),
+      var95hist: Math.abs(liveResult.var_95_hist),
+    };
+  }, [positions, btcPriceHistory]);
 
   const maxDrawdownUSD = useMemo(() => {
     const stressVals = stressScenarios.map(s => stressTest(positions.filter(p => p.type !== 'cash'), s.pct));

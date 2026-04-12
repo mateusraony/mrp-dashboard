@@ -4,16 +4,19 @@ import {
   fearGreed, recentAlerts, globalRisk, sourceHealth, fmtNum, fmtPct, aiAnalysis,
 } from '../components/data/mockData';
 import { useBtcTicker, useFearGreed as useFearGreedHook } from '@/hooks/useBtcData';
+import { useRiskScore } from '@/hooks/useRiskScore';
+import { useMacroBoard } from '@/hooks/useFred';
+import { useMempoolState } from '@/hooks/useMempool';
 
 // ─── DATA LAYER (live > mock fallback) ───────────────────────────────────────
-// Retorna os mesmos nomes dos imports mock — main component os shadowa localmente.
-// Sub-componentes (FearGreedGauge, BTCSnapshot) continuam usando mock via closure.
 function useDashboardLiveData() {
-  const { data: ticker } = useBtcTicker();
-  const { data: fng }    = useFearGreedHook();
+  const { data: ticker }    = useBtcTicker();
+  const { data: fng }       = useFearGreedHook();
+  const { data: riskScore } = useRiskScore();
   return {
     btcFutures: ticker ? { ...btcFutures, mark_price: ticker.mark_price, funding_rate: ticker.last_funding_rate, oi_delta_pct: ticker.oi_delta_pct, open_interest: ticker.open_interest } : btcFutures,
     fearGreed:  fng    ? { ...fearGreed,  value: fng.value, label: fng.label, classification: fng.label } : fearGreed,
+    riskScore:  riskScore ?? null,
   };
 }
 import RiskMeter from '../components/ui/RiskMeter';
@@ -75,8 +78,8 @@ function SectionTitle({ icon, label, sub = '', action = null }) {
 }
 
 // ─── FEAR & GREED ─────────────────────────────────────────────────────────────
-function FearGreedGauge() {
-  const v = fearGreed.value;
+function FearGreedGauge({ liveValue }) {
+  const v = liveValue ?? fearGreed.value;
   const zones = [
     { label: 'Extreme Fear', max: 25, color: '#60a5fa' },
     { label: 'Fear',         max: 45, color: '#10b981' },
@@ -139,8 +142,8 @@ function FearGreedGauge() {
 }
 
 // ─── BTC SNAPSHOT ─────────────────────────────────────────────────────────────
-function BTCSnapshot() {
-  const fr = btcFutures;
+function BTCSnapshot({ liveData }) {
+  const fr = liveData ?? btcFutures;
   const fundingColor = fr.funding_rate > 0.0005 ? '#ef4444' : fr.funding_rate > 0 ? '#f59e0b' : '#10b981';
   const oiColor = '#f59e0b';
 
@@ -185,8 +188,11 @@ function BTCSnapshot() {
 }
 
 // ─── MACRO MINI CARDS ─────────────────────────────────────────────────────────
+const MACRO_ICONS = { SP500: '📈', DXY: '💵', GOLD: '🥇', VIX: '🌡️', US10Y: '📊', US2Y: '📉' };
+
 function MacroRow() {
-  const series = macroBoard.series;
+  const { data: liveMacro } = useMacroBoard();
+  const series = liveMacro?.series ?? macroBoard.series;
   const invertColors = { DXY: true, VIX: true };
 
   return (
@@ -207,7 +213,7 @@ function MacroRow() {
             borderRadius: 10, padding: '12px 13px',
           }}>
             <div style={{ fontSize: 10, color: '#64748b', marginBottom: 5, display: 'flex', alignItems: 'center', gap: 4 }}>
-              <span>{s.icon}</span> {s.name}
+              <span>{s.icon ?? MACRO_ICONS[s.id] ?? '📊'}</span> {s.name}
             </div>
             <div style={{ fontSize: 16, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: '#f1f5f9', letterSpacing: '-0.02em', marginBottom: 5 }}>
               {valStr}
@@ -289,7 +295,7 @@ function DataQualityStrip() {
         <span style={{ fontSize: 12, fontWeight: 700, color: '#64748b', flex: 1, textAlign: 'left' }}>Saúde das Fontes de Dados</span>
         <span style={{ fontSize: 10, color: '#10b981', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 4, padding: '1px 6px', fontWeight: 700 }}>{ok} OK</span>
         {warn > 0 && <span style={{ fontSize: 10, color: '#f59e0b', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 4, padding: '1px 6px', fontWeight: 700 }}>{warn} ⚠</span>}
-        <ModeBadge mode="mock" />
+        <ModeBadge />
         <span style={{ fontSize: 10, color: '#334155' }}>{open ? '▲' : '▼'}</span>
       </button>
       {open && <div style={{ borderTop: '1px solid #1a2535' }}>{sourceHealth.map(s => <SourceRow key={s.source} source={s} />)}</div>}
@@ -299,13 +305,21 @@ function DataQualityStrip() {
 
 // ─── MEMPOOL ──────────────────────────────────────────────────────────────────
 function MempoolRow() {
+  const { data: liveMempool } = useMempoolState();
+  // Live: MempoolData shape (snake_case). Mock: onChain.fees/mempool shape (camelCase).
+  const fastest  = liveMempool?.fees.fastest_fee   ?? onChain.fees.fastestFee;
+  const halfHour = liveMempool?.fees.half_hour_fee  ?? onChain.fees.halfHourFee;
+  const hour     = liveMempool?.fees.hour_fee       ?? onChain.fees.hourFee;
+  const economy  = liveMempool?.fees.economy_fee    ?? onChain.fees.economyFee;
+  const txCount  = liveMempool?.tx_count            ?? onChain.mempool.count;
+  const vsize    = liveMempool?.vsize_bytes          ?? onChain.mempool.vsize;
   const items = [
-    { label: 'Fastest', value: onChain.fees.fastestFee, unit: 'sat/vB', color: '#ef4444' },
-    { label: '½ Hour',  value: onChain.fees.halfHourFee, unit: 'sat/vB', color: '#f59e0b' },
-    { label: '1 Hour',  value: onChain.fees.hourFee, unit: 'sat/vB', color: '#10b981' },
-    { label: 'Economy', value: onChain.fees.economyFee, unit: 'sat/vB', color: '#64748b' },
-    { label: 'Txs',     value: onChain.mempool.count.toLocaleString(), unit: 'unconf', color: '#60a5fa' },
-    { label: 'Mempool', value: `${(onChain.mempool.vsize/1e6).toFixed(1)}`, unit: 'MB', color: '#a78bfa' },
+    { label: 'Fastest', value: fastest,  unit: 'sat/vB', color: '#ef4444' },
+    { label: '½ Hour',  value: halfHour, unit: 'sat/vB', color: '#f59e0b' },
+    { label: '1 Hour',  value: hour,     unit: 'sat/vB', color: '#10b981' },
+    { label: 'Economy', value: economy,  unit: 'sat/vB', color: '#64748b' },
+    { label: 'Txs',     value: txCount.toLocaleString(), unit: 'unconf', color: '#60a5fa' },
+    { label: 'Mempool', value: `${(vsize/1e6).toFixed(1)}`, unit: 'MB', color: '#a78bfa' },
   ];
   return (
     <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '12px 16px', display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -397,14 +411,19 @@ function AITrackRecord() {
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
 export default function Dashboard() {
   // eslint-disable-next-line no-unused-vars
-  const { btcFutures: _btcLive, fearGreed: _fngLive } = useDashboardLiveData();
+  const { btcFutures: _btcLive, fearGreed: _fngLive, riskScore: liveRiskScore } = useDashboardLiveData();
   const [lastUpdate, setLastUpdate] = useState(new Date());
   useEffect(() => {
     const t = setInterval(() => setLastUpdate(new Date()), 5000);
     return () => clearInterval(t);
   }, []);
 
-  const regimeColor = globalRisk.regime === 'RISK-ON' ? '#10b981' : globalRisk.regime === 'RISK-OFF' ? '#ef4444' : '#f59e0b';
+  // Usa Risk Score live se disponível; fallback para globalRisk do mock
+  const activeScore  = liveRiskScore?.score  ?? globalRisk.score;
+  const activeRegime = liveRiskScore
+    ? (liveRiskScore.regime === 'RISCO ELEVADO' ? 'RISK-OFF' : liveRiskScore.regime === 'SAUDÁVEL' ? 'RISK-ON' : 'NEUTRAL')
+    : globalRisk.regime;
+  const regimeColor = activeRegime === 'RISK-ON' ? '#10b981' : activeRegime === 'RISK-OFF' ? '#ef4444' : '#f59e0b';
 
   return (
     <div style={{ maxWidth: 1440, margin: '0 auto' }}>
@@ -418,10 +437,10 @@ export default function Dashboard() {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <div style={{ width: 8, height: 8, borderRadius: '50%', background: regimeColor, boxShadow: `0 0 8px ${regimeColor}` }} className="live-dot" />
-          <span style={{ fontSize: 11, fontWeight: 800, color: regimeColor, letterSpacing: '0.08em' }}>{globalRisk.regime}</span>
+          <span style={{ fontSize: 11, fontWeight: 800, color: regimeColor, letterSpacing: '0.08em' }}>{activeRegime}</span>
         </div>
         <div style={{ fontSize: 11, color: '#475569' }}>
-          Risk Score: <span style={{ fontFamily: 'JetBrains Mono, monospace', color: regimeColor, fontWeight: 700 }}>{globalRisk.score}/100</span>
+          Risk Score: <span style={{ fontFamily: 'JetBrains Mono, monospace', color: regimeColor, fontWeight: 700 }}>{activeScore}/100</span>
         </div>
         <div style={{ fontSize: 11, color: '#475569' }}>
           Prob. Evento: <span style={{ fontFamily: 'JetBrains Mono, monospace', color: '#f1f5f9', fontWeight: 700 }}>{globalRisk.prob}%</span>
@@ -430,14 +449,19 @@ export default function Dashboard() {
         <div style={{ fontSize: 10, color: '#334155' }}>
           Updated {lastUpdate.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' })} BRT
         </div>
-        <ModeBadge mode="mock" />
+        <ModeBadge />
       </div>
 
       {/* ── ZONA A: Risk + F&G + BTC ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px,1fr))', gap: 14, marginBottom: 20 }}>
-        <RiskMeter score={globalRisk.score} prob={globalRisk.prob} regime={globalRisk.regime} moduleScores={globalRisk.module_scores} />
-        <FearGreedGauge />
-        <BTCSnapshot />
+        <RiskMeter
+          score={activeScore}
+          prob={globalRisk.prob}
+          regime={activeRegime}
+          moduleScores={liveRiskScore?.module_scores ?? globalRisk.module_scores}
+        />
+        <FearGreedGauge liveValue={_fngLive?.value} />
+        <BTCSnapshot liveData={_btcLive} />
       </div>
 
       {/* ── Regra de Ouro ── */}

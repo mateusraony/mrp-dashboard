@@ -1,15 +1,40 @@
 import { btcOptions as btcOptionsMock, btcOptionsExtended, aiAnalysis } from '../components/data/mockData';
 import { useOptionsData } from '@/hooks/useDeribit';
+import { computeGex, computeMaxPain } from '@/utils/riskCalculations';
 
 // ─── DATA LAYER (live > mock fallback) ───────────────────────────────────────
-// useOptionsData() retorna OptionsData — shape compatível com btcOptions:
-//   spot → spot, iv_atm → iv_atm, chain → strikes (mesmos campos base)
+// useOptionsData() retorna OptionsData com chain incluindo gammas reais do Deribit.
 function useOptionsPageData() {
   const { data: live } = useOptionsData();
+
   const btcOptions = live
     ? { ...btcOptionsMock, spot: live.spot, iv_atm: live.iv_atm, strikes: live.chain.map(c => ({ strike: c.strike, call_iv: c.call_iv, put_iv: c.put_iv })) }
     : btcOptionsMock;
-  return { btcOptions };
+
+  // GEX calculado da chain viva (fórmula validada em scripts/validate_gex.py)
+  const gexData = live
+    ? computeGex(
+        live.chain.map(c => ({
+          strike:  c.strike,
+          call_oi: c.call_oi,
+          put_oi:  c.put_oi,
+          gamma:   c.call_gamma,  // gamma da call (Deribit retorna por contrato)
+          call_iv: c.call_iv,
+          put_iv:  c.put_iv,
+        })),
+        live.spot,
+      )
+    : null;
+
+  // Max Pain calculado da chain viva
+  const maxPain = live
+    ? computeMaxPain(
+        live.chain.map(c => ({ strike: c.strike, call_oi: c.call_oi, put_oi: c.put_oi, call_iv: c.call_iv, put_iv: c.put_iv })),
+        live.spot,
+      )
+    : btcOptionsExtended.max_pain;
+
+  return { btcOptions, liveGex: gexData, liveMaxPain: maxPain, liveChain: live?.chain ?? null };
 }
 import { AIModuleCard } from '../components/ui/AIAnalysisPanel';
 import SectionHeader from '../components/ui/SectionHeader';
@@ -30,7 +55,7 @@ const regimeLabels = {
 };
 
 export default function Options() {
-  const { btcOptions } = useOptionsPageData();
+  const { btcOptions, liveGex, liveMaxPain } = useOptionsPageData();
   const o = btcOptions;
   const regime = regimeLabels[o.regime];
 
@@ -186,10 +211,10 @@ export default function Options() {
         <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: 20 }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 14 }}>Max Pain</div>
           <div style={{ fontSize: 32, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: '#a78bfa', marginBottom: 4, letterSpacing: '-0.04em' }}>
-            ${btcOptionsExtended.max_pain.toLocaleString()}
+            ${liveMaxPain.toLocaleString()}
           </div>
           <div style={{ fontSize: 11, color: '#4a5568', marginBottom: 14 }}>
-            {btcOptionsExtended.max_pain_distance_pct.toFixed(2)}% {btcOptionsExtended.max_pain_distance_pct < 0 ? 'abaixo' : 'acima'} do spot atual
+            {(((liveMaxPain - o.spot) / o.spot) * 100).toFixed(2)}% {liveMaxPain < o.spot ? 'abaixo' : 'acima'} do spot atual
           </div>
           <div style={{ padding: '8px 12px', borderRadius: 7, background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.18)', marginBottom: 12 }}>
             <div style={{ fontSize: 11, color: '#a78bfa', fontWeight: 600, marginBottom: 3 }}>
@@ -200,13 +225,27 @@ export default function Options() {
               Preço tende a ser "atraído" para este nível próximo ao vencimento. Distância atual: {Math.abs(btcOptionsExtended.max_pain_distance_pct).toFixed(1)}%.
             </div>
           </div>
-          <div style={{ fontSize: 10, color: '#334155' }}>
-            Gamma Exposure (GEX):{' '}
-            <span style={{ fontFamily: 'JetBrains Mono, monospace', color: btcOptionsExtended.gamma_exposure_usd < 0 ? '#ef4444' : '#10b981', fontWeight: 700 }}>
-              ${(btcOptionsExtended.gamma_exposure_usd / 1e6).toFixed(0)}M
-            </span>
-            {btcOptionsExtended.gamma_exposure_usd < 0 ? ' (Short GEX — dealers amplificam moves)' : ' (Long GEX — dealers amortecendo moves)'}
-          </div>
+          {(() => {
+            const gexUsd = liveGex ? liveGex.net_gex_usd : btcOptionsExtended.gamma_exposure_usd;
+            const gexColor = gexUsd < 0 ? '#ef4444' : '#10b981';
+            const gexLabel = liveGex?.dealer_position === 'short_gamma' ? ' (Short GEX — dealers amplificam moves)'
+              : liveGex?.dealer_position === 'long_gamma' ? ' (Long GEX — dealers amortecendo moves)'
+              : gexUsd < 0 ? ' (Short GEX — dealers amplificam moves)' : ' (Long GEX — dealers amortecendo moves)';
+            return (
+              <div style={{ fontSize: 10, color: '#334155' }}>
+                Gamma Exposure (GEX):{' '}
+                <span style={{ fontFamily: 'JetBrains Mono, monospace', color: gexColor, fontWeight: 700 }}>
+                  ${(gexUsd / 1e6).toFixed(0)}M
+                </span>
+                {gexLabel}
+                {liveGex?.gamma_flip && (
+                  <span style={{ color: '#a78bfa', marginLeft: 8 }}>
+                    · Flip: ${liveGex.gamma_flip.toLocaleString()} ({liveGex.flip_distance_pct > 0 ? '+' : ''}{liveGex.flip_distance_pct}%)
+                  </span>
+                )}
+              </div>
+            );
+          })()}
         </div>
       </div>
 

@@ -1,6 +1,6 @@
 # CHECKPOINT.md — MRP Dashboard
 > Memória técnica viva do projeto. Atualizar ao final de cada bloco importante.
-> Última atualização: 2026-04-12 (Fase 3 — 100% CONCLUÍDA — Sprints 3.1–3.9)
+> Última atualização: 2026-04-12 (Fase 4 — 100% CONCLUÍDA — Sprints 4.1–4.5)
 
 ---
 
@@ -12,7 +12,7 @@
 | Lint (`eslint . --quiet`) | ✅ PASSA | 0 erros |
 | TypeCheck (`tsc -p jsconfig.json`) | ✅ PASSA | 0 erros |
 | Deploy (Render) | ✅ ONLINE | https://mrp-dashboard.onrender.com |
-| Dados ao vivo | ⚠️ PRONTO / NÃO ATIVO | DATA_MODE=mock (serviços criados, `.env.local` pendente) |
+| Dados ao vivo | ✅ ATIVO | DATA_MODE=live é padrão permanente (env.ts default='live') |
 | Serviços externos | ✅ ESTRUTURADO | 6 services em `src/services/` (binance, coingecko, alternative, deribit, fred, mempool, supabase) |
 | Auth real | ❌ AUSENTE | Stub hardcoded — aguarda Fase futura |
 | Supabase | ✅ INSTALADO + SCHEMA | Instalado, service criado, migração SQL pronta |
@@ -28,7 +28,7 @@
 | Fase 1 — Análise Profunda | ✅ CONCLUÍDA | 2026-04-11 |
 | Fase 2 — Interface/Visual (Sprints 1+2) | ✅ CONCLUÍDA | 2026-04-11 |
 | Fase 3 — API + Hooks + Settings (Sprints 3.1–3.9) | ✅ CONCLUÍDA | 2026-04-12 |
-| Fase 4 — Cálculos Python | ⏳ AGUARDA AUTORIZAÇÃO | — |
+| Fase 4 — Cálculos Python + Wiring Live (Sprints 4.1–4.5) | ✅ CONCLUÍDA | 2026-04-12 |
 
 ---
 
@@ -101,16 +101,36 @@
 | src/lib/env.ts — DATA_MODE lê localStorage primeiro (sem rebuild), setDataMode() | ✅ DONE |
 | **Varredura final:** `npm run build` ✅ · `tsc -p jsconfig.json` ✅ · `eslint --quiet` ✅ | ✅ DONE |
 
+### ─── SPRINTS 4.1–4.5 (2026-04-12) — FASE 4 FINALIZADA ───
+| Item | Status |
+|------|--------|
+| **Sprint 4.1** — `scripts/validate_var.py` — VaR paramétrico, histórico, CVaR, Sharpe, Beta, Max Drawdown | ✅ DONE |
+| **Sprint 4.1** — `src/utils/riskCalculations.ts` — TypeScript port completo de todos os cálculos | ✅ DONE |
+| **Sprint 4.1** — `Portfolio.jsx` — computeLiveRiskMetrics() substituindo vol hardcoded (BTC_DAILY_VOL=0.042 removido) | ✅ DONE |
+| **Sprint 4.2** — `scripts/validate_risk_score.py` — Risk Score 5-fatores validado (funding 30%, OI 20%, DVOL 20%, F&G 20%, preço 10%) | ✅ DONE |
+| **Sprint 4.2** — `src/hooks/useRiskScore.ts` — hook composto live (useBtcTicker + useFearGreed + useDvolHistory + useKlines) | ✅ DONE |
+| **Sprint 4.2** — `Dashboard.jsx` — RiskMeter wired para liveRiskScore (FearGreedGauge + BTCSnapshot recebem props live) | ✅ DONE |
+| **Sprint 4.3** — `scripts/validate_gex.py` — GEX por strike, net GEX, dealer position, gamma flip, max pain (Black-Scholes gamma) | ✅ DONE |
+| **Sprint 4.3** — `Options.jsx` — computeGex() + computeMaxPain() wired com dados live da cadeia Deribit | ✅ DONE |
+| **Sprint 4.4** — `scripts/validate_macro_surprise.py` — Z-Score rolling por evento (only prior history) | ✅ DONE |
+| **Sprint 4.4** — `MacroCalendar.jsx` — coluna Z-Score na tab Surpresa com computeSurpriseZScores() | ✅ DONE |
+| **Sprint 4.5** — `Dashboard.jsx` — MacroRow wired para useMacroBoard() (live > mock fallback, MACRO_ICONS map) | ✅ DONE |
+| **Sprint 4.5** — `Dashboard.jsx` — MempoolRow wired para useMempoolState() (fees + tx_count + vsize live) | ✅ DONE |
+| **Sprint 4.5** — `useRiskScore.ts` — corrigido chamada useKlines (arg order + .dvol→.value + k[4]→k.close) | ✅ DONE |
+| **Sprint 4.5** — `Portfolio.jsx` — corrigido useKlines('1d', 30) + k.close (não mais k[4]) | ✅ DONE |
+| **Sprint 4.5** — `src/lib/env.ts` — DATA_MODE default='live' (sem mais mock como padrão) | ✅ DONE |
+| **Varredura final:** `npm run build` ✅ · `tsc -p jsconfig.json` ✅ · `eslint --quiet` ✅ | ✅ DONE |
+
 ---
 
-## 🏗 ARQUITETURA ATUAL (2026-04-12)
+## 🏗 ARQUITETURA ATUAL (2026-04-12 — pós Fase 4)
 
 ```
 src/
   pages/          → 20 páginas roteadas (19 originais + Altcoins)
   components/
     ui/           → 40+ componentes Shadcn/Radix
-    data/         → 15 arquivos mock (TEMPORÁRIO — eliminação gradual pela Fase 3)
+    data/         → 15 arquivos mock (TEMPORÁRIO — eliminação gradual conforme APIs ativadas)
     dashboard/    → 4 componentes
     derivatives/  → 2 componentes
     onchain/      → 1 componente
@@ -119,26 +139,22 @@ src/
   hooks/
     use-mobile.jsx
     useBtcData.ts      ← Sprint 3.3
-    useDeribit.ts      ← NOVO (Sprint 3.8)
-    useFred.ts         ← NOVO (Sprint 3.8)
-    useMempool.ts      ← NOVO (Sprint 3.8)
-    useSupabase.ts     ← NOVO (Sprint 3.8)
+    useDeribit.ts      ← Sprint 3.8
+    useFred.ts         ← Sprint 3.8
+    useMempool.ts      ← Sprint 3.8
+    useSupabase.ts     ← Sprint 3.8
+    useRiskScore.ts    ← NOVO (Sprint 4.2) — Risk Score 5-fatores live
   lib/
-    env.ts             ← NOVO (Sprint 3.1)
-    errorBoundary.tsx  ← NOVO (Sprint 3.1)
+    env.ts             ← Sprint 3.1 (DATA_MODE default='live' desde Sprint 4.5)
+    errorBoundary.tsx  ← Sprint 3.1
     AuthContext.jsx    (stub — ainda hardcoded)
     query-client.js    (atualizado Sprint 3.1)
     utils, app-params, notificationClient
   services/            ← CRIADO (Fase 3)
-    binance.ts         ← Sprint 3.1
-    coingecko.ts       ← Sprint 3.1
-    alternative.ts     ← Sprint 3.1
-    deribit.ts         ← Sprint 3.4
-    fred.ts            ← Sprint 3.5
-    mempool.ts         ← Sprint 3.6
-    supabase.ts        ← Sprint 3.7
+    binance.ts, coingecko.ts, alternative.ts, deribit.ts, fred.ts, mempool.ts, supabase.ts
   utils/
     index.ts
+    riskCalculations.ts ← NOVO (Sprint 4.1) — VaR, Sharpe, Beta, GEX, Risk Score (TypeScript)
   App.jsx              (atualizado Sprint 3.1 — ErrorBoundary)
   Layout.jsx           (redesenhado Sprint 3.2)
   pages.config.js      (atualizado Sprint 3.4 — PAGE_IMPORTS para prefetch)
@@ -196,7 +212,7 @@ select: (data) => ({ ...data, formatted: data.value.toFixed(2) }),
 | # | Arquivo | Problema | Ação |
 |---|---------|---------|------|
 | M1 | `src/services/mempool.ts` | `fetchOnChainAdvanced` sempre retorna mock (sem API pública gratuita) | Integrar Glassnode/CryptoQuant quando autorizado |
-| M2 | Páginas com sub-componentes | Sub-componentes usam module-level mock vars; live data ativo via cache, mas não renderizado | Fase 4 — prop-passing completo para sub-componentes |
+| M2 | `src/components/data/` | 15 arquivos mock ainda presentes | Eliminação gradual conforme APIs são ativadas e testadas |
 
 ---
 
@@ -225,12 +241,14 @@ VITE_SUPABASE_ANON_KEY=sua_anon_key
 ## 🗺 PRÓXIMOS PASSOS
 
 ### ✅ Fase 3 — COMPLETA (Sprints 3.1–3.9)
+### ✅ Fase 4 — COMPLETA (Sprints 4.1–4.5)
 
-### Aguarda Fase 4
-- [ ] Script Python: Risk Score composto (BTC, funding, IV, on-chain)
-- [ ] Script Python: VaR paramétrico vs histórico vs Monte Carlo
-- [ ] Script Python: GEX/Dealer positioning formula validation
-- [ ] Script Python: Macro Surprise Index
+### Próximas iniciativas (aguarda nova autorização)
+- [ ] Glassnode/CryptoQuant — NUPL, MVRV, Netflow live (requer plano pago)
+- [ ] Auth real — Supabase Auth (email/OAuth) para proteger portfólio e alertas
+- [ ] Testes automatizados — Vitest/Playwright (zero testes no projeto)
+- [ ] OnChain Cycle Pack — MVRV Z-score, HODL Waves, Dormancy (pago)
+- [ ] Cross-venue microstructure — taker imbalance cross-exchange
 
 ### Gaps de produto ainda presentes
 - [ ] Spot Sessions Analytics — CVD intraday por sessão Ásia/Europa/EUA
@@ -244,7 +262,8 @@ VITE_SUPABASE_ANON_KEY=sua_anon_key
 ## 📝 DECISÕES PENDENTES
 
 1. **Glassnode/CryptoQuant** — autorizar integração paga para NUPL/MVRV/Netflow live?
-2. **Fase 4** — Autorizar scripts Python de cálculo? (plano apresentado pelo conselho técnico)
+2. **Auth real** — Implementar Supabase Auth antes de expor dados de portfólio de usuário?
+3. **Testes** — Autorizar sprint de testes (Vitest unit + Playwright e2e)?
 
 ---
 
