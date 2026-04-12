@@ -1,6 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
+import { PAGE_IMPORTS } from './pages.config';
+
+// Prefetch antecipado: dispara o import() no hover para que o chunk
+// já esteja em cache quando o usuário clicar no item.
+function prefetchPage(page) {
+  if (page && PAGE_IMPORTS[page]) {
+    PAGE_IMPORTS[page]().catch(() => {});
+  }
+}
 import {
   LayoutDashboard, Activity, FileBarChart2,
   TrendingUp, BarChart3, ArrowUpDown, Sigma, Building2,
@@ -103,6 +112,7 @@ function NavItem({ label, icon: Icon, page, desc, active, collapsed, onClick = u
     <Link
       to={createPageUrl(page)}
       onClick={onClick}
+      onMouseEnter={() => prefetchPage(page)}
       title={collapsed ? `${label} — ${desc}` : undefined}
       className="nav-item"
       style={{
@@ -216,6 +226,7 @@ function MobileDrawer({ currentPageName, onClose }) {
                     key={page}
                     to={createPageUrl(page)}
                     onClick={onClose}
+                    onMouseEnter={() => prefetchPage(page)}
                     style={{
                       display: 'flex', alignItems: 'center', gap: 10,
                       padding: '10px 12px', borderRadius: 10, textDecoration: 'none',

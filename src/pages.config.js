@@ -6,32 +6,41 @@
  *
  * THE ONLY EDITABLE VALUE: mainPage
  * Controla qual página é a landing page.
+ *
+ * PAGE_IMPORTS: funções de import exportadas separadamente para
+ * hover-prefetch no Layout — chama import() antecipadamente sem
+ * instanciar o componente.
  */
 import { lazy } from 'react';
 import __Layout from './Layout.jsx';
 
-export const PAGES = {
-  Dashboard:          lazy(() => import('./pages/Dashboard')),
-  Derivatives:        lazy(() => import('./pages/DerivativesPage')),
-  InstitutionalFlows: lazy(() => import('./pages/InstitutionalFlows')),
-  Opportunities:      lazy(() => import('./pages/Opportunities')),
-  Automations:        lazy(() => import('./pages/AutomationsPage')),
-  Macro:              lazy(() => import('./pages/Macro')),
-  OnChain:            lazy(() => import('./pages/OnChain')),
-  Options:            lazy(() => import('./pages/Options')),
-  Settings:           lazy(() => import('./pages/Settings')),
-  SpotFlow:           lazy(() => import('./pages/SpotFlow')),
-  NewsIntelligence:   lazy(() => import('./pages/NewsIntelligence')),
-  Portfolio:          lazy(() => import('./pages/Portfolio')),
-  SmartAlerts:        lazy(() => import('./pages/SmartAlerts')),
-  MarketRegime:       lazy(() => import('./pages/MarketRegime')),
-  PredictivePanel:    lazy(() => import('./pages/PredictivePanel')),
-  ExecutiveReport:    lazy(() => import('./pages/ExecutiveReport')),
-  MacroCalendar:      lazy(() => import('./pages/MacroCalendar')),
-  MarketSentiment:    lazy(() => import('./pages/MarketSentiment')),
-  GlobalMarkets:      lazy(() => import('./pages/GlobalMarkets')),
-  Altcoins:           lazy(() => import('./pages/Altcoins')),
+// Importações separadas para permitir prefetch antecipado via hover
+export const PAGE_IMPORTS = {
+  Dashboard:          () => import('./pages/Dashboard'),
+  Derivatives:        () => import('./pages/DerivativesPage'),
+  InstitutionalFlows: () => import('./pages/InstitutionalFlows'),
+  Opportunities:      () => import('./pages/Opportunities'),
+  Automations:        () => import('./pages/AutomationsPage'),
+  Macro:              () => import('./pages/Macro'),
+  OnChain:            () => import('./pages/OnChain'),
+  Options:            () => import('./pages/Options'),
+  Settings:           () => import('./pages/Settings'),
+  SpotFlow:           () => import('./pages/SpotFlow'),
+  NewsIntelligence:   () => import('./pages/NewsIntelligence'),
+  Portfolio:          () => import('./pages/Portfolio'),
+  SmartAlerts:        () => import('./pages/SmartAlerts'),
+  MarketRegime:       () => import('./pages/MarketRegime'),
+  PredictivePanel:    () => import('./pages/PredictivePanel'),
+  ExecutiveReport:    () => import('./pages/ExecutiveReport'),
+  MacroCalendar:      () => import('./pages/MacroCalendar'),
+  MarketSentiment:    () => import('./pages/MarketSentiment'),
+  GlobalMarkets:      () => import('./pages/GlobalMarkets'),
+  Altcoins:           () => import('./pages/Altcoins'),
 };
+
+export const PAGES = Object.fromEntries(
+  Object.entries(PAGE_IMPORTS).map(([key, fn]) => [key, lazy(fn)])
+);
 
 export const pagesConfig = {
   mainPage: 'Dashboard',
