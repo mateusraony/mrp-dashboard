@@ -8,12 +8,29 @@ import {
   Tooltip, ResponsiveContainer, ComposedChart, Line,
 } from 'recharts';
 import { format } from 'date-fns';
+import { useKlines, useBtcTicker } from '@/hooks/useBtcData';
+import { computeSessionStats } from '@/utils/sessionAnalytics';
 
 export default function SpotFlow() {
   const s = btcSpotFlow;
+
+  // ── Sprint 5.4: live session analytics from Binance klines ──────────────────
+  const { data: klines }  = useKlines('1h', 72);   // 72h = 3 ciclos garantidos
+  const { data: ticker }  = useBtcTicker();
+  const btcPrice          = ticker?.mark_price ?? btcSpotFlow.price;
+
+  // Calcula sessões live quando klines disponíveis; fallback para mock
+  const liveSessions = klines && klines.length >= 24
+    ? computeSessionStats(klines, btcPrice)
+    : null;
+
+  // Compatibiliza shape: live retorna array, mock é objeto {asia, europe, us}
+  const sessionList = liveSessions ?? Object.values(spotSessions);
   const cvdPositive = s.cvd > 0;
 
-  const chartData = s.klines.map(k => ({
+  // Usar klines live quando disponível para o gráfico de preço
+  const klinesSource = klines && klines.length > 0 ? klines : s.klines;
+  const chartData = klinesSource.map(k => ({
     time: format(new Date(k.time), 'HH:mm'),
     close: parseFloat(k.close.toFixed(0)),
     volume: parseFloat(k.volume.toFixed(0)),
@@ -161,12 +178,19 @@ export default function SpotFlow() {
 
       {/* ── SESSIONS ANÁLISE ── */}
       <div style={{ marginBottom: 16 }}>
-        <div style={{ marginBottom: 10 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 2 }}>Análise por Sessão de Mercado</div>
-          <div style={{ fontSize: 10, color: '#334155' }}>Ásia · Europa · EUA — CVD · Volume · Agressão por janela</div>
+        <div style={{ marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 2 }}>Análise por Sessão de Mercado</div>
+            <div style={{ fontSize: 10, color: '#334155' }}>Ásia · Europa · EUA — CVD · Volume · Agressão por janela</div>
+          </div>
+          {liveSessions && (
+            <span style={{ fontSize: 9, color: '#10b981', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 4, padding: '2px 7px', fontWeight: 700 }}>
+              LIVE · Binance 1h klines
+            </span>
+          )}
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
-          {Object.values(spotSessions).map((sess) => {
+          {sessionList.map((sess) => {
             const isBuy = sess.dominant_side === 'buy';
             const cvdColor = sess.cvd > 0 ? '#10b981' : '#ef4444';
             const moveColor = sess.price_move_pct > 0 ? '#10b981' : '#ef4444';

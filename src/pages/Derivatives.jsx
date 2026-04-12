@@ -3,7 +3,8 @@ import {
   oiByExchange as oiByExchangeMock,
   fmtNum, fmtPct, aiAnalysis,
 } from '../components/data/mockData';
-import { useBtcTicker, useOiByExchange } from '@/hooks/useBtcData';
+import { useBtcTicker, useOiByExchange, useLiquidations } from '@/hooks/useBtcData';
+import { useMultiVenueSnapshot } from '@/hooks/useMultiVenue';
 
 // ─── DATA LAYER (live > mock fallback) ───────────────────────────────────────
 // oiByExchange live → mapeia oi_usd para oi_b (shape do mock) para compatibilidade do UI
@@ -382,8 +383,173 @@ export function DerivativesOverview() {
 
       {/* Basis & Carry */}
       <BasisPanel />
+
+      {/* Liquidações Forçadas — Sprint 5.3 */}
+      <LiquidationsPanel />
+
+      {/* Cross-Venue Microstructure — Sprint 5.5 */}
+      <MultiVenuePanel />
     </div>
   );
 }
+// ─── LIQUIDATIONS PANEL (Sprint 5.3) ─────────────────────────────────────────
+function LiquidationsPanel() {
+  const { data: liq, isLoading, isError } = useLiquidations(50);
+
+  // Calcular totais
+  const longLiqs  = liq?.filter(l => l.side === 'SELL') ?? [];  // SELL = long foi liquidado
+  const shortLiqs = liq?.filter(l => l.side === 'BUY')  ?? [];  // BUY  = short foi liquidado
+  const totalLongUsd  = longLiqs.reduce((s, l) => s + l.usd_value, 0);
+  const totalShortUsd = shortLiqs.reduce((s, l) => s + l.usd_value, 0);
+
+  return (
+    <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: 20, marginBottom: 16 }}>
+      <SectionHeader title="Liquidações Forçadas — BTCUSDT" subtitle="Binance Futures · últimas 50 ordens · tempo real" />
+
+      {/* Totais */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+        <div style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, padding: '10px 14px' }}>
+          <div style={{ fontSize: 9, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Longs Liquidados</div>
+          <div style={{ fontSize: 22, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: '#ef4444' }}>
+            ${(totalLongUsd / 1e3).toFixed(0)}K
+          </div>
+          <div style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>{longLiqs.length} ordens</div>
+        </div>
+        <div style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 8, padding: '10px 14px' }}>
+          <div style={{ fontSize: 9, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Shorts Liquidados</div>
+          <div style={{ fontSize: 22, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: '#10b981' }}>
+            ${(totalShortUsd / 1e3).toFixed(0)}K
+          </div>
+          <div style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>{shortLiqs.length} ordens</div>
+        </div>
+      </div>
+
+      {/* Tabela */}
+      {isLoading && <div style={{ fontSize: 12, color: '#475569', padding: '12px 0' }}>Carregando liquidações...</div>}
+      {isError  && <div style={{ fontSize: 12, color: '#ef4444', padding: '12px 0' }}>Erro ao carregar liquidações da Binance.</div>}
+      {liq && liq.length > 0 && (
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+            <thead>
+              <tr>
+                {['Lado', 'Preço', 'Qtd (BTC)', 'USD', 'Tempo'].map(h => (
+                  <th key={h} style={{ textAlign: 'left', padding: '4px 8px', fontSize: 9, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid #1a2535' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {liq.slice(0, 20).map((l, i) => {
+                const isLong = l.side === 'SELL'; // SELL = long liquidado
+                const color  = isLong ? '#ef4444' : '#10b981';
+                const label  = isLong ? 'Long ↓' : 'Short ↑';
+                const ageMs  = Date.now() - l.timestamp;
+                const ageFmt = ageMs < 60_000
+                  ? `${Math.round(ageMs / 1000)}s atrás`
+                  : ageMs < 3_600_000
+                    ? `${Math.round(ageMs / 60_000)}min atrás`
+                    : format(new Date(l.timestamp), 'HH:mm');
+                return (
+                  <tr key={i} style={{ borderBottom: '1px solid #0d1421' }}>
+                    <td style={{ padding: '5px 8px', color, fontWeight: 700 }}>{label}</td>
+                    <td style={{ padding: '5px 8px', fontFamily: 'JetBrains Mono, monospace', color: '#e2e8f0' }}>${fmtNum(l.price, 0)}</td>
+                    <td style={{ padding: '5px 8px', fontFamily: 'JetBrains Mono, monospace', color: '#94a3b8' }}>{l.qty.toFixed(3)}</td>
+                    <td style={{ padding: '5px 8px', fontFamily: 'JetBrains Mono, monospace', color }}>
+                      {l.usd_value >= 1e6 ? `$${(l.usd_value/1e6).toFixed(2)}M` : `$${(l.usd_value/1e3).toFixed(0)}K`}
+                    </td>
+                    <td style={{ padding: '5px 8px', color: '#475569' }}>{ageFmt}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── MULTI-VENUE PANEL (Sprint 5.5) ──────────────────────────────────────────
+function MultiVenuePanel() {
+  const { data: binance } = useBtcTicker();
+  const { bybit, okx, isLoading } = useMultiVenueSnapshot();
+
+  // Montar tabela de 3 venues
+  const venues = [
+    {
+      name: 'Binance',
+      color: '#f59e0b',
+      mark: binance?.mark_price ?? null,
+      funding: binance?.last_funding_rate ?? null,
+      oi: null,  // OI Binance está no useOiByExchange separado — usar null por ora
+    },
+    {
+      name: 'Bybit',
+      color: '#3b82f6',
+      mark: bybit?.mark_price ?? null,
+      funding: bybit?.funding_rate ?? null,
+      oi: bybit?.open_interest_usd ?? null,
+    },
+    {
+      name: 'OKX',
+      color: '#10b981',
+      mark: okx?.last_price ?? null,
+      funding: okx?.funding_rate ?? null,
+      oi: okx?.open_interest_usd ?? null,
+    },
+  ];
+
+  // Divergência de funding: range entre max e min das três venues
+  const rates = venues.map(v => v.funding).filter(r => r !== null);
+  const fundingDivBps = rates.length >= 2
+    ? ((Math.max(...rates) - Math.min(...rates)) * 100 * 100).toFixed(1)
+    : null;
+
+  return (
+    <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: 20, marginBottom: 16 }}>
+      <SectionHeader title="Cross-Venue Microstructure" subtitle="Binance · Bybit · OKX — Funding · Mark Price · OI" />
+      {isLoading && !bybit && !okx && (
+        <div style={{ fontSize: 12, color: '#475569', padding: '12px 0' }}>Carregando dados multi-venue...</div>
+      )}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 14 }}>
+        {venues.map(v => (
+          <div key={v.name} style={{ background: '#0D1421', border: `1px solid ${v.color}25`, borderTop: `3px solid ${v.color}`, borderRadius: 9, padding: '12px 14px' }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: v.color, marginBottom: 10, letterSpacing: '0.04em' }}>{v.name}</div>
+            <div style={{ marginBottom: 8 }}>
+              <div style={{ fontSize: 9, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>Mark Price</div>
+              <div style={{ fontSize: 15, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', color: '#e2e8f0' }}>
+                {v.mark !== null ? `$${fmtNum(v.mark, 0)}` : <span style={{ color: '#334155' }}>—</span>}
+              </div>
+            </div>
+            <div style={{ marginBottom: 8 }}>
+              <div style={{ fontSize: 9, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>Funding Rate</div>
+              <div style={{ fontSize: 15, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', color: v.funding > 0 ? '#ef4444' : v.funding < 0 ? '#10b981' : '#94a3b8' }}>
+                {v.funding !== null ? `${(v.funding * 100).toFixed(4)}%` : <span style={{ color: '#334155' }}>—</span>}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: 9, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>OI (USD)</div>
+              <div style={{ fontSize: 13, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', color: '#94a3b8' }}>
+                {v.oi !== null ? `$${(v.oi / 1e9).toFixed(2)}B` : <span style={{ color: '#334155' }}>—</span>}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Funding divergence signal */}
+      {fundingDivBps !== null && (
+        <div style={{ padding: '8px 12px', background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.15)', borderRadius: 7 }}>
+          <span style={{ fontSize: 10, color: '#60a5fa' }}>
+            Divergência de funding entre venues: <strong>{fundingDivBps} bps</strong>
+            {parseFloat(fundingDivBps) > 5
+              ? ' — Divergência elevada · possível oportunidade de arbitragem'
+              : ' — Venues sincronizadas'}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Wrapper com tab Avançado ─────────────────────────────────────────────────
 // Re-export como default com tabs (Overview + Avançado)

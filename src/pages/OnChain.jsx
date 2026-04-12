@@ -6,15 +6,16 @@ import {
   btcRealizedMetrics, btcHashRate, onChain, fmtNum,
 } from '../components/data/mockData';
 import { useOnChainAdvanced, useMempoolState, useHashrate } from '@/hooks/useMempool';
+import { useOnChainCycle } from '@/hooks/useCoinMetrics';
+import { IS_LIVE } from '@/lib/env';
 
 // ─── DATA LAYER (live > mock fallback) ───────────────────────────────────────
-// Sub-componentes (NuplCard, SoprCard, etc.) usam os nomes de módulo diretamente.
-// O componente principal chama este hook — os valores são ignorados por ora mas
-// as queries ficam ativas para cache (os sub-componentes serão conectados por props na Fase 4).
 function useOnChainLiveData() {
-  useOnChainAdvanced(); // mantém cache ativo
-  useMempoolState();    // mantém cache ativo
-  useHashrate();        // mantém cache ativo
+  const { data: cycle }   = useOnChainCycle();    // MVRV Z-Score, NUPL, Realized Price
+  const { data: mempool } = useMempoolState();    // fees + mempool state live
+  const { data: hashrate} = useHashrate();        // hashrate live
+  useOnChainAdvanced();                           // NUPL/SOPR/Netflow — mantém cache (mock quality B)
+  return { cycle, mempool, hashrate };
 }
 import MiniTimeChart from '../components/dashboard/MiniTimeChart';
 import { ModeBadge, GradeBadge } from '../components/ui/DataBadge';
@@ -272,12 +273,25 @@ function WhaleCard() {
 }
 
 // ─── REALIZED PRICE / MVRV ───────────────────────────────────────────────────
-function MvrvCard() {
-  const m = btcRealizedMetrics;
-  const color = m.mvrv_zone_color;
-  const distPct = ((m.current_price - m.realized_price) / m.realized_price * 100);
+function MvrvCard({ liveCycle }) {
+  // live via CoinMetrics Community API (grátis, qualidade A) se disponível
+  const mvrv      = liveCycle?.mvrv_current    ?? btcRealizedMetrics.mvrv_ratio;
+  const mvrvZ     = liveCycle?.mvrv_zscore     ?? btcRealizedMetrics.mvrv_zscore;
+  const rPrice    = liveCycle?.realized_price  ?? btcRealizedMetrics.realized_price;
+  const cPrice    = liveCycle?.current_price   ?? btcRealizedMetrics.current_price;
+  const zone      = liveCycle?.mvrv_zone       ?? btcRealizedMetrics.mvrv_zone;
+  const color     = liveCycle?.mvrv_zone_color ?? btcRealizedMetrics.mvrv_zone_color;
+  const grade     = liveCycle?.quality         ?? 'B';
+  const distPct   = rPrice > 0 ? ((cPrice - rPrice) / rPrice * 100) : 0;
+  const rDelta30d = btcRealizedMetrics.realized_price_delta_30d;
   return (
-    <OnChainCard title="Realized Price · MVRV" glossKey="mvrv" accent={color} grade="B">
+    <OnChainCard title="Realized Price · MVRV" glossKey="mvrv" accent={color} grade={grade}>
+      {liveCycle && (
+        <div style={{ fontSize: 9, color: '#10b981', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
+          CoinMetrics Community · Grátis · Qualidade A
+        </div>
+      )}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 10 }}>
         <div>
           <div style={{ fontSize: 9, color: '#475569', marginBottom: 2, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
@@ -285,19 +299,19 @@ function MvrvCard() {
             <HelpIcon title={G.realizedPrice.title} content={G.realizedPrice.content} width={280} />
           </div>
           <span style={{ fontSize: 20, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: '#f1f5f9' }}>
-            ${fmtNum(m.realized_price, 0)}
+            ${fmtNum(rPrice, 0)}
           </span>
-          <div style={{ fontSize: 10, color: '#10b981', fontWeight: 600, marginTop: 1 }}>
-            Spot +{distPct.toFixed(1)}% acima
+          <div style={{ fontSize: 10, color: distPct >= 0 ? '#10b981' : '#ef4444', fontWeight: 600, marginTop: 1 }}>
+            Spot {distPct >= 0 ? '+' : ''}{distPct.toFixed(1)}% {distPct >= 0 ? 'acima' : 'abaixo'}
           </div>
         </div>
         <div>
           <div style={{ fontSize: 9, color: '#475569', marginBottom: 2, textTransform: 'uppercase', letterSpacing: '0.06em' }}>MVRV Ratio</div>
           <span style={{ fontSize: 26, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color, letterSpacing: '-0.04em' }}>
-            {m.mvrv_ratio.toFixed(2)}×
+            {mvrv.toFixed(2)}×
           </span>
           <div style={{ fontSize: 10, color, fontWeight: 600, marginTop: 1 }}>
-            {m.mvrv_zone}
+            {zone}
           </div>
         </div>
       </div>
@@ -320,29 +334,52 @@ function MvrvCard() {
       </div>
 
       <div style={{ display: 'flex', gap: 10, marginBottom: 8, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 10, color: '#64748b' }}>Z-Score: <span style={{ fontFamily: 'JetBrains Mono, monospace', color, fontWeight: 700 }}>{m.mvrv_zscore.toFixed(2)}</span></span>
-        <span style={{ fontSize: 10, color: '#64748b' }}>Realized +{m.realized_price_delta_30d.toFixed(1)}% em 30d</span>
+        <span style={{ fontSize: 10, color: '#64748b' }}>Z-Score: <span style={{ fontFamily: 'JetBrains Mono, monospace', color, fontWeight: 700 }}>{mvrvZ.toFixed(2)}</span></span>
+        <span style={{ fontSize: 10, color: '#64748b' }}>Realized +{rDelta30d.toFixed(1)}% em 30d</span>
       </div>
-      <InterpretBox text={m.interpretation} color="#94a3b8" />
+      <InterpretBox text={btcRealizedMetrics.interpretation} color="#94a3b8" />
     </OnChainCard>
   );
 }
 
 // ─── HASH RATE ────────────────────────────────────────────────────────────────
-function HashRateCard() {
-  const h = btcHashRate;
-  const isGrowing = h.delta_7d_pct > 0;
+function HashRateCard({ liveHashrate }) {
+  // live via Mempool.space (grátis, qualidade A) se disponível; fallback para mock
+  const currentEh     = liveHashrate?.current_eh      ?? btcHashRate.hash_rate_eh;
+  const d7            = liveHashrate?.delta_7d_pct     ?? btcHashRate.delta_7d_pct;
+  const d30           = liveHashrate?.delta_30d_pct    ?? btcHashRate.delta_30d_pct;
+  const difficulty    = liveHashrate?.difficulty       ?? btcHashRate.difficulty;
+  const diffAdj       = liveHashrate?.diff_adj_pct     ?? btcHashRate.difficulty_adj_pct;
+  const nextAdjPct    = liveHashrate?.next_adj_est_pct ?? btcHashRate.next_adj_est_pct;
+  const nextAdjBlocks = liveHashrate?.next_adj_blocks  ?? btcHashRate.next_adj_blocks;
+  const grade         = liveHashrate ? 'A' : btcHashRate.quality;
+
+  // Converter history live para formato MiniTimeChart { '1d', '1w', '1m' }
+  const history = liveHashrate
+    ? (() => {
+        const pts = liveHashrate.history.map(h => ({ t: h.timestamp, v: h.eh }));
+        return { '1d': pts.slice(-2), '1w': pts.slice(-7), '1m': pts.slice(-30) };
+      })()
+    : btcHashRate.history;
+
+  const isGrowing = d7 > 0;
   const color = isGrowing ? '#10b981' : '#ef4444';
   return (
-    <OnChainCard title="Hash Rate & Dificuldade" glossKey="hashrate" accent={color} grade={h.quality}>
+    <OnChainCard title="Hash Rate & Dificuldade" glossKey="hashrate" accent={color} grade={grade}>
+      {liveHashrate && (
+        <div style={{ fontSize: 9, color: '#10b981', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
+          Mempool.space · Grátis · Qualidade A
+        </div>
+      )}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 8 }}>
         <div>
           <div style={{ fontSize: 9, color: '#475569', marginBottom: 2, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Hash Rate</div>
           <span style={{ fontSize: 22, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color }}>
-            {h.hash_rate_eh.toFixed(1)}<span style={{ fontSize: 11, color: '#64748b' }}>EH/s</span>
+            {currentEh.toFixed(1)}<span style={{ fontSize: 11, color: '#64748b' }}>EH/s</span>
           </span>
           <div style={{ fontSize: 10, color, fontWeight: 600, marginTop: 1 }}>
-            {isGrowing ? '+' : ''}{h.delta_7d_pct.toFixed(2)}% 7d · {h.delta_30d_pct.toFixed(1)}% 30d
+            {isGrowing ? '+' : ''}{d7.toFixed(2)}% 7d · {d30.toFixed(1)}% 30d
           </div>
         </div>
         <div>
@@ -351,46 +388,61 @@ function HashRateCard() {
             <HelpIcon title={G.difficulty.title} content={G.difficulty.content} width={280} />
           </div>
           <span style={{ fontSize: 14, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', color: '#94a3b8' }}>
-            {(h.difficulty / 1e12).toFixed(1)}T
+            {(difficulty / 1e12).toFixed(1)}T
           </span>
           <div style={{ fontSize: 10, color: '#f59e0b', marginTop: 1 }}>
-            Último adj.: +{h.difficulty_adj_pct.toFixed(1)}%
+            Último adj.: {diffAdj >= 0 ? '+' : ''}{diffAdj.toFixed(1)}%
           </div>
         </div>
       </div>
-      <MiniTimeChart data={h.history} color={color} height={65} formatter={v => `${v.toFixed(1)} EH/s`} />
+      <MiniTimeChart data={history} color={color} height={65} formatter={v => `${v.toFixed(1)} EH/s`} />
       <div style={{ marginTop: 8, padding: '6px 10px', background: 'rgba(59,130,246,0.06)', borderRadius: 6, border: '1px solid rgba(59,130,246,0.15)' }}>
         <span style={{ fontSize: 10, color: '#60a5fa' }}>
-          Próximo ajuste estimado: <strong>+{h.next_adj_est_pct.toFixed(1)}%</strong> — {h.next_adj_blocks.toLocaleString()} blocos
+          Próximo ajuste estimado: <strong>{nextAdjPct >= 0 ? '+' : ''}{nextAdjPct.toFixed(1)}%</strong> — {nextAdjBlocks.toLocaleString()} blocos
         </span>
       </div>
-      <InterpretBox text={h.signal} color="#94a3b8" />
+      <InterpretBox text={btcHashRate.signal} color="#94a3b8" />
     </OnChainCard>
   );
 }
 
 // ─── MEMPOOL CARD ─────────────────────────────────────────────────────────────
-function MempoolCard() {
-  const m = onChain;
+function MempoolCard({ liveMempool }) {
+  // live via Mempool.space (grátis, qualidade A) se disponível; fallback para mock
+  const txCount  = liveMempool?.tx_count    ?? onChain.mempool.count;
+  const vsizeB   = liveMempool?.vsize_bytes  ?? onChain.mempool.vsize;
+  const grade    = liveMempool ? 'A' : onChain.quality;
+  const fees = {
+    fastest:   liveMempool?.fees.fastest_fee   ?? onChain.fees.fastestFee,
+    halfHour:  liveMempool?.fees.half_hour_fee ?? onChain.fees.halfHourFee,
+    hour:      liveMempool?.fees.hour_fee      ?? onChain.fees.hourFee,
+    economy:   liveMempool?.fees.economy_fee   ?? onChain.fees.economyFee,
+  };
   const feeItems = [
-    { label: 'Prioridade Máxima', val: m.fees.fastestFee, unit: 'sat/vB', color: '#ef4444' },
-    { label: '~30 min',           val: m.fees.halfHourFee, unit: 'sat/vB', color: '#f59e0b' },
-    { label: '~1 hora',           val: m.fees.hourFee,     unit: 'sat/vB', color: '#10b981' },
-    { label: 'Econômica',         val: m.fees.economyFee,  unit: 'sat/vB', color: '#64748b' },
+    { label: 'Prioridade Máxima', val: fees.fastest,  unit: 'sat/vB', color: '#ef4444' },
+    { label: '~30 min',           val: fees.halfHour, unit: 'sat/vB', color: '#f59e0b' },
+    { label: '~1 hora',           val: fees.hour,     unit: 'sat/vB', color: '#10b981' },
+    { label: 'Econômica',         val: fees.economy,  unit: 'sat/vB', color: '#64748b' },
   ];
   return (
-    <OnChainCard title="Mempool BTC" glossKey={null} accent="#8b5cf6" grade={m.quality}>
+    <OnChainCard title="Mempool BTC" glossKey={null} accent="#8b5cf6" grade={grade}>
+      {liveMempool && (
+        <div style={{ fontSize: 9, color: '#10b981', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
+          Mempool.space · Grátis · Qualidade A
+        </div>
+      )}
       <div style={{ display: 'flex', gap: 16, marginBottom: 12 }}>
         <div>
           <div style={{ fontSize: 9, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>Tx não confirmadas</div>
           <span style={{ fontSize: 22, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: '#a78bfa' }}>
-            {m.mempool.count.toLocaleString()}
+            {txCount.toLocaleString()}
           </span>
         </div>
         <div>
           <div style={{ fontSize: 9, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>Tamanho</div>
           <span style={{ fontSize: 22, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: '#8b5cf6' }}>
-            {(m.mempool.vsize / 1e6).toFixed(1)}<span style={{ fontSize: 11, color: '#64748b' }}>MB</span>
+            {(vsizeB / 1e6).toFixed(1)}<span style={{ fontSize: 11, color: '#64748b' }}>MB</span>
           </span>
         </div>
       </div>
@@ -405,14 +457,19 @@ function MempoolCard() {
           </div>
         ))}
       </div>
-      <div style={{ marginTop: 8, fontSize: 10, color: '#334155' }}>Fonte: mempool.space · Grade: {m.quality}</div>
+      <div style={{ marginTop: 8, fontSize: 10, color: '#334155' }}>
+        Fonte: mempool.space · Grade: {grade}
+      </div>
     </OnChainCard>
   );
 }
 
 // ─── PÁGINA PRINCIPAL ─────────────────────────────────────────────────────────
 export default function OnChain() {
-  useOnChainLiveData(); // ativa queries em background para cache
+  const { cycle, mempool, hashrate } = useOnChainLiveData();
+  // Determina se algum dado live está disponível (para ajustar o badge)
+  const hasLiveData = !!(cycle || mempool || hashrate);
+  const modeLabel   = IS_LIVE ? (hasLiveData ? 'live' : 'loading') : 'mock';
   return (
     <div style={{ maxWidth: 1400, margin: '0 auto' }}>
       {/* Header */}
@@ -421,14 +478,14 @@ export default function OnChain() {
           <h1 style={{ fontSize: 20, fontWeight: 900, color: '#f1f5f9', margin: 0, letterSpacing: '-0.03em' }}>
             On-Chain Analytics
           </h1>
-          <ModeBadge mode="mock" />
+          <ModeBadge mode={modeLabel} />
           <span style={{ fontSize: 10, color: '#f59e0b', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 4, padding: '2px 8px', fontWeight: 600 }}>
-            ⚠ Fontes: Glassnode · CryptoQuant · mempool.space
+            ⚠ Fontes: CoinMetrics · Mempool.space · Glassnode(mock)
           </span>
         </div>
         <p style={{ fontSize: 11, color: '#475569', marginTop: 6, lineHeight: 1.6 }}>
-          Métricas on-chain são de atualização diária/horária. Grau B = estimativas baseadas em dados públicos parciais.
-          Para precisão máxima, conecte via API Glassnode ou CryptoQuant em produção.
+          MVRV/Realized Price: CoinMetrics Community (grátis, qualidade A). Hash Rate/Mempool: Mempool.space (live).
+          NUPL/SOPR/Netflow/Whales: estimativas mock (quality B) — requerem Glassnode/CryptoQuant para dados live.
         </p>
       </div>
 
@@ -451,7 +508,7 @@ export default function OnChain() {
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14, marginBottom: 20 }}>
           <WhaleCard />
-          <MvrvCard />
+          <MvrvCard liveCycle={cycle} />
           <LthSthCard />
         </div>
       </div>
@@ -462,8 +519,8 @@ export default function OnChain() {
           ● Saúde da Rede Bitcoin
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14 }}>
-          <HashRateCard />
-          <MempoolCard />
+          <HashRateCard liveHashrate={hashrate} />
+          <MempoolCard liveMempool={mempool} />
         </div>
       </div>
     </div>
