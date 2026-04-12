@@ -1,9 +1,10 @@
 // ─── SMART ALERTS — CENTRAL DE NOTIFICAÇÕES AI ───────────────────────────────
 // Alertas automáticos do sistema + AI com sugestões
 // Usuário configura prioridade e tipo de alerta — sem gestão de portfólio
-import { useState } from 'react';
-import { defaultAlertRules, alertHistory, riskDashboard, ALERT_TYPES } from '../components/data/mockDataAlerts';
+import { useState, useEffect } from 'react';
+import { defaultAlertRules as defaultAlertRulesMock, alertHistory, riskDashboard, ALERT_TYPES } from '../components/data/mockDataAlerts';
 import { recentAlerts, globalRisk } from '../components/data/mockData';
+import { useAlertRules, useUpsertAlertRule, useDeleteAlertRule } from '@/hooks/useSupabase';
 import { ModeBadge, GradeBadge } from '../components/ui/DataBadge';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -334,7 +335,20 @@ function AlertRuleConfig({ rule, prefs, onToggle, onPriorityChange, onThresholdC
 }
 
 export default function SmartAlerts() {
-  const [rules, setRules] = useState(defaultAlertRules);
+  // Carrega regras do Supabase (ou mock se não configurado)
+  const { data: savedRules } = useAlertRules();
+  const { mutate: saveRule } = useUpsertAlertRule();
+  const { mutate: removeRule } = useDeleteAlertRule();
+
+  // Estado local inicializado com dados do Supabase (ou mock como fallback)
+  const [rules, setRules] = useState(defaultAlertRulesMock);
+  useEffect(() => {
+    if (savedRules && savedRules.length > 0) {
+      // Adiciona campos de runtime ausentes no schema Supabase (current_value, triggered)
+      // @ts-ignore — Supabase AlertRule tem campos Zod opcionais; runtime sempre válido após parse()
+      setRules(savedRules.map(r => ({ ...r, id: r.id ?? crypto.randomUUID(), current_value: 0, triggered: false, last_triggered: r.last_triggered ? new Date(r.last_triggered) : null })));
+    }
+  }, [savedRules]);
   const [prefs, setPrefs] = useState(DEFAULT_PREFS);
   const [history, setHistory] = useState(alertHistory);
   const [tab, setTab] = useState('ai');

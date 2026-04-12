@@ -1,4 +1,14 @@
-import { macroBoard, macroHistory, fmtNum, aiAnalysis } from '../components/data/mockData';
+import { macroBoard as macroBoardMock, macroHistory, fmtNum, aiAnalysis } from '../components/data/mockData';
+import { useMacroBoard } from '@/hooks/useFred';
+
+// ─── DATA LAYER (live > mock fallback) ───────────────────────────────────────
+// useMacroBoard() retorna MacroBoardData — shape idêntico ao macroBoardMock:
+//   { series: MacroSeriesEntry[], updated_at: number }
+function useMacroPageData() {
+  const { data: live } = useMacroBoard();
+  const macroBoard = live ?? macroBoardMock;
+  return { macroBoard };
+}
 import { AIModuleCard } from '../components/ui/AIAnalysisPanel';
 import GoldenRule from '../components/ui/GoldenRule';
 import SectionHeader from '../components/ui/SectionHeader';
@@ -78,6 +88,7 @@ function SeriesCard({ s }) {
 }
 
 export default function Macro() {
+  const { macroBoard } = useMacroPageData();
   const m = macroBoard;
   const yieldSpread = m.series.find(s => s.id === 'US10Y').value - m.series.find(s => s.id === 'US2Y').value;
   const yieldSpreadBp = (yieldSpread * 100).toFixed(1);
@@ -99,7 +110,7 @@ export default function Macro() {
         </h1>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
           <p style={{ fontSize: 12, color: '#4a5568', margin: 0 }}>
-            FRED Daily Data · Updated {m.updated_at.toLocaleDateString('pt-BR')} ·
+            FRED Daily Data · Updated {new Date(m.updated_at).toLocaleDateString('pt-BR')} ·
           </p>
           <ModeBadge />
           <div style={{

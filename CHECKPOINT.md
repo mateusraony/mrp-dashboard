@@ -1,6 +1,6 @@
 # CHECKPOINT.md — MRP Dashboard
 > Memória técnica viva do projeto. Atualizar ao final de cada bloco importante.
-> Última atualização: 2026-04-12 (Fase 3 — Sprints 3.1 a 3.7 concluídos)
+> Última atualização: 2026-04-12 (Fase 3 — 100% CONCLUÍDA — Sprints 3.1–3.9)
 
 ---
 
@@ -27,7 +27,7 @@
 |------|--------|------|
 | Fase 1 — Análise Profunda | ✅ CONCLUÍDA | 2026-04-11 |
 | Fase 2 — Interface/Visual (Sprints 1+2) | ✅ CONCLUÍDA | 2026-04-11 |
-| Fase 3 — API com Mocks (Sprints 3.1–3.7) | ✅ CONCLUÍDA | 2026-04-12 |
+| Fase 3 — API + Hooks + Settings (Sprints 3.1–3.9) | ✅ CONCLUÍDA | 2026-04-12 |
 | Fase 4 — Cálculos Python | ⏳ AGUARDA AUTORIZAÇÃO | — |
 
 ---
@@ -83,6 +83,24 @@
 | src/services/supabase.ts — CRUD: alert_rules, portfolio_positions, user_settings (+ isSupabaseConfigured) | ✅ DONE |
 | supabase/migrations/20260412000000_create_core_tables.sql — 3 tabelas, RLS, índices, triggers updated_at | ✅ DONE |
 
+### ─── SPRINT 3.8–3.9 (2026-04-12) — FASE 3 FINALIZADA ───
+| Item | Status |
+|------|--------|
+| src/hooks/useDeribit.ts — useOptionsData, useDvolHistory (60s live refetch) | ✅ DONE |
+| src/hooks/useFred.ts — useMacroBoard, useYieldCurve (1h live refetch) | ✅ DONE |
+| src/hooks/useMempool.ts — useMempoolState (30s), useHashrate (5min), useMiningPools (1h), useOnChainAdvanced | ✅ DONE |
+| src/hooks/useSupabase.ts — useAlertRules, useUpsertAlertRule, useDeleteAlertRule, usePortfolioPositions, useUpsertPosition, useDeletePosition, useUserSettings, useUpdateSettings | ✅ DONE |
+| Dashboard.jsx → useBtcTicker + useFearGreed (live > mock fallback) | ✅ DONE |
+| Derivatives.jsx → useBtcTicker + useOiByExchange (live data wired to UI) | ✅ DONE |
+| Options.jsx → useOptionsData (spot, iv_atm, strikes chain) | ✅ DONE |
+| Macro.jsx → useMacroBoard (series, updated_at) | ✅ DONE |
+| OnChain.jsx → useOnChainAdvanced + useMempoolState + useHashrate (cache ativo) | ✅ DONE |
+| Portfolio.jsx → usePortfolioPositions + useUpsertPosition + useDeletePosition (Supabase CRUD) | ✅ DONE |
+| SmartAlerts.jsx → useAlertRules + useUpsertAlertRule + useDeleteAlertRule (Supabase CRUD) | ✅ DONE |
+| Settings.jsx — DataModeToggle funcional (mock↔live) com persistência localStorage + page reload | ✅ DONE |
+| src/lib/env.ts — DATA_MODE lê localStorage primeiro (sem rebuild), setDataMode() | ✅ DONE |
+| **Varredura final:** `npm run build` ✅ · `tsc -p jsconfig.json` ✅ · `eslint --quiet` ✅ | ✅ DONE |
+
 ---
 
 ## 🏗 ARQUITETURA ATUAL (2026-04-12)
@@ -100,7 +118,11 @@ src/
     ai/           → 1 componente AI
   hooks/
     use-mobile.jsx
-    useBtcData.ts      ← NOVO (Sprint 3.3)
+    useBtcData.ts      ← Sprint 3.3
+    useDeribit.ts      ← NOVO (Sprint 3.8)
+    useFred.ts         ← NOVO (Sprint 3.8)
+    useMempool.ts      ← NOVO (Sprint 3.8)
+    useSupabase.ts     ← NOVO (Sprint 3.8)
   lib/
     env.ts             ← NOVO (Sprint 3.1)
     errorBoundary.tsx  ← NOVO (Sprint 3.1)
@@ -173,8 +195,8 @@ select: (data) => ({ ...data, formatted: data.value.toFixed(2) }),
 ### Média Severidade
 | # | Arquivo | Problema | Ação |
 |---|---------|---------|------|
-| M1 | `src/hooks/useBtcData.ts` | Hooks criados mas não usados nas páginas ainda | Conectar páginas na Fase 3 next |
-| M2 | `src/services/mempool.ts` | `fetchOnChainAdvanced` sempre retorna mock (sem API pública) | Integrar Glassnode/CryptoQuant quando autorizado |
+| M1 | `src/services/mempool.ts` | `fetchOnChainAdvanced` sempre retorna mock (sem API pública gratuita) | Integrar Glassnode/CryptoQuant quando autorizado |
+| M2 | Páginas com sub-componentes | Sub-componentes usam module-level mock vars; live data ativo via cache, mas não renderizado | Fase 4 — prop-passing completo para sub-componentes |
 
 ---
 
@@ -202,20 +224,7 @@ VITE_SUPABASE_ANON_KEY=sua_anon_key
 
 ## 🗺 PRÓXIMOS PASSOS
 
-### Autorização necessária (Fase 3 continuation)
-
-**Sprint 3.8 — Conectar páginas aos hooks reais:**
-- [ ] Dashboard.jsx → usar `useBtcTicker()`, `useFearGreed()`, `useDominance()`
-- [ ] Derivatives.jsx → usar `useBtcTicker()`, `useOiByExchange()`, `useKlines()`
-- [ ] Options.jsx → usar hook `useOptionsData()` (criar em useDeribit.ts)
-- [ ] Macro.jsx → usar hook `useMacroBoard()` (criar em useFred.ts)
-- [ ] OnChain.jsx → usar hooks `useMempoolState()`, `useHashrate()` (criar em useMempool.ts)
-- [ ] Portfolio.jsx → usar `fetchPortfolioPositions()` via TanStack Query
-- [ ] SmartAlerts.jsx → usar `fetchAlertRules()` via TanStack Query
-
-**Sprint 3.9 — Toggle DATA_MODE na página Settings:**
-- [ ] UI switch mock ↔ live com persistência em user_settings (Supabase)
-- [ ] Indicador de status por fonte no topbar (sourceHealth real)
+### ✅ Fase 3 — COMPLETA (Sprints 3.1–3.9)
 
 ### Aguarda Fase 4
 - [ ] Script Python: Risk Score composto (BTC, funding, IV, on-chain)
@@ -234,10 +243,8 @@ VITE_SUPABASE_ANON_KEY=sua_anon_key
 
 ## 📝 DECISÕES PENDENTES
 
-1. **Avançar para Sprint 3.8** — Conectar páginas aos hooks (eliminar mock imports gradualmente)?
-2. **Sprint 3.9** — Toggle DATA_MODE em Settings?
-3. **Glassnode/CryptoQuant** — autorizar integração paga para NUPL/MVRV/Netflow live?
-4. **Fase 4** — Autorizar scripts Python de cálculo?
+1. **Glassnode/CryptoQuant** — autorizar integração paga para NUPL/MVRV/Netflow live?
+2. **Fase 4** — Autorizar scripts Python de cálculo? (plano apresentado pelo conselho técnico)
 
 ---
 

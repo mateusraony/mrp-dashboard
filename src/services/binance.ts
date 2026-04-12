@@ -90,9 +90,10 @@ export interface OiByExchangeEntry {
 }
 
 function mockOiByExchange(): OiByExchangeEntry[] {
-  return oiByExchange.map((e: { exchange: string; oi_usd: number; share_pct: number }) => ({
+  // Mock tem oi_b (bilhões USD) — converter para oi_usd (USD) para manter shape do serviço
+  return oiByExchange.map((e: { exchange: string; oi_b?: number; oi_usd?: number; share_pct: number }) => ({
     exchange:  e.exchange,
-    oi_usd:    e.oi_usd,
+    oi_usd:    e.oi_usd ?? (e.oi_b ? e.oi_b * 1e9 : 0),
     share_pct: e.share_pct,
   }));
 }

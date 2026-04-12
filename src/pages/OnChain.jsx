@@ -5,6 +5,17 @@ import {
   btcNUPL, btcSOPR, btcExchangeNetflow, btcWhaleActivity,
   btcRealizedMetrics, btcHashRate, onChain, fmtNum,
 } from '../components/data/mockData';
+import { useOnChainAdvanced, useMempoolState, useHashrate } from '@/hooks/useMempool';
+
+// ─── DATA LAYER (live > mock fallback) ───────────────────────────────────────
+// Sub-componentes (NuplCard, SoprCard, etc.) usam os nomes de módulo diretamente.
+// O componente principal chama este hook — os valores são ignorados por ora mas
+// as queries ficam ativas para cache (os sub-componentes serão conectados por props na Fase 4).
+function useOnChainLiveData() {
+  useOnChainAdvanced(); // mantém cache ativo
+  useMempoolState();    // mantém cache ativo
+  useHashrate();        // mantém cache ativo
+}
 import MiniTimeChart from '../components/dashboard/MiniTimeChart';
 import { ModeBadge, GradeBadge } from '../components/ui/DataBadge';
 import { HelpIcon } from '../components/ui/Tooltip';
@@ -401,6 +412,7 @@ function MempoolCard() {
 
 // ─── PÁGINA PRINCIPAL ─────────────────────────────────────────────────────────
 export default function OnChain() {
+  useOnChainLiveData(); // ativa queries em background para cache
   return (
     <div style={{ maxWidth: 1400, margin: '0 auto' }}>
       {/* Header */}

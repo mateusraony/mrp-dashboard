@@ -1,4 +1,16 @@
-import { btcOptions, btcOptionsExtended, aiAnalysis } from '../components/data/mockData';
+import { btcOptions as btcOptionsMock, btcOptionsExtended, aiAnalysis } from '../components/data/mockData';
+import { useOptionsData } from '@/hooks/useDeribit';
+
+// ─── DATA LAYER (live > mock fallback) ───────────────────────────────────────
+// useOptionsData() retorna OptionsData — shape compatível com btcOptions:
+//   spot → spot, iv_atm → iv_atm, chain → strikes (mesmos campos base)
+function useOptionsPageData() {
+  const { data: live } = useOptionsData();
+  const btcOptions = live
+    ? { ...btcOptionsMock, spot: live.spot, iv_atm: live.iv_atm, strikes: live.chain.map(c => ({ strike: c.strike, call_iv: c.call_iv, put_iv: c.put_iv })) }
+    : btcOptionsMock;
+  return { btcOptions };
+}
 import { AIModuleCard } from '../components/ui/AIAnalysisPanel';
 import SectionHeader from '../components/ui/SectionHeader';
 import { ModeBadge, GradeBadge } from '../components/ui/DataBadge';
@@ -18,6 +30,7 @@ const regimeLabels = {
 };
 
 export default function Options() {
+  const { btcOptions } = useOptionsPageData();
   const o = btcOptions;
   const regime = regimeLabels[o.regime];
 
