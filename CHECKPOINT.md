@@ -1,6 +1,238 @@
 # CHECKPOINT.md — MRP Dashboard
 > Memória técnica viva do projeto. Atualizar ao final de cada bloco importante.
-> Última atualização: 2026-04-12 (Fase 4 — 100% CONCLUÍDA — Sprints 4.1–4.5)
+> Última atualização: 2026-04-12 (Fase 5 — 100% CONCLUÍDA — Sprints 5.1–5.6)
+
+---
+
+## 🗂 ESTADO GERAL
+
+| Aspecto | Status | Observação |
+|---------|--------|------------|
+| Build (`npm run build`) | ✅ PASSA | 20+ chunks lazy loading, maior chunk 378KB (Recharts) |
+| Lint (`eslint . --quiet`) | ✅ PASSA | 0 erros |
+| TypeCheck (`tsc -p jsconfig.json`) | ✅ PASSA | 0 erros |
+| Testes (`npm test`) | ✅ 25/25 | Vitest — sessionAnalytics (15) + coinmetrics (10) |
+| Deploy (Render) | ✅ ONLINE | https://mrp-dashboard.onrender.com |
+| Dados ao vivo | ✅ ATIVO | DATA_MODE=live é padrão permanente (env.ts default='live') |
+| Auth real | ❌ AUSENTE | Stub anônimo (isAuthenticated: false) — aguarda Fase futura |
+| Supabase | ✅ INSTALADO + SCHEMA | Instalado, service criado, migração SQL pronta |
+| TanStack Query Hooks | ✅ 15 hooks | useBtcData (7), useMempool (4), useCoinMetrics (1), useMultiVenue (4+1) |
+| Navegação performance | ✅ CORRIGIDA | Suspense dentro de LayoutWrapper; hover prefetch nas rotas |
+
+---
+
+## 🧭 MAPA DE FASES
+
+| Fase | Status | Data |
+|------|--------|------|
+| Fase 1 — Análise Profunda | ✅ CONCLUÍDA | 2026-04-11 |
+| Fase 2 — Interface/Visual (Sprints 1+2) | ✅ CONCLUÍDA | 2026-04-11 |
+| Fase 3 — API + Hooks + Settings (Sprints 3.1–3.9) | ✅ CONCLUÍDA | 2026-04-12 |
+| Fase 4 — Cálculos Python + Wiring Live (Sprints 4.1–4.5) | ✅ CONCLUÍDA | 2026-04-12 |
+| Fase 5 — APIs Gratuitas + Testes + Varredura (Sprints 5.1–5.6) | ✅ CONCLUÍDA | 2026-04-12 |
+
+---
+
+## ✅ SPRINTS CONCLUÍDOS
+
+### ─── SPRINTS 1–4.5 (ver histórico acima) ───
+> Consulte versão anterior do CHECKPOINT para detalhes dos sprints 1–4.5.
+
+### ─── SPRINTS 5.1–5.6 (2026-04-12) — FASE 5 FINALIZADA ───
+| Item | Status | Detalhes |
+|------|--------|----------|
+| **5.1** — `AuthContext.jsx`: `isAuthenticated: false` (estado anônimo correto) | ✅ DONE | Estava `true` hardcoded — bug crítico corrigido |
+| **5.2** — `services/coinmetrics.ts`: MVRV Z-Score, NUPL, Realized Price, NVT via CoinMetrics Community | ✅ DONE | Grátis, sem API key, qualidade A |
+| **5.2** — `hooks/useCoinMetrics.ts`: `useOnChainCycle` (1h refetch em live) | ✅ DONE | staleTime 3.5h |
+| **5.2** — `scripts/validate_mvrv_zscore.py`: fórmulas MVRV Z-Score + NUPL validadas em Python | ✅ DONE | 8 assertions |
+| **5.2** — `OnChain.jsx`: `MvrvCard` wired para CoinMetrics live (live>mock fallback + grade badge) | ✅ DONE | |
+| **5.2** — `OnChain.jsx`: `HashRateCard` wired para Mempool.space live | ✅ DONE | Converte history para formato MiniTimeChart |
+| **5.2** — `OnChain.jsx`: `MempoolCard` wired para Mempool.space live | ✅ DONE | Fees + tx_count + vsize |
+| **5.2** — `OnChain.jsx`: `ModeBadge` dinâmico (mock/live/loading baseado no IS_LIVE + dados) | ✅ DONE | Era hardcoded "mock" |
+| **5.2** — `mockData.jsx`: adicionado `'1d'` key em `btcHashRate.history` | ✅ DONE | Bug fix varredura |
+| **5.3** — `services/binance.ts`: `fetchLiquidations` via `/fapi/v1/forceOrders` (público, sem key) | ✅ DONE | |
+| **5.3** — `hooks/useBtcData.ts`: `useLiquidations(limit)` (30s refetch em live) | ✅ DONE | |
+| **5.3** — `Derivatives.jsx`: `LiquidationsPanel` — tabela live com totais longs/shorts em USD | ✅ DONE | |
+| **5.4** — `utils/sessionAnalytics.ts`: `computeSessionStats` — CVD/vol/taker%/price move por sessão UTC | ✅ DONE | Asia 00-08 / Europe 08-16 / US 16-24 |
+| **5.4** — `SpotFlow.jsx`: sessões calculadas de klines 1h Binance (72h window) com fallback mock | ✅ DONE | Badge "LIVE" quando ativo |
+| **5.4** — `SpotFlow.jsx`: chart de preço usa klines live quando disponível | ✅ DONE | |
+| **5.5** — `services/bybit.ts`: Bybit V5 API — mark price, funding, OI (Zod schemas) | ✅ DONE | Grátis, sem key |
+| **5.5** — `services/okx.ts`: OKX V5 API — funding-rate + ticker paralelo (Zod schemas) | ✅ DONE | OI: contratos × 0.01 BTC × preço |
+| **5.5** — `hooks/useMultiVenue.ts`: 5 hooks (useBybitTicker/Funding, useOkxTicker/Funding, useMultiVenueSnapshot) | ✅ DONE | 30s refetch |
+| **5.5** — `Derivatives.jsx`: `MultiVenuePanel` — tabela Binance\|Bybit\|OKX + sinal de divergência de funding em bps | ✅ DONE | |
+| **5.6** — `vitest.config.ts`: jsdom env, VITE_DATA_MODE=mock para testes determinísticos | ✅ DONE | |
+| **5.6** — `src/__tests__/utils/sessionAnalytics.test.ts`: 15 testes de lógica pura | ✅ DONE | getSessionForHour + computeSessionStats |
+| **5.6** — `src/__tests__/services/coinmetrics.test.ts`: 10 testes (shape + zonas + consistency) | ✅ DONE | |
+| **5.6** — `package.json`: scripts `"test"` e `"test:watch"` adicionados | ✅ DONE | |
+| **Varredura:** `npm run build` ✅ · `tsc` ✅ · `eslint` ✅ · `vitest 25/25` ✅ | ✅ DONE | Varredura profunda com agent de revisão |
+
+---
+
+## 🏗 ARQUITETURA ATUAL (2026-04-12 — pós Fase 5)
+
+```
+src/
+  pages/          → 20 páginas roteadas
+  components/
+    ui/           → 40+ componentes Shadcn/Radix
+    data/         → 15 arquivos mock (TEMPORÁRIO — eliminação gradual)
+    dashboard/    → 4 componentes
+    derivatives/  → 2 componentes
+    onchain/      → 1 componente
+    options/      → 3 componentes
+    ai/           → 1 componente AI
+  hooks/
+    use-mobile.jsx
+    useBtcData.ts       ← Sprint 3.3 + 5.3 (+ useLiquidations)
+    useCoinMetrics.ts   ← NOVO Sprint 5.2
+    useDeribit.ts       ← Sprint 3.8
+    useFred.ts          ← Sprint 3.8
+    useMempool.ts       ← Sprint 3.8
+    useMultiVenue.ts    ← NOVO Sprint 5.5
+    useRiskScore.ts     ← Sprint 4.2
+    useSupabase.ts      ← Sprint 3.8
+  services/
+    alternative.ts, binance.ts (+ liquidações), bybit.ts (NOVO),
+    coingecko.ts, coinmetrics.ts (NOVO), deribit.ts,
+    fred.ts, mempool.ts, okx.ts (NOVO), supabase.ts
+  utils/
+    index.ts
+    riskCalculations.ts ← Sprint 4.1
+    sessionAnalytics.ts ← NOVO Sprint 5.4
+  lib/
+    env.ts, errorBoundary.tsx, AuthContext.jsx (stub anônimo)
+    query-client.js, app-params.js, notificationClient.js
+  __tests__/
+    utils/sessionAnalytics.test.ts   ← NOVO Sprint 5.6 (15 testes)
+    services/coinmetrics.test.ts      ← NOVO Sprint 5.6 (10 testes)
+
+scripts/
+  validate_var.py           ← Sprint 4.1
+  validate_risk_score.py    ← Sprint 4.2
+  validate_gex.py           ← Sprint 4.3
+  validate_macro_surprise.py← Sprint 4.4
+  validate_mvrv_zscore.py   ← NOVO Sprint 5.2
+
+supabase/migrations/20260412000000_create_core_tables.sql ← Sprint 3.7
+vitest.config.ts    ← NOVO Sprint 5.6
+.env.example        ← Sprint 3.3
+```
+
+---
+
+## 🔑 PADRÃO DE API (OBRIGATÓRIO — definido pelo usuário)
+
+```typescript
+// 1. Schemas com z.coerce.number() (APIs retornam strings)
+const Schema = z.object({ value: z.coerce.number() });
+
+// 2. res.ok check ANTES do parse
+const res = await fetch(url);
+if (!res.ok) throw new Error(`API error ${res.status}: ${url}`);
+
+// 3. refetchInterval só em IS_LIVE
+refetchInterval: IS_LIVE ? 5_000 : false,
+
+// 4. REGRA ABSOLUTA: Mock NÃO substitui live com falha
+// DATA_MODE=mock  → retorna mock instantaneamente
+// DATA_MODE=live  → chama API; se falhar → lança erro (UI mostra error state)
+// Mock NUNCA é fallback silencioso de dado live com falha
+```
+
+---
+
+## 🔴 PROBLEMAS AINDA PRESENTES
+
+### Críticos
+| # | Arquivo | Problema | Ação |
+|---|---------|---------|------|
+| C1 | `src/lib/AuthContext.jsx` | Auth stub — acesso anônimo sem proteção | Aguarda Fase futura (Supabase Auth) |
+| C2 | `.env.local` (não existe) | VITE_FRED_API_KEY, VITE_SUPABASE_* não configuradas | Usuário deve criar `.env.local` |
+
+### Alta Severidade
+| # | Arquivo | Problema | Ação |
+|---|---------|---------|------|
+| A1 | Projeto inteiro | Cobertura de testes baixa (25 testes apenas utils/services) | Ampliar para hooks, risk calcs, sorprise z-score |
+| A2 | `src/components/data/` | 15 arquivos mock ainda ativos | Eliminação gradual conforme APIs ligadas |
+
+### Média Severidade
+| # | Arquivo | Problema | Ação |
+|---|---------|---------|------|
+| M1 | `mempool.ts` + `OnChain.jsx` | NUPL/SOPR/Netflow sempre mock (sem API pública gratuita) | Integrar Glassnode/CryptoQuant quando autorizado |
+| M2 | `coinmetrics.ts` | HODL Waves sem API gratuita confiável — mantido mock | Confirmar com usuário se pago é opção |
+
+---
+
+## 📊 STATUS DAS APIs
+
+| Serviço | Arquivo | DATA_MODE=mock | DATA_MODE=live | API Key? |
+|---------|---------|----------------|----------------|----------|
+| Binance Futures/Spot | `binance.ts` | ✅ Mock | ✅ Pronto | Não |
+| CoinGecko | `coingecko.ts` | ✅ Mock | ✅ Pronto | Não |
+| Alternative.me (F&G) | `alternative.ts` | ✅ Mock | ✅ Pronto | Não |
+| Deribit Options | `deribit.ts` | ✅ Mock | ✅ Pronto | Não |
+| FRED (macro) | `fred.ts` | ✅ Mock | ✅ Pronto | ⚠️ `VITE_FRED_API_KEY` |
+| Mempool.space | `mempool.ts` | ✅ Mock | ✅ Pronto | Não |
+| CoinMetrics Community | `coinmetrics.ts` | ✅ Mock | ✅ Pronto | Não |
+| Bybit V5 | `bybit.ts` | ✅ Mock | ✅ Pronto | Não |
+| OKX V5 | `okx.ts` | ✅ Mock | ✅ Pronto | Não |
+| Supabase | `supabase.ts` | ✅ Fallback | ✅ Pronto | ⚠️ `VITE_SUPABASE_*` |
+| Glassnode | — | ✅ Mock | ❌ AUSENTE | ⚠️ Plano pago |
+| CryptoQuant | — | ✅ Mock | ❌ AUSENTE | ⚠️ Plano pago |
+
+---
+
+## 🗺 PRÓXIMOS PASSOS (aguarda nova autorização)
+
+### Prioridade alta
+- [ ] **Ampliar testes** — Vitest para `riskCalculations.ts`, `surpriseZScore`, hooks (`useRiskScore`, `useBtcTicker`)
+- [ ] **HODL Waves** — confirmar se CoinMetrics Community tem `SplyAdr1yrPlus` suficiente para aproximação
+- [ ] **Glassnode/CryptoQuant** — NUPL, SOPR, Netflow live (requer plano pago — confirmar com usuário)
+
+### Prioridade média
+- [ ] **Auth real** — Supabase Auth (email/OAuth) — ativar quando tudo estiver live e estável
+- [ ] **Playwright e2e** — testes de navegação e fluxo crítico (Dashboard → Portfolio → Alertas)
+- [ ] **Bundle split** — separar Recharts (378KB) em chunk próprio via `manualChunks` no vite.config.js
+- [ ] **Rate limiting CoinGecko** — implementar debounce/queue para respeitar 30 req/min free tier
+- [ ] **Altcoins Page** — conectar `useDominance` + `useTopAltcoins` à página (dados já disponíveis)
+
+### Gaps de produto ainda presentes
+- [ ] GEX live via Deribit strike chain (dados disponíveis, falta wiring completo em Options.jsx)
+- [ ] Crypto Institutional Upgrade — cohort flow por exchange (requer CoinGlass pago)
+- [ ] OnChain Cycle Pack completo — HODL Waves (sem API gratuita confiável)
+
+---
+
+## 🏦 APIs GRATUITAS MAPEADAS
+
+| Dado | API | Limite Free | Status |
+|------|-----|-------------|--------|
+| BTC price, funding, OI, liquidações | Binance Futures/Spot | Sem limite | ✅ Service pronto |
+| MVRV Z-Score, NUPL, Realized Price, NVT | CoinMetrics Community | ~2 req/s, sem key | ✅ NOVO Sprint 5.2 |
+| Mark price, funding, OI | Bybit V5 | Sem limite | ✅ NOVO Sprint 5.5 |
+| Funding, preço, OI | OKX V5 | Sem limite | ✅ NOVO Sprint 5.5 |
+| Fear & Greed | alternative.me | Sem limite | ✅ Service pronto |
+| Price, dominance, altcoins | CoinGecko | 30 req/min | ✅ Service pronto |
+| Options IV, term structure | Deribit | Sem limite | ✅ Service pronto |
+| Macro: yields, VIX, S&P | FRED API | 120 req/min | ✅ Service pronto (key free) |
+| On-Chain básico, hashrate, mempool | Mempool.space | Sem limite | ✅ Service pronto |
+| Persistência usuário | Supabase free | 500MB DB | ✅ Service + schema prontos |
+| NUPL, MVRV, Netflow (live) | Glassnode | ❌ Pago | ⚠️ Mock permanente até autorização |
+| Exchange flows | CryptoQuant | ❌ Pago | ⚠️ Mock permanente até autorização |
+
+---
+
+## 🔐 SEGURANÇA — CHECKLIST PRÉ-PRODUÇÃO
+
+- [x] Zod validation em todos os inputs externos (API responses)
+- [x] `res.ok` check antes de qualquer JSON.parse
+- [x] ErrorBoundary global em App.jsx
+- [x] Variáveis de ambiente tipadas via env.ts (nunca `import.meta.env.X` direto)
+- [x] `isAuthenticated: false` — acesso anônimo (não expõe dados privados prematuramente)
+- [ ] Auth real antes de expor portfólio/alertas do usuário em produção
+- [ ] VITE_SUPABASE_ANON_KEY nunca commitada (está em .gitignore via .env.local)
+- [ ] VITE_FRED_API_KEY nunca commitada
+- [ ] Rate limiting client-side para CoinGecko (30 req/min free tier)
 
 ---
 
