@@ -1,5 +1,5 @@
 // ─── CALENDÁRIO MACRO — CPI · FOMC · NFP · Volatilidade Histórica · Alertas ──
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   ComposedChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, Cell, BarChart, Legend,
@@ -17,6 +17,36 @@ const AGENCY_COLOR = {
 
 const RESULT_COLOR = { above: '#ef4444', below: '#10b981', inline: '#f59e0b' };
 const RESULT_LABEL = { above: '▲ Acima', below: '▼ Abaixo', inline: '= Conforme' };
+
+// ─── Macro Surprise Z-Score (validado em scripts/validate_macro_surprise.py) ──
+/**
+ * Calcula Z-Score de surpresa para cada evento histórico.
+ * z = (actual - consensus) / std_dev(histórico de surpresas)
+ */
+function computeSurpriseZScores(events) {
+  return events.map((ev, i) => {
+    const hist = events.slice(0, i);
+    const surprises = hist.map(h => h.actual - h.consensus).filter(s => typeof s === 'number' && !isNaN(s));
+    const surpriseRaw = (typeof ev.actual === 'number' && typeof ev.consensus === 'number')
+      ? ev.actual - ev.consensus
+      : null;
+
+    let zScore = null;
+    let direction = 'inline';
+    if (surpriseRaw !== null) {
+      if (surprises.length >= 2) {
+        const mean = surprises.reduce((s, r) => s + r, 0) / surprises.length;
+        const std  = Math.sqrt(surprises.reduce((s, r) => s + (r - mean) ** 2, 0) / (surprises.length - 1));
+        zScore = std > 0 ? (surpriseRaw - mean) / std : 0;
+      } else {
+        zScore = 0;
+      }
+      direction = zScore > 0.5 ? 'above' : zScore < -0.5 ? 'below' : 'inline';
+    }
+
+    return { ...ev, surprise_raw: surpriseRaw, z_score: zScore !== null ? parseFloat(zScore.toFixed(2)) : null, z_direction: direction };
+  });
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function timeUntil(dt) {
@@ -219,6 +249,9 @@ export default function MacroCalendar() {
   const [selectedHistEvent, setSelectedHistEvent] = useState(eventVolatilityData[0]);
   const [toast, setToast] = useState(null);
 
+  // Enriquece eventVolatilityData com Z-Score de surpresa (fórmula validada Python)
+  const surpriseData = useMemo(() => computeSurpriseZScores(eventVolatilityData), []);
+
   const showToast = (msg, color = '#10b981') => {
     setToast({ msg, color });
     setTimeout(() => setToast(null), 3000);
@@ -345,17 +378,18 @@ export default function MacroCalendar() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid #1e2d45' }}>
-                  {['Evento', 'Data', 'Esperado', 'Atual', 'Surpresa', 'BTC +1h', 'BTC +24h', 'IV Spike'].map((h, i) => (
+                  {['Evento', 'Data', 'Esperado', 'Atual', 'Z-Score', 'Surpresa', 'BTC +1h', 'BTC +24h', 'IV Spike'].map((h, i) => (
                     <th key={i} style={{ padding: '10px 14px', textAlign: i <= 1 ? 'left' : 'right', fontSize: 9, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 700, whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {eventVolatilityData.map((ev, i) => {
+                {surpriseData.map((ev, i) => {
                   const rc = RESULT_COLOR[ev.result_vs_expected];
                   const rl = RESULT_LABEL[ev.result_vs_expected];
                   const move1h = ev.windows.find(w => w.label === '+1h')?.btc_move ?? 0;
                   const move24h = ev.windows.find(w => w.label === '+24h')?.btc_move ?? 0;
+                  const zColor = ev.z_score > 0 ? '#ef4444' : ev.z_score < 0 ? '#10b981' : '#f59e0b';
                   return (
                     <tr key={i} style={{ borderBottom: '1px solid rgba(30,45,69,0.4)', transition: 'background 0.12s' }}
                       onMouseEnter={e => e.currentTarget.style.background = 'rgba(59,130,246,0.04)'}
@@ -365,6 +399,9 @@ export default function MacroCalendar() {
                       <td style={{ padding: '10px 14px', fontFamily: 'JetBrains Mono, monospace', color: '#64748b', fontSize: 10 }}>{ev.date}</td>
                       <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'JetBrains Mono, monospace', color: '#94a3b8' }}>{ev.expected}</td>
                       <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'JetBrains Mono, monospace', fontWeight: 700, color: rc }}>{ev.actual}</td>
+                      <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'JetBrains Mono, monospace', fontWeight: 700, color: ev.z_score !== null ? zColor : '#334155' }}>
+                        {ev.z_score !== null ? `${ev.z_score > 0 ? '+' : ''}${ev.z_score}σ` : '—'}
+                      </td>
                       <td style={{ padding: '10px 14px', textAlign: 'right' }}>
                         <span style={{ fontSize: 9, padding: '2px 7px', borderRadius: 4, background: `${rc}10`, color: rc, border: `1px solid ${rc}25`, fontWeight: 700 }}>
                           {rl}

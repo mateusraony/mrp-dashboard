@@ -8,7 +8,7 @@ import { z } from 'zod';
 
 const EnvSchema = z.object({
   // ── Data mode ─────────────────────────────────────────────────────────────
-  VITE_DATA_MODE: z.enum(['mock', 'live']).default('mock'),
+  VITE_DATA_MODE: z.enum(['mock', 'live']).default('live'),
 
   // ── Supabase (obrigatório para persistência do usuário) ───────────────────
   VITE_SUPABASE_URL:      z.string().url().optional(),
