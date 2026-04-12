@@ -112,7 +112,7 @@ function getClient(): SupabaseClient {
     auth: {
       persistSession:      false, // sem auth por agora (anon)
       autoRefreshToken:    false,
-      detectSessionInBrowserUrl: false,
+      detectSessionInUrl: false,
     },
   });
 

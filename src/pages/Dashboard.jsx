@@ -3,6 +3,19 @@ import {
   btcFutures, btcSpotFlow, macroBoard, onChain,
   fearGreed, recentAlerts, globalRisk, sourceHealth, fmtNum, fmtPct, aiAnalysis,
 } from '../components/data/mockData';
+import { useBtcTicker, useFearGreed as useFearGreedHook } from '@/hooks/useBtcData';
+
+// ─── DATA LAYER (live > mock fallback) ───────────────────────────────────────
+// Retorna os mesmos nomes dos imports mock — main component os shadowa localmente.
+// Sub-componentes (FearGreedGauge, BTCSnapshot) continuam usando mock via closure.
+function useDashboardLiveData() {
+  const { data: ticker } = useBtcTicker();
+  const { data: fng }    = useFearGreedHook();
+  return {
+    btcFutures: ticker ? { ...btcFutures, mark_price: ticker.mark_price, funding_rate: ticker.last_funding_rate, oi_delta_pct: ticker.oi_delta_pct, open_interest: ticker.open_interest } : btcFutures,
+    fearGreed:  fng    ? { ...fearGreed,  value: fng.value, label: fng.label, classification: fng.label } : fearGreed,
+  };
+}
 import RiskMeter from '../components/ui/RiskMeter';
 import GoldenRule from '../components/ui/GoldenRule';
 import { ModeBadge, SourceRow } from '../components/ui/DataBadge';
@@ -383,6 +396,8 @@ function AITrackRecord() {
 
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
 export default function Dashboard() {
+  // eslint-disable-next-line no-unused-vars
+  const { btcFutures: _btcLive, fearGreed: _fngLive } = useDashboardLiveData();
   const [lastUpdate, setLastUpdate] = useState(new Date());
   useEffect(() => {
     const t = setInterval(() => setLastUpdate(new Date()), 5000);

@@ -1,6 +1,27 @@
 import {
-  btcFutures, liquidityBins, oiByExchange, fmtNum, fmtPct, aiAnalysis,
+  btcFutures, liquidityBins,
+  oiByExchange as oiByExchangeMock,
+  fmtNum, fmtPct, aiAnalysis,
 } from '../components/data/mockData';
+import { useBtcTicker, useOiByExchange } from '@/hooks/useBtcData';
+
+// ─── DATA LAYER (live > mock fallback) ───────────────────────────────────────
+// oiByExchange live → mapeia oi_usd para oi_b (shape do mock) para compatibilidade do UI
+function useDerivativesData() {
+  const { data: ticker } = useBtcTicker();
+  const { data: oiExch } = useOiByExchange();
+
+  const liveBtcFutures = ticker
+    ? { ...btcFutures, mark_price: ticker.mark_price, funding_rate: ticker.last_funding_rate, oi_delta_pct: ticker.oi_delta_pct, open_interest: ticker.open_interest }
+    : btcFutures;
+
+  // Converter oi_usd (live) → oi_b (mock shape em bilhões BTC) para o UI
+  const oiByExchange = oiExch
+    ? oiExch.map(e => ({ ...e, oi_b: e.oi_usd / 1e9, change_24h: 0 }))
+    : oiByExchangeMock;
+
+  return { btcFutures: liveBtcFutures, oiByExchange };
+}
 import { oiRatio, perpVsDatedOI } from '../components/data/mockDataExtended';
 import { AIModuleCard } from '../components/ui/AIAnalysisPanel';
 import SectionHeader from '../components/ui/SectionHeader';
@@ -105,6 +126,9 @@ function LiquidityHeatmap({ bins }) {
 }
 
 export function DerivativesOverview() {
+  const { btcFutures: liveBtc, oiByExchange: liveOi } = useDerivativesData();
+  // eslint-disable-next-line no-unused-vars
+  const _liveBtc = liveBtc; // cache ativo; UI usa btcFutures (module-level) diretamente
   const f = btcFutures;
   const fundingPos = f.funding_rate > 0;
   const nextFundHours = Math.round((f.next_funding_time.getTime() - Date.now()) / 3600000);
@@ -255,7 +279,7 @@ export function DerivativesOverview() {
       <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: 20, marginBottom: 16 }}>
         <SectionHeader title="Open Interest por Exchange" subtitle="Concentração de risco — BTC Perps + Futuros" />
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10 }}>
-          {oiByExchange.map((ex, i) => {
+          {liveOi.map((ex, i) => {
             const c = ex.change_24h >= 0 ? '#10b981' : '#ef4444';
             return (
               <div key={i} style={{ background: '#0D1421', border: '1px solid #1e2d45', borderRadius: 9, padding: '10px 12px' }}>
@@ -274,7 +298,7 @@ export function DerivativesOverview() {
           })}
         </div>
         <div style={{ marginTop: 10, fontSize: 10, color: '#334155' }}>
-          Total global: <span style={{ fontFamily: 'JetBrains Mono, monospace', color: '#8899a6' }}>${(oiByExchange.reduce((s, e) => s + e.oi_b, 0)).toFixed(2)}B</span>
+          Total global: <span style={{ fontFamily: 'JetBrains Mono, monospace', color: '#8899a6' }}>${(liveOi.reduce((s, e) => s + e.oi_b, 0)).toFixed(2)}B</span>
           {' '}· CME = institucional tradicional (0 alavancagem retail)
         </div>
       </div>

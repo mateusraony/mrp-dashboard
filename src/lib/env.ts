@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 /**
  * env.ts — Validação de variáveis de ambiente com Zod
  * Falha em build-time se variável obrigatória estiver ausente.
@@ -26,8 +27,26 @@ if (!parsed.success) {
 
 export const env = parsed.success ? parsed.data : EnvSchema.parse({});
 
-/** DATA_MODE global — 'mock' enquanto não houver API live validada */
-export const DATA_MODE = env.VITE_DATA_MODE;
+/**
+ * DATA_MODE global — prioridade:
+ * 1. localStorage 'mrp_data_mode' (alterado em Settings sem rebuild)
+ * 2. VITE_DATA_MODE do .env.local
+ * 3. 'mock' (default)
+ */
+const _storedMode = typeof localStorage !== 'undefined'
+  ? (localStorage.getItem('mrp_data_mode') as 'mock' | 'live' | null)
+  : null;
+export const DATA_MODE: 'mock' | 'live' =
+  (_storedMode === 'mock' || _storedMode === 'live') ? _storedMode : env.VITE_DATA_MODE;
 
 /** true = usar APIs reais; false = usar mock data */
 export const IS_LIVE = DATA_MODE === 'live';
+
+/**
+ * setDataMode — persiste o modo em localStorage e recarrega a página.
+ * Como DATA_MODE é lido no bootstrap do módulo, precisa de reload para ativar.
+ */
+export function setDataMode(mode: 'mock' | 'live'): void {
+  localStorage.setItem('mrp_data_mode', mode);
+  window.location.reload();
+}

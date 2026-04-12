@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { THRESHOLDS, sourceHealth } from '../components/data/mockData';
 import { ModeBadge, GradeBadge } from '../components/ui/DataBadge';
+import { DATA_MODE, setDataMode } from '@/lib/env';
+import { isSupabaseConfigured } from '@/services/supabase';
 
 function SettingRow({ label, value, description, type = 'text', options = undefined }) {
   const [v, setV] = useState(value);
@@ -85,6 +87,102 @@ function Section({ title, children }) {
   );
 }
 
+// ─── DATA MODE TOGGLE ─────────────────────────────────────────────────────────
+function DataModeToggle() {
+  const isLive = DATA_MODE === 'live';
+  const [confirming, setConfirming] = useState(false);
+  const supabaseOk = isSupabaseConfigured();
+
+  const handleToggle = () => {
+    if (!confirming) { setConfirming(true); return; }
+    setDataMode(isLive ? 'mock' : 'live');
+  };
+
+  return (
+    <div style={{ padding: '12px 0', borderBottom: '1px solid rgba(30,45,69,0.5)' }}>
+      {/* Linha principal */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0', marginBottom: 2 }}>
+            DATA_MODE
+          </div>
+          <div style={{ fontSize: 11, color: '#4a5568' }}>
+            Alterna entre mock data (sem rede) e APIs reais (Binance, CoinGecko, Deribit, FRED, Mempool).
+            A página recarrega ao trocar.
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+          {/* Status badge */}
+          <span style={{
+            fontSize: 10, fontFamily: 'JetBrains Mono, monospace', fontWeight: 700,
+            padding: '3px 8px', borderRadius: 4,
+            background: isLive ? 'rgba(16,185,129,0.12)' : 'rgba(245,158,11,0.1)',
+            color: isLive ? '#10b981' : '#f59e0b',
+            border: `1px solid ${isLive ? 'rgba(16,185,129,0.3)' : 'rgba(245,158,11,0.25)'}`,
+            letterSpacing: '0.06em',
+          }}>
+            {isLive ? 'LIVE' : 'MOCK'}
+          </span>
+          {/* Toggle switch */}
+          <div
+            onClick={handleToggle}
+            style={{
+              width: 44, height: 24, borderRadius: 12, cursor: 'pointer',
+              background: isLive ? '#10b981' : '#1e2d45',
+              position: 'relative', transition: 'background 0.2s',
+              border: `1px solid ${isLive ? 'rgba(16,185,129,0.5)' : '#2a3f5f'}`,
+            }}
+          >
+            <div style={{
+              position: 'absolute', top: 3, width: 18, height: 18, borderRadius: '50%',
+              background: '#fff', transition: 'left 0.2s',
+              left: isLive ? 22 : 3,
+            }} />
+          </div>
+        </div>
+      </div>
+
+      {/* Confirmação antes de trocar */}
+      {confirming && (
+        <div style={{
+          marginTop: 10, padding: '10px 12px', borderRadius: 8,
+          background: isLive ? 'rgba(245,158,11,0.07)' : 'rgba(16,185,129,0.07)',
+          border: `1px solid ${isLive ? 'rgba(245,158,11,0.25)' : 'rgba(16,185,129,0.25)'}`,
+          fontSize: 11,
+        }}>
+          <div style={{ color: '#e2e8f0', marginBottom: 8, fontWeight: 600 }}>
+            {isLive
+              ? 'Mudar para MOCK? As páginas usarão dados simulados. A página vai recarregar.'
+              : 'Mudar para LIVE? As páginas buscarão dados reais de todas as APIs configuradas. A página vai recarregar.'}
+          </div>
+          {!isLive && !supabaseOk && (
+            <div style={{ color: '#f59e0b', fontSize: 10, marginBottom: 8 }}>
+              ⚠️ Supabase não configurado — portfólio e alertas usarão estado local (sem persistência).
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={handleToggle} style={{
+              background: isLive ? 'rgba(245,158,11,0.15)' : 'rgba(16,185,129,0.15)',
+              color: isLive ? '#f59e0b' : '#10b981',
+              border: `1px solid ${isLive ? 'rgba(245,158,11,0.4)' : 'rgba(16,185,129,0.4)'}`,
+              borderRadius: 6, padding: '5px 12px', fontSize: 11, cursor: 'pointer', fontWeight: 600,
+            }}>
+              Confirmar e recarregar
+            </button>
+            <button onClick={() => setConfirming(false)} style={{
+              background: 'transparent', color: '#4a5568',
+              border: '1px solid rgba(30,45,69,0.8)',
+              borderRadius: 6, padding: '5px 12px', fontSize: 11, cursor: 'pointer',
+            }}>
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Settings() {
   return (
     <div style={{ maxWidth: 900, margin: '0 auto' }}>
@@ -119,13 +217,7 @@ export default function Settings() {
 
       {/* Data Mode */}
       <Section title="📡 Data Mode">
-        <SettingRow
-          label="DATA_MODE"
-          value="mock"
-          type="select"
-          options={['mock', 'live']}
-          description="Switch between mock data and live API calls"
-        />
+        <DataModeToggle />
         <SettingRow
           label="CRYPTO_SYMBOLS"
           value="BTCUSDT"

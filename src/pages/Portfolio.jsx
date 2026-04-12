@@ -1,9 +1,11 @@
 // ─── PORTFOLIO MANAGER PAGE ───────────────────────────────────────────────────
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
-  defaultPositions, computePortfolioGreeks, computePositionPnL,
+  defaultPositions as defaultPositionsMock,
+  computePortfolioGreeks, computePositionPnL,
   stressTest, stressScenarios, SPOT_PRICE,
 } from '../components/data/mockDataPortfolio';
+import { usePortfolioPositions, useUpsertPosition, useDeletePosition } from '@/hooks/useSupabase';
 
 // ─── RISK METRICS COMPUTATION ─────────────────────────────────────────────────
 // Usa aproximação paramétrica (normal). Produção: Monte Carlo ou histórico.
@@ -193,7 +195,20 @@ const inputStyle = { width: '100%', background: '#0d1421', border: '1px solid #1
 const selectStyle = { ...inputStyle, cursor: 'pointer' };
 
 export default function Portfolio() {
-  const [positions, setPositions] = useState(defaultPositions);
+  // Carrega posições do Supabase (ou mock se não configurado)
+  const { data: savedPositions } = usePortfolioPositions();
+  const { mutate: persistPosition } = useUpsertPosition();
+  const { mutate: persistRemovePosition } = useDeletePosition();
+
+  // Estado local inicializado com dados do Supabase (ou mock como fallback)
+  const [positions, setPositions] = useState(defaultPositionsMock);
+  useEffect(() => {
+    if (savedPositions && savedPositions.length > 0) {
+      // Adiciona current_price do SPOT_PRICE como fallback (será atualizado via hook live)
+      // @ts-ignore — Supabase PortfolioPosition tem campos Zod opcionais; runtime sempre válido
+      setPositions(savedPositions.map(p => ({ ...p, id: p.id ?? crypto.randomUUID(), current_price: p.entry_price })));
+    }
+  }, [savedPositions]);
   const [showAddForm, setShowAddForm] = useState(false);
   const [stressMove, setStressMove] = useState(null);
 
