@@ -6,16 +6,18 @@ import {
   btcRealizedMetrics, btcHashRate, onChain, fmtNum,
 } from '../components/data/mockData';
 import { useOnChainAdvanced, useMempoolState, useHashrate } from '@/hooks/useMempool';
-import { useOnChainCycle } from '@/hooks/useCoinMetrics';
+import { useOnChainCycle, useOnChainExtended } from '@/hooks/useCoinMetrics';
 import { IS_LIVE } from '@/lib/env';
+import { DataQualityBadge } from '../components/ui/DataQualityBadge';
 
 // ─── DATA LAYER (live > mock fallback) ───────────────────────────────────────
 function useOnChainLiveData() {
-  const { data: cycle }   = useOnChainCycle();    // MVRV Z-Score, NUPL, Realized Price
-  const { data: mempool } = useMempoolState();    // fees + mempool state live
-  const { data: hashrate} = useHashrate();        // hashrate live
-  useOnChainAdvanced();                           // NUPL/SOPR/Netflow — mantém cache (mock quality B)
-  return { cycle, mempool, hashrate };
+  const { data: cycle }    = useOnChainCycle();     // MVRV Z-Score, NUPL, Realized Price
+  const { data: mempool }  = useMempoolState();     // fees + mempool state live
+  const { data: hashrate } = useHashrate();         // hashrate live
+  const { data: extended } = useOnChainExtended();  // CDD, HODL Waves, Dormancy
+  useOnChainAdvanced();                             // NUPL/SOPR/Netflow — mantém cache (mock quality B)
+  return { cycle, mempool, hashrate, extended };
 }
 import MiniTimeChart from '../components/dashboard/MiniTimeChart';
 import { ModeBadge, GradeBadge } from '../components/ui/DataBadge';
@@ -59,6 +61,14 @@ const G = {
   difficulty: {
     title: 'Dificuldade de Mineração',
     content: 'Ajusta automaticamente a cada ~2 semanas para manter o tempo médio de bloco em ~10 minutos. Aumento de dificuldade = rede mais segura e mineradores investindo mais capital.',
+  },
+  cdd: {
+    title: 'CDD — Coin Days Destroyed',
+    content: 'Cada moeda BTC acumula "dias de moeda" por cada dia que permanece sem ser movimentada. Quando a moeda é movimentada, esses dias são "destruídos" (CDD). CDD alto = moedas antigas sendo movimentadas em grande escala, possível sinal de distribuição. CDD baixo = holders em repouso, acumulação silenciosa. Z-Score normaliza pelo histórico dos últimos 90 dias.',
+  },
+  hodlWave: {
+    title: 'HODL Wave 1yr+ — Supply Dormente',
+    content: 'Percentual do supply circulante de BTC que não foi movimentado nos últimos 12 meses ou mais. Aumento progressivo = fase de acumulação (holders comprando e guardando). Queda rápida = distribuição (coins velhas sendo vendidas). Fonte: CoinMetrics Community (SplyAdr1yrPlus).',
   },
 };
 
@@ -287,9 +297,15 @@ function MvrvCard({ liveCycle }) {
   return (
     <OnChainCard title="Realized Price · MVRV" glossKey="mvrv" accent={color} grade={grade}>
       {liveCycle && (
-        <div style={{ fontSize: 9, color: '#10b981', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 4 }}>
-          <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
-          CoinMetrics Community · Grátis · Qualidade A
+        <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <DataQualityBadge
+            freshness={liveCycle.updated_at && Date.now() - liveCycle.updated_at < 3_600_000 ? 100 : 60}
+            completeness={100}
+            consistency={100}
+            fallback_active={false}
+            source="CoinMetrics"
+          />
+          <span style={{ fontSize: 9, color: '#475569' }}>Community · Grátis</span>
         </div>
       )}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 10 }}>
@@ -464,11 +480,197 @@ function MempoolCard({ liveMempool }) {
   );
 }
 
+// ─── CDD CARD ─────────────────────────────────────────────────────────────────
+function CddCard({ liveExtended }) {
+  const cdd       = liveExtended?.cdd_current   ?? 8_000_000;
+  const ma30      = liveExtended?.cdd_ma30       ?? 7_500_000;
+  const zScore    = liveExtended?.cdd_z_score    ?? 0.3;
+  const signal    = liveExtended?.cdd_signal     ?? 'Dados não disponíveis — exibindo estimativa mock.';
+  const grade     = liveExtended?.quality        ?? 'B';
+
+  // Cor baseada no z-score: azul (baixo) → verde (neutro) → amarelo → vermelho (alto)
+  const zColor = zScore > 2 ? '#ef4444' : zScore > 1 ? '#f59e0b' : zScore > 0 ? '#10b981' : '#3b82f6';
+
+  // Escala da barra: -2 a +3 (faixa típica de CDD z-score)
+  const barMin   = -2;
+  const barMax   = 3;
+  const barPct   = Math.min(100, Math.max(0, ((zScore - barMin) / (barMax - barMin)) * 100));
+  const neutralPct = ((0 - barMin) / (barMax - barMin)) * 100;
+
+  // Formata CDD em milhões para exibição compacta
+  const fmtCdd = (v) => v >= 1_000_000
+    ? `${(v / 1_000_000).toFixed(2)}M`
+    : fmtNum(v, 0);
+
+  // Prepara dados para MiniTimeChart: mapeia history_cdd → formato {1d, 1w, 1m}
+  const pts = (liveExtended?.history_cdd ?? []).map(d => ({ t: d.date, v: d.value }));
+  const chartData = pts.length > 0
+    ? { '1d': pts.slice(-2), '1w': pts.slice(-7), '1m': pts }
+    : { '1d': [], '1w': [], '1m': [] };
+
+  return (
+    <OnChainCard title="CDD — Coin Days Destroyed" glossKey="cdd" accent={zColor} grade={grade}>
+      {liveExtended && (
+        <div style={{ fontSize: 9, color: '#10b981', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
+          CoinMetrics Community · Grátis · Qualidade A
+        </div>
+      )}
+
+      {/* Valores principais */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 10 }}>
+        <div>
+          <div style={{ fontSize: 9, color: '#475569', marginBottom: 2, textTransform: 'uppercase', letterSpacing: '0.06em' }}>CDD Atual</div>
+          <span style={{ fontSize: 22, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: zColor }}>
+            {fmtCdd(cdd)}
+          </span>
+          <div style={{ fontSize: 10, color: '#475569', marginTop: 1 }}>
+            MA30: <span style={{ fontFamily: 'JetBrains Mono, monospace', color: '#94a3b8' }}>{fmtCdd(ma30)}</span>
+          </div>
+        </div>
+        <div>
+          <div style={{ fontSize: 9, color: '#475569', marginBottom: 2, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Z-Score (90d)</div>
+          <span style={{ fontSize: 26, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: zColor, letterSpacing: '-0.04em' }}>
+            {zScore >= 0 ? '+' : ''}{zScore.toFixed(2)}
+          </span>
+        </div>
+      </div>
+
+      {/* Barra de z-score com linha de zero */}
+      <div style={{ marginBottom: 10 }}>
+        <div style={{ position: 'relative', height: 8, borderRadius: 4, overflow: 'hidden', marginBottom: 4,
+          background: 'linear-gradient(90deg, #3b82f6 0%, #10b981 40%, #f59e0b 65%, #ef4444 100%)' }}>
+          {/* Marcador posição atual */}
+          <div style={{
+            position: 'absolute', top: -2, left: `${barPct}%`,
+            transform: 'translateX(-50%)',
+            width: 6, height: 12, borderRadius: 3, background: '#fff',
+            boxShadow: '0 0 6px rgba(255,255,255,0.8)',
+          }} />
+          {/* Linha zero */}
+          <div style={{
+            position: 'absolute', top: 0, left: `${neutralPct}%`,
+            width: 1, height: '100%', background: 'rgba(255,255,255,0.4)',
+          }} />
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 8, color: '#334155' }}>
+          <span>Baixo (-2)</span><span>Neutro (0)</span><span>Alto (+3)</span>
+        </div>
+      </div>
+
+      {/* Mini chart de histórico CDD */}
+      {pts.length > 0 && (
+        <MiniTimeChart
+          data={chartData}
+          color={zColor}
+          height={65}
+          formatter={v => fmtCdd(v)}
+        />
+      )}
+
+      <InterpretBox text={signal} color="#94a3b8" />
+    </OnChainCard>
+  );
+}
+
+// ─── HODL WAVE CARD ───────────────────────────────────────────────────────────
+function HodlWaveCard({ liveExtended }) {
+  const hodlPct   = liveExtended?.hodl_wave_1yr_pct ?? 0.705;
+  const trend     = liveExtended?.hodl_wave_trend   ?? 'neutral';
+  const actSply   = liveExtended?.active_supply_1yr ?? 5_713_000;
+  const dormancy  = liveExtended?.dormancy_value    ?? 9.4;
+  const dormSig   = liveExtended?.dormancy_signal   ?? 'Dados não disponíveis — exibindo estimativa mock.';
+  const grade     = liveExtended?.quality           ?? 'B';
+
+  // Cor e label de tendência
+  const trendMeta = {
+    accumulating: { color: '#10b981', label: 'Acumulação' },
+    distributing: { color: '#ef4444', label: 'Distribuição' },
+    neutral:      { color: '#f59e0b', label: 'Neutro' },
+  }[trend] ?? { color: '#64748b', label: 'Indefinido' };
+
+  // Barra visual: HODL vs Ativo
+  const hodlBarPct   = Math.min(100, hodlPct * 100);
+  const activeBarPct = Math.min(100, (1 - hodlPct) * 100);
+
+  // Prepara dados para MiniTimeChart: history_hodl → pct como valor
+  const pts = (liveExtended?.history_hodl ?? []).map(d => ({ t: d.date, v: d.pct * 100 }));
+  const chartData = pts.length > 0
+    ? { '1d': pts.slice(-2), '1w': pts.slice(-7), '1m': pts }
+    : { '1d': [], '1w': [], '1m': [] };
+
+  return (
+    <OnChainCard title="HODL Wave 1yr+ · Dormancy" glossKey="hodlWave" accent={trendMeta.color} grade={grade}>
+      {liveExtended && (
+        <div style={{ fontSize: 9, color: '#10b981', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
+          CoinMetrics Community · Grátis · Qualidade A
+        </div>
+      )}
+
+      {/* % HODL destaque */}
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 8 }}>
+        <span style={{ fontSize: 36, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: trendMeta.color, letterSpacing: '-0.04em' }}>
+          {(hodlPct * 100).toFixed(1)}%
+        </span>
+        <div>
+          <div style={{ fontSize: 10, color: '#475569', marginBottom: 2 }}>supply em HODL &gt;1 ano</div>
+          <span style={{
+            fontSize: 10, fontWeight: 700, color: trendMeta.color,
+            background: `${trendMeta.color}18`,
+            border: `1px solid ${trendMeta.color}30`,
+            borderRadius: 5, padding: '2px 8px',
+          }}>
+            {trendMeta.label}
+          </span>
+        </div>
+      </div>
+
+      {/* Barra HODL vs Ativo */}
+      <div style={{ marginBottom: 10 }}>
+        <div style={{ height: 10, borderRadius: 5, overflow: 'hidden', display: 'flex', marginBottom: 4 }}>
+          <div style={{ width: `${hodlBarPct}%`, background: trendMeta.color, opacity: 0.8 }} />
+          <div style={{ width: `${activeBarPct}%`, background: '#1e3a5f' }} />
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: '#475569' }}>
+          <span style={{ color: trendMeta.color }}>HODL {(hodlPct * 100).toFixed(1)}%</span>
+          <span>Ativo {(activeBarPct).toFixed(1)}%</span>
+        </div>
+      </div>
+
+      {/* Mini chart % HODL histórico */}
+      {pts.length > 0 && (
+        <MiniTimeChart
+          data={chartData}
+          color={trendMeta.color}
+          height={55}
+          formatter={v => `${v.toFixed(1)}%`}
+        />
+      )}
+
+      {/* Dormancy proxy */}
+      <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 7, background: 'rgba(30,45,69,0.5)', border: '1px solid #1e2d45' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+          <span style={{ fontSize: 9, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            Dormancy Proxy (CDD / Endereços Ativos)
+          </span>
+          <span style={{ fontSize: 12, fontWeight: 800, fontFamily: 'JetBrains Mono, monospace', color: '#94a3b8' }}>
+            {dormancy.toFixed(1)}
+          </span>
+        </div>
+        <div style={{ fontSize: 10, color: '#64748b', lineHeight: 1.5 }}>
+          {dormSig}
+        </div>
+      </div>
+    </OnChainCard>
+  );
+}
+
 // ─── PÁGINA PRINCIPAL ─────────────────────────────────────────────────────────
 export default function OnChain() {
-  const { cycle, mempool, hashrate } = useOnChainLiveData();
+  const { cycle, mempool, hashrate, extended } = useOnChainLiveData();
   // Determina se algum dado live está disponível (para ajustar o badge)
-  const hasLiveData = !!(cycle || mempool || hashrate);
+  const hasLiveData = !!(cycle || mempool || hashrate || extended);
   const modeLabel   = IS_LIVE ? (hasLiveData ? 'live' : 'loading') : 'mock';
   return (
     <div style={{ maxWidth: 1400, margin: '0 auto' }}>
@@ -484,7 +686,7 @@ export default function OnChain() {
           </span>
         </div>
         <p style={{ fontSize: 11, color: '#475569', marginTop: 6, lineHeight: 1.6 }}>
-          MVRV/Realized Price: CoinMetrics Community (grátis, qualidade A). Hash Rate/Mempool: Mempool.space (live).
+          MVRV/Realized Price/CDD/HODL: CoinMetrics Community (grátis, qualidade A). Hash Rate/Mempool: Mempool.space (live).
           NUPL/SOPR/Netflow/Whales: estimativas mock (quality B) — requerem Glassnode/CryptoQuant para dados live.
         </p>
       </div>
@@ -510,6 +712,17 @@ export default function OnChain() {
           <WhaleCard />
           <MvrvCard liveCycle={cycle} />
           <LthSthCard />
+        </div>
+      </div>
+
+      {/* Fluxo de Ciclo — CDD & HODL (Sprint 6.1) */}
+      <div style={{ marginBottom: 8 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
+          ● Fluxo de Ciclo — CDD & HODL
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14, marginBottom: 20 }}>
+          <CddCard liveExtended={extended} />
+          <HodlWaveCard liveExtended={extended} />
         </div>
       </div>
 

@@ -259,6 +259,186 @@ export async function fetchMacroBoard(): Promise<MacroBoardData> {
   };
 }
 
+// ─── Global Liquidity ─────────────────────────────────────────────────────────
+
+export interface GlobalLiquidityData {
+  fed_balance_b: number;       // Fed BS em bilhões USD
+  fed_balance_chg_4w: number;  // variação 4 semanas (bilhões)
+  rrp_b: number;               // Reverse Repo (bilhões)
+  rrp_trend: 'draining' | 'adding' | 'stable';
+  tga_b: number;               // Treasury General Account (bilhões)
+  tga_trend: 'spending' | 'building' | 'stable';
+  real_yield_10y: number;      // DFII10
+  term_premium_10y: number;    // ACM term premium (THREEFYTP10)
+  dollar_index: number;        // DTWEXBGS
+  net_liquidity: number;       // Fed BS - RRP - TGA (proxy liquidez líquida)
+  net_liquidity_signal: string;
+  history: Array<{
+    date: string;
+    fed_b: number;
+    rrp_b: number;
+    tga_b: number;
+    net_b: number;
+  }>;
+  quality: 'A';
+  source: 'FRED';
+  updated_at: number;
+}
+
+/**
+ * Calcula tendência de uma série comparando último vs 4 semanas atrás.
+ * Threshold de 2% para considerar movimento significativo.
+ */
+function calcTrend<T extends string>(
+  current: number,
+  prev4w: number,
+  labels: { up: T; down: T; flat: T },
+  threshold = 0.02,
+): T {
+  const chg = prev4w > 0 ? (current - prev4w) / prev4w : 0;
+  if (chg > threshold) return labels.up;
+  if (chg < -threshold) return labels.down;
+  return labels.flat;
+}
+
+function mockGlobalLiquidity(): GlobalLiquidityData {
+  const fed_b = 7_100;
+  const rrp_b = 300;
+  const tga_b = 600;
+  const net    = fed_b - rrp_b - tga_b; // 6_200
+
+  const now = Date.now();
+  const history = Array.from({ length: 30 }, (_, i) => {
+    const d = new Date(now - (29 - i) * 7 * 86_400_000); // dados semanais
+    const _fed = fed_b * (0.97 + (i / 30) * 0.03 + (Math.random() - 0.5) * 0.005);
+    const _rrp = rrp_b * (1.4 - (i / 30) * 0.4 + (Math.random() - 0.5) * 0.02);
+    const _tga = tga_b * (0.9 + (Math.random() - 0.5) * 0.1);
+    return {
+      date:  d.toISOString().slice(0, 10),
+      fed_b: parseFloat(_fed.toFixed(1)),
+      rrp_b: parseFloat(_rrp.toFixed(1)),
+      tga_b: parseFloat(_tga.toFixed(1)),
+      net_b: parseFloat((_fed - _rrp - _tga).toFixed(1)),
+    };
+  });
+
+  return {
+    fed_balance_b:       fed_b,
+    fed_balance_chg_4w:  -120,
+    rrp_b,
+    rrp_trend:           'draining',
+    tga_b,
+    tga_trend:           'building',
+    real_yield_10y:      1.95,
+    term_premium_10y:    0.42,
+    dollar_index:        104.8,
+    net_liquidity:       net,
+    net_liquidity_signal: 'Liquidez líquida estável — RRP drenando gradualmente (bullish marginal)',
+    history,
+    quality:    'A',
+    source:     'FRED',
+    updated_at: now,
+  };
+}
+
+/**
+ * fetchGlobalLiquidity — Fed Balance Sheet, RRP, TGA, Real Yield, Term Premium, DXY
+ *
+ * Busca 6 séries em paralelo via FRED.
+ * Cache recomendado: 1 hora (dados semanais/diários, não intraday).
+ */
+export async function fetchGlobalLiquidity(): Promise<GlobalLiquidityData> {
+  if (DATA_MODE === 'mock') return mockGlobalLiquidity();
+
+  const apiKey = requireApiKey();
+
+  // Buscar histórico de 35 dias (séries semanais: ~5 pontos; diárias: ~25 pontos)
+  const [
+    walcl,     // Fed Balance Sheet (weekly, bilhões)
+    rrp,       // Reverse Repo (daily, bilhões)
+    wtregen,   // Treasury General Account (weekly, bilhões)
+    dfii10,    // 10Y Real Yield TIPS (daily, %)
+    term10,    // 10Y Term Premium ACM (daily, %)
+    dtwex,     // Broad Dollar Index (daily)
+  ] = await Promise.all([
+    fetchSeries('WALCL',       apiKey, 35),
+    fetchSeries('RRPONTSYD',   apiKey, 35),
+    fetchSeries('WTREGEN',     apiKey, 35),
+    fetchSeries('DFII10',      apiKey, 35),
+    fetchSeries('THREEFYTP10', apiKey, 35),
+    fetchSeries('DTWEXBGS',    apiKey, 35),
+  ]);
+
+  // Valores mais recentes disponíveis
+  const fed_b  = (walcl[walcl.length - 1]?.value   ?? 7_100_000) / 1_000; // FRED: milhões → bilhões
+  const rrp_b  = rrp[rrp.length - 1]?.value         ?? 300;
+  const tga_b  = (wtregen[wtregen.length - 1]?.value ?? 600_000) / 1_000;
+
+  // Valor 4 semanas atrás (séries semanais: ~4 pontos atrás)
+  const fed4w  = (walcl[Math.max(0, walcl.length - 5)]?.value   ?? fed_b * 1_000) / 1_000;
+  const rrp4w  = rrp[Math.max(0, rrp.length - 28)]?.value        ?? rrp_b;
+  const tga4w  = (wtregen[Math.max(0, wtregen.length - 5)]?.value ?? tga_b * 1_000) / 1_000;
+
+  const fed_balance_chg_4w = fed_b - fed4w;
+
+  const rrp_trend = calcTrend(rrp_b, rrp4w, { up: 'adding', down: 'draining', flat: 'stable' });
+  const tga_trend = calcTrend(tga_b, tga4w, { up: 'building', down: 'spending', flat: 'stable' });
+
+  const real_yield_10y   = dfii10[dfii10.length - 1]?.value   ?? 0;
+  const term_premium_10y = term10[term10.length - 1]?.value   ?? 0;
+  const dollar_index     = dtwex[dtwex.length - 1]?.value     ?? 0;
+
+  const net_liquidity = fed_b - rrp_b - tga_b;
+
+  // Sinal interpretativo simples
+  const chg4wPct = fed_b > 0 ? (fed_balance_chg_4w / fed_b) * 100 : 0;
+  let net_liquidity_signal: string;
+  if (net_liquidity > 6_500 && rrp_trend === 'draining') {
+    net_liquidity_signal = 'Alta liquidez líquida + RRP drenando → condições favoráveis ao risco';
+  } else if (net_liquidity < 5_500 || rrp_trend === 'adding') {
+    net_liquidity_signal = 'Liquidez líquida comprimida → headwind para ativos de risco';
+  } else if (chg4wPct > 0.5) {
+    net_liquidity_signal = 'Expansão do Fed BS (4 semanas) → injeção líquida de liquidez';
+  } else {
+    net_liquidity_signal = 'Liquidez líquida estável — sem sinal direcional forte';
+  }
+
+  // Construir histórico alinhando WALCL (weekly) com RRP e TGA
+  // Usamos as datas do WALCL como âncora
+  const histLen = Math.min(walcl.length, 30);
+  const history = walcl.slice(-histLen).map(w => {
+    const w_fed   = w.value / 1_000;
+    // Busca o ponto mais próximo nas séries diárias/semanais
+    const w_rrp   = rrp.find(r => r.date >= w.date)?.value ?? rrp_b;
+    const w_tga   = (wtregen.find(t => t.date >= w.date)?.value ?? tga_b * 1_000) / 1_000;
+    return {
+      date:  w.date,
+      fed_b: parseFloat(w_fed.toFixed(1)),
+      rrp_b: parseFloat(w_rrp.toFixed(1)),
+      tga_b: parseFloat(w_tga.toFixed(1)),
+      net_b: parseFloat((w_fed - w_rrp - w_tga).toFixed(1)),
+    };
+  });
+
+  return {
+    fed_balance_b:       parseFloat(fed_b.toFixed(1)),
+    fed_balance_chg_4w:  parseFloat(fed_balance_chg_4w.toFixed(1)),
+    rrp_b:               parseFloat(rrp_b.toFixed(1)),
+    rrp_trend,
+    tga_b:               parseFloat(tga_b.toFixed(1)),
+    tga_trend,
+    real_yield_10y:      parseFloat(real_yield_10y.toFixed(2)),
+    term_premium_10y:    parseFloat(term_premium_10y.toFixed(2)),
+    dollar_index:        parseFloat(dollar_index.toFixed(2)),
+    net_liquidity:       parseFloat(net_liquidity.toFixed(1)),
+    net_liquidity_signal,
+    history,
+    quality:    'A',
+    source:     'FRED',
+    updated_at: Date.now(),
+  };
+}
+
 /**
  * fetchYieldCurve — Curva de juros US: 10Y, 2Y, spread, Fed Funds
  *
