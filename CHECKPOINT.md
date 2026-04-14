@@ -1,6 +1,6 @@
 # CHECKPOINT.md — MRP Dashboard
 > Memória técnica viva do projeto. Atualizar ao final de cada bloco importante.
-> Última atualização: 2026-04-14 (Fase 6 — Sprints 6.1–6.5 CONCLUÍDOS)
+> Última atualização: 2026-04-14 (Fase 6 — Sprints 6.1–6.7 + 6.3 COMPLETOS — apenas 6.6 bloqueado)
 
 ---
 
@@ -224,7 +224,7 @@ refetchInterval: IS_LIVE ? 5_000 : false,
 | Sprint | Prioridade | Descrição | Status |
 |--------|------------|-----------|--------|
 | **6.2b** | Alta | BCB Layer — SELIC, IPCA, USDBRL via BCB OpenData | ✅ CONCLUÍDO |
-| **6.3** | Média | HODL Waves visual avançado + CDD histórico completo | 🔄 EM EXECUÇÃO |
+| **6.3** | Média | HODL Waves visual avançado + CDD histórico completo | ✅ CONCLUÍDO |
 | **6.4** | Alta | Charm/Vanna/GEX Dealer Flow — Black-Scholes 2ª derivada | ✅ CONCLUÍDO |
 | **6.5** | Média | Governance — audit feed, threshold history, data lineage | ✅ CONCLUÍDO |
 | **6.6** | 🔴 BLOQUEADO | Telegram Digest — aguarda Bot Token via @BotFather | 🔴 BLOQUEADO |
@@ -233,8 +233,12 @@ refetchInterval: IS_LIVE ? 5_000 : false,
 | **Bundle split** | — | manualChunks: index.js 284KB→90KB | ✅ CONCLUÍDO |
 
 ### Pendentes
-- [ ] **Sprint 6.3** — Em execução (agente ativo): HODL Waves visuais + CDD chart
 - [ ] **Sprint 6.6** — Telegram Digest: usuário deve criar bot via @BotFather e fornecer token
+
+### Itens técnicos menores remanescentes
+- Base44 favicon residual (`index.html`) — baixa severidade
+- Auth real Supabase (email/OAuth) — aguarda decisão do usuário
+- Rate limiting CoinGecko — debounce ≤30 req/min
 
 ---
 
