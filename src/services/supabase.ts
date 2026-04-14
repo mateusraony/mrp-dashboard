@@ -291,3 +291,121 @@ export async function upsertUserSettings(settings: Partial<UserSettings>): Promi
 
   return UserSettingsSchema.parse(assertNoError(result));
 }
+
+// ─── Governance — Alert Events (auditoria de disparos) ────────────────────────
+
+export const AlertEventSchema = z.object({
+  id:         z.string().uuid().optional(),
+  rule_id:    z.string(),
+  rule_label: z.string(),
+  fired_at:   z.string(),              // ISO timestamp
+  value_at_fire: z.coerce.number(),
+  threshold:  z.coerce.number(),
+  condition:  z.string(),
+  source:     z.string().default('system'),
+});
+export type AlertEvent = z.infer<typeof AlertEventSchema>;
+
+/** insertAlertEvent — registra disparo de alerta na tabela alert_events */
+export async function insertAlertEvent(event: Omit<AlertEvent, 'id'>): Promise<void> {
+  if (!isSupabaseConfigured()) return; // no-op em mock
+
+  const sb = getClient();
+  const payload = AlertEventSchema.omit({ id: true }).parse(event);
+
+  try {
+    await sb.from('alert_events').insert(payload);
+  } catch {
+    // tabela ainda não existe (migration pendente) — falha silenciosa
+  }
+}
+
+/** fetchAlertEvents — últimos N disparos de alertas */
+export async function fetchAlertEvents(limit = 20): Promise<AlertEvent[]> {
+  if (!isSupabaseConfigured()) return MOCK_ALERT_EVENTS;
+
+  const sb = getClient();
+  try {
+    const result = await sb
+      .from('alert_events')
+      .select('*')
+      .order('fired_at', { ascending: false })
+      .limit(limit);
+
+    if (result.error) return MOCK_ALERT_EVENTS;
+    return (result.data as unknown[]).map(r => AlertEventSchema.parse(r));
+  } catch {
+    return MOCK_ALERT_EVENTS;
+  }
+}
+
+// ─── Governance — Threshold History (rastreio de mudanças de limiar) ──────────
+
+export const ThresholdChangeSchema = z.object({
+  id:        z.string().uuid().optional(),
+  rule_id:   z.string(),
+  rule_label:z.string(),
+  old_value: z.coerce.number(),
+  new_value: z.coerce.number(),
+  changed_at:z.string(),
+  changed_by:z.string().default('user'),
+});
+export type ThresholdChange = z.infer<typeof ThresholdChangeSchema>;
+
+/** insertThresholdChange — registra mudança de threshold */
+export async function insertThresholdChange(change: Omit<ThresholdChange, 'id'>): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+
+  const sb = getClient();
+  const payload = ThresholdChangeSchema.omit({ id: true }).parse(change);
+
+  try {
+    await sb.from('threshold_history').insert(payload);
+  } catch {
+    // tabela pendente — falha silenciosa
+  }
+}
+
+/** fetchThresholdHistory — histórico de mudanças (todas as regras ou uma específica) */
+export async function fetchThresholdHistory(ruleId?: string): Promise<ThresholdChange[]> {
+  if (!isSupabaseConfigured()) {
+    return ruleId ? MOCK_THRESHOLD_HISTORY.filter(t => t.rule_id === ruleId) : MOCK_THRESHOLD_HISTORY;
+  }
+
+  const sb = getClient();
+  try {
+    let q = sb
+      .from('threshold_history')
+      .select('*')
+      .order('changed_at', { ascending: false })
+      .limit(50);
+
+    if (ruleId) q = q.eq('rule_id', ruleId);
+
+    const result = await q;
+    if (result.error) return MOCK_THRESHOLD_HISTORY;
+    return (result.data as unknown[]).map(r => ThresholdChangeSchema.parse(r));
+  } catch {
+    return MOCK_THRESHOLD_HISTORY;
+  }
+}
+
+// ─── Mock data para governança ────────────────────────────────────────────────
+
+const now = new Date();
+const hoursAgo = (h: number) => new Date(now.getTime() - h * 3_600_000).toISOString();
+const minsAgo  = (m: number) => new Date(now.getTime() - m * 60_000).toISOString();
+
+const MOCK_ALERT_EVENTS: AlertEvent[] = [
+  { id: crypto.randomUUID(), rule_id: 'rule-001', rule_label: 'Funding Rate Extremo', fired_at: minsAgo(23), value_at_fire: 0.0812, threshold: 0.08, condition: '> 0.08%', source: 'binance' },
+  { id: crypto.randomUUID(), rule_id: 'rule-002', rule_label: 'Long Flush Watch', fired_at: hoursAgo(2), value_at_fire: 1240, threshold: 1000, condition: 'liquidações > $1M', source: 'binance' },
+  { id: crypto.randomUUID(), rule_id: 'rule-003', rule_label: 'MVRV Z-Score Crítico', fired_at: hoursAgo(6), value_at_fire: 3.82, threshold: 3.7, condition: '> 3.7', source: 'coinmetrics' },
+  { id: crypto.randomUUID(), rule_id: 'rule-001', rule_label: 'Funding Rate Extremo', fired_at: hoursAgo(14), value_at_fire: 0.0923, threshold: 0.08, condition: '> 0.08%', source: 'binance' },
+  { id: crypto.randomUUID(), rule_id: 'rule-004', rule_label: 'VIX Spike', fired_at: hoursAgo(28), value_at_fire: 22.4, threshold: 20, condition: '> 20', source: 'fred' },
+];
+
+const MOCK_THRESHOLD_HISTORY: ThresholdChange[] = [
+  { id: crypto.randomUUID(), rule_id: 'rule-001', rule_label: 'Funding Rate Extremo', old_value: 0.06, new_value: 0.08, changed_at: hoursAgo(48), changed_by: 'user' },
+  { id: crypto.randomUUID(), rule_id: 'rule-002', rule_label: 'Long Flush Watch', old_value: 500, new_value: 1000, changed_at: hoursAgo(72), changed_by: 'user' },
+  { id: crypto.randomUUID(), rule_id: 'rule-003', rule_label: 'MVRV Z-Score Crítico', old_value: 3.5, new_value: 3.7, changed_at: hoursAgo(120), changed_by: 'user' },
+];
