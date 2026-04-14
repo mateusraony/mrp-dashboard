@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { THRESHOLDS, sourceHealth } from '../components/data/mockData';
 import { ModeBadge, GradeBadge } from '../components/ui/DataBadge';
-import { DATA_MODE, setDataMode } from '@/lib/env';
+import { DATA_MODE, setDataMode, env } from '@/lib/env';
 import { isSupabaseConfigured } from '@/services/supabase';
+import { useUserSettings, useUpdateSettings } from '@/hooks/useSupabase';
 
 function SettingRow({ label, value, description, type = 'text', options = undefined }) {
   const [v, setV] = useState(value);
@@ -183,6 +184,310 @@ function DataModeToggle() {
   );
 }
 
+// ─── TELEGRAM SECTION (real persistence) ─────────────────────────────────────
+
+const SCHEDULE_OPTIONS = [
+  '07:00','08:00','09:00','10:00','11:00','12:00',
+  '13:00','14:00','15:00','16:00','17:00','18:00',
+  '19:00','20:00','21:00','22:00',
+];
+
+function TelegramSection() {
+  const { data: settings, isLoading } = useUserSettings();
+  const updateSettings = useUpdateSettings();
+
+  const [enabled, setEnabled]       = useState(false);
+  const [token, setToken]           = useState('');
+  const [chatId, setChatId]         = useState('');
+  const [schedule, setSchedule]     = useState('11:00');
+  const [showToken, setShowToken]   = useState(false);
+  const [saveStatus, setSaveStatus] = useState(/** @type {'idle'|'saving'|'saved'|'error'} */('idle'));
+  const [testStatus, setTestStatus] = useState(/** @type {'idle'|'sending'|'sent'|'error'} */('idle'));
+  const [testMsg, setTestMsg]       = useState('');
+
+  // Populate form from Supabase settings on load
+  useEffect(() => {
+    if (!settings) return;
+    setEnabled(settings.telegram_enabled ?? false);
+    setToken(settings.telegram_bot_token ?? '');
+    setChatId(settings.telegram_chat_id ?? '');
+    setSchedule(settings.telegram_schedule ?? '11:00');
+  }, [settings]);
+
+  const handleSave = async () => {
+    setSaveStatus('saving');
+    try {
+      await updateSettings.mutateAsync({
+        telegram_enabled:   enabled,
+        telegram_bot_token: token.trim() || null,
+        telegram_chat_id:   chatId.trim() || null,
+        telegram_schedule:  schedule,
+      });
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus('idle'), 2500);
+    } catch {
+      setSaveStatus('error');
+      setTimeout(() => setSaveStatus('idle'), 3000);
+    }
+  };
+
+  const handleTest = async () => {
+    if (!token.trim() || !chatId.trim()) {
+      setTestMsg('Bot Token e Chat ID são obrigatórios.');
+      setTestStatus('error');
+      setTimeout(() => setTestStatus('idle'), 3000);
+      return;
+    }
+
+    setTestStatus('sending');
+    setTestMsg('');
+
+    try {
+      const supabaseUrl = env.VITE_SUPABASE_URL;
+      const anonKey     = env.VITE_SUPABASE_ANON_KEY;
+
+      if (!supabaseUrl || !anonKey) throw new Error('Supabase não configurado.');
+
+      // Salva antes de testar para que a Edge Function leia o token atualizado
+      await updateSettings.mutateAsync({
+        telegram_enabled:   true,
+        telegram_bot_token: token.trim(),
+        telegram_chat_id:   chatId.trim(),
+        telegram_schedule:  schedule,
+      });
+
+      const res = await fetch(`${supabaseUrl}/functions/v1/send-telegram-digest`, {
+        method:  'POST',
+        headers: {
+          'Authorization': `Bearer ${anonKey}`,
+          'Content-Type':  'application/json',
+        },
+      });
+
+      const body = await res.json().catch(() => ({}));
+
+      if (res.ok && body.status === 'sent') {
+        setTestStatus('sent');
+        setTestMsg('Mensagem enviada com sucesso!');
+      } else {
+        setTestStatus('error');
+        setTestMsg(body.reason ?? body.error ?? `HTTP ${res.status}`);
+      }
+    } catch (/** @type {any} */ err) {
+      setTestStatus('error');
+      setTestMsg(err?.message ?? 'Erro desconhecido.');
+    } finally {
+      setTimeout(() => { setTestStatus('idle'); setTestMsg(''); }, 5000);
+    }
+  };
+
+  const row = (label, description, control) => (
+    <div style={{
+      display: 'flex', alignItems: 'flex-start', gap: 16, padding: '12px 0',
+      borderBottom: '1px solid rgba(30,45,69,0.5)',
+    }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0', marginBottom: 2 }}>{label}</div>
+        {description && <div style={{ fontSize: 11, color: '#4a5568' }}>{description}</div>}
+      </div>
+      <div style={{ flexShrink: 0 }}>{control}</div>
+    </div>
+  );
+
+  if (isLoading) {
+    return (
+      <Section title="📨 Reports & Telegram">
+        <div style={{ fontSize: 12, color: '#4a5568', padding: '12px 0' }}>Carregando configurações…</div>
+      </Section>
+    );
+  }
+
+  return (
+    <Section title="📨 Reports & Telegram">
+      {/* Supabase not configured warning */}
+      {!isSupabaseConfigured() && (
+        <div style={{
+          marginBottom: 12, padding: '8px 12px', borderRadius: 6, fontSize: 11,
+          background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.25)',
+          color: '#f59e0b',
+        }}>
+          ⚠️ Supabase não configurado — configurações não serão persistidas.
+        </div>
+      )}
+
+      {/* Enable toggle */}
+      {row(
+        'TELEGRAM_ENABLED',
+        'Ativa o envio automático do resumo diário via Telegram Bot.',
+        <div
+          onClick={() => setEnabled(v => !v)}
+          style={{
+            width: 44, height: 24, borderRadius: 12, cursor: 'pointer',
+            background: enabled ? '#3b82f6' : '#1e2d45',
+            position: 'relative', transition: 'background 0.2s',
+            border: `1px solid ${enabled ? 'rgba(59,130,246,0.5)' : '#2a3f5f'}`,
+          }}
+        >
+          <div style={{
+            position: 'absolute', top: 3, width: 18, height: 18, borderRadius: '50%',
+            background: '#fff', transition: 'left 0.2s', left: enabled ? 22 : 3,
+          }} />
+        </div>
+      )}
+
+      {/* Bot Token */}
+      {row(
+        'TELEGRAM_BOT_TOKEN',
+        'Token do bot obtido via @BotFather no Telegram.',
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <input
+            type={showToken ? 'text' : 'password'}
+            value={token}
+            onChange={e => setToken(e.target.value)}
+            placeholder="1234567890:AABBcc..."
+            style={{
+              background: '#0D1421', border: '1px solid #2a3f5f', borderRadius: 6,
+              color: '#e2e8f0', padding: '5px 8px', fontSize: 11,
+              fontFamily: 'JetBrains Mono, monospace', width: 210,
+            }}
+          />
+          <button
+            onClick={() => setShowToken(v => !v)}
+            title={showToken ? 'Ocultar' : 'Mostrar'}
+            style={{
+              background: 'rgba(59,130,246,0.08)', color: '#60a5fa',
+              border: '1px solid rgba(59,130,246,0.2)', borderRadius: 6,
+              padding: '5px 8px', fontSize: 11, cursor: 'pointer',
+            }}
+          >
+            {showToken ? '👁‍🗨' : '👁'}
+          </button>
+        </div>
+      )}
+
+      {/* Chat ID */}
+      {row(
+        'TELEGRAM_CHAT_ID',
+        'ID do chat ou canal. Use @userinfobot no Telegram para obter.',
+        <input
+          type="text"
+          value={chatId}
+          onChange={e => setChatId(e.target.value)}
+          placeholder="-100123456789"
+          style={{
+            background: '#0D1421', border: '1px solid #2a3f5f', borderRadius: 6,
+            color: '#e2e8f0', padding: '5px 8px', fontSize: 12,
+            fontFamily: 'JetBrains Mono, monospace', width: 160,
+          }}
+        />
+      )}
+
+      {/* Schedule */}
+      {row(
+        'TELEGRAM_SCHEDULE',
+        'Horário de envio diário (UTC). Configure pg_cron no Supabase para ativar.',
+        <select
+          value={schedule}
+          onChange={e => setSchedule(e.target.value)}
+          style={{
+            background: '#0D1421', border: '1px solid #2a3f5f', borderRadius: 6,
+            color: '#e2e8f0', padding: '5px 8px', fontSize: 12,
+            fontFamily: 'JetBrains Mono, monospace',
+          }}
+        >
+          {SCHEDULE_OPTIONS.map(t => (
+            <option key={t} value={t}>{t} UTC</option>
+          ))}
+        </select>
+      )}
+
+      {/* Actions row */}
+      <div style={{ display: 'flex', gap: 10, paddingTop: 14, alignItems: 'center', flexWrap: 'wrap' }}>
+        {/* Save button */}
+        <button
+          onClick={handleSave}
+          disabled={saveStatus === 'saving'}
+          style={{
+            background: saveStatus === 'saved'  ? 'rgba(16,185,129,0.15)'
+                      : saveStatus === 'error'  ? 'rgba(239,68,68,0.12)'
+                      : 'rgba(59,130,246,0.12)',
+            color:      saveStatus === 'saved'  ? '#10b981'
+                      : saveStatus === 'error'  ? '#ef4444'
+                      : '#60a5fa',
+            border: `1px solid ${
+                        saveStatus === 'saved'  ? 'rgba(16,185,129,0.35)'
+                      : saveStatus === 'error'  ? 'rgba(239,68,68,0.3)'
+                      : 'rgba(59,130,246,0.25)'}`,
+            borderRadius: 7, padding: '7px 18px', fontSize: 12,
+            fontWeight: 600, cursor: saveStatus === 'saving' ? 'not-allowed' : 'pointer',
+            transition: 'all 0.2s',
+          }}
+        >
+          {saveStatus === 'saving' ? 'Salvando…'
+         : saveStatus === 'saved'  ? '✓ Salvo'
+         : saveStatus === 'error'  ? '✗ Erro ao salvar'
+         : 'Salvar configurações'}
+        </button>
+
+        {/* Test button */}
+        <button
+          onClick={handleTest}
+          disabled={testStatus === 'sending'}
+          style={{
+            background: testStatus === 'sent'    ? 'rgba(16,185,129,0.1)'
+                      : testStatus === 'error'   ? 'rgba(239,68,68,0.08)'
+                      : 'rgba(245,158,11,0.08)',
+            color:      testStatus === 'sent'    ? '#10b981'
+                      : testStatus === 'error'   ? '#ef4444'
+                      : '#f59e0b',
+            border: `1px solid ${
+                        testStatus === 'sent'    ? 'rgba(16,185,129,0.3)'
+                      : testStatus === 'error'   ? 'rgba(239,68,68,0.25)'
+                      : 'rgba(245,158,11,0.2)'}`,
+            borderRadius: 7, padding: '7px 18px', fontSize: 12,
+            fontWeight: 600, cursor: testStatus === 'sending' ? 'not-allowed' : 'pointer',
+            transition: 'all 0.2s',
+          }}
+        >
+          {testStatus === 'sending' ? '📤 Enviando…'
+         : testStatus === 'sent'    ? '✓ Enviado!'
+         : testStatus === 'error'   ? '✗ Falhou'
+         : '📤 Enviar teste'}
+        </button>
+
+        {/* Feedback message */}
+        {testMsg && (
+          <span style={{
+            fontSize: 11,
+            color: testStatus === 'error' ? '#ef4444' : '#10b981',
+            fontFamily: 'JetBrains Mono, monospace',
+          }}>
+            {testMsg}
+          </span>
+        )}
+      </div>
+
+      {/* pg_cron hint */}
+      <div style={{
+        marginTop: 14, padding: '10px 12px', borderRadius: 7, fontSize: 11,
+        background: 'rgba(59,130,246,0.04)', border: '1px solid rgba(59,130,246,0.12)',
+        color: '#4a6580', lineHeight: 1.6,
+      }}>
+        <strong style={{ color: '#60a5fa' }}>Agendamento automático (pg_cron):</strong>{' '}
+        Acesse o Supabase Dashboard → SQL Editor e execute:
+        <br />
+        <code style={{
+          display: 'block', marginTop: 6, padding: '6px 8px',
+          background: 'rgba(0,0,0,0.3)', borderRadius: 4,
+          color: '#94a3b8', fontFamily: 'JetBrains Mono, monospace', fontSize: 10,
+        }}>
+          {'SELECT cron.schedule(\'telegram-digest\', \'0 11 * * *\', $$SELECT net.http_post(url:=\'<SUPABASE_URL>/functions/v1/send-telegram-digest\', headers:=\'{"Authorization":"Bearer <ANON_KEY>"}\', body:=\'{}\'::jsonb)$$);'}
+        </code>
+      </div>
+    </Section>
+  );
+}
+
 export default function Settings() {
   return (
     <div style={{ maxWidth: 900, margin: '0 auto' }}>
@@ -239,25 +544,8 @@ export default function Settings() {
         ))}
       </Section>
 
-      {/* Reports */}
-      <Section title="📨 Reports & Telegram">
-        <SettingRow
-          label="REPORT_TIMES"
-          value="08:00,21:00"
-          description="Daily report times in BRT (comma-separated HH:MM)"
-        />
-        <SettingRow
-          label="TELEGRAM_CHAT_ID"
-          value="[hidden]"
-          type="password"
-          description="Telegram chat/channel ID"
-        />
-        <SettingRow
-          label="TIMEZONE"
-          value="America/Sao_Paulo"
-          description="System timezone for scheduling"
-        />
-      </Section>
+      {/* Reports & Telegram — real persistence */}
+      <TelegramSection />
 
       {/* Thresholds */}
       <Section title="⚡ Alert Thresholds">

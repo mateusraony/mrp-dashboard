@@ -77,17 +77,22 @@ export const PortfolioPositionSchema = z.object({
 export type PortfolioPosition = z.infer<typeof PortfolioPositionSchema>;
 
 export const UserSettingsSchema = z.object({
-  id:              z.string().uuid().optional(),
-  user_id:         z.string().uuid().optional(),
-  data_mode:       z.enum(['mock', 'live']).default('mock'),
-  base_currency:   z.string().default('USD'),
-  theme:           z.enum(['dark', 'light']).default('dark'),
-  notifications:   z.boolean().default(true),
-  risk_profile:    z.enum(['conservative', 'moderate', 'aggressive']).default('moderate'),
-  leverage_limit:  z.coerce.number().default(3),
-  // API keys são guardadas do lado cliente apenas — nunca persiste no Supabase
-  created_at:      z.string().optional(),
-  updated_at:      z.string().optional(),
+  id:                  z.string().uuid().optional(),
+  user_id:             z.string().uuid().optional(),
+  data_mode:           z.enum(['mock', 'live']).default('mock'),
+  base_currency:       z.string().default('USD'),
+  theme:               z.enum(['dark', 'light']).default('dark'),
+  notifications:       z.boolean().default(true),
+  risk_profile:        z.enum(['conservative', 'moderate', 'aggressive']).default('moderate'),
+  leverage_limit:      z.coerce.number().default(3),
+  // Telegram Digest (Sprint 6.6)
+  telegram_enabled:    z.boolean().default(false),
+  telegram_chat_id:    z.string().nullable().optional(),
+  telegram_bot_token:  z.string().nullable().optional(),
+  telegram_schedule:   z.string().default('11:00'),
+  // metadata
+  created_at:          z.string().optional(),
+  updated_at:          z.string().optional(),
 });
 export type UserSettings = z.infer<typeof UserSettingsSchema>;
 
