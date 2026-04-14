@@ -117,8 +117,8 @@ export default function DealerFlowPanel({ spot = 85_000, iv = 0.65 }) {
       const callOI = simulatedOI(spot, strike, BASE_OI_CALL);
       const putOI  = simulatedOI(spot, strike, BASE_OI_PUT);
 
-      const callInputs = { spot, strike, timeToExpiry: TIME_TO_EXPIRY, riskFreeRate: RISK_FREE_RATE, iv, optionType: 'call' };
-      const putInputs  = { spot, strike, timeToExpiry: TIME_TO_EXPIRY, riskFreeRate: RISK_FREE_RATE, iv, optionType: 'put' };
+      const callInputs = /** @type {import('@/utils/riskCalculations').BSInputs} */({ spot, strike, timeToExpiry: TIME_TO_EXPIRY, riskFreeRate: RISK_FREE_RATE, iv, optionType: /** @type {'call'} */('call') });
+      const putInputs  = /** @type {import('@/utils/riskCalculations').BSInputs} */({ spot, strike, timeToExpiry: TIME_TO_EXPIRY, riskFreeRate: RISK_FREE_RATE, iv, optionType: /** @type {'put'} */('put') });
 
       const callG = computeContractGreeks(callInputs, callOI, CONTRACT_SIZE);
       const putG  = computeContractGreeks(putInputs,  putOI,  CONTRACT_SIZE);
@@ -260,7 +260,7 @@ export default function DealerFlowPanel({ spot = 85_000, iv = 0.65 }) {
               tickFormatter={v => fmtUSD(v)}
               width={52}
             />
-            <Tooltip content={<GexTooltip />} />
+            <Tooltip content={({ active, payload, label }) => <GexTooltip active={active} payload={payload} label={label} />} />
             <ReferenceLine y={0} stroke="#1e3048" strokeWidth={1.5} />
             <ReferenceLine
               x={`$${(atmStrike / 1000).toFixed(0)}K`}
