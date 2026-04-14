@@ -4,7 +4,7 @@
 > Stack: React, Tailwind, Lucide, Vite, Node.js (ESM), TypeScript, Zod.
 > Repositório: https://github.com/mateusraony/mrp-dashboard
 > Deploy: https://mrp-dashboard.onrender.com
-> Última atualização: 2026-04-13
+> Última atualização: 2026-04-14
 
 ---
 
@@ -227,13 +227,16 @@ AUTOMAÇÕES
 6. ✅ **OnChain Cycle Pack** — MVRV Z-score, NUPL, Realized Price, NVT (Sprint 5.2).
 7. ✅ **CDD + Dormancy + HODL Waves** — proxy via CoinMetrics Community (Sprint 6.1).
 8. ✅ **Global Liquidity** — Fed BS/RRP/TGA Net Liquidity, Real Yield, Term Premium, DXY (Sprint 6.2).
+9. ✅ **BCB Layer** — SELIC, IPCA, USDBRL via BCB OpenData (Sprint 6.2b).
+10. ✅ **Charm/Vanna/GEX Dealer Flow** — Black-Scholes 2ª derivada + DealerFlowPanel + 27 testes (Sprint 6.4).
+11. ✅ **Governance Pack** — Alert audit feed, threshold history, data lineage (Sprint 6.5).
+12. ✅ **Testes ≥45** — 52/52 testes (Sprint 6.7 antecipado).
 
-### Pendentes (próximos sprints):
-- [ ] **Charm/Vanna/GEX Dealer Flow** — Black-Scholes second derivatives + DealerFlowPanel (Sprint 6.4).
-- [ ] **BCB Layer** — SELIC, IPCA, USDBRL via BCB OpenData (Sprint 6.2b).
-- [ ] **Governance Pack** — Data lineage, alert replay, threshold versioning (Sprint 6.5).
+### Pendentes (próxima sessão):
+- [ ] **HODL Waves visual avançado** — barras de coorte por tempo de detenção (Sprint 6.3).
 - [ ] **Telegram Digest** — Edge Function + pg_cron BLOQUEADO aguarda Bot Token do usuário (Sprint 6.6).
-- [ ] **Cobertura de testes** — ampliar para hooks, risk calcs, surprise z-score (Sprint 6.7).
+- [ ] **Migration Supabase** — tabelas `alert_events` + `threshold_history` (código pronto).
+- [ ] **Bundle split** — Recharts 378KB → `manualChunks` vite.config.js.
 
 ---
 
@@ -297,12 +300,12 @@ Ver `CHECKPOINT.md` na raiz para estado atual e próximos passos.
 |--------|--------|-----------|
 | 6.1 | ✅ CONCLUÍDO | CoinMetrics CDD + Dormancy + HODL Waves proxy |
 | 6.2 | ✅ CONCLUÍDO | Global Liquidity (FRED) + DataQualityBadge |
-| 6.2b | ⏳ PENDENTE | BCB Layer — SELIC/IPCA/USDBRL |
+| 6.2b | ✅ CONCLUÍDO | BCB Layer — SELIC/IPCA/USDBRL via BCB OpenData |
 | 6.3 | ⏳ PENDENTE | HODL Waves visual avançado + CDD histórico completo |
-| 6.4 | ⏳ PENDENTE | Charm/Vanna dealer flow (Black-Scholes 2ª deriv.) |
-| 6.5 | ⏳ PENDENTE | Governance — data lineage, alert replay, threshold versioning |
+| 6.4 | ✅ CONCLUÍDO | Charm/Vanna/GEX dealer flow (Black-Scholes 2ª deriv.) |
+| 6.5 | ✅ CONCLUÍDO | Governance — audit feed, threshold history, data lineage |
 | 6.6 | 🔴 BLOQUEADO | Telegram digest — aguarda Bot Token (@BotFather) |
-| 6.7 | ⏳ PENDENTE | Varredura final — build + tsc + lint + testes ≥45 |
+| 6.7 | ✅ ANTECIPADO | Varredura: build ✅ + tsc ✅ + lint ✅ + 52 testes ✅ |
 
 ### Instrução permanente
 Antes de qualquer avanço estrutural fora da fase atual → apresentar debate dos especialistas e pedir autorização.

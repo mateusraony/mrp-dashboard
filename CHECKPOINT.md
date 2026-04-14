@@ -1,6 +1,6 @@
 # CHECKPOINT.md — MRP Dashboard
 > Memória técnica viva do projeto. Atualizar ao final de cada bloco importante.
-> Última atualização: 2026-04-13 (Fase 6 — Sprint 6.1 + 6.2 CONCLUÍDOS)
+> Última atualização: 2026-04-14 (Fase 6 — Sprints 6.1–6.5 CONCLUÍDOS)
 
 ---
 
@@ -11,12 +11,12 @@
 | Build (`npm run build`) | ✅ PASSA | 20+ chunks lazy loading, maior chunk 378KB (Recharts) |
 | Lint (`eslint . --quiet`) | ✅ PASSA | 0 erros |
 | TypeCheck (`tsc -p jsconfig.json`) | ✅ PASSA | 0 erros |
-| Testes (`npm test`) | ✅ 25/25 | Vitest — sessionAnalytics (15) + coinmetrics (10) |
+| Testes (`npm test`) | ✅ 52/52 | 3 arquivos: sessionAnalytics(15) + coinmetrics(10) + dealerGreeks(27) |
 | Deploy (Render) | ✅ ONLINE | https://mrp-dashboard.onrender.com |
 | Dados ao vivo | ✅ ATIVO | DATA_MODE=live, .env.local configurado com credenciais reais |
 | Auth real | ❌ AUSENTE | Stub anônimo (isAuthenticated: false) — aguarda Fase futura |
 | Supabase | ✅ ATIVO | 3 tabelas vivas com RLS (alert_rules, portfolio_positions, user_settings) |
-| TanStack Query Hooks | ✅ 17 hooks | + useOnChainExtended (6.1) + useGlobalLiquidity (6.2) |
+| TanStack Query Hooks | ✅ 22 hooks | + useOnChainExtended(6.1) + useGlobalLiquidity(6.2) + useBcbData(6.2b) + 4 governance hooks(6.5) |
 | Navegação performance | ✅ CORRIGIDA | Suspense dentro de LayoutWrapper; hover prefetch nas rotas |
 
 ---
@@ -81,6 +81,22 @@
 | **6.2** — `.env.local`: criado com VITE_FRED_API_KEY + VITE_SUPABASE_* reais | ✅ DONE | Ignorado pelo git |
 | **6.2** — Supabase: migração aplicada via MCP — 3 tabelas com RLS | ✅ DONE | alert_rules, portfolio_positions, user_settings |
 | **Varredura pós-6.2:** `npm run build` ✅ · `vitest 25/25` ✅ | ✅ DONE | 8 arquivos modificados, 1.196 inserções |
+
+### ─── SPRINTS 6.2b–6.5 (2026-04-14) — FASE 6 AVANÇADA ───
+| Item | Status | Detalhes |
+|------|--------|----------|
+| **6.2b** — `services/bcb.ts`: SELIC (série 11), IPCA (433), USDBRL (1) via BCB OpenData | ✅ DONE | Promise.allSettled, sem API key |
+| **6.2b** — `hooks/useBcb.ts`: `useBcbData()` staleTime 4h | ✅ DONE | |
+| **6.2b** — `Macro.jsx`: `BrMacroPanel` — semáforo SELIC/IPCA/USDBRL + DataQualityBadge | ✅ DONE | Cores: verde/amarelo/vermelho por threshold |
+| **6.4** — `riskCalculations.ts`: `computeGreeks()`, `computeContractGreeks()` — BS 2ª derivada | ✅ DONE | Delta, Gamma, Vanna, Charm + GEX/VannaExp/CharmExp |
+| **6.4** — `dealerGreeks.test.ts`: 27 testes (null guards, ATM delta, put-call parity, GEX sign) | ✅ DONE | Total: 52/52 testes |
+| **6.4** — `DealerFlowPanel.jsx`: bar chart GEX por strike + 3 summary cards | ✅ DONE | Strike ladder ±5 × 2%, OI simulado |
+| **6.4** — `Options.jsx`: seção "Dealer Flow (GEX/Vanna/Charm)" adicionada | ✅ DONE | |
+| **6.5** — `supabase.ts`: `AlertEventSchema`, `ThresholdChangeSchema`, insert/fetch functions | ✅ DONE | Fallback gracioso (tabelas Migration futura) |
+| **6.5** — `useSupabase.ts`: `useAlertEvents()`, `useLogAlertEvent()`, `useThresholdHistory()`, `useLogThresholdChange()` | ✅ DONE | |
+| **6.5** — `AlertAuditPanel.jsx`: 3 sub-abas (Disparos / Limiares / Data Lineage) | ✅ DONE | 9 fontes mapeadas no lineage |
+| **6.5** — `SmartAlerts.jsx`: aba "Auditoria" adicionada | ✅ DONE | |
+| **Varredura pós-6.5:** `npm run build` ✅ · `tsc` ✅ · `eslint` ✅ · `vitest 52/52` ✅ | ✅ DONE | Sprint 6.7 antecipado |
 
 ---
 
@@ -203,31 +219,20 @@ refetchInterval: IS_LIVE ? 5_000 : false,
 
 ## 🗺 PRÓXIMOS PASSOS — FASE 6 (sprints pendentes)
 
-| Sprint | Prioridade | Descrição |
-|--------|------------|-----------|
-| **6.2b** | Alta | BCB Layer — SELIC (série 11), IPCA (433), USDBRL (1) via BCB OpenData |
-| **6.3** | Alta | HODL Waves visual avançado + CDD histórico completo em OnChain.jsx |
-| **6.4** | Alta | Charm/Vanna/GEX Dealer Flow — Black-Scholes 2ª derivada + DealerFlowPanel |
-| **6.5** | Média | Governance — data lineage, alert replay, threshold versioning |
-| **6.6** | 🔴 BLOQUEADO | Telegram Digest — aguarda Bot Token do usuário via @BotFather |
-| **6.7** | Alta | Varredura final: build + tsc + lint + testes ≥45 |
+| Sprint | Prioridade | Descrição | Status |
+|--------|------------|-----------|--------|
+| **6.2b** | Alta | BCB Layer — SELIC, IPCA, USDBRL via BCB OpenData | ✅ CONCLUÍDO |
+| **6.3** | Média | HODL Waves visual avançado + CDD histórico completo | ⏳ Pendente |
+| **6.4** | Alta | Charm/Vanna/GEX Dealer Flow — Black-Scholes 2ª derivada | ✅ CONCLUÍDO |
+| **6.5** | Média | Governance — audit feed, threshold history, data lineage | ✅ CONCLUÍDO |
+| **6.6** | 🔴 BLOQUEADO | Telegram Digest — aguarda Bot Token via @BotFather | 🔴 BLOQUEADO |
+| **6.7** | Alta | Varredura final: build + tsc + lint + testes ≥45 | ✅ 52/52 ANTECIPADO |
 
-### Detalhes Sprint 6.2b — BCB Layer
-- `src/services/bcb.ts` — fetch séries BCB OpenData (JSON, sem key)
-- `src/hooks/useBcb.ts` — `useSelic()`, `useIpca()`, `useUsdBrl()`
-- `src/components/macro/BrMacroPanel.tsx` — painel compacto com rates + tendência
-- Integrar em `Macro.jsx` após GlobalLiquiditySection
-
-### Detalhes Sprint 6.4 — Charm/Vanna
-- `scripts/validate_charm_vanna.py` — fórmulas Black-Scholes 2ª derivada
-- `src/utils/riskCalculations.ts` — `estimateCharm()`, `estimateVanna()`, `computeVannaExposure()`
-- `src/components/options/DealerFlowPanel.tsx`
-- `src/__tests__/utils/dealerGreeks.test.ts`
-
-### Itens técnicos pendentes (não bloqueantes)
-- [ ] Bundle split Recharts 378KB → `manualChunks` em `vite.config.js`
-- [ ] Auth real — Supabase Auth (email/OAuth) — aguarda estabilidade
-- [ ] Rate limiting CoinGecko — debounce/queue ≤30 req/min
+### Pendentes (próxima sessão)
+- [ ] **Sprint 6.3** — HODL Waves visual avançado: barras horizontais por coorte de tempo, CDD histórico 90d com linha de tendência
+- [ ] **Sprint 6.6** — Telegram Digest: usuário deve criar bot via @BotFather e fornecer token
+- [ ] **Migration Supabase** — criar tabelas `alert_events` + `threshold_history` (código pronto, migration pendente)
+- [ ] **Bundle split** — Recharts 378KB → `manualChunks` em `vite.config.js`
 
 ---
 
