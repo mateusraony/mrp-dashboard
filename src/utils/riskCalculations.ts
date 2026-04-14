@@ -392,7 +392,108 @@ export function computeGex(
   };
 }
 
-// ─── 11. Max Pain ─────────────────────────────────────────────────────────────
+// ─── 11. Black-Scholes 2ª Ordem: Charm / Vanna / GEX Dealer Flow ──────────────
+
+/**
+ * Distribuição normal padrão — PDF.
+ * Internamente usada por computeGreeks.
+ */
+function normPdf(x: number): number {
+  return Math.exp(-0.5 * x * x) / Math.sqrt(2 * Math.PI);
+}
+
+/**
+ * Distribuição normal padrão — CDF.
+ * Aproximação de Hart, precisa a 7 casas decimais.
+ */
+function normCdf(x: number): number {
+  const t = 1 / (1 + 0.2316419 * Math.abs(x));
+  const d = 0.3989423 * Math.exp(-x * x / 2);
+  const p = d * t * (0.3193815 + t * (-0.3565638 + t * (1.7814779 + t * (-1.8212560 + t * 1.3302744))));
+  return x > 0 ? 1 - p : p;
+}
+
+export interface BSInputs {
+  spot: number;         // S — preço spot do ativo
+  strike: number;       // K — strike da opção
+  timeToExpiry: number; // T — tempo para expiração em anos
+  riskFreeRate: number; // r — taxa livre de risco (ex: 0.045 para 4.5%)
+  iv: number;           // σ — IV como decimal (ex: 0.65 para 65%)
+  optionType: 'call' | 'put';
+}
+
+export interface BSGreeks {
+  delta: number;
+  gamma: number;
+  vanna: number;  // ∂Delta/∂σ
+  charm: number;  // ∂Delta/∂t (taxa de decaimento do delta)
+}
+
+/**
+ * Calcula Delta, Gamma, Vanna e Charm via Black-Scholes.
+ * Retorna null para entradas inválidas (T ≤ 0, σ ≤ 0, S ≤ 0, K ≤ 0).
+ */
+export function computeGreeks(inputs: BSInputs): BSGreeks | null {
+  const { spot: S, strike: K, timeToExpiry: T, riskFreeRate: r, iv: sigma, optionType } = inputs;
+  if (T <= 0 || sigma <= 0 || S <= 0 || K <= 0) return null;
+
+  const sqrtT = Math.sqrt(T);
+  const d1 = (Math.log(S / K) + (r + 0.5 * sigma * sigma) * T) / (sigma * sqrtT);
+  const d2 = d1 - sigma * sqrtT;
+
+  const nd1 = normPdf(d1);
+  const Nd1 = normCdf(d1);
+
+  const delta = optionType === 'call' ? Nd1 : Nd1 - 1;
+  const gamma = nd1 / (S * sigma * sqrtT);
+  const vanna = -nd1 * d2 / sigma;
+  const charm = -nd1 * (2 * r * T - d2 * sigma * sqrtT) / (2 * T * sigma * sqrtT);
+
+  return { delta, gamma, vanna, charm };
+}
+
+export interface ContractGreeks extends BSGreeks {
+  strike: number;
+  optionType: 'call' | 'put';
+  oi: number;
+  gex: number;           // Gamma Exposure em USD (por 1% de movimento)
+  vannaExposure: number; // Vanna × OI × contractSize × S × (σ/100)
+  charmExposure: number; // Charm × OI × contractSize (delta/dia decaindo)
+}
+
+/**
+ * Calcula gregas por contrato, incluindo GEX, Vanna Exposure e Charm Exposure.
+ *
+ * @param inputs       - parâmetros Black-Scholes
+ * @param oi           - open interest em contratos
+ * @param contractSize - tamanho do contrato (default 1.0 BTC)
+ */
+export function computeContractGreeks(
+  inputs: BSInputs,
+  oi: number,
+  contractSize = 1.0,
+): ContractGreeks | null {
+  const greeks = computeGreeks(inputs);
+  if (!greeks) return null;
+
+  const { spot: S, iv: sigma } = inputs;
+  // GEX: calls positivo (dealers long gamma → amortece), puts negativo (dealers short gamma → amplifica)
+  const gex = greeks.gamma * oi * contractSize * S * S * (inputs.optionType === 'put' ? -1 : 1);
+  const vannaExposure = greeks.vanna * oi * contractSize * S * (sigma / 100);
+  const charmExposure = greeks.charm * oi * contractSize;
+
+  return {
+    ...greeks,
+    strike: inputs.strike,
+    optionType: inputs.optionType,
+    oi,
+    gex,
+    vannaExposure,
+    charmExposure,
+  };
+}
+
+// ─── 13. Max Pain ─────────────────────────────────────────────────────────────
 
 /**
  * Max Pain: strike com menor custo total de expiração para writers de opções.

@@ -42,6 +42,7 @@ import { ModeBadge, GradeBadge } from '../components/ui/DataBadge';
 import TermStructure from '../components/options/TermStructure';
 import IVRankPanel from '../components/options/IVRankPanel';
 import TakerFlowPanel from '../components/options/TakerFlowPanel';
+import DealerFlowPanel from '../components/options/DealerFlowPanel';
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine,
@@ -284,6 +285,17 @@ export default function Options() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
         <IVRankPanel />
         <TakerFlowPanel />
+      </div>
+
+      {/* Dealer Flow — GEX / Vanna / Charm */}
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 10 }}>
+          ● Dealer Flow (GEX/Vanna/Charm)
+        </div>
+        <DealerFlowPanel
+          spot={o.spot}
+          iv={o.iv_atm}
+        />
       </div>
 
       {/* Strikes table */}
