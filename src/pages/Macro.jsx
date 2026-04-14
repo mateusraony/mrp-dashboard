@@ -1,5 +1,6 @@
 import { macroBoard as macroBoardMock, macroHistory, fmtNum, aiAnalysis } from '../components/data/mockData';
 import { useMacroBoard, useGlobalLiquidity } from '@/hooks/useFred';
+import { useBcbData } from '@/hooks/useBcb';
 import { DataQualityBadge } from '../components/ui/DataQualityBadge';
 import { Area, AreaChart } from 'recharts';
 
@@ -9,8 +10,9 @@ import { Area, AreaChart } from 'recharts';
 function useMacroPageData() {
   const { data: live } = useMacroBoard();
   const { data: liquidity } = useGlobalLiquidity();
+  const { data: bcb, isLoading: bcbLoading, isError: bcbError } = useBcbData();
   const macroBoard = live ?? macroBoardMock;
-  return { macroBoard, liquidity };
+  return { macroBoard, liquidity, bcb, bcbLoading, bcbError };
 }
 import { AIModuleCard } from '../components/ui/AIAnalysisPanel';
 import GoldenRule from '../components/ui/GoldenRule';
@@ -307,8 +309,210 @@ function GlobalLiquiditySection({ liq }) {
   );
 }
 
+// ─── BR MACRO PANEL ──────────────────────────────────────────────────────────
+
+/**
+ * Retorna a cor semafórica para cada métrica BCB.
+ * @param {'selic'|'ipca'|'usdbrl'} metric
+ * @param {number|null} value
+ */
+function bcbColor(metric, value) {
+  if (value === null) return '#94a3b8';
+  if (metric === 'selic') {
+    if (value < 12)  return '#10b981'; // verde
+    if (value < 15)  return '#f59e0b'; // amarelo
+    return '#ef4444';                  // vermelho
+  }
+  if (metric === 'ipca') {
+    if (value < 0.4) return '#10b981';
+    if (value < 0.7) return '#f59e0b';
+    return '#ef4444';
+  }
+  if (metric === 'usdbrl') {
+    if (value < 5.5) return '#10b981';
+    if (value < 6.0) return '#f59e0b';
+    return '#ef4444';
+  }
+  return '#94a3b8';
+}
+
+/**
+ * BrMacroPanel — exibe SELIC, IPCA e USDBRL do BCB com badges de qualidade/fonte.
+ * Estilo consistente com LiquidityMetricCard.
+ */
+function BrMacroPanel({ bcb, isLoading, isError }) {
+  // Calcula DataQualityBadge props a partir do BcbData
+  const freshness = bcb
+    ? (Date.now() - bcb.updated_at < 3_600_000 ? 100 : 60)
+    : 0;
+  const nullCount = bcb
+    ? [bcb.selic, bcb.ipca, bcb.usdbrl].filter(v => v === null).length
+    : 3;
+  const completeness = bcb ? Math.round(((3 - nullCount) / 3) * 100) : 0;
+  const isMock = !bcb || bcb.source === 'mock';
+
+  // Formata valor ou exibe "—" para null/loading/erro
+  const fmt = (val, decimals = 2) => {
+    if (isLoading) return '…';
+    if (isError || val === null || val === undefined) return '—';
+    return val.toFixed(decimals);
+  };
+
+  const metrics = [
+    {
+      key:    'selic',
+      label:  'SELIC',
+      value:  bcb?.selic ?? null,
+      unit:   '% a.a.',
+      sub:    'Taxa overnight referência',
+      color:  bcbColor('selic', bcb?.selic ?? null),
+    },
+    {
+      key:    'ipca',
+      label:  'IPCA',
+      value:  bcb?.ipca ?? null,
+      unit:   '% ao mês',
+      sub:    'Inflação oficial mensal',
+      color:  bcbColor('ipca', bcb?.ipca ?? null),
+    },
+    {
+      key:    'usdbrl',
+      label:  'USD/BRL',
+      value:  bcb?.usdbrl ?? null,
+      unit:   'R$',
+      sub:    'Câmbio dólar / real',
+      color:  bcbColor('usdbrl', bcb?.usdbrl ?? null),
+    },
+  ];
+
+  return (
+    <div style={{ marginBottom: 24 }}>
+      {/* Cabeçalho da seção */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        marginBottom: 14, flexWrap: 'wrap', gap: 8,
+      }}>
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 800, color: '#e2e8f0', letterSpacing: '-0.01em' }}>
+            Brasil — Macro BCB
+          </div>
+          <div style={{ fontSize: 10, color: '#475569', marginTop: 2 }}>
+            SELIC · IPCA · USD/BRL via Banco Central do Brasil OpenData
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          {bcb && (
+            <DataQualityBadge
+              freshness={freshness}
+              completeness={completeness}
+              consistency={100}
+              fallback_active={isMock}
+              source={bcb.source}
+            />
+          )}
+          {/* Badge de fonte */}
+          <span style={{
+            fontSize: 9, padding: '2px 7px', borderRadius: 4, fontWeight: 700,
+            background: isMock ? 'rgba(245,158,11,0.1)' : 'rgba(16,185,129,0.1)',
+            color:      isMock ? '#f59e0b' : '#10b981',
+            border:     isMock ? '1px solid rgba(245,158,11,0.25)' : '1px solid rgba(16,185,129,0.25)',
+          }}>
+            {isMock ? 'Mock' : 'BCB OpenData'}
+          </span>
+          <span style={{ fontSize: 9, color: '#334155' }}>
+            SGS 11 · SGS 433 · SGS 1
+          </span>
+        </div>
+      </div>
+
+      {/* Grid de cards */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+        gap: 12,
+      }}>
+        {metrics.map(m => (
+          <div
+            key={m.key}
+            style={{
+              background: '#111827',
+              border: '1px solid #1e2d45',
+              borderRadius: 12,
+              padding: '16px 18px',
+            }}
+          >
+            <div style={{
+              display: 'flex', justifyContent: 'space-between',
+              alignItems: 'flex-start', marginBottom: 6,
+            }}>
+              <div style={{
+                fontSize: 10, color: '#4a5568',
+                textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 700,
+              }}>
+                {m.label}
+              </div>
+              {/* Indicador de qualidade por campo */}
+              <div style={{
+                width: 8, height: 8, borderRadius: '50%',
+                background: m.color, flexShrink: 0,
+                boxShadow: `0 0 5px ${m.color}80`,
+              }} />
+            </div>
+
+            {/* Valor principal */}
+            <div style={{
+              fontSize: 26, fontWeight: 900,
+              fontFamily: 'JetBrains Mono, monospace',
+              color: m.color,
+              letterSpacing: '-0.04em', lineHeight: 1.1,
+            }}>
+              {fmt(m.value)}
+              <span style={{ fontSize: 12, color: '#4a5568', marginLeft: 5, fontWeight: 400 }}>
+                {m.unit}
+              </span>
+            </div>
+
+            {/* Sub-label */}
+            {m.sub && (
+              <div style={{ fontSize: 10, color: '#64748b', marginTop: 4 }}>
+                {m.sub}
+              </div>
+            )}
+
+            {/* Status badge por campo */}
+            {!isLoading && !isError && m.value !== null && (
+              <div style={{
+                marginTop: 8,
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                fontSize: 9, fontWeight: 700,
+                color: m.color,
+                background: `${m.color}12`,
+                border: `1px solid ${m.color}25`,
+                borderRadius: 4, padding: '2px 7px',
+              }}>
+                {m.color === '#10b981' ? '● Saudável' : m.color === '#f59e0b' ? '● Atenção' : '● Elevado'}
+              </div>
+            )}
+
+            {/* Estado de erro/loading por campo */}
+            {(isLoading || isError || m.value === null) && !isLoading && (
+              <div style={{
+                marginTop: 8,
+                fontSize: 9, color: '#ef4444',
+                fontFamily: 'JetBrains Mono, monospace',
+              }}>
+                {isError ? 'Erro ao carregar' : 'Dado indisponível'}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function Macro() {
-  const { macroBoard, liquidity } = useMacroPageData();
+  const { macroBoard, liquidity, bcb, bcbLoading, bcbError } = useMacroPageData();
   const m = macroBoard;
   const yieldSpread = m.series.find(s => s.id === 'US10Y').value - m.series.find(s => s.id === 'US2Y').value;
   const yieldSpreadBp = (yieldSpread * 100).toFixed(1);
@@ -405,6 +609,9 @@ export default function Macro() {
 
       {/* Liquidez Global — Fed BS / RRP / TGA / Real Yield / Term Premium / DXY */}
       <GlobalLiquiditySection liq={liquidity} />
+
+      {/* Brasil — Macro BCB: SELIC / IPCA / USDBRL */}
+      <BrMacroPanel bcb={bcb} isLoading={bcbLoading} isError={bcbError} />
     </div>
   );
 }
