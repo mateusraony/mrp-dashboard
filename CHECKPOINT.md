@@ -1,6 +1,6 @@
 # CHECKPOINT.md — MRP Dashboard
 > Memória técnica viva do projeto. Atualizar ao final de cada bloco importante.
-> Última atualização: 2026-04-14 (Auditoria completa — Fase 6 finalizada)
+> Última atualização: 2026-04-14 (Sprint 6.6 concluído — Telegram + RLS fix + Settings persistence)
 
 ---
 
@@ -8,16 +8,18 @@
 
 | Aspecto | Status | Evidência Real |
 |---------|--------|---------------|
-| Build (`npm run build`) | ✅ PASSA | 3.259 módulos, 0 erros |
+| Build (`npm run build`) | ✅ PASSA | 0 erros — index.js 90KB |
 | Lint (`eslint . --quiet`) | ✅ PASSA | 0 erros |
 | TypeCheck (`tsc -p jsconfig.json`) | ✅ PASSA | 0 erros |
 | Testes (`npm test`) | ✅ 52/52 | 3 suites: sessionAnalytics(15) + coinmetrics(10) + dealerGreeks(27) |
 | Deploy (Render) | ✅ ONLINE | https://mrp-dashboard.onrender.com |
 | DATA_MODE | ✅ live | .env.local: VITE_DATA_MODE=live |
 | FRED API Key | ✅ CONFIGURADA | VITE_FRED_API_KEY presente em .env.local |
-| Supabase | ✅ ATIVO | URL + ANON_KEY em .env.local; 5 tabelas com RLS |
+| Supabase | ✅ ATIVO | URL + ANON_KEY em .env.local; 5 tabelas com RLS corrigido |
+| Supabase RLS | ✅ CORRIGIDO | Políticas auth.uid() substituídas por using(true) — dados salvam |
+| Supabase GitHub Integration | ✅ CORRIGIDO | Migration .sql files presentes no repo |
 | Auth real | ❌ AUSENTE | Stub anônimo — aguarda decisão futura |
-| Telegram | 🔴 BLOQUEADO | Edge Function pronta; falta Bot Token do usuário |
+| Telegram | ✅ IMPLEMENTADO | Edge Function + Settings persistence + Bot Token configurado |
 
 ---
 
@@ -48,7 +50,7 @@
 | **6.3** | ✅ | `HodlWavesPanel.jsx` (5 coortes CSS stacked bar). `CddCard` + `ComposedChart` 30d. `HodlWaveCard` + `AreaChart` supply activity |
 | **6.4** | ✅ | `computeGreeks()` + `computeContractGreeks()` (Black-Scholes 2ª derivada). `DealerFlowPanel.jsx`. `dealerGreeks.test.ts` (27 testes) |
 | **6.5** | ✅ | `AlertAuditPanel.jsx` (Disparos / Limiares / Data Lineage). `useAlertEvents()` + `useThresholdHistory()`. Aba "Auditoria" em SmartAlerts.jsx |
-| **6.6** | 🔴 BLOQUEADO | Código da Edge Function pronto. Aguarda Bot Token via @BotFather |
+| **6.6** | ✅ CONCLUÍDO | Edge Function deploy-ready. Settings.jsx com persistência real. Bot Token configurado. |
 | **6.7** | ✅ ANTECIPADO | build ✅ · tsc ✅ · eslint ✅ · 52/52 testes ✅ |
 | **Bundle split** | ✅ | `vite.config.js` manualChunks: index.js 284KB→90KB |
 | **Migration** | ✅ | `alert_events` + `threshold_history` aplicadas via MCP Supabase |
@@ -91,7 +93,7 @@
 
 | Item | Bloqueio | O que falta |
 |------|---------|-------------|
-| **Telegram Digest** | Sem Bot Token | Criar bot via @BotFather → fornecer token |
+| **Telegram Digest** | ✅ Implementado | Deploy Edge Function + ativar pg_cron no Supabase Dashboard |
 
 ---
 
@@ -173,7 +175,7 @@ refetchInterval: IS_LIVE ? 30_000 : false,
 | Item | Severidade | Status | Ação |
 |------|------------|--------|------|
 | Auth stub anônimo (`AuthContext.jsx`) | Alta | Pendente | Supabase Auth (email/OAuth) — aguarda decisão |
-| Telegram Bot Token | Alta | 🔴 BLOQUEADO | Usuário cria bot via @BotFather e fornece token |
+| Telegram deploy | Baixa | Pendente | `supabase functions deploy send-telegram-digest` + pg_cron SQL no Dashboard |
 | SOPR/Netflow/Whale via Glassnode | Média | Pendente | Requer plano pago ~$29/mês |
 | Base44 favicon residual (`index.html`) | Baixa | Pendente | 1 linha — remover quando conveniente |
 | Rate limiting CoinGecko | Baixa | Pendente | Debounce/queue ≤30 req/min no free tier |
@@ -207,6 +209,6 @@ refetchInterval: IS_LIVE ? 30_000 : false,
 
 | Item | Descrição | Bloqueio |
 |------|-----------|---------|
-| **Telegram Digest (Sprint 6.6)** | Envio diário de resumo via bot | Você precisa criar um bot no @BotFather e me passar o token |
+| **Telegram Digest (Sprint 6.6)** | ✅ CONCLUÍDO | Edge Function + Settings persistence. Falta apenas: deploy via CLI/Dashboard + ativar pg_cron |
 | **Auth real** | Login com email/Google via Supabase Auth | Decisão de negócio — quando quiser ativar |
 | **APIs pagas** | SOPR, Netflow, Whale via Glassnode/CryptoQuant | Custo ~$29/mês — confirmar se vale |
