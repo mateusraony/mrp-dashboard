@@ -267,14 +267,23 @@ export async function deletePortfolioPosition(id: string): Promise<void> {
  *
  * Filtra pelo ANON_USER_ID para evitar `.maybeSingle()` falhar quando múltiplas
  * linhas existem (situação causada pelo bug antigo de upsert sem user_id).
+ *
+ * Em caso de erro de rede/credenciais, retorna defaults com aviso (não quebra a UI).
  */
 export async function fetchUserSettings(): Promise<UserSettings> {
   if (!isSupabaseConfigured()) {
-    console.warn('[Supabase] fetchUserSettings: Supabase não configurado, retornando defaults.');
+    console.warn('[Supabase] fetchUserSettings: Supabase não configurado — retornando defaults. Configure VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY em .env.local (dev) e nas variáveis de ambiente do Render (produção).');
     return UserSettingsSchema.parse(defaultSettings ?? {});
   }
 
-  const sb = getClient();
+  let sb: SupabaseClient;
+  try {
+    sb = getClient();
+  } catch (err) {
+    console.error('[Supabase] fetchUserSettings: falha ao criar cliente Supabase:', err);
+    return UserSettingsSchema.parse(defaultSettings ?? {});
+  }
+
   const result = await sb
     .from('user_settings')
     .select('*')
@@ -282,32 +291,43 @@ export async function fetchUserSettings(): Promise<UserSettings> {
     .maybeSingle(); // retorna null se não existir (sem erro 406)
 
   if (result.error) {
-    console.error('[Supabase] fetchUserSettings error:', result.error.message);
-    throw new Error(`Supabase error: ${result.error.message}`);
+    const code = (result.error as { code?: string }).code ?? '';
+    if (code === '42501' || result.error.message?.includes('row-level security')) {
+      console.error('[Supabase] fetchUserSettings: BLOQUEADO POR RLS — retornando defaults. Verifique as políticas RLS em user_settings.', result.error.message);
+    } else {
+      console.error('[Supabase] fetchUserSettings error:', result.error.message, result.error);
+    }
+    // Retorna defaults em vez de throw para não quebrar a UI
+    return UserSettingsSchema.parse(defaultSettings ?? {});
   }
 
   // Se não existe ainda nenhuma linha para este user_id, retorna defaults
   if (!result.data) {
-    console.info('[Supabase] fetchUserSettings: nenhuma configuração encontrada, usando defaults.');
+    console.info('[Supabase] fetchUserSettings: nenhuma configuração encontrada para user_id sentinel — usando defaults. O upsert criará a linha no primeiro save.');
     return UserSettingsSchema.parse({});
   }
 
+  console.info('[Supabase] fetchUserSettings: configurações carregadas com sucesso.');
   return UserSettingsSchema.parse(result.data);
 }
 
 /**
  * upsertUserSettings — salva configurações do usuário anônimo.
  *
- * CORREÇÃO CRÍTICA: o upsert usa onConflict: 'user_id' e agora inclui o ANON_USER_ID
+ * CORREÇÃO CRÍTICA: o upsert usa onConflict: 'user_id' e inclui o ANON_USER_ID
  * fixo no payload. Sem user_id no payload, dois NULLs não conflitam no Postgres
  * (NULL != NULL), criando uma nova linha a cada save em vez de atualizar a existente.
  *
  * A coluna user_id é UNIQUE na tabela — com o sentinel UUID fixo, o upsert
  * encontra o registro existente e faz UPDATE em vez de INSERT.
+ *
+ * PRÉ-REQUISITO: a migration 20260414000002_drop_fk_for_anon_sentinel.sql deve estar
+ * aplicada no Supabase — ela remove a FK de user_id -> auth.users para que o
+ * sentinel '00000000-...' possa ser inserido sem erro de chave estrangeira.
  */
 export async function upsertUserSettings(settings: Partial<UserSettings>): Promise<UserSettings> {
   if (!isSupabaseConfigured()) {
-    console.warn('[Supabase] upsertUserSettings: Supabase não configurado, retornando mock merged com defaults.');
+    console.warn('[Supabase] upsertUserSettings: Supabase não configurado — retornando mock merged com defaults. Configure VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.');
     return UserSettingsSchema.parse({ ...defaultSettings, ...settings });
   }
 
@@ -328,6 +348,42 @@ export async function upsertUserSettings(settings: Partial<UserSettings>): Promi
     .single();
 
   if (result.error) {
+    // Diagnóstico aprimorado: diferencia FK violation, RLS block e outros erros
+    const msg = result.error.message ?? '';
+    const code = (result.error as { code?: string }).code ?? '';
+
+    if (msg.includes('foreign key') || code === '23503') {
+      console.error(
+        '[Supabase] upsertUserSettings: ERRO DE CHAVE ESTRANGEIRA (FK).' +
+        ' A migration 20260414000002_drop_fk_for_anon_sentinel.sql NÃO foi aplicada.' +
+        ' Aplique-a no Supabase Dashboard → SQL Editor.',
+        result.error,
+      );
+      throw new Error(
+        'Supabase FK violation: user_settings.user_id tem FK para auth.users. ' +
+        'Aplique a migration 20260414000002_drop_fk_for_anon_sentinel.sql no Supabase.',
+      );
+    }
+
+    if (code === '42501' || msg.includes('permission denied') || msg.includes('row-level security')) {
+      console.error(
+        '[Supabase] upsertUserSettings: BLOQUEADO POR RLS.' +
+        ' A migration 20260414000000_add_telegram_and_fix_rls.sql pode não ter sido aplicada.',
+        result.error,
+      );
+      throw new Error(
+        'Supabase RLS block: sem permissão de escrita em user_settings. ' +
+        'Aplique a migration 20260414000000_add_telegram_and_fix_rls.sql no Supabase.',
+      );
+    }
+
+    if (code === 'PGRST116') {
+      // PostgREST .single() não encontrou linha após o upsert (raro — pode indicar
+      // problema com .select() após upsert sem retorno)
+      console.error('[Supabase] upsertUserSettings: PGRST116 — .single() não retornou linha.', result.error);
+      throw new Error('Supabase: upsert executado mas .select().single() não retornou dados (PGRST116).');
+    }
+
     console.error('[Supabase] upsertUserSettings error:', result.error.message, result.error);
     throw new Error(`Supabase upsert error: ${result.error.message}`);
   }
