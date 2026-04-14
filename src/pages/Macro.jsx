@@ -1,9 +1,7 @@
 import { macroBoard as macroBoardMock, macroHistory, fmtNum, aiAnalysis } from '../components/data/mockData';
 import { useMacroBoard, useGlobalLiquidity } from '@/hooks/useFred';
 import { DataQualityBadge } from '../components/ui/DataQualityBadge';
-import {
-  LineChart, Line, Area, AreaChart,
-} from 'recharts';
+import { Area, AreaChart } from 'recharts';
 
 // ─── DATA LAYER (live > mock fallback) ───────────────────────────────────────
 // useMacroBoard() retorna MacroBoardData — shape idêntico ao macroBoardMock:
@@ -94,6 +92,9 @@ function SeriesCard({ s }) {
 
 // ─── GLOBAL LIQUIDITY SECTION ────────────────────────────────────────────────
 
+/**
+ * @param {{ label: string, value: string|number, sub?: string, color?: string, trend?: string, trendLabel?: string, badge?: import('react').ReactNode }} props
+ */
 function LiquidityMetricCard({ label, value, sub, color = '#e2e8f0', trend, trendLabel, badge }) {
   const trendColor = trend === 'draining' || trend === 'spending'
     ? '#10b981' // drenagem de RRP/TGA = bullish para liquidez
@@ -272,7 +273,7 @@ function GlobalLiquiditySection({ liq }) {
                 />
                 <Tooltip
                   contentStyle={{ background: '#111827', border: '1px solid #2a3f5f', borderRadius: 6, fontSize: 10 }}
-                  formatter={v => [`$${(v / 1000).toFixed(2)}T`, 'Net Liquidity']}
+                  formatter={v => [`$${(Number(v) / 1000).toFixed(2)}T`, 'Net Liquidity']}
                 />
                 <Area
                   type="monotone"
@@ -295,7 +296,7 @@ function GlobalLiquiditySection({ liq }) {
               <span key={s.key} style={{ fontSize: 9, color: '#475569', display: 'flex', alignItems: 'center', gap: 4 }}>
                 <span style={{ width: 8, height: 2, background: s.color, borderRadius: 1, display: 'inline-block' }} />
                 {s.label}: <span style={{ fontFamily: 'JetBrains Mono, monospace', color: s.color }}>
-                  ${(liq.history[liq.history.length - 1]?.[s.key] / 1000).toFixed(2)}T
+                  ${(Number(liq.history[liq.history.length - 1]?.[s.key] ?? 0) / 1000).toFixed(2)}T
                 </span>
               </span>
             ))}

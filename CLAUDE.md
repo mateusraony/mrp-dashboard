@@ -4,7 +4,7 @@
 > Stack: React, Tailwind, Lucide, Vite, Node.js (ESM), TypeScript, Zod.
 > Repositório: https://github.com/mateusraony/mrp-dashboard
 > Deploy: https://mrp-dashboard.onrender.com
-> Última atualização: 2026-04-11
+> Última atualização: 2026-04-13
 
 ---
 
@@ -30,22 +30,46 @@ Dashboard profissional de inteligência de mercado cripto (foco em Bitcoin). Pai
 - Todo dado de mercado vem de APIs externas (Binance, CoinGecko, Alternative.me, CoinGlass, Deribit, FRED, etc.)
 - Persistência de dados do usuário (alertas, portfólio, configurações) vai para **Supabase** (free tier).
 
-### Arquitetura atual (estado real — 2026-04-11)
+### Arquitetura atual (estado real — 2026-04-13)
 ```
 src/
-  pages/          → 31 arquivos de página (19 roteados, 12 órfãos/legados)
-  components/ui/  → 40+ componentes Shadcn/Radix (prontos)
-  components/data/→ 14 arquivos de mock data (TEMPORÁRIO — a ser eliminado)
-  components/dashboard/ → 4 componentes de dashboard
-  components/derivatives/ → 2 componentes
-  components/onchain/ → 1 componente
-  components/options/ → 3 componentes
-  components/ai/ → 1 componente AI
-  hooks/          → use-mobile.jsx
-  lib/            → AuthContext (stub), utils, query-client, app-params, notificationClient
-  utils/          → index.ts (createPageUrl)
-  api/            → (vazio/excluído do jsconfig)
-  services/       → NÃO EXISTE (a criar na Fase 3)
+  pages/          → 20 páginas roteadas
+  components/
+    ui/           → 40+ componentes Shadcn/Radix + DataQualityBadge (NOVO Sprint 6.2)
+    data/         → 15 arquivos mock (TEMPORÁRIO — eliminação gradual)
+    dashboard/    → 4 componentes
+    derivatives/  → 2 componentes
+    onchain/      → 1 componente
+    options/      → 3 componentes
+    ai/           → 1 componente AI
+  hooks/
+    useBtcData.ts       ← 7 hooks (ticker, klines, liquidações, etc.)
+    useCoinMetrics.ts   ← useOnChainCycle + useOnChainExtended (NOVO Sprint 6.1)
+    useDeribit.ts       ← options IV, term structure
+    useFred.ts          ← macro yields + useGlobalLiquidity (NOVO Sprint 6.2)
+    useMempool.ts       ← hashrate, fees, mempool
+    useMultiVenue.ts    ← Bybit/OKX snapshot + divergência
+    useRiskScore.ts     ← Risk Score composto
+    useSupabase.ts      ← alertas, portfólio, settings
+  services/
+    alternative.ts, binance.ts, bybit.ts, coingecko.ts,
+    coinmetrics.ts (CDD/Dormancy/HODL proxy — NOVO Sprint 6.1),
+    deribit.ts, fred.ts (Global Liquidity — NOVO Sprint 6.2),
+    mempool.ts, okx.ts, supabase.ts
+  utils/
+    index.ts, riskCalculations.ts, sessionAnalytics.ts
+  lib/
+    env.ts, errorBoundary.tsx, AuthContext.jsx (stub anônimo)
+    query-client.js, app-params.js, notificationClient.js
+  __tests__/
+    utils/sessionAnalytics.test.ts   ← 15 testes
+    services/coinmetrics.test.ts      ← 10 testes
+scripts/
+  validate_var.py, validate_risk_score.py, validate_gex.py,
+  validate_macro_surprise.py, validate_mvrv_zscore.py
+supabase/migrations/20260412000000_create_core_tables.sql
+vitest.config.ts
+.env.local (criado com credenciais reais — ignorado pelo git)
 ```
 
 ---
@@ -192,37 +216,44 @@ AUTOMAÇÕES
 
 ---
 
-## 🔍 GAPS PRIORITÁRIOS IDENTIFICADOS (Fase 1)
+## 🔍 GAPS PRIORITÁRIOS — STATUS ATUAL (2026-04-13)
 
-### Implementar (ordem de prioridade):
-1. **Portfolio Risk Pack Institucional** — VaR, Sharpe, Max Drawdown, Beta vs BTC. Impacto: muito alto | Complexidade: média.
-2. **Spot Sessions Analytics** — Quebrar SpotFlow por sessões Ásia/Europa/EUA com CVD/vol/agressão por sessão. Impacto: alto.
-3. **Macro Surprise Layer** — actual vs consensus vs reação histórica no calendário macro. Impacto: alto para timing tático.
-4. **Altcoins Page** — dominância BTC/ETH, rotação de capital, alts season index. (página nova, não existe).
-5. **Crypto Institutional Upgrade** — GEX/Dealer positioning, cohort flow por exchange, microstructure cross-venue. Impacto: altíssimo, complexidade alta.
-6. **OnChain Cycle Pack** — MVRV Z-score, Realized Cap HODL Waves, Coin Days Destroyed, dormancy flow.
+### Implementados (Sprints 1–6.2):
+1. ✅ **Portfolio Risk Pack Institucional** — VaR, Sharpe, Max Drawdown, Beta vs BTC (Sprint 2).
+2. ✅ **Spot Sessions Analytics** — Ásia/Europa/EUA com CVD/vol/agressão por sessão (Sprint 5.4).
+3. ✅ **Macro Surprise Layer** — actual vs consensus vs z-score no calendário macro (Sprint 4.4).
+4. ✅ **Altcoins Page** — dominância BTC/ETH, rotação, BTC.D/ETH (Sprint 2).
+5. ✅ **Cross-venue snapshot** — Binance | Bybit | OKX divergência de funding em bps (Sprint 5.5).
+6. ✅ **OnChain Cycle Pack** — MVRV Z-score, NUPL, Realized Price, NVT (Sprint 5.2).
+7. ✅ **CDD + Dormancy + HODL Waves** — proxy via CoinMetrics Community (Sprint 6.1).
+8. ✅ **Global Liquidity** — Fed BS/RRP/TGA Net Liquidity, Real Yield, Term Premium, DXY (Sprint 6.2).
+
+### Pendentes (próximos sprints):
+- [ ] **Charm/Vanna/GEX Dealer Flow** — Black-Scholes second derivatives + DealerFlowPanel (Sprint 6.4).
+- [ ] **BCB Layer** — SELIC, IPCA, USDBRL via BCB OpenData (Sprint 6.2b).
+- [ ] **Governance Pack** — Data lineage, alert replay, threshold versioning (Sprint 6.5).
+- [ ] **Telegram Digest** — Edge Function + pg_cron BLOQUEADO aguarda Bot Token do usuário (Sprint 6.6).
+- [ ] **Cobertura de testes** — ampliar para hooks, risk calcs, surprise z-score (Sprint 6.7).
 
 ---
 
-## ⚠️ DÍVIDA TÉCNICA IDENTIFICADA (Fase 1)
+## ⚠️ DÍVIDA TÉCNICA — STATUS ATUAL (2026-04-13)
 
 | Item | Arquivo | Severidade | Status |
 |------|---------|------------|--------|
 | Base44 favicon URL | index.html | Baixa | Pendente |
 | Base44 app_id param | src/lib/app-params.js | Baixa | Pendente |
 | useLocation não usado | src/Layout.jsx:2 | Baixa | Pendente |
-| 17 erros de lint (unused imports) | 8 arquivos | Média | Pendente |
-| 17+ erros de typecheck | 12 arquivos | Alta | Pendente |
-| Bundle único 1.35MB | vite.config.js | Alta | Pendente |
-| Auth stub hardcoded | src/lib/AuthContext.jsx | Alta | Pré-Fase 3 |
-| services/ não existe | src/services/ | Crítica | Criar na Fase 3 |
-| Supabase não instalado | package.json | Crítica | Pré-Fase 3 |
-| Preço BTC hardcoded no topbar | src/Layout.jsx:265 | Média | Fase 2/3 |
-| Emojis no nav (não Lucide) | src/Layout.jsx | Média | Fase 2 |
-| Stripe instalado sem uso aparente | package.json | Baixa | Avaliar |
-| ErrorBoundary ausente | App.jsx | Alta | Pré-produção |
-| Zero testes | projeto todo | Alta | Fase 4+ |
-| 12 arquivos de página órfãos | src/pages/ | Média | Fase 2 |
+| Lint warnings residuais | múltiplos arquivos | Baixa | Monitorar |
+| Bundle grande (Recharts 378KB) | vite.config.js | Média | Pendente — manualChunks |
+| Auth stub anônimo | src/lib/AuthContext.jsx | Alta | Aguarda Supabase Auth |
+| ~~services/ não existe~~ | src/services/ | ~~Crítica~~ | ✅ RESOLVIDO (Sprint 3) |
+| ~~Supabase não instalado~~ | package.json | ~~Crítica~~ | ✅ RESOLVIDO (Sprint 3) |
+| ~~Zero testes~~ | projeto todo | ~~Alta~~ | ✅ 25 testes (Sprint 5.6) |
+| ~~.env.local ausente~~ | — | ~~Alta~~ | ✅ Criado com credenciais reais |
+| Cobertura de testes baixa | 25 testes apenas | Alta | Ampliar Sprint 6.7 |
+| Telegram Bot Token | Edge Function pronta | Alta | BLOQUEADO — usuário deve criar bot |
+| Stripe instalado sem uso | package.json | Baixa | Avaliar |
 
 ---
 
@@ -251,12 +282,27 @@ Ver `CHECKPOINT.md` na raiz para estado atual e próximos passos.
 
 ## 🧠 MEMÓRIA VIVA — STATUS DE FASES
 
-| Fase | Status | Autorização |
-|------|--------|-------------|
-| Fase 1 — Análise Profunda | EM EXECUÇÃO | ✅ Autorizada |
-| Fase 2 — Interface/Visual | PENDENTE | Aguarda usuário |
-| Fase 3 — API com Mocks | PENDENTE | Aguarda usuário |
-| Fase 4 — Script Python | PENDENTE | Aguarda usuário |
+| Fase | Status | Data |
+|------|--------|------|
+| Fase 1 — Análise Profunda | ✅ CONCLUÍDA | 2026-04-11 |
+| Fase 2 — Interface/Visual (Sprints 1+2) | ✅ CONCLUÍDA | 2026-04-11 |
+| Fase 3 — API + Hooks + Settings (Sprints 3.1–3.9) | ✅ CONCLUÍDA | 2026-04-12 |
+| Fase 4 — Cálculos Python + Wiring (Sprints 4.1–4.5) | ✅ CONCLUÍDA | 2026-04-12 |
+| Fase 5 — APIs Gratuitas + Testes (Sprints 5.1–5.6) | ✅ CONCLUÍDA | 2026-04-12 |
+| Fase 6 — Expansão OnChain/Macro/Governance | 🔄 EM EXECUÇÃO | 2026-04-13 |
+
+### Fase 6 — Sub-sprints
+
+| Sprint | Status | Descrição |
+|--------|--------|-----------|
+| 6.1 | ✅ CONCLUÍDO | CoinMetrics CDD + Dormancy + HODL Waves proxy |
+| 6.2 | ✅ CONCLUÍDO | Global Liquidity (FRED) + DataQualityBadge |
+| 6.2b | ⏳ PENDENTE | BCB Layer — SELIC/IPCA/USDBRL |
+| 6.3 | ⏳ PENDENTE | HODL Waves visual avançado + CDD histórico completo |
+| 6.4 | ⏳ PENDENTE | Charm/Vanna dealer flow (Black-Scholes 2ª deriv.) |
+| 6.5 | ⏳ PENDENTE | Governance — data lineage, alert replay, threshold versioning |
+| 6.6 | 🔴 BLOQUEADO | Telegram digest — aguarda Bot Token (@BotFather) |
+| 6.7 | ⏳ PENDENTE | Varredura final — build + tsc + lint + testes ≥45 |
 
 ### Instrução permanente
 Antes de qualquer avanço estrutural fora da fase atual → apresentar debate dos especialistas e pedir autorização.
