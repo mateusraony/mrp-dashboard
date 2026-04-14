@@ -1,6 +1,6 @@
 # CHECKPOINT.md — MRP Dashboard
 > Memória técnica viva do projeto. Atualizar ao final de cada bloco importante.
-> Última atualização: 2026-04-14 (Fase 6 — Sprints 6.1–6.5 CONCLUÍDOS)
+> Última atualização: 2026-04-14 (Fase 6 — Sprints 6.1–6.7 + 6.3 COMPLETOS — apenas 6.6 bloqueado)
 
 ---
 
@@ -97,6 +97,8 @@
 | **6.5** — `AlertAuditPanel.jsx`: 3 sub-abas (Disparos / Limiares / Data Lineage) | ✅ DONE | 9 fontes mapeadas no lineage |
 | **6.5** — `SmartAlerts.jsx`: aba "Auditoria" adicionada | ✅ DONE | |
 | **Varredura pós-6.5:** `npm run build` ✅ · `tsc` ✅ · `eslint` ✅ · `vitest 52/52` ✅ | ✅ DONE | Sprint 6.7 antecipado |
+| **Migration** — `alert_events` + `threshold_history` via MCP Supabase | ✅ DONE | RLS ativo, índices por rule_id + timestamp |
+| **Bundle split** — `vite.config.js` manualChunks: recharts/supabase/tanstack/react-vendor | ✅ DONE | index.js 284KB→90KB (gzip 92→30KB) |
 
 ---
 
@@ -222,17 +224,21 @@ refetchInterval: IS_LIVE ? 5_000 : false,
 | Sprint | Prioridade | Descrição | Status |
 |--------|------------|-----------|--------|
 | **6.2b** | Alta | BCB Layer — SELIC, IPCA, USDBRL via BCB OpenData | ✅ CONCLUÍDO |
-| **6.3** | Média | HODL Waves visual avançado + CDD histórico completo | ⏳ Pendente |
+| **6.3** | Média | HODL Waves visual avançado + CDD histórico completo | ✅ CONCLUÍDO |
 | **6.4** | Alta | Charm/Vanna/GEX Dealer Flow — Black-Scholes 2ª derivada | ✅ CONCLUÍDO |
 | **6.5** | Média | Governance — audit feed, threshold history, data lineage | ✅ CONCLUÍDO |
 | **6.6** | 🔴 BLOQUEADO | Telegram Digest — aguarda Bot Token via @BotFather | 🔴 BLOQUEADO |
 | **6.7** | Alta | Varredura final: build + tsc + lint + testes ≥45 | ✅ 52/52 ANTECIPADO |
+| **Migration extra** | — | alert_events + threshold_history via MCP | ✅ APLICADA |
+| **Bundle split** | — | manualChunks: index.js 284KB→90KB | ✅ CONCLUÍDO |
 
-### Pendentes (próxima sessão)
-- [ ] **Sprint 6.3** — HODL Waves visual avançado: barras horizontais por coorte de tempo, CDD histórico 90d com linha de tendência
+### Pendentes
 - [ ] **Sprint 6.6** — Telegram Digest: usuário deve criar bot via @BotFather e fornecer token
-- [ ] **Migration Supabase** — criar tabelas `alert_events` + `threshold_history` (código pronto, migration pendente)
-- [ ] **Bundle split** — Recharts 378KB → `manualChunks` em `vite.config.js`
+
+### Itens técnicos menores remanescentes
+- Base44 favicon residual (`index.html`) — baixa severidade
+- Auth real Supabase (email/OAuth) — aguarda decisão do usuário
+- Rate limiting CoinGecko — debounce ≤30 req/min
 
 ---
 

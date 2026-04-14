@@ -233,10 +233,10 @@ AUTOMAÇÕES
 12. ✅ **Testes ≥45** — 52/52 testes (Sprint 6.7 antecipado).
 
 ### Pendentes (próxima sessão):
-- [ ] **HODL Waves visual avançado** — barras de coorte por tempo de detenção (Sprint 6.3).
+- ~~**HODL Waves visual avançado**~~ ✅ CONCLUÍDO (Sprint 6.3) — HodlWavesPanel + CDD ComposedChart + AreaChart supply.
 - [ ] **Telegram Digest** — Edge Function + pg_cron BLOQUEADO aguarda Bot Token do usuário (Sprint 6.6).
-- [ ] **Migration Supabase** — tabelas `alert_events` + `threshold_history` (código pronto).
-- [ ] **Bundle split** — Recharts 378KB → `manualChunks` vite.config.js.
+- ~~**Migration Supabase** — tabelas `alert_events` + `threshold_history`~~ ✅ APLICADA via MCP.
+- ~~[ ] **Bundle split** — Recharts 378KB → `manualChunks` vite.config.js.~~ ✅ RESOLVIDO
 
 ---
 
@@ -248,7 +248,7 @@ AUTOMAÇÕES
 | Base44 app_id param | src/lib/app-params.js | Baixa | Pendente |
 | useLocation não usado | src/Layout.jsx:2 | Baixa | Pendente |
 | Lint warnings residuais | múltiplos arquivos | Baixa | Monitorar |
-| Bundle grande (Recharts 378KB) | vite.config.js | Média | Pendente — manualChunks |
+| ~~Bundle grande (Recharts 378KB)~~ | vite.config.js | ~~Média~~ | ✅ RESOLVIDO — index.js 284KB→90KB |
 | Auth stub anônimo | src/lib/AuthContext.jsx | Alta | Aguarda Supabase Auth |
 | ~~services/ não existe~~ | src/services/ | ~~Crítica~~ | ✅ RESOLVIDO (Sprint 3) |
 | ~~Supabase não instalado~~ | package.json | ~~Crítica~~ | ✅ RESOLVIDO (Sprint 3) |
@@ -301,11 +301,13 @@ Ver `CHECKPOINT.md` na raiz para estado atual e próximos passos.
 | 6.1 | ✅ CONCLUÍDO | CoinMetrics CDD + Dormancy + HODL Waves proxy |
 | 6.2 | ✅ CONCLUÍDO | Global Liquidity (FRED) + DataQualityBadge |
 | 6.2b | ✅ CONCLUÍDO | BCB Layer — SELIC/IPCA/USDBRL via BCB OpenData |
-| 6.3 | ⏳ PENDENTE | HODL Waves visual avançado + CDD histórico completo |
+| 6.3 | ✅ CONCLUÍDO | HODL Waves visual avançado + CDD histórico completo |
 | 6.4 | ✅ CONCLUÍDO | Charm/Vanna/GEX dealer flow (Black-Scholes 2ª deriv.) |
 | 6.5 | ✅ CONCLUÍDO | Governance — audit feed, threshold history, data lineage |
 | 6.6 | 🔴 BLOQUEADO | Telegram digest — aguarda Bot Token (@BotFather) |
 | 6.7 | ✅ ANTECIPADO | Varredura: build ✅ + tsc ✅ + lint ✅ + 52 testes ✅ |
+| Bundle split | ✅ CONCLUÍDO | index.js 284KB→90KB, recharts/supabase chunks isolados |
+| Migration | ✅ APLICADA | alert_events + threshold_history no Supabase com RLS |
 
 ### Instrução permanente
 Antes de qualquer avanço estrutural fora da fase atual → apresentar debate dos especialistas e pedir autorização.
