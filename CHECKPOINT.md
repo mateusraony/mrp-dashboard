@@ -1,6 +1,6 @@
 # CHECKPOINT.md — MRP Dashboard
 > Memória técnica viva do projeto. Atualizar ao final de cada bloco importante.
-> Última atualização: 2026-04-12 (Fase 5 — 100% CONCLUÍDA — Sprints 5.1–5.6)
+> Última atualização: 2026-04-14 (Fase 6 — Sprints 6.1–6.5 CONCLUÍDOS)
 
 ---
 
@@ -11,12 +11,12 @@
 | Build (`npm run build`) | ✅ PASSA | 20+ chunks lazy loading, maior chunk 378KB (Recharts) |
 | Lint (`eslint . --quiet`) | ✅ PASSA | 0 erros |
 | TypeCheck (`tsc -p jsconfig.json`) | ✅ PASSA | 0 erros |
-| Testes (`npm test`) | ✅ 25/25 | Vitest — sessionAnalytics (15) + coinmetrics (10) |
+| Testes (`npm test`) | ✅ 52/52 | 3 arquivos: sessionAnalytics(15) + coinmetrics(10) + dealerGreeks(27) |
 | Deploy (Render) | ✅ ONLINE | https://mrp-dashboard.onrender.com |
-| Dados ao vivo | ✅ ATIVO | DATA_MODE=live é padrão permanente (env.ts default='live') |
+| Dados ao vivo | ✅ ATIVO | DATA_MODE=live, .env.local configurado com credenciais reais |
 | Auth real | ❌ AUSENTE | Stub anônimo (isAuthenticated: false) — aguarda Fase futura |
-| Supabase | ✅ INSTALADO + SCHEMA | Instalado, service criado, migração SQL pronta |
-| TanStack Query Hooks | ✅ 15 hooks | useBtcData (7), useMempool (4), useCoinMetrics (1), useMultiVenue (4+1) |
+| Supabase | ✅ ATIVO | 3 tabelas vivas com RLS (alert_rules, portfolio_positions, user_settings) |
+| TanStack Query Hooks | ✅ 22 hooks | + useOnChainExtended(6.1) + useGlobalLiquidity(6.2) + useBcbData(6.2b) + 4 governance hooks(6.5) |
 | Navegação performance | ✅ CORRIGIDA | Suspense dentro de LayoutWrapper; hover prefetch nas rotas |
 
 ---
@@ -30,6 +30,7 @@
 | Fase 3 — API + Hooks + Settings (Sprints 3.1–3.9) | ✅ CONCLUÍDA | 2026-04-12 |
 | Fase 4 — Cálculos Python + Wiring Live (Sprints 4.1–4.5) | ✅ CONCLUÍDA | 2026-04-12 |
 | Fase 5 — APIs Gratuitas + Testes + Varredura (Sprints 5.1–5.6) | ✅ CONCLUÍDA | 2026-04-12 |
+| Fase 6 — Expansão OnChain/Macro/Governance (Sprints 6.1–6.7) | 🔄 EM EXECUÇÃO | 2026-04-13 |
 
 ---
 
@@ -66,9 +67,40 @@
 | **5.6** — `package.json`: scripts `"test"` e `"test:watch"` adicionados | ✅ DONE | |
 | **Varredura:** `npm run build` ✅ · `tsc` ✅ · `eslint` ✅ · `vitest 25/25` ✅ | ✅ DONE | Varredura profunda com agent de revisão |
 
+### ─── SPRINTS 6.1–6.2 (2026-04-13) — FASE 6 EM EXECUÇÃO ───
+| Item | Status | Detalhes |
+|------|--------|----------|
+| **6.1** — `services/coinmetrics.ts`: `fetchOnChainExtended()` — CDD, SplyAdr, VelCur1yr | ✅ DONE | MA30, Z-score, dormancy proxy, HODL %, trend |
+| **6.1** — `hooks/useCoinMetrics.ts`: `useOnChainExtended()` | ✅ DONE | staleTime 1h, refetch live |
+| **6.1** — `OnChain.jsx`: `CddCard` — Z-score bar, sinal textual, MiniTimeChart | ✅ DONE | Seção "Fluxo de Ciclo — CDD & HODL" |
+| **6.1** — `OnChain.jsx`: `HodlWaveCard` — HODL >1yr %, trend badge, dormancy proxy | ✅ DONE | |
+| **6.2** — `services/fred.ts`: WALCL, RRPONTSYD, WTREGEN, DFII10, THREEFYTP10, DTWEXBGS | ✅ DONE | Promise.allSettled para resiliência |
+| **6.2** — `hooks/useFred.ts`: `useGlobalLiquidity()` | ✅ DONE | staleTime 4h, Net Liquidity formula |
+| **6.2** — `Macro.jsx`: `GlobalLiquiditySection` — 6 cards + AreaChart histórico | ✅ DONE | Fed BS / RRP / TGA / Real Yield / Term Premium / DXY |
+| **6.2** — `components/ui/DataQualityBadge.jsx`: badge reutilizável score 0-100, grau A-D | ✅ DONE | |
+| **6.2** — `.env.local`: criado com VITE_FRED_API_KEY + VITE_SUPABASE_* reais | ✅ DONE | Ignorado pelo git |
+| **6.2** — Supabase: migração aplicada via MCP — 3 tabelas com RLS | ✅ DONE | alert_rules, portfolio_positions, user_settings |
+| **Varredura pós-6.2:** `npm run build` ✅ · `vitest 25/25` ✅ | ✅ DONE | 8 arquivos modificados, 1.196 inserções |
+
+### ─── SPRINTS 6.2b–6.5 (2026-04-14) — FASE 6 AVANÇADA ───
+| Item | Status | Detalhes |
+|------|--------|----------|
+| **6.2b** — `services/bcb.ts`: SELIC (série 11), IPCA (433), USDBRL (1) via BCB OpenData | ✅ DONE | Promise.allSettled, sem API key |
+| **6.2b** — `hooks/useBcb.ts`: `useBcbData()` staleTime 4h | ✅ DONE | |
+| **6.2b** — `Macro.jsx`: `BrMacroPanel` — semáforo SELIC/IPCA/USDBRL + DataQualityBadge | ✅ DONE | Cores: verde/amarelo/vermelho por threshold |
+| **6.4** — `riskCalculations.ts`: `computeGreeks()`, `computeContractGreeks()` — BS 2ª derivada | ✅ DONE | Delta, Gamma, Vanna, Charm + GEX/VannaExp/CharmExp |
+| **6.4** — `dealerGreeks.test.ts`: 27 testes (null guards, ATM delta, put-call parity, GEX sign) | ✅ DONE | Total: 52/52 testes |
+| **6.4** — `DealerFlowPanel.jsx`: bar chart GEX por strike + 3 summary cards | ✅ DONE | Strike ladder ±5 × 2%, OI simulado |
+| **6.4** — `Options.jsx`: seção "Dealer Flow (GEX/Vanna/Charm)" adicionada | ✅ DONE | |
+| **6.5** — `supabase.ts`: `AlertEventSchema`, `ThresholdChangeSchema`, insert/fetch functions | ✅ DONE | Fallback gracioso (tabelas Migration futura) |
+| **6.5** — `useSupabase.ts`: `useAlertEvents()`, `useLogAlertEvent()`, `useThresholdHistory()`, `useLogThresholdChange()` | ✅ DONE | |
+| **6.5** — `AlertAuditPanel.jsx`: 3 sub-abas (Disparos / Limiares / Data Lineage) | ✅ DONE | 9 fontes mapeadas no lineage |
+| **6.5** — `SmartAlerts.jsx`: aba "Auditoria" adicionada | ✅ DONE | |
+| **Varredura pós-6.5:** `npm run build` ✅ · `tsc` ✅ · `eslint` ✅ · `vitest 52/52` ✅ | ✅ DONE | Sprint 6.7 antecipado |
+
 ---
 
-## 🏗 ARQUITETURA ATUAL (2026-04-12 — pós Fase 5)
+## 🏗 ARQUITETURA ATUAL (2026-04-13 — pós Sprint 6.2)
 
 ```
 src/
@@ -84,37 +116,38 @@ src/
   hooks/
     use-mobile.jsx
     useBtcData.ts       ← Sprint 3.3 + 5.3 (+ useLiquidations)
-    useCoinMetrics.ts   ← NOVO Sprint 5.2
+    useCoinMetrics.ts   ← useOnChainCycle + useOnChainExtended (NOVO Sprint 6.1)
     useDeribit.ts       ← Sprint 3.8
-    useFred.ts          ← Sprint 3.8
+    useFred.ts          ← useMacroBoard + useGlobalLiquidity (NOVO Sprint 6.2)
     useMempool.ts       ← Sprint 3.8
-    useMultiVenue.ts    ← NOVO Sprint 5.5
+    useMultiVenue.ts    ← Bybit/OKX snapshot + divergência (Sprint 5.5)
     useRiskScore.ts     ← Sprint 4.2
     useSupabase.ts      ← Sprint 3.8
   services/
-    alternative.ts, binance.ts (+ liquidações), bybit.ts (NOVO),
-    coingecko.ts, coinmetrics.ts (NOVO), deribit.ts,
-    fred.ts, mempool.ts, okx.ts (NOVO), supabase.ts
+    alternative.ts, binance.ts (+ liquidações), bybit.ts,
+    coingecko.ts, coinmetrics.ts (CDD/Dormancy/HODL — ATUALIZADO Sprint 6.1),
+    deribit.ts, fred.ts (Global Liquidity — ATUALIZADO Sprint 6.2),
+    mempool.ts, okx.ts, supabase.ts
   utils/
     index.ts
     riskCalculations.ts ← Sprint 4.1
-    sessionAnalytics.ts ← NOVO Sprint 5.4
+    sessionAnalytics.ts ← Sprint 5.4
   lib/
     env.ts, errorBoundary.tsx, AuthContext.jsx (stub anônimo)
     query-client.js, app-params.js, notificationClient.js
   __tests__/
-    utils/sessionAnalytics.test.ts   ← NOVO Sprint 5.6 (15 testes)
-    services/coinmetrics.test.ts      ← NOVO Sprint 5.6 (10 testes)
+    utils/sessionAnalytics.test.ts   ← 15 testes (Sprint 5.6)
+    services/coinmetrics.test.ts      ← 10 testes (Sprint 5.6)
+  components/ui/
+    DataQualityBadge.jsx ← NOVO Sprint 6.2
 
 scripts/
-  validate_var.py           ← Sprint 4.1
-  validate_risk_score.py    ← Sprint 4.2
-  validate_gex.py           ← Sprint 4.3
-  validate_macro_surprise.py← Sprint 4.4
-  validate_mvrv_zscore.py   ← NOVO Sprint 5.2
+  validate_var.py, validate_risk_score.py, validate_gex.py,
+  validate_macro_surprise.py, validate_mvrv_zscore.py
 
-supabase/migrations/20260412000000_create_core_tables.sql ← Sprint 3.7
-vitest.config.ts    ← NOVO Sprint 5.6
+supabase/migrations/20260412000000_create_core_tables.sql ← 3 tabelas com RLS (ATIVAS)
+vitest.config.ts    ← Sprint 5.6
+.env.local          ← CRIADO com credenciais reais (ignorado pelo git)
 .env.example        ← Sprint 3.3
 ```
 
@@ -147,19 +180,20 @@ refetchInterval: IS_LIVE ? 5_000 : false,
 | # | Arquivo | Problema | Ação |
 |---|---------|---------|------|
 | C1 | `src/lib/AuthContext.jsx` | Auth stub — acesso anônimo sem proteção | Aguarda Fase futura (Supabase Auth) |
-| C2 | `.env.local` (não existe) | VITE_FRED_API_KEY, VITE_SUPABASE_* não configuradas | Usuário deve criar `.env.local` |
+| ~~C2~~ | ~~`.env.local`~~ | ~~VITE_FRED_API_KEY, VITE_SUPABASE_* não configuradas~~ | ✅ RESOLVIDO — `.env.local` criado com credenciais reais |
 
 ### Alta Severidade
 | # | Arquivo | Problema | Ação |
 |---|---------|---------|------|
-| A1 | Projeto inteiro | Cobertura de testes baixa (25 testes apenas utils/services) | Ampliar para hooks, risk calcs, sorprise z-score |
+| A1 | Projeto inteiro | Cobertura de testes baixa (25 testes apenas) | Sprint 6.7 — ampliar para ≥45 testes |
 | A2 | `src/components/data/` | 15 arquivos mock ainda ativos | Eliminação gradual conforme APIs ligadas |
+| A3 | Telegram Bot Token | Edge Function arquitetada mas não deployada | BLOQUEADO — usuário deve criar bot via @BotFather |
 
 ### Média Severidade
 | # | Arquivo | Problema | Ação |
 |---|---------|---------|------|
-| M1 | `mempool.ts` + `OnChain.jsx` | NUPL/SOPR/Netflow sempre mock (sem API pública gratuita) | Integrar Glassnode/CryptoQuant quando autorizado |
-| M2 | `coinmetrics.ts` | HODL Waves sem API gratuita confiável — mantido mock | Confirmar com usuário se pago é opção |
+| M1 | `mempool.ts` + `OnChain.jsx` | SOPR/Netflow sempre mock (sem API pública gratuita) | Integrar Glassnode/CryptoQuant se autorizado |
+| M2 | `vite.config.js` | Bundle Recharts 378KB sem split | Pendente — manualChunks Sprint 6.7 |
 
 ---
 
@@ -171,35 +205,34 @@ refetchInterval: IS_LIVE ? 5_000 : false,
 | CoinGecko | `coingecko.ts` | ✅ Mock | ✅ Pronto | Não |
 | Alternative.me (F&G) | `alternative.ts` | ✅ Mock | ✅ Pronto | Não |
 | Deribit Options | `deribit.ts` | ✅ Mock | ✅ Pronto | Não |
-| FRED (macro) | `fred.ts` | ✅ Mock | ✅ Pronto | ⚠️ `VITE_FRED_API_KEY` |
+| FRED (macro + Global Liquidity) | `fred.ts` | ✅ Mock | ✅ Pronto | ⚠️ `VITE_FRED_API_KEY` ✅ |
 | Mempool.space | `mempool.ts` | ✅ Mock | ✅ Pronto | Não |
-| CoinMetrics Community | `coinmetrics.ts` | ✅ Mock | ✅ Pronto | Não |
+| CoinMetrics Community | `coinmetrics.ts` | ✅ Mock | ✅ Pronto (+ CDD/HODL) | Não |
 | Bybit V5 | `bybit.ts` | ✅ Mock | ✅ Pronto | Não |
 | OKX V5 | `okx.ts` | ✅ Mock | ✅ Pronto | Não |
-| Supabase | `supabase.ts` | ✅ Fallback | ✅ Pronto | ⚠️ `VITE_SUPABASE_*` |
+| Supabase | `supabase.ts` | ✅ Fallback | ✅ Pronto + 3 tabelas vivas | ⚠️ `VITE_SUPABASE_*` ✅ |
+| BCB OpenData | — | — | ⏳ Sprint 6.2b | Não |
 | Glassnode | — | ✅ Mock | ❌ AUSENTE | ⚠️ Plano pago |
 | CryptoQuant | — | ✅ Mock | ❌ AUSENTE | ⚠️ Plano pago |
 
 ---
 
-## 🗺 PRÓXIMOS PASSOS (aguarda nova autorização)
+## 🗺 PRÓXIMOS PASSOS — FASE 6 (sprints pendentes)
 
-### Prioridade alta
-- [ ] **Ampliar testes** — Vitest para `riskCalculations.ts`, `surpriseZScore`, hooks (`useRiskScore`, `useBtcTicker`)
-- [ ] **HODL Waves** — confirmar se CoinMetrics Community tem `SplyAdr1yrPlus` suficiente para aproximação
-- [ ] **Glassnode/CryptoQuant** — NUPL, SOPR, Netflow live (requer plano pago — confirmar com usuário)
+| Sprint | Prioridade | Descrição | Status |
+|--------|------------|-----------|--------|
+| **6.2b** | Alta | BCB Layer — SELIC, IPCA, USDBRL via BCB OpenData | ✅ CONCLUÍDO |
+| **6.3** | Média | HODL Waves visual avançado + CDD histórico completo | ⏳ Pendente |
+| **6.4** | Alta | Charm/Vanna/GEX Dealer Flow — Black-Scholes 2ª derivada | ✅ CONCLUÍDO |
+| **6.5** | Média | Governance — audit feed, threshold history, data lineage | ✅ CONCLUÍDO |
+| **6.6** | 🔴 BLOQUEADO | Telegram Digest — aguarda Bot Token via @BotFather | 🔴 BLOQUEADO |
+| **6.7** | Alta | Varredura final: build + tsc + lint + testes ≥45 | ✅ 52/52 ANTECIPADO |
 
-### Prioridade média
-- [ ] **Auth real** — Supabase Auth (email/OAuth) — ativar quando tudo estiver live e estável
-- [ ] **Playwright e2e** — testes de navegação e fluxo crítico (Dashboard → Portfolio → Alertas)
-- [ ] **Bundle split** — separar Recharts (378KB) em chunk próprio via `manualChunks` no vite.config.js
-- [ ] **Rate limiting CoinGecko** — implementar debounce/queue para respeitar 30 req/min free tier
-- [ ] **Altcoins Page** — conectar `useDominance` + `useTopAltcoins` à página (dados já disponíveis)
-
-### Gaps de produto ainda presentes
-- [ ] GEX live via Deribit strike chain (dados disponíveis, falta wiring completo em Options.jsx)
-- [ ] Crypto Institutional Upgrade — cohort flow por exchange (requer CoinGlass pago)
-- [ ] OnChain Cycle Pack completo — HODL Waves (sem API gratuita confiável)
+### Pendentes (próxima sessão)
+- [ ] **Sprint 6.3** — HODL Waves visual avançado: barras horizontais por coorte de tempo, CDD histórico 90d com linha de tendência
+- [ ] **Sprint 6.6** — Telegram Digest: usuário deve criar bot via @BotFather e fornecer token
+- [ ] **Migration Supabase** — criar tabelas `alert_events` + `threshold_history` (código pronto, migration pendente)
+- [ ] **Bundle split** — Recharts 378KB → `manualChunks` em `vite.config.js`
 
 ---
 

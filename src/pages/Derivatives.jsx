@@ -5,6 +5,7 @@ import {
 } from '../components/data/mockData';
 import { useBtcTicker, useOiByExchange, useLiquidations } from '@/hooks/useBtcData';
 import { useMultiVenueSnapshot } from '@/hooks/useMultiVenue';
+import { DataQualityBadge } from '../components/ui/DataQualityBadge';
 
 // ─── DATA LAYER (live > mock fallback) ───────────────────────────────────────
 // oiByExchange live → mapeia oi_usd para oi_b (shape do mock) para compatibilidade do UI
@@ -511,29 +512,46 @@ function MultiVenuePanel() {
         <div style={{ fontSize: 12, color: '#475569', padding: '12px 0' }}>Carregando dados multi-venue...</div>
       )}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 14 }}>
-        {venues.map(v => (
-          <div key={v.name} style={{ background: '#0D1421', border: `1px solid ${v.color}25`, borderTop: `3px solid ${v.color}`, borderRadius: 9, padding: '12px 14px' }}>
-            <div style={{ fontSize: 11, fontWeight: 800, color: v.color, marginBottom: 10, letterSpacing: '0.04em' }}>{v.name}</div>
-            <div style={{ marginBottom: 8 }}>
-              <div style={{ fontSize: 9, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>Mark Price</div>
-              <div style={{ fontSize: 15, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', color: '#e2e8f0' }}>
-                {v.mark !== null ? `$${fmtNum(v.mark, 0)}` : <span style={{ color: '#334155' }}>—</span>}
+        {venues.map(v => {
+          // Score de qualidade por venue: live se tem mark price, fallback se null
+          const isLive    = v.mark !== null;
+          const vFresh    = isLive ? 100 : 40;
+          const vComplete = [v.mark, v.funding, v.oi].filter(x => x !== null).length;
+          const vComplPct = Math.round((vComplete / 3) * 100);
+
+          return (
+            <div key={v.name} style={{ background: '#0D1421', border: `1px solid ${v.color}25`, borderTop: `3px solid ${v.color}`, borderRadius: 9, padding: '12px 14px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: v.color, letterSpacing: '0.04em' }}>{v.name}</div>
+                <DataQualityBadge
+                  freshness={vFresh}
+                  completeness={vComplPct}
+                  consistency={100}
+                  fallback_active={!isLive}
+                  source={v.name}
+                />
+              </div>
+              <div style={{ marginBottom: 8 }}>
+                <div style={{ fontSize: 9, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>Mark Price</div>
+                <div style={{ fontSize: 15, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', color: '#e2e8f0' }}>
+                  {v.mark !== null ? `$${fmtNum(v.mark, 0)}` : <span style={{ color: '#334155' }}>—</span>}
+                </div>
+              </div>
+              <div style={{ marginBottom: 8 }}>
+                <div style={{ fontSize: 9, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>Funding Rate</div>
+                <div style={{ fontSize: 15, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', color: v.funding > 0 ? '#ef4444' : v.funding < 0 ? '#10b981' : '#94a3b8' }}>
+                  {v.funding !== null ? `${(v.funding * 100).toFixed(4)}%` : <span style={{ color: '#334155' }}>—</span>}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: 9, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>OI (USD)</div>
+                <div style={{ fontSize: 13, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', color: '#94a3b8' }}>
+                  {v.oi !== null ? `$${(v.oi / 1e9).toFixed(2)}B` : <span style={{ color: '#334155' }}>—</span>}
+                </div>
               </div>
             </div>
-            <div style={{ marginBottom: 8 }}>
-              <div style={{ fontSize: 9, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>Funding Rate</div>
-              <div style={{ fontSize: 15, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', color: v.funding > 0 ? '#ef4444' : v.funding < 0 ? '#10b981' : '#94a3b8' }}>
-                {v.funding !== null ? `${(v.funding * 100).toFixed(4)}%` : <span style={{ color: '#334155' }}>—</span>}
-              </div>
-            </div>
-            <div>
-              <div style={{ fontSize: 9, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>OI (USD)</div>
-              <div style={{ fontSize: 13, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', color: '#94a3b8' }}>
-                {v.oi !== null ? `$${(v.oi / 1e9).toFixed(2)}B` : <span style={{ color: '#334155' }}>—</span>}
-              </div>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Funding divergence signal */}

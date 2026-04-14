@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import { defaultAlertRules as defaultAlertRulesMock, alertHistory, riskDashboard, ALERT_TYPES } from '../components/data/mockDataAlerts';
 import { recentAlerts, globalRisk } from '../components/data/mockData';
 import { useAlertRules, useUpsertAlertRule, useDeleteAlertRule } from '@/hooks/useSupabase';
+import { AlertAuditPanel } from '../components/governance/AlertAuditPanel';
 import { ModeBadge, GradeBadge } from '../components/ui/DataBadge';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -367,11 +368,12 @@ export default function SmartAlerts() {
     : AI_SUGGESTIONS.filter(s => s.category === categoryFilter);
 
   const TABS = [
-    { id: 'ai',       label: '🤖 AI & Sugestões',  badge: AI_SUGGESTIONS.filter(s => s.priority === 'HIGH' || s.priority === 'CRITICAL').length },
-    { id: 'active',   label: '🔔 Ativos',           badge: activeAlerts.length },
-    { id: 'config',   label: '⚙️ Configurar',       badge: rules.filter(r => r.enabled).length },
-    { id: 'history',  label: '📋 Histórico',        badge: null },
-    { id: 'cycle',    label: '🔄 Ciclo',            badge: null },
+    { id: 'ai',        label: '🤖 AI & Sugestões',  badge: AI_SUGGESTIONS.filter(s => s.priority === 'HIGH' || s.priority === 'CRITICAL').length },
+    { id: 'active',    label: '🔔 Ativos',           badge: activeAlerts.length },
+    { id: 'config',    label: '⚙️ Configurar',       badge: rules.filter(r => r.enabled).length },
+    { id: 'history',   label: '📋 Histórico',        badge: null },
+    { id: 'cycle',     label: '🔄 Ciclo',            badge: null },
+    { id: 'auditoria', label: '🔍 Auditoria',        badge: null },
   ];
 
   return (
@@ -565,6 +567,9 @@ export default function SmartAlerts() {
           </div>
         </div>
       )}
+
+      {/* ── AUDITORIA ── */}
+      {tab === 'auditoria' && <AlertAuditPanel />}
     </div>
   );
 }

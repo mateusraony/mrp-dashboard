@@ -17,9 +17,15 @@ import {
   deletePortfolioPosition,
   fetchUserSettings,
   upsertUserSettings,
+  fetchAlertEvents,
+  insertAlertEvent,
+  fetchThresholdHistory,
+  insertThresholdChange,
   type AlertRule,
   type PortfolioPosition,
   type UserSettings,
+  type AlertEvent,
+  type ThresholdChange,
 } from '@/services/supabase';
 
 // ─── Alert Rules ──────────────────────────────────────────────────────────────
@@ -110,5 +116,45 @@ export function useUpdateSettings() {
   });
 }
 
+// ─── Governance — Alert Events ────────────────────────────────────────────────
+
+/** useAlertEvents — feed de disparos recentes de alertas */
+export function useAlertEvents(limit = 20) {
+  return useQuery({
+    queryKey: ['supabase', 'alert-events', limit],
+    queryFn:  () => fetchAlertEvents(limit),
+    staleTime: 30_000,
+    refetchInterval: 30_000,
+  });
+}
+
+/** useLogAlertEvent — mutation para registrar disparo */
+export function useLogAlertEvent() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (event: Omit<AlertEvent, 'id'>) => insertAlertEvent(event),
+    onSuccess:  () => qc.invalidateQueries({ queryKey: ['supabase', 'alert-events'] }),
+  });
+}
+
+/** useThresholdHistory — histórico de mudanças de limiar */
+export function useThresholdHistory(ruleId?: string) {
+  return useQuery({
+    queryKey: ['supabase', 'threshold-history', ruleId ?? 'all'],
+    queryFn:  () => fetchThresholdHistory(ruleId),
+    staleTime: Infinity,
+    refetchInterval: false,
+  });
+}
+
+/** useLogThresholdChange — mutation para registrar mudança de threshold */
+export function useLogThresholdChange() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (change: Omit<ThresholdChange, 'id'>) => insertThresholdChange(change),
+    onSuccess:  () => qc.invalidateQueries({ queryKey: ['supabase', 'threshold-history'] }),
+  });
+}
+
 // Re-export types for convenience in pages
-export type { AlertRule, PortfolioPosition, UserSettings };
+export type { AlertRule, PortfolioPosition, UserSettings, AlertEvent, ThresholdChange };

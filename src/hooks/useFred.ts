@@ -7,7 +7,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { IS_LIVE } from '@/lib/env';
-import { fetchMacroBoard, fetchYieldCurve } from '@/services/fred';
+import { fetchMacroBoard, fetchYieldCurve, fetchGlobalLiquidity } from '@/services/fred';
 
 // FRED atualiza 1x/dia — poll a cada 1h é suficiente
 const MACRO_INTERVAL = IS_LIVE ? 3_600_000 : false;
@@ -34,5 +34,18 @@ export function useYieldCurve() {
     queryFn:  fetchYieldCurve,
     staleTime: 3_500_000,
     refetchInterval: MACRO_INTERVAL,
+  });
+}
+
+/**
+ * useGlobalLiquidity — Fed BS, RRP, TGA, Net Liquidity, Real Yield, Term Premium, DXY
+ * FRED atualiza dados semanais/diários — poll 1h é suficiente.
+ */
+export function useGlobalLiquidity() {
+  return useQuery({
+    queryKey: ['macro', 'global-liquidity'],
+    queryFn:  fetchGlobalLiquidity,
+    staleTime: 3_500_000,
+    refetchInterval: IS_LIVE ? 3_600_000 : false,
   });
 }
