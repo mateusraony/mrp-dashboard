@@ -235,8 +235,8 @@ AUTOMAÇÕES
 ### Pendentes (próxima sessão):
 - [ ] **HODL Waves visual avançado** — barras de coorte por tempo de detenção (Sprint 6.3).
 - [ ] **Telegram Digest** — Edge Function + pg_cron BLOQUEADO aguarda Bot Token do usuário (Sprint 6.6).
-- [ ] **Migration Supabase** — tabelas `alert_events` + `threshold_history` (código pronto).
-- [ ] **Bundle split** — Recharts 378KB → `manualChunks` vite.config.js.
+- ~~**Migration Supabase** — tabelas `alert_events` + `threshold_history`~~ ✅ APLICADA via MCP.
+- ~~[ ] **Bundle split** — Recharts 378KB → `manualChunks` vite.config.js.~~ ✅ RESOLVIDO
 
 ---
 
@@ -248,7 +248,7 @@ AUTOMAÇÕES
 | Base44 app_id param | src/lib/app-params.js | Baixa | Pendente |
 | useLocation não usado | src/Layout.jsx:2 | Baixa | Pendente |
 | Lint warnings residuais | múltiplos arquivos | Baixa | Monitorar |
-| Bundle grande (Recharts 378KB) | vite.config.js | Média | Pendente — manualChunks |
+| ~~Bundle grande (Recharts 378KB)~~ | vite.config.js | ~~Média~~ | ✅ RESOLVIDO — index.js 284KB→90KB |
 | Auth stub anônimo | src/lib/AuthContext.jsx | Alta | Aguarda Supabase Auth |
 | ~~services/ não existe~~ | src/services/ | ~~Crítica~~ | ✅ RESOLVIDO (Sprint 3) |
 | ~~Supabase não instalado~~ | package.json | ~~Crítica~~ | ✅ RESOLVIDO (Sprint 3) |
