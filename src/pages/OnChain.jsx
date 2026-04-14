@@ -24,9 +24,13 @@ import { ModeBadge, GradeBadge } from '../components/ui/DataBadge';
 import { HelpIcon } from '../components/ui/Tooltip';
 import LthSthCard from '../components/onchain/LthSthCard';
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip,
+  BarChart, Bar,
+  AreaChart, Area,
+  ComposedChart, Line,
+  XAxis, YAxis, Tooltip,
   ResponsiveContainer,
 } from 'recharts';
+import HodlWavesPanel from '../components/onchain/HodlWavesPanel';
 
 // ─── GLOSSÁRIO ────────────────────────────────────────────────────────────────
 const G = {
@@ -568,6 +572,60 @@ function CddCard({ liveExtended }) {
         />
       )}
 
+      {/* CDD 30d vs MA30 — ComposedChart (barras + linha MA30) */}
+      {(liveExtended?.history_cdd ?? []).length > 0 && (() => {
+        // Últimos 30 pontos do histórico CDD
+        const raw30 = (liveExtended.history_cdd).slice(-30);
+        const composed30 = raw30.map(d => ({
+          date:  d.date.slice(5),  // MM-DD para exibição compacta
+          cdd:   d.value,
+          ma30:  d.ma30,
+          // z-score simplificado inline para cor da barra
+          _z:    liveExtended.cdd_z_score ?? 0,
+        }));
+        // Cor de cada barra individual baseada no z-score global do dia (aproximação)
+        const barColor = zScore >= 2 ? '#ef4444' : zScore >= 1 ? '#f59e0b' : '#10b981';
+        return (
+          <div style={{ marginTop: 10 }}>
+            <div style={{ fontSize: 9, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
+              CDD 30d vs MA30
+            </div>
+            <ResponsiveContainer width="100%" height={90}>
+              <ComposedChart data={composed30} margin={{ top: 2, right: 4, bottom: 0, left: -28 }}>
+                <XAxis
+                  dataKey="date"
+                  tick={{ fontSize: 7, fill: '#475569' }}
+                  interval={Math.floor(composed30.length / 5)}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <YAxis hide />
+                <Tooltip
+                  contentStyle={{
+                    background: '#0d1421', border: '1px solid #2a3f5f',
+                    borderRadius: 6, fontSize: 9,
+                  }}
+                  formatter={(v, name) => [
+                    name === 'cdd' ? fmtCdd(v) : fmtCdd(v),
+                    name === 'cdd' ? 'CDD' : 'MA30',
+                  ]}
+                  labelStyle={{ color: '#64748b', fontSize: 8 }}
+                />
+                <Bar dataKey="cdd" fill={`${barColor}70`} radius={[1, 1, 0, 0]} maxBarSize={12} />
+                <Line
+                  type="monotone"
+                  dataKey="ma30"
+                  stroke="#60a5fa"
+                  strokeWidth={1.5}
+                  dot={false}
+                  activeDot={false}
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        );
+      })()}
+
       <InterpretBox text={signal} color="#94a3b8" />
     </OnChainCard>
   );
@@ -648,6 +706,73 @@ function HodlWaveCard({ liveExtended }) {
         />
       )}
 
+      {/* Supply Activity — stacked AreaChart hodl_pct vs active_pct */}
+      {(liveExtended?.history_hodl ?? []).length > 0 && (() => {
+        const areaData = (liveExtended.history_hodl).map(d => ({
+          date:       d.date.slice(5),          // MM-DD
+          hodl_pct:   parseFloat((d.pct * 100).toFixed(2)),
+          active_pct: parseFloat(((1 - d.pct) * 100).toFixed(2)),
+        }));
+        // Exibe apenas cada N-ésimo tick para não sobrecarregar o eixo X
+        const tickInterval = Math.floor(areaData.length / 5);
+        return (
+          <div style={{ marginTop: 10 }}>
+            <div style={{ fontSize: 9, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
+              Supply Activity (% of total)
+            </div>
+            <ResponsiveContainer width="100%" height={100}>
+              <AreaChart data={areaData} margin={{ top: 2, right: 4, bottom: 0, left: -28 }} stackOffset="expand">
+                <XAxis
+                  dataKey="date"
+                  tick={{ fontSize: 7, fill: '#475569' }}
+                  interval={tickInterval}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <YAxis
+                  tickFormatter={v => `${(v * 100).toFixed(0)}%`}
+                  tick={{ fontSize: 7, fill: '#475569' }}
+                  tickLine={false}
+                  axisLine={false}
+                  domain={[0, 1]}
+                />
+                <Tooltip
+                  contentStyle={{
+                    background: '#0d1421', border: '1px solid #2a3f5f',
+                    borderRadius: 6, fontSize: 9,
+                  }}
+                  formatter={(v, name) => [
+                    `${typeof v === 'number' ? v.toFixed(2) : v}%`,
+                    name === 'hodl_pct' ? 'HODL >1yr' : 'Ativo <1yr',
+                  ]}
+                  labelStyle={{ color: '#64748b', fontSize: 8 }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="hodl_pct"
+                  stackId="supply"
+                  stroke="#10b981"
+                  fill="#10b981"
+                  fillOpacity={0.65}
+                  dot={false}
+                  activeDot={false}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="active_pct"
+                  stackId="supply"
+                  stroke="#3b82f6"
+                  fill="#3b82f6"
+                  fillOpacity={0.45}
+                  dot={false}
+                  activeDot={false}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        );
+      })()}
+
       {/* Dormancy proxy */}
       <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 7, background: 'rgba(30,45,69,0.5)', border: '1px solid #1e2d45' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
@@ -715,14 +840,18 @@ export default function OnChain() {
         </div>
       </div>
 
-      {/* Fluxo de Ciclo — CDD & HODL (Sprint 6.1) */}
+      {/* Fluxo de Ciclo — CDD & HODL (Sprint 6.1 + 6.3) */}
       <div style={{ marginBottom: 8 }}>
         <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
           ● Fluxo de Ciclo — CDD & HODL
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14, marginBottom: 20 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14, marginBottom: 14 }}>
           <CddCard liveExtended={extended} />
           <HodlWaveCard liveExtended={extended} />
+        </div>
+        {/* Sprint 6.3 — HODL Waves visual avançado: distribuição de supply por coorte */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 14, marginBottom: 20 }}>
+          <HodlWavesPanel liveExtended={extended} />
         </div>
       </div>
 
