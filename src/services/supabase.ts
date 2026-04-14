@@ -96,6 +96,12 @@ export const UserSettingsSchema = z.object({
 });
 export type UserSettings = z.infer<typeof UserSettingsSchema>;
 
+// ─── Sentinel UUID para usuário anônimo ───────────────────────────────────────
+// Como o app não usa autenticação real, usamos um UUID fixo como user_id.
+// Isso garante que upsert por user_id encontre o registro existente em vez de criar um novo.
+// O campo user_id na tabela é UNIQUE, então dois NULLs não conflitam — o sentinel resolve isso.
+const ANON_USER_ID = '00000000-0000-0000-0000-000000000000';
+
 // ─── Singleton do cliente Supabase ─────────────────────────────────────────────
 
 let _client: SupabaseClient | null = null;
@@ -107,6 +113,7 @@ function getClient(): SupabaseClient {
   const key = env.VITE_SUPABASE_ANON_KEY;
 
   if (!url || !key) {
+    console.error('[Supabase] Cliente não criado: VITE_SUPABASE_URL ou VITE_SUPABASE_ANON_KEY ausentes.');
     throw new Error(
       'Supabase não configurado. Defina VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY em .env.local. ' +
       'Crie um projeto gratuito em https://supabase.com',
@@ -255,11 +262,15 @@ export async function deletePortfolioPosition(id: string): Promise<void> {
 // ─── User Settings ────────────────────────────────────────────────────────────
 
 /**
- * fetchUserSettings — busca configurações do usuário.
+ * fetchUserSettings — busca configurações do usuário anônimo (sentinel UUID).
  * Retorna defaults se não existir ou se Supabase não estiver configurado.
+ *
+ * Filtra pelo ANON_USER_ID para evitar `.maybeSingle()` falhar quando múltiplas
+ * linhas existem (situação causada pelo bug antigo de upsert sem user_id).
  */
 export async function fetchUserSettings(): Promise<UserSettings> {
   if (!isSupabaseConfigured()) {
+    console.warn('[Supabase] fetchUserSettings: Supabase não configurado, retornando defaults.');
     return UserSettingsSchema.parse(defaultSettings ?? {});
   }
 
@@ -267,34 +278,67 @@ export async function fetchUserSettings(): Promise<UserSettings> {
   const result = await sb
     .from('user_settings')
     .select('*')
-    .maybeSingle(); // retorna null se não existir (sem erro)
+    .eq('user_id', ANON_USER_ID)
+    .maybeSingle(); // retorna null se não existir (sem erro 406)
 
-  if (result.error) throw new Error(`Supabase error: ${result.error.message}`);
+  if (result.error) {
+    console.error('[Supabase] fetchUserSettings error:', result.error.message);
+    throw new Error(`Supabase error: ${result.error.message}`);
+  }
 
-  // Se não existe ainda, retorna defaults
-  if (!result.data) return UserSettingsSchema.parse({});
+  // Se não existe ainda nenhuma linha para este user_id, retorna defaults
+  if (!result.data) {
+    console.info('[Supabase] fetchUserSettings: nenhuma configuração encontrada, usando defaults.');
+    return UserSettingsSchema.parse({});
+  }
 
   return UserSettingsSchema.parse(result.data);
 }
 
 /**
- * upsertUserSettings — salva configurações do usuário.
- * Usa upsert por user_id para garantir 1 registro por usuário.
+ * upsertUserSettings — salva configurações do usuário anônimo.
+ *
+ * CORREÇÃO CRÍTICA: o upsert usa onConflict: 'user_id' e agora inclui o ANON_USER_ID
+ * fixo no payload. Sem user_id no payload, dois NULLs não conflitam no Postgres
+ * (NULL != NULL), criando uma nova linha a cada save em vez de atualizar a existente.
+ *
+ * A coluna user_id é UNIQUE na tabela — com o sentinel UUID fixo, o upsert
+ * encontra o registro existente e faz UPDATE em vez de INSERT.
  */
 export async function upsertUserSettings(settings: Partial<UserSettings>): Promise<UserSettings> {
   if (!isSupabaseConfigured()) {
-    return UserSettingsSchema.parse({ ...settings });
+    console.warn('[Supabase] upsertUserSettings: Supabase não configurado, retornando mock merged com defaults.');
+    return UserSettingsSchema.parse({ ...defaultSettings, ...settings });
   }
 
   const sb = getClient();
-  const payload = UserSettingsSchema.partial().parse(settings);
+
+  // Inclui user_id fixo para garantir que o upsert encontre o registro existente
+  const payload = UserSettingsSchema.partial().parse({
+    ...settings,
+    user_id: ANON_USER_ID,
+  });
+
+  console.info('[Supabase] upsertUserSettings: enviando payload com user_id sentinel', payload);
+
   const result = await sb
     .from('user_settings')
     .upsert(payload, { onConflict: 'user_id' })
     .select()
     .single();
 
-  return UserSettingsSchema.parse(assertNoError(result));
+  if (result.error) {
+    console.error('[Supabase] upsertUserSettings error:', result.error.message, result.error);
+    throw new Error(`Supabase upsert error: ${result.error.message}`);
+  }
+
+  if (!result.data) {
+    console.error('[Supabase] upsertUserSettings: resposta vazia após upsert bem-sucedido.');
+    throw new Error('Supabase: upsert retornou vazio inesperadamente');
+  }
+
+  console.info('[Supabase] upsertUserSettings: salvo com sucesso', result.data);
+  return UserSettingsSchema.parse(result.data);
 }
 
 // ─── Governance — Alert Events (auditoria de disparos) ────────────────────────

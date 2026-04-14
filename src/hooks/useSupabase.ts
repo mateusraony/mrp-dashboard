@@ -113,6 +113,7 @@ export function useUpdateSettings() {
   return useMutation({
     mutationFn: (settings: Partial<UserSettings>) => upsertUserSettings(settings),
     onSuccess:  () => qc.invalidateQueries({ queryKey: ['supabase', 'settings'] }),
+    onError:    (err) => console.error('[useUpdateSettings] Falha ao salvar configurações:', err),
   });
 }
 

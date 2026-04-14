@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { THRESHOLDS, sourceHealth } from '../components/data/mockData';
+import { logError, logInfo } from '@/lib/debugLog';
 import { ModeBadge, GradeBadge } from '../components/ui/DataBadge';
 import { DATA_MODE, setDataMode, env } from '@/lib/env';
 import { isSupabaseConfigured } from '@/services/supabase';
@@ -216,6 +217,7 @@ function TelegramSection() {
 
   const handleSave = async () => {
     setSaveStatus('saving');
+    logInfo('Tentativa de save das configurações do Telegram', { enabled, schedule }, 'Settings.TelegramSection');
     try {
       await updateSettings.mutateAsync({
         telegram_enabled:   enabled,
@@ -224,9 +226,11 @@ function TelegramSection() {
         telegram_schedule:  schedule,
       });
       setSaveStatus('saved');
+      logInfo('Configurações do Telegram salvas com sucesso', undefined, 'Settings.TelegramSection');
       setTimeout(() => setSaveStatus('idle'), 2500);
-    } catch {
+    } catch (/** @type {unknown} */ err) {
       setSaveStatus('error');
+      logError('Falha ao salvar configurações do Telegram no Supabase', err, 'Settings.TelegramSection');
       setTimeout(() => setSaveStatus('idle'), 3000);
     }
   };

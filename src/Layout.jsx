@@ -20,6 +20,7 @@ import {
   MoreHorizontal, X,
 } from 'lucide-react';
 import { btcFutures } from '@/components/data/mockData';
+import DebugPanel from '@/components/ui/DebugPanel';
 
 // ─── NAVEGAÇÃO ─────────────────────────────────────────────────────────────────
 const NAV_GROUPS = [
@@ -554,6 +555,9 @@ export default function Layout({ children, currentPageName }) {
       {isMobile && drawerOpen && (
         <MobileDrawer currentPageName={currentPageName} onClose={closeDrawer} />
       )}
+
+      {/* ── DEBUG PANEL (flutuante, produção) ─────────────────────────────── */}
+      <DebugPanel />
     </div>
   );
 }
