@@ -3,17 +3,24 @@
 -- Cria as 3 tabelas de persistência de dados do usuário:
 --   alert_rules, portfolio_positions, user_settings
 --
--- Row Level Security (RLS) habilitado em todas as tabelas.
--- Política padrão: usuário só acessa seus próprios registros via auth.uid().
--- Para uso anônimo (sem auth), remover as políticas de user_id ou usar anon.
+-- IDEMPOTENTE: seguro para re-aplicar (IF NOT EXISTS, DROP ... IF EXISTS).
 
 -- ─── Extensões ────────────────────────────────────────────────────────────────
 create extension if not exists "pgcrypto";
 
+-- ─── Helper: updated_at ───────────────────────────────────────────────────────
+create or replace function public.set_updated_at()
+returns trigger language plpgsql as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
 -- ─── 1. alert_rules ──────────────────────────────────────────────────────────
 create table if not exists public.alert_rules (
   id             uuid        primary key default gen_random_uuid(),
-  user_id        uuid        references auth.users(id) on delete cascade,
+  user_id        uuid,
   type           text        not null,
   label          text        not null,
   enabled        boolean     not null default true,
@@ -27,38 +34,26 @@ create table if not exists public.alert_rules (
   updated_at     timestamptz not null default now()
 );
 
--- Índices
 create index if not exists alert_rules_user_id_idx on public.alert_rules (user_id);
 create index if not exists alert_rules_type_idx    on public.alert_rules (type);
 
--- RLS
 alter table public.alert_rules enable row level security;
 
-create policy "Usuário lê seus próprios alertas"
-  on public.alert_rules for select
-  using (auth.uid() = user_id or user_id is null);
+drop policy if exists "Usuário lê seus próprios alertas"      on public.alert_rules;
+drop policy if exists "Usuário cria seus próprios alertas"    on public.alert_rules;
+drop policy if exists "Usuário atualiza seus próprios alertas" on public.alert_rules;
+drop policy if exists "Usuário deleta seus próprios alertas"  on public.alert_rules;
+drop policy if exists "alert_rules: leitura pública"          on public.alert_rules;
+drop policy if exists "alert_rules: inserção pública"         on public.alert_rules;
+drop policy if exists "alert_rules: atualização pública"      on public.alert_rules;
+drop policy if exists "alert_rules: deleção pública"          on public.alert_rules;
 
-create policy "Usuário cria seus próprios alertas"
-  on public.alert_rules for insert
-  with check (auth.uid() = user_id or user_id is null);
+create policy "alert_rules: leitura pública"   on public.alert_rules for select using (true);
+create policy "alert_rules: inserção pública"  on public.alert_rules for insert with check (true);
+create policy "alert_rules: atualização pública" on public.alert_rules for update using (true);
+create policy "alert_rules: deleção pública"   on public.alert_rules for delete using (true);
 
-create policy "Usuário atualiza seus próprios alertas"
-  on public.alert_rules for update
-  using (auth.uid() = user_id or user_id is null);
-
-create policy "Usuário deleta seus próprios alertas"
-  on public.alert_rules for delete
-  using (auth.uid() = user_id or user_id is null);
-
--- Trigger: atualizar updated_at automaticamente
-create or replace function public.set_updated_at()
-returns trigger language plpgsql as $$
-begin
-  new.updated_at = now();
-  return new;
-end;
-$$;
-
+drop trigger if exists alert_rules_updated_at on public.alert_rules;
 create trigger alert_rules_updated_at
   before update on public.alert_rules
   for each row execute function public.set_updated_at();
@@ -66,7 +61,7 @@ create trigger alert_rules_updated_at
 -- ─── 2. portfolio_positions ───────────────────────────────────────────────────
 create table if not exists public.portfolio_positions (
   id           uuid        primary key default gen_random_uuid(),
-  user_id      uuid        references auth.users(id) on delete cascade,
+  user_id      uuid,
   type         text        not null check (type in (
                              'spot', 'futures_perp', 'futures_dated',
                              'option_call', 'option_put', 'cash'
@@ -75,9 +70,9 @@ create table if not exists public.portfolio_positions (
   size         numeric     not null,
   side         text        not null check (side in ('long', 'short')),
   entry_price  numeric     not null,
-  strike       numeric,                    -- apenas para opções
-  expiry_days  integer,                    -- apenas para futuros/opções
-  iv           numeric,                    -- IV da opção (0–1)
+  strike       numeric,
+  expiry_days  integer,
+  iv           numeric,
   delta        numeric     not null default 0,
   gamma        numeric     not null default 0,
   theta        numeric     not null default 0,
@@ -87,29 +82,26 @@ create table if not exists public.portfolio_positions (
   updated_at   timestamptz not null default now()
 );
 
--- Índices
 create index if not exists portfolio_positions_user_id_idx on public.portfolio_positions (user_id);
 create index if not exists portfolio_positions_type_idx    on public.portfolio_positions (type);
 
--- RLS
 alter table public.portfolio_positions enable row level security;
 
-create policy "Usuário lê suas próprias posições"
-  on public.portfolio_positions for select
-  using (auth.uid() = user_id or user_id is null);
+drop policy if exists "Usuário lê suas próprias posições"       on public.portfolio_positions;
+drop policy if exists "Usuário cria suas próprias posições"     on public.portfolio_positions;
+drop policy if exists "Usuário atualiza suas próprias posições"  on public.portfolio_positions;
+drop policy if exists "Usuário deleta suas próprias posições"   on public.portfolio_positions;
+drop policy if exists "portfolio: leitura pública"              on public.portfolio_positions;
+drop policy if exists "portfolio: inserção pública"             on public.portfolio_positions;
+drop policy if exists "portfolio: atualização pública"          on public.portfolio_positions;
+drop policy if exists "portfolio: deleção pública"              on public.portfolio_positions;
 
-create policy "Usuário cria suas próprias posições"
-  on public.portfolio_positions for insert
-  with check (auth.uid() = user_id or user_id is null);
+create policy "portfolio: leitura pública"   on public.portfolio_positions for select using (true);
+create policy "portfolio: inserção pública"  on public.portfolio_positions for insert with check (true);
+create policy "portfolio: atualização pública" on public.portfolio_positions for update using (true);
+create policy "portfolio: deleção pública"   on public.portfolio_positions for delete using (true);
 
-create policy "Usuário atualiza suas próprias posições"
-  on public.portfolio_positions for update
-  using (auth.uid() = user_id or user_id is null);
-
-create policy "Usuário deleta suas próprias posições"
-  on public.portfolio_positions for delete
-  using (auth.uid() = user_id or user_id is null);
-
+drop trigger if exists portfolio_positions_updated_at on public.portfolio_positions;
 create trigger portfolio_positions_updated_at
   before update on public.portfolio_positions
   for each row execute function public.set_updated_at();
@@ -117,7 +109,7 @@ create trigger portfolio_positions_updated_at
 -- ─── 3. user_settings ────────────────────────────────────────────────────────
 create table if not exists public.user_settings (
   id             uuid        primary key default gen_random_uuid(),
-  user_id        uuid unique references auth.users(id) on delete cascade,
+  user_id        uuid unique,
   data_mode      text        not null default 'mock' check (data_mode in ('mock', 'live')),
   base_currency  text        not null default 'USD',
   theme          text        not null default 'dark' check (theme in ('dark', 'light')),
@@ -129,26 +121,25 @@ create table if not exists public.user_settings (
   updated_at     timestamptz not null default now()
 );
 
--- RLS
 alter table public.user_settings enable row level security;
 
-create policy "Usuário lê suas próprias configurações"
-  on public.user_settings for select
-  using (auth.uid() = user_id or user_id is null);
+drop policy if exists "Usuário lê suas próprias configurações"      on public.user_settings;
+drop policy if exists "Usuário cria suas próprias configurações"    on public.user_settings;
+drop policy if exists "Usuário atualiza suas próprias configurações" on public.user_settings;
+drop policy if exists "user_settings: leitura pública"              on public.user_settings;
+drop policy if exists "user_settings: inserção pública"             on public.user_settings;
+drop policy if exists "user_settings: atualização pública"          on public.user_settings;
 
-create policy "Usuário cria suas próprias configurações"
-  on public.user_settings for insert
-  with check (auth.uid() = user_id or user_id is null);
+create policy "user_settings: leitura pública"    on public.user_settings for select using (true);
+create policy "user_settings: inserção pública"   on public.user_settings for insert with check (true);
+create policy "user_settings: atualização pública" on public.user_settings for update using (true);
 
-create policy "Usuário atualiza suas próprias configurações"
-  on public.user_settings for update
-  using (auth.uid() = user_id or user_id is null);
-
+drop trigger if exists user_settings_updated_at on public.user_settings;
 create trigger user_settings_updated_at
   before update on public.user_settings
   for each row execute function public.set_updated_at();
 
--- ─── Comentários de documentação ─────────────────────────────────────────────
-comment on table public.alert_rules        is 'Regras de alerta configuradas pelo usuário (funded risk, IV spike, etc.)';
-comment on table public.portfolio_positions is 'Posições do portfólio do usuário (spot, futuros, opções, cash)';
-comment on table public.user_settings      is 'Configurações gerais do usuário (modo, tema, preferências)';
+-- ─── Comentários ──────────────────────────────────────────────────────────────
+comment on table public.alert_rules         is 'Regras de alerta configuradas pelo usuário';
+comment on table public.portfolio_positions is 'Posições do portfólio do usuário';
+comment on table public.user_settings       is 'Configurações gerais do usuário';

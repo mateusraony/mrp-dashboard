@@ -4,8 +4,7 @@
 --   alert_events      — log de disparos de alertas
 --   threshold_history — histórico de mudanças de limiares
 --
--- Nota: tabelas foram aplicadas via MCP em 2026-04-13.
--- Este arquivo garante rastreabilidade no controle de versão.
+-- IDEMPOTENTE: seguro para re-aplicar (IF NOT EXISTS, DROP POLICY IF EXISTS).
 
 -- ─── 1. alert_events ─────────────────────────────────────────────────────────
 create table if not exists public.alert_events (
@@ -22,13 +21,16 @@ create table if not exists public.alert_events (
 
 alter table public.alert_events enable row level security;
 
+drop policy if exists "alert_events: leitura pública"  on public.alert_events;
+drop policy if exists "alert_events: inserção pública" on public.alert_events;
+
 create policy "alert_events: leitura pública"
   on public.alert_events for select using (true);
 
 create policy "alert_events: inserção pública"
   on public.alert_events for insert with check (true);
 
-create index if not exists alert_events_rule_id_idx on public.alert_events(rule_id);
+create index if not exists alert_events_rule_id_idx  on public.alert_events(rule_id);
 create index if not exists alert_events_fired_at_idx on public.alert_events(fired_at desc);
 
 -- ─── 2. threshold_history ────────────────────────────────────────────────────
@@ -45,11 +47,14 @@ create table if not exists public.threshold_history (
 
 alter table public.threshold_history enable row level security;
 
+drop policy if exists "threshold_history: leitura pública"  on public.threshold_history;
+drop policy if exists "threshold_history: inserção pública" on public.threshold_history;
+
 create policy "threshold_history: leitura pública"
   on public.threshold_history for select using (true);
 
 create policy "threshold_history: inserção pública"
   on public.threshold_history for insert with check (true);
 
-create index if not exists threshold_history_rule_id_idx   on public.threshold_history(rule_id);
+create index if not exists threshold_history_rule_id_idx    on public.threshold_history(rule_id);
 create index if not exists threshold_history_changed_at_idx on public.threshold_history(changed_at desc);
