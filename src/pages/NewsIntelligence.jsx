@@ -2,9 +2,10 @@
 // Notícias institucionais com AI Sentiment Score + correlação BTC + Bull-Bear Index
 import { useState, useMemo } from 'react';
 import { institutionalNews, newsSentimentAggregate, impactCategoryConfig } from '../components/data/mockDataNews';
-import { topNews } from '../components/data/mockData';
 import { optionsTakerFlow } from '../components/data/mockDataExtended';
 import { ModeBadge, GradeBadge } from '../components/ui/DataBadge';
+import { IS_LIVE } from '@/lib/env';
+import { useGdeltNews } from '@/hooks/useGdelt';
 import { formatDistanceToNow } from 'date-fns';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -221,29 +222,81 @@ function NewsDetail({ news }) {
   );
 }
 
-// ─── NewsSimpleCard (absorvido de News.jsx) ───────────────────────────────────
-function NewsSimpleCard({ news, rank }) {
-  const sc = news.sentiment > 0.1 ? '#10b981' : news.sentiment < -0.1 ? '#ef4444' : '#f59e0b';
-  const sl = news.sentiment > 0.1 ? '▲ Bullish' : news.sentiment < -0.1 ? '▼ Bearish' : '◆ Neutral';
+// ─── GdeltNewsCard — card para artigos reais do GDELT ────────────────────────
+function GdeltNewsCard({ article, rank }) {
+  const sentColor =
+    article.sentiment === 1  ? '#10b981' :
+    article.sentiment === -1 ? '#ef4444' : '#f59e0b';
+  const sentIcon =
+    article.sentiment === 1  ? '▲' :
+    article.sentiment === -1 ? '▼' : '◆';
+
+  let timeAgo = '';
+  try {
+    timeAgo = formatDistanceToNow(new Date(article.published_at), { addSuffix: true });
+  } catch {
+    timeAgo = '';
+  }
+
   return (
-    <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 10, padding: '14px 16px', marginBottom: 10, display: 'flex', gap: 14, alignItems: 'flex-start' }}>
-      <div style={{ width: 28, height: 28, borderRadius: 6, background: rank <= 2 ? 'rgba(59,130,246,0.15)' : '#0D1421', border: `1px solid ${rank <= 2 ? 'rgba(59,130,246,0.3)' : '#1e2d45'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, flexShrink: 0, color: rank <= 2 ? '#60a5fa' : '#4a5568', fontFamily: 'JetBrains Mono, monospace' }}>{rank}</div>
+    <div style={{
+      background: '#111827', border: '1px solid #1e2d45',
+      borderRadius: 10, padding: '14px 16px', marginBottom: 10,
+      display: 'flex', gap: 14, alignItems: 'flex-start',
+    }}>
+      {/* Rank badge */}
+      <div style={{
+        width: 28, height: 28, borderRadius: 6, flexShrink: 0,
+        background: rank <= 2 ? 'rgba(59,130,246,0.15)' : '#0D1421',
+        border: `1px solid ${rank <= 2 ? 'rgba(59,130,246,0.3)' : '#1e2d45'}`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 13, fontWeight: 700,
+        color: rank <= 2 ? '#60a5fa' : '#4a5568',
+        fontFamily: 'JetBrains Mono, monospace',
+      }}>{rank}</div>
+
       <div style={{ flex: 1, minWidth: 0 }}>
-        <a href={news.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0', lineHeight: 1.5, marginBottom: 6 }}>{news.title}</div>
-        </a>
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-          <span style={{ fontSize: 10, fontFamily: 'JetBrains Mono, monospace', color: '#60a5fa', background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: 4, padding: '1px 6px' }}>{news.source}</span>
-          <span style={{ fontSize: 10, color: sc, fontWeight: 600 }}>{sl}</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <div style={{ height: 4, width: 40, borderRadius: 2, background: '#1e2d45', overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${Math.round(news.relevance * 100)}%`, background: '#3b82f6', borderRadius: 2 }} />
-            </div>
-            <span style={{ fontSize: 10, color: '#4a5568' }}>{Math.round(news.relevance * 100)}% rel</span>
+        {/* Thumbnail (se disponível) */}
+        {article.socialimage && (
+          <div style={{ marginBottom: 8, borderRadius: 6, overflow: 'hidden', maxHeight: 80 }}>
+            <img
+              src={article.socialimage}
+              alt=""
+              style={{ width: '100%', height: 80, objectFit: 'cover', display: 'block' }}
+              onError={e => { e.currentTarget.style.display = 'none'; }}
+            />
           </div>
-        </div>
-        <div style={{ marginTop: 6, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-          {news.tags.map(t => <span key={t} style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: '#0D1421', color: '#4a5568', border: '1px solid #1e2d45', fontFamily: 'JetBrains Mono, monospace' }}>{t}</span>)}
+        )}
+
+        {/* Título com link */}
+        <a href={article.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0', lineHeight: 1.5, marginBottom: 6 }}>
+            {article.title}
+          </div>
+        </a>
+
+        {/* Meta row */}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          {/* Domínio */}
+          <span style={{
+            fontSize: 10, fontFamily: 'JetBrains Mono, monospace',
+            color: '#60a5fa', background: 'rgba(59,130,246,0.08)',
+            border: '1px solid rgba(59,130,246,0.2)', borderRadius: 4, padding: '1px 6px',
+          }}>{article.domain}</span>
+
+          {/* Badge de sentimento */}
+          <span style={{
+            fontSize: 9, padding: '2px 7px', borderRadius: 4, fontWeight: 700,
+            background: `${sentColor}14`, border: `1px solid ${sentColor}30`,
+            color: sentColor, fontFamily: 'JetBrains Mono, monospace',
+          }}>
+            {sentIcon} {article.sentiment_label}
+          </span>
+
+          {/* Tempo */}
+          {timeAgo && (
+            <span style={{ fontSize: 10, color: '#4a5568', marginLeft: 'auto' }}>{timeAgo}</span>
+          )}
         </div>
       </div>
     </div>
@@ -257,6 +310,21 @@ export default function NewsIntelligence() {
   const [categoryFilter, setCategoryFilter] = useState('Todos');
   const [sentimentFilter, setSentimentFilter] = useState('Todos');
   const agg = newsSentimentAggregate;
+
+  // ─── GDELT real news feed ──────────────────────────────────────────────────
+  const {
+    data: gdeltArticles = [],
+    isLoading: gdeltLoading,
+    isError: gdeltError,
+    error: gdeltRawError,
+    refetch: gdeltRefetch,
+    dataUpdatedAt: gdeltUpdatedAt,
+  } = useGdeltNews('bitcoin crypto');
+
+  // Derivados para o resumo de sentimento do Feed Geral
+  const gdeltBullishCount  = gdeltArticles.filter(a => a.sentiment === 1).length;
+  const gdeltNeutralCount  = gdeltArticles.filter(a => a.sentiment === 0).length;
+  const gdeltBearishCount  = gdeltArticles.filter(a => a.sentiment === -1).length;
 
   const filtered = useMemo(() => {
     return institutionalNews.filter(n => {
@@ -281,37 +349,155 @@ export default function NewsIntelligence() {
         ))}
       </div>
 
-      {/* Feed Geral (de News.jsx) */}
+      {/* ── Feed Geral — GDELT real news ─────────────────────────────────── */}
       {mainTab === 'feed' && (
         <div style={{ maxWidth: 1000 }}>
-          <div style={{ marginBottom: 16, padding: '12px 16px', background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.15)', borderRadius: 10, fontSize: 12, color: '#4a5568', lineHeight: 1.6 }}>
-            <strong style={{ color: '#60a5fa' }}>Query GDELT:</strong> <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11 }}>(Bitcoin OR crypto OR "Federal Reserve" OR CPI OR inflation)</span> · sort=hybridrel
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
-            <div>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#60a5fa', marginBottom: 12 }}>Top 5 — Hoje</div>
-              {topNews.map((n, i) => <NewsSimpleCard key={n.title} news={n} rank={i + 1} />)}
-            </div>
-            <div>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#60a5fa', marginBottom: 12 }}>Top 5 — Semana</div>
-              {[...topNews].reverse().map((n, i) => <NewsSimpleCard key={n.title + '_w'} news={n} rank={i + 1} />)}
-            </div>
-          </div>
-          <div style={{ marginTop: 20, background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: 20 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 12 }}>Resumo de Sentimento</div>
-            <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'center' }}>
-              {[{ label: 'Bullish', count: topNews.filter(n => n.sentiment > 0.1).length, color: '#10b981' }, { label: 'Neutral', count: topNews.filter(n => Math.abs(n.sentiment) <= 0.1).length, color: '#f59e0b' }, { label: 'Bearish', count: topNews.filter(n => n.sentiment < -0.1).length, color: '#ef4444' }].map(s => (
-                <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div style={{ width: 10, height: 10, borderRadius: '50%', background: s.color }} />
-                  <span style={{ fontSize: 13, color: '#8899a6' }}>{s.label}:</span>
-                  <span style={{ fontSize: 16, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', color: s.color }}>{s.count}</span>
-                </div>
-              ))}
-              <div style={{ flex: 1, textAlign: 'right', fontSize: 11, color: '#4a5568' }}>
-                Avg sentimento: {(topNews.reduce((s, n) => s + n.sentiment, 0) / topNews.length).toFixed(3)}
+
+          {/* Header info + status */}
+          <div style={{
+            marginBottom: 16, padding: '12px 16px',
+            background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.15)',
+            borderRadius: 10, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 12,
+          }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 12, color: '#4a5568', lineHeight: 1.6 }}>
+                <strong style={{ color: '#60a5fa' }}>Fonte:</strong>{' '}
+                <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11 }}>
+                  GDELT DOC 2.0 · query=&quot;bitcoin crypto&quot; · sort=DateDesc
+                </span>
               </div>
             </div>
+            {/* Modo badge */}
+            <ModeBadge mode={IS_LIVE ? 'live' : 'mock'} />
+            {/* Contagem de artigos */}
+            {!gdeltLoading && !gdeltError && (
+              <span style={{
+                fontSize: 10, fontFamily: 'JetBrains Mono, monospace',
+                color: '#60a5fa', background: 'rgba(59,130,246,0.1)',
+                border: '1px solid rgba(59,130,246,0.2)', borderRadius: 4, padding: '2px 8px',
+              }}>
+                {gdeltArticles.length} artigos
+              </span>
+            )}
+            {/* Timestamp do último fetch */}
+            {gdeltUpdatedAt > 0 && (
+              <span style={{ fontSize: 10, color: '#4a5568', fontFamily: 'JetBrains Mono, monospace' }}>
+                atualizado {formatDistanceToNow(new Date(gdeltUpdatedAt), { addSuffix: true })}
+              </span>
+            )}
           </div>
+
+          {/* Estado: loading */}
+          {gdeltLoading && (
+            <div style={{
+              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+              padding: '48px 0', gap: 12,
+            }}>
+              <div style={{
+                width: 32, height: 32, borderRadius: '50%',
+                border: '3px solid #1e2d45', borderTopColor: '#3b82f6',
+                animation: 'spin 0.8s linear infinite',
+              }} />
+              <span style={{ fontSize: 13, color: '#475569' }}>Carregando notícias...</span>
+              <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+            </div>
+          )}
+
+          {/* Estado: erro */}
+          {gdeltError && !gdeltLoading && (
+            <div style={{
+              padding: '32px 24px', background: 'rgba(239,68,68,0.06)',
+              border: '1px solid rgba(239,68,68,0.2)', borderRadius: 12,
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, textAlign: 'center',
+            }}>
+              <div style={{ fontSize: 13, color: '#ef4444', fontWeight: 600 }}>
+                Falha ao carregar notícias GDELT
+              </div>
+              <div style={{ fontSize: 11, color: '#64748b', fontFamily: 'JetBrains Mono, monospace' }}>
+                {gdeltRawError?.message ?? 'Erro desconhecido'}
+              </div>
+              <button
+                onClick={() => gdeltRefetch()}
+                style={{
+                  marginTop: 4, padding: '6px 18px', borderRadius: 6, cursor: 'pointer',
+                  background: 'rgba(59,130,246,0.15)', color: '#60a5fa',
+                  border: '1px solid rgba(59,130,246,0.3)', fontSize: 11, fontWeight: 600,
+                }}
+              >
+                Tentar novamente
+              </button>
+            </div>
+          )}
+
+          {/* Estado: modo mock (sem dados) */}
+          {!gdeltLoading && !gdeltError && gdeltArticles.length === 0 && (
+            <div style={{
+              padding: '48px 24px', background: 'rgba(245,158,11,0.05)',
+              border: '1px solid rgba(245,158,11,0.2)', borderRadius: 12,
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, textAlign: 'center',
+            }}>
+              <div style={{ fontSize: 20 }}>🛰️</div>
+              <div style={{ fontSize: 14, color: '#f59e0b', fontWeight: 700 }}>Modo MOCK ativo</div>
+              <div style={{ fontSize: 12, color: '#64748b', lineHeight: 1.6, maxWidth: 380 }}>
+                Ative o modo <strong style={{ color: '#e2e8f0' }}>LIVE</strong> em Configurações para ver notícias reais via GDELT.
+              </div>
+            </div>
+          )}
+
+          {/* Lista de artigos */}
+          {!gdeltLoading && !gdeltError && gdeltArticles.length > 0 && (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+                {/* Coluna esquerda: primeiros 12 artigos */}
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#60a5fa', marginBottom: 12 }}>
+                    Recentes — Parte 1
+                  </div>
+                  {gdeltArticles.slice(0, 12).map((a, i) => (
+                    <GdeltNewsCard key={a.url} article={a} rank={i + 1} />
+                  ))}
+                </div>
+                {/* Coluna direita: artigos 13–25 */}
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#60a5fa', marginBottom: 12 }}>
+                    Recentes — Parte 2
+                  </div>
+                  {gdeltArticles.slice(12).map((a, i) => (
+                    <GdeltNewsCard key={a.url} article={a} rank={i + 13} />
+                  ))}
+                </div>
+              </div>
+
+              {/* Resumo de sentimento */}
+              <div style={{
+                marginTop: 20, background: '#111827',
+                border: '1px solid #1e2d45', borderRadius: 12, padding: 20,
+              }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 12 }}>
+                  Resumo de Sentimento — GDELT
+                </div>
+                <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'center' }}>
+                  {[
+                    { label: 'Positivo', count: gdeltBullishCount, color: '#10b981' },
+                    { label: 'Neutro',   count: gdeltNeutralCount, color: '#f59e0b' },
+                    { label: 'Negativo', count: gdeltBearishCount, color: '#ef4444' },
+                  ].map(s => (
+                    <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ width: 10, height: 10, borderRadius: '50%', background: s.color }} />
+                      <span style={{ fontSize: 13, color: '#8899a6' }}>{s.label}:</span>
+                      <span style={{
+                        fontSize: 16, fontWeight: 700,
+                        fontFamily: 'JetBrains Mono, monospace', color: s.color,
+                      }}>{s.count}</span>
+                    </div>
+                  ))}
+                  <div style={{ flex: 1, textAlign: 'right', fontSize: 11, color: '#4a5568' }}>
+                    {gdeltArticles.length} artigos · via GDELT DOC 2.0
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       )}
 
