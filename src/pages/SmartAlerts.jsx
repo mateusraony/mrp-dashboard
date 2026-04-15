@@ -1,13 +1,20 @@
 // ─── SMART ALERTS — CENTRAL DE NOTIFICAÇÕES AI ───────────────────────────────
 // Alertas automáticos do sistema + AI com sugestões
 // Usuário configura prioridade e tipo de alerta — sem gestão de portfólio
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { defaultAlertRules as defaultAlertRulesMock, alertHistory, riskDashboard, ALERT_TYPES } from '../components/data/mockDataAlerts';
 import { recentAlerts, globalRisk } from '../components/data/mockData';
 import { useAlertRules, useUpsertAlertRule, useDeleteAlertRule } from '@/hooks/useSupabase';
 import { AlertAuditPanel } from '../components/governance/AlertAuditPanel';
 import { ModeBadge, GradeBadge } from '../components/ui/DataBadge';
+import { DataQualityBadge } from '@/components/ui/DataQualityBadge';
 import { formatDistanceToNow } from 'date-fns';
+// ── Hooks de dados reais ────────────────────────────────────────────────────
+import { useBtcTicker, useLiquidations } from '@/hooks/useBtcData';
+import { useRiskScore } from '@/hooks/useRiskScore';
+import { useMultiVenueSnapshot } from '@/hooks/useMultiVenue';
+import { IS_LIVE } from '@/lib/env';
+import { logInfo, logError } from '@/lib/debugLog';
 
 // ─── Componentes do Ciclo de Alertas ─────────────────────────────────────────
 const cycleTypeConfig = {
@@ -335,11 +342,113 @@ function AlertRuleConfig({ rule, prefs, onToggle, onPriorityChange, onThresholdC
   );
 }
 
+// ─── Cálculo de Short Squeeze Score a partir de liquidações ──────────────────
+// Quando há mais liquidações de shorts (side=BUY) = pressão de squeeze
+// Retorna score 0–100 proporcional à dominância de short-liq no volume total
+function computeShortSqueezeScore(liquidations) {
+  if (!liquidations || liquidations.length === 0) return null;
+  const totalUsd  = liquidations.reduce((s, l) => s + l.usd_value, 0);
+  const shortLiqUsd = liquidations
+    .filter(l => l.side === 'BUY') // BUY = short foi liquidado
+    .reduce((s, l) => s + l.usd_value, 0);
+  if (totalUsd === 0) return null;
+  // Score: % de liq que são de shorts × 100, limitado a 100
+  return Math.min(100, Math.round((shortLiqUsd / totalUsd) * 100));
+}
+
+// ─── Cálculo de Long Flush Score a partir de liquidações ──────────────────────
+// Quando há mais liquidações de longs (side=SELL) = risco de flush
+function computeLongFlushScore(liquidations, riskScoreValue) {
+  if (!liquidations || liquidations.length === 0) return riskScoreValue ?? null;
+  const totalUsd   = liquidations.reduce((s, l) => s + l.usd_value, 0);
+  const longLiqUsd = liquidations
+    .filter(l => l.side === 'SELL') // SELL = long foi liquidado
+    .reduce((s, l) => s + l.usd_value, 0);
+  if (totalUsd === 0) return riskScoreValue ?? null;
+  const liqScore = Math.min(100, Math.round((longLiqUsd / totalUsd) * 100));
+  // Combina liq ratio (60%) + risk score composto (40%) para sinal mais robusto
+  if (riskScoreValue != null) {
+    return Math.round(liqScore * 0.6 + riskScoreValue * 0.4);
+  }
+  return liqScore;
+}
+
+// ─── Nearest Liquidation Cluster a partir de dados reais ─────────────────────
+// Agrupa liquidações por faixas de preço de $500 e retorna a mais densa próxima ao spot
+function computeNearestCluster(liquidations, spotPrice, mockCluster) {
+  if (!liquidations || liquidations.length === 0 || !spotPrice) return mockCluster;
+  // Agrupa em buckets de $500
+  const BUCKET = 500;
+  const buckets = {};
+  for (const liq of liquidations) {
+    const key = Math.round(liq.price / BUCKET) * BUCKET;
+    if (!buckets[key]) buckets[key] = { price: key, usd: 0 };
+    buckets[key].usd += liq.usd_value;
+  }
+  // Seleciona o bucket com maior volume em USD (excluindo spot ± 0.1%)
+  const candidates = Object.values(buckets)
+    .filter(b => Math.abs(b.price - spotPrice) / spotPrice > 0.001);
+  if (candidates.length === 0) return mockCluster;
+  const top = candidates.reduce((best, b) => b.usd > best.usd ? b : best, candidates[0]);
+  const distance_pct = Math.abs(top.price - spotPrice) / spotPrice * 100;
+  return { price: top.price, distance_pct, usd: top.usd };
+}
+
 export default function SmartAlerts() {
   // Carrega regras do Supabase (ou mock se não configurado)
   const { data: savedRules } = useAlertRules();
   const { mutate: saveRule } = useUpsertAlertRule();
   const { mutate: removeRule } = useDeleteAlertRule();
+
+  // ── Hooks de dados reais ──────────────────────────────────────────────────
+  const { data: ticker,       isLoading: tickerLoading,  isError: tickerError  } = useBtcTicker();
+  const { data: liquidations, isLoading: liqLoading,    isError: liqError     } = useLiquidations(100);
+  const { data: riskScore,    isLoading: riskLoading,   isError: riskError    } = useRiskScore();
+  const multiVenue = useMultiVenueSnapshot();
+
+  // ── Logging quando dados live carregam ───────────────────────────────────
+  const _loggedRef = useRef(false);
+  useEffect(() => {
+    if (ticker && riskScore && !_loggedRef.current) {
+      _loggedRef.current = true;
+      logInfo('SmartAlerts gauges loaded', {
+        funding:       ticker.last_funding_rate,
+        riskScore:     riskScore.score,
+        riskRegime:    riskScore.regime,
+        liqCount:      liquidations?.length ?? 0,
+        bybitFunding:  multiVenue.bybit?.funding_rate ?? null,
+        okxFunding:    multiVenue.okx?.funding_rate   ?? null,
+      }, 'alerts');
+    }
+    if (tickerError) logError('SmartAlerts ticker fetch failed', undefined, 'alerts');
+    if (liqError)    logError('SmartAlerts liquidations fetch failed', undefined, 'alerts');
+    if (riskError)   logError('SmartAlerts riskScore fetch failed', undefined, 'alerts');
+  }, [ticker, riskScore, liquidations, tickerError, liqError, riskError, multiVenue]);
+
+  // ── Valores calculados (com fallback para mock) ──────────────────────────
+  const spotPrice       = ticker?.mark_price ?? SPOT_PRICE;
+  const fundingCurrent  = ticker != null
+    ? ticker.last_funding_rate * 100
+    : riskDashboard.funding_current;
+  const isFundingLive   = ticker != null;
+
+  const longFlushScore  = computeLongFlushScore(liquidations, riskScore?.score);
+  const longFlushLive   = longFlushScore != null;
+  const longFlushVal    = longFlushLive ? longFlushScore : riskDashboard.long_flush_score;
+
+  const shortSqueezeScore = computeShortSqueezeScore(liquidations);
+  const shortSqueezeLive  = shortSqueezeScore != null;
+  const shortSqueezeVal   = shortSqueezeLive ? shortSqueezeScore : riskDashboard.short_squeeze_score;
+
+  const nearestCluster = computeNearestCluster(
+    liquidations, spotPrice, riskDashboard.nearest_liq_cluster,
+  );
+  const isClusterLive  = liquidations != null && liquidations.length > 0;
+
+  // Funding cross-venue: média das 3 exchanges quando disponível
+  const fundingCrossVenue = (ticker && multiVenue.bybit && multiVenue.okx)
+    ? (ticker.last_funding_rate * 100 + (multiVenue.bybit.funding_rate ?? 0) * 100 + (multiVenue.okx.funding_rate ?? 0) * 100) / 3
+    : null;
 
   // Estado local inicializado com dados do Supabase (ou mock como fallback)
   const [rules, setRules] = useState(defaultAlertRulesMock);
@@ -382,7 +491,7 @@ export default function SmartAlerts() {
       <div style={{ marginBottom: 18 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
           <h1 style={{ fontSize: 20, fontWeight: 900, color: '#f1f5f9', margin: 0, letterSpacing: '-0.03em' }}>Central de Alertas</h1>
-          <ModeBadge mode="mock" />
+          <ModeBadge mode={IS_LIVE && ticker ? 'live' : 'mock'} />
           {activeAlerts.length > 0 && (
             <span style={{ fontSize: 10, color: '#ef4444', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 4, padding: '2px 8px', fontWeight: 800 }}>
               🔔 {activeAlerts.length} ativo{activeAlerts.length > 1 ? 's' : ''}
@@ -394,14 +503,95 @@ export default function SmartAlerts() {
         </p>
       </div>
 
-      {/* Risk gauges — sempre visíveis */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 8, marginBottom: 16 }}>
-        <RiskGauge label="Long Flush" icon="⬇️" value={rd.long_flush_score} max={100} threshold={70} color="#ef4444" sub={`${70 - rd.long_flush_score}pts p/ ativar`} />
-        <RiskGauge label="Short Squeeze" icon="⬆️" value={rd.short_squeeze_score} max={100} threshold={65} color="#10b981" sub={`${65 - rd.short_squeeze_score}pts p/ ativar`} />
-        <RiskGauge label="Funding Rate" icon="💸" value={rd.funding_current} max={rd.funding_threshold_hi * 1.5} threshold={rd.funding_threshold_hi} color="#f59e0b" sub={`Threshold: ${rd.funding_threshold_hi}%`} />
-        <RiskGauge label="Basis Dev." icon="📐" value={rd.basis_deviation} max={5} threshold={3} color="#a78bfa" sub={`${rd.basis_current.toFixed(1)}% ann.`} />
-        <RiskGauge label="Sentimento" icon="🧠" value={Math.abs(rd.sentiment_24h)} max={1} threshold={0.5} color="#06b6d4" sub={`Score: ${rd.sentiment_24h > 0 ? '+' : ''}${rd.sentiment_24h.toFixed(2)}`} />
-        <RiskGauge label="Cluster BTC" icon="🔥" value={100 - rd.nearest_liq_cluster.distance_pct * 10} max={100} threshold={80} color="#f97316" sub={`$${(rd.nearest_liq_cluster.price/1000).toFixed(0)}K · ${rd.nearest_liq_cluster.distance_pct.toFixed(1)}% dist`} />
+      {/* Risk gauges — sempre visíveis, conectados a dados reais */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(145px, 1fr))', gap: 8, marginBottom: 16 }}>
+
+        {/* Long Flush — derivado de liquidações (SELL side) + Risk Score composto */}
+        <div>
+          <RiskGauge label="Long Flush" icon="⬇️" value={longFlushVal} max={100} threshold={70} color="#ef4444" sub={`${Math.max(0, 70 - longFlushVal)}pts p/ ativar`} />
+          <div style={{ marginTop: 3, display: 'flex', justifyContent: 'flex-end' }}>
+            <DataQualityBadge
+              freshness={longFlushLive ? 100 : 0}
+              completeness={longFlushLive ? 100 : 60}
+              fallback_active={!longFlushLive}
+              source={longFlushLive ? 'Binance' : 'MOCK'}
+            />
+          </div>
+        </div>
+
+        {/* Short Squeeze — derivado de liquidações (BUY side) */}
+        <div>
+          <RiskGauge label="Short Squeeze" icon="⬆️" value={shortSqueezeVal} max={100} threshold={65} color="#10b981" sub={`${Math.max(0, 65 - shortSqueezeVal)}pts p/ ativar`} />
+          <div style={{ marginTop: 3, display: 'flex', justifyContent: 'flex-end' }}>
+            <DataQualityBadge
+              freshness={shortSqueezeLive ? 100 : 0}
+              completeness={shortSqueezeLive ? 100 : 60}
+              fallback_active={!shortSqueezeLive}
+              source={shortSqueezeLive ? 'Binance' : 'MOCK'}
+            />
+          </div>
+        </div>
+
+        {/* Funding Rate — useBtcTicker (Binance) + cross-venue Bybit/OKX */}
+        <div>
+          <RiskGauge
+            label="Funding Rate"
+            icon="💸"
+            value={fundingCrossVenue ?? fundingCurrent}
+            max={rd.funding_threshold_hi * 1.5}
+            threshold={rd.funding_threshold_hi}
+            color="#f59e0b"
+            sub={fundingCrossVenue
+              ? `Cross-venue avg · Threshold: ${rd.funding_threshold_hi}%`
+              : `Threshold: ${rd.funding_threshold_hi}%`}
+          />
+          <div style={{ marginTop: 3, display: 'flex', justifyContent: 'flex-end' }}>
+            <DataQualityBadge
+              freshness={isFundingLive ? 100 : 0}
+              completeness={isFundingLive ? 100 : 60}
+              fallback_active={!isFundingLive}
+              source={fundingCrossVenue ? 'Cross-venue' : isFundingLive ? 'Binance' : 'MOCK'}
+            />
+          </div>
+        </div>
+
+        {/* Basis Dev. — sem hook real; mantém mock com badge explícito */}
+        <div>
+          <RiskGauge label="Basis Dev." icon="📐" value={rd.basis_deviation} max={5} threshold={3} color="#a78bfa" sub={`${rd.basis_current.toFixed(1)}% ann.`} />
+          <div style={{ marginTop: 3, display: 'flex', justifyContent: 'flex-end' }}>
+            <DataQualityBadge freshness={0} completeness={60} fallback_active={true} source="MOCK" />
+          </div>
+        </div>
+
+        {/* Sentimento — sem hook real; mantém mock com badge explícito */}
+        <div>
+          <RiskGauge label="Sentimento" icon="🧠" value={Math.abs(rd.sentiment_24h)} max={1} threshold={0.5} color="#06b6d4" sub={`Score: ${rd.sentiment_24h > 0 ? '+' : ''}${rd.sentiment_24h.toFixed(2)}`} />
+          <div style={{ marginTop: 3, display: 'flex', justifyContent: 'flex-end' }}>
+            <DataQualityBadge freshness={0} completeness={60} fallback_active={true} source="MOCK" />
+          </div>
+        </div>
+
+        {/* Cluster BTC — derivado de liquidações reais quando disponível */}
+        <div>
+          <RiskGauge
+            label="Cluster BTC"
+            icon="🔥"
+            value={100 - nearestCluster.distance_pct * 10}
+            max={100}
+            threshold={80}
+            color="#f97316"
+            sub={`$${(nearestCluster.price / 1000).toFixed(0)}K · ${nearestCluster.distance_pct.toFixed(1)}% dist`}
+          />
+          <div style={{ marginTop: 3, display: 'flex', justifyContent: 'flex-end' }}>
+            <DataQualityBadge
+              freshness={isClusterLive ? 100 : 0}
+              completeness={isClusterLive ? 100 : 60}
+              fallback_active={!isClusterLive}
+              source={isClusterLive ? 'Binance' : 'MOCK'}
+            />
+          </div>
+        </div>
+
       </div>
 
       {/* Tabs */}
