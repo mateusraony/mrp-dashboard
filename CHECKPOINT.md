@@ -1,6 +1,6 @@
 # CHECKPOINT.md — MRP Dashboard
 > Memória técnica viva do projeto. Atualizar ao final de cada bloco importante.
-> Última atualização: 2026-04-14 (Sprint 6.6 concluído — Telegram + RLS fix + Settings persistence)
+> Última atualização: 2026-04-16 (Migration conflict resolvido — Supabase GitHub check ✅ — GDELT + SmartAlerts live)
 
 ---
 
@@ -16,10 +16,14 @@
 | DATA_MODE | ✅ live | .env.local: VITE_DATA_MODE=live |
 | FRED API Key | ✅ CONFIGURADA | VITE_FRED_API_KEY presente em .env.local |
 | Supabase | ✅ ATIVO | URL + ANON_KEY em .env.local; 5 tabelas com RLS corrigido |
-| Supabase RLS | ✅ CORRIGIDO | Políticas auth.uid() substituídas por using(true) — dados salvam |
-| Supabase GitHub Integration | ✅ CORRIGIDO | Migration .sql files presentes no repo |
+| Supabase RLS | ✅ CORRIGIDO | Políticas using(true) — dados salvam (FK constraint removida) |
+| Supabase GitHub Integration | ✅ RESOLVIDO | 5 stubs + full_schema consolidado — drift detection eliminada — PR check ✅ |
+| SPA routing (Render) | ✅ CORRIGIDO | `public/_redirects`: `/* /index.html 200` |
 | Auth real | ❌ AUSENTE | Stub anônimo — aguarda decisão futura |
 | Telegram | ✅ IMPLEMENTADO | Edge Function + Settings persistence + Bot Token configurado |
+| GDELT News | ✅ LIVE | `src/services/gdelt.ts` + `src/hooks/useGdelt.ts` — NewsIntelligence usa dados reais |
+| SmartAlerts gauges | ✅ LIVE | Conectados a useBtcTicker + useLiquidations + useRiskScore + useMultiVenueSnapshot |
+| Debug Panel | ✅ IMPLEMENTADO | `src/lib/debugLog.ts` + `src/components/ui/DebugPanel.jsx` — logs internos visíveis em prod |
 
 ---
 
@@ -54,6 +58,11 @@
 | **6.7** | ✅ ANTECIPADO | build ✅ · tsc ✅ · eslint ✅ · 52/52 testes ✅ |
 | **Bundle split** | ✅ | `vite.config.js` manualChunks: index.js 284KB→90KB |
 | **Migration** | ✅ | `alert_events` + `threshold_history` aplicadas via MCP Supabase |
+| **Migration conflict fix** | ✅ | 5 stubs (`SELECT 1`) + `20260420000000_full_schema.sql` + versões pré-registradas em prod + preview via execute_sql |
+| **GDELT** | ✅ | `gdelt.ts` + `useGdelt.ts` — NewsIntelligence substituiu mock por feed real |
+| **SmartAlerts live** | ✅ | Gauges: Funding (multi-venue avg), Flush/Squeeze (liquidações SELL/BUY), Risk Score, DataQualityBadge |
+| **Debug/log interno** | ✅ | `debugLog.ts` intercepta window.onerror + DebugPanel.jsx flutuante com badge de erros |
+| **Render SPA fix** | ✅ | `public/_redirects` → sem 404 em refresh de rota |
 
 ---
 
@@ -138,8 +147,12 @@ scripts/
   validate_macro_surprise.py, validate_mvrv_zscore.py
 
 supabase/migrations/
-  20260412000000_create_core_tables.sql   ← alert_rules, portfolio_positions, user_settings
-  (alert_events + threshold_history aplicados via MCP — sem arquivo local)
+  20260412000000_create_core_tables.sql        ← stub (SELECT 1) — evita drift detection
+  20260413000001_create_governance_tables.sql  ← stub (SELECT 1)
+  20260414000000_add_telegram_and_fix_rls.sql  ← stub (SELECT 1)
+  20260414000001_fix_user_settings_anon_upsert.sql ← stub (SELECT 1)
+  20260414000002_drop_auth_fk_allow_anon_sentinel.sql ← stub (SELECT 1)
+  20260420000000_full_schema.sql               ← schema real, completo, idempotente (5 tabelas)
 
 vite.config.js  ← manualChunks: recharts/supabase/tanstack/react-vendor
 vitest.config.ts
@@ -179,7 +192,7 @@ refetchInterval: IS_LIVE ? 30_000 : false,
 | SOPR/Netflow/Whale via Glassnode | Média | Pendente | Requer plano pago ~$29/mês |
 | Base44 favicon residual (`index.html`) | Baixa | Pendente | 1 linha — remover quando conveniente |
 | Rate limiting CoinGecko | Baixa | Pendente | Debounce/queue ≤30 req/min no free tier |
-| Migration `alert_events`/`threshold_history` sem arquivo .sql | Baixa | Pendente | Criar arquivo local para rastreabilidade |
+| ~~Migration conflict~~ | ~~Alta~~ | ✅ RESOLVIDO | 5 stubs + full_schema + pré-registro no preview DB |
 
 ---
 
