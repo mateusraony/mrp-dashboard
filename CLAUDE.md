@@ -4,7 +4,7 @@
 > Stack: React, Tailwind, Lucide, Vite, Node.js (ESM), TypeScript, Zod.
 > Repositório: https://github.com/mateusraony/mrp-dashboard
 > Deploy: https://mrp-dashboard.onrender.com
-> Última atualização: 2026-04-14
+> Última atualização: 2026-04-16
 
 ---
 
@@ -232,15 +232,22 @@ AUTOMAÇÕES
 11. ✅ **Governance Pack** — Alert audit feed, threshold history, data lineage (Sprint 6.5).
 12. ✅ **Testes ≥45** — 52/52 testes (Sprint 6.7 antecipado).
 
-### Pendentes (próxima sessão):
-- ~~**HODL Waves visual avançado**~~ ✅ CONCLUÍDO (Sprint 6.3) — HodlWavesPanel + CDD ComposedChart + AreaChart supply.
-- [ ] **Telegram Digest** — Edge Function + pg_cron BLOQUEADO aguarda Bot Token do usuário (Sprint 6.6).
-- ~~**Migration Supabase** — tabelas `alert_events` + `threshold_history`~~ ✅ APLICADA via MCP.
-- ~~[ ] **Bundle split** — Recharts 378KB → `manualChunks` vite.config.js.~~ ✅ RESOLVIDO
+### Implementados (Sprints 6.6–6.8 + fixes):
+13. ✅ **GDELT News real** — `src/services/gdelt.ts` + `src/hooks/useGdelt.ts` — NewsIntelligence usa feed real (Sprint 6.8).
+14. ✅ **SmartAlerts gauges live** — Funding multi-venue, Long Flush/Short Squeeze via liquidações, Risk Score (Sprint 6.8).
+15. ✅ **Debug Panel interno** — `debugLog.ts` + `DebugPanel.jsx` — logs de erro visíveis em produção sem DevTools.
+16. ✅ **SPA routing Render** — `public/_redirects` — sem 404 em refresh de rota.
+17. ✅ **Migration conflict Supabase** — 5 stubs + schema consolidado + pré-registro prod/preview — PR check ✅.
+18. ✅ **Settings persistência** — FK constraint removida, upsert anônimo funciona com sentinel UUID.
+
+### Pendentes:
+- [ ] **Telegram Digest** — Edge Function pronta. Falta: deploy via CLI + pg_cron no Supabase Dashboard.
+- [ ] **Auth real** — Stub anônimo em uso — aguarda decisão de negócio para Supabase Auth.
+- [ ] **APIs pagas** — SOPR/Netflow/Whale (Glassnode ~$29/mês) — aguarda confirmação do usuário.
 
 ---
 
-## ⚠️ DÍVIDA TÉCNICA — STATUS ATUAL (2026-04-13)
+## ⚠️ DÍVIDA TÉCNICA — STATUS ATUAL (2026-04-16)
 
 | Item | Arquivo | Severidade | Status |
 |------|---------|------------|--------|
@@ -252,10 +259,11 @@ AUTOMAÇÕES
 | Auth stub anônimo | src/lib/AuthContext.jsx | Alta | Aguarda Supabase Auth |
 | ~~services/ não existe~~ | src/services/ | ~~Crítica~~ | ✅ RESOLVIDO (Sprint 3) |
 | ~~Supabase não instalado~~ | package.json | ~~Crítica~~ | ✅ RESOLVIDO (Sprint 3) |
-| ~~Zero testes~~ | projeto todo | ~~Alta~~ | ✅ 25 testes (Sprint 5.6) |
+| ~~Zero testes~~ | projeto todo | ~~Alta~~ | ✅ 52 testes (Sprint 6.7) |
 | ~~.env.local ausente~~ | — | ~~Alta~~ | ✅ Criado com credenciais reais |
-| Cobertura de testes baixa | 25 testes apenas | Alta | Ampliar Sprint 6.7 |
-| Telegram Bot Token | Edge Function pronta | Alta | BLOQUEADO — usuário deve criar bot |
+| ~~Migration conflict~~ | supabase/migrations/ | ~~Crítica~~ | ✅ RESOLVIDO — 5 stubs + full_schema + pré-registro prod/preview |
+| ~~404 no refresh (Render)~~ | public/_redirects | ~~Alta~~ | ✅ RESOLVIDO — `/* /index.html 200` |
+| Telegram Bot Token | Edge Function pronta | Alta | BLOQUEADO — usuário deve criar bot via @BotFather |
 | Stripe instalado sem uso | package.json | Baixa | Avaliar |
 
 ---
@@ -292,7 +300,7 @@ Ver `CHECKPOINT.md` na raiz para estado atual e próximos passos.
 | Fase 3 — API + Hooks + Settings (Sprints 3.1–3.9) | ✅ CONCLUÍDA | 2026-04-12 |
 | Fase 4 — Cálculos Python + Wiring (Sprints 4.1–4.5) | ✅ CONCLUÍDA | 2026-04-12 |
 | Fase 5 — APIs Gratuitas + Testes (Sprints 5.1–5.6) | ✅ CONCLUÍDA | 2026-04-12 |
-| Fase 6 — Expansão OnChain/Macro/Governance | 🔄 EM EXECUÇÃO | 2026-04-13 |
+| Fase 6 — Expansão OnChain/Macro/Governance | ✅ CONCLUÍDA | 2026-04-16 |
 
 ### Fase 6 — Sub-sprints
 
@@ -306,8 +314,9 @@ Ver `CHECKPOINT.md` na raiz para estado atual e próximos passos.
 | 6.5 | ✅ CONCLUÍDO | Governance — audit feed, threshold history, data lineage |
 | 6.6 | 🔴 BLOQUEADO | Telegram digest — aguarda Bot Token (@BotFather) |
 | 6.7 | ✅ ANTECIPADO | Varredura: build ✅ + tsc ✅ + lint ✅ + 52 testes ✅ |
+| 6.8 | ✅ CONCLUÍDO | GDELT News real + SmartAlerts live + DebugPanel + SPA fix |
 | Bundle split | ✅ CONCLUÍDO | index.js 284KB→90KB, recharts/supabase chunks isolados |
-| Migration | ✅ APLICADA | alert_events + threshold_history no Supabase com RLS |
+| Migration conflict | ✅ RESOLVIDO | 5 stubs + full_schema + pré-registro prod/preview — PR check ✅ |
 
 ### Instrução permanente
 Antes de qualquer avanço estrutural fora da fase atual → apresentar debate dos especialistas e pedir autorização.
