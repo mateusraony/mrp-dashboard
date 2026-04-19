@@ -39,10 +39,13 @@ function parsePrevToNumeric(prev: string | null): number | null {
 async function persistMacroSchedule(events: MacroCalendarEvent[]): Promise<void> {
   if (!_supUrl || !_supKey || events.length === 0) return;
   try {
+    const now = new Date();
     const rows = events.map(e => ({
       event_code:       e.code,
       release_time_utc: e.datetime_utc,
-      status:           e.status,
+      // Deriva status do timestamp UTC completo para evitar que eventos de hoje
+      // sejam marcados como 'released' antes de sua hora real de publicação.
+      status:           new Date(e.datetime_utc) <= now ? 'released' : 'scheduled',
       previous:         parsePrevToNumeric(e.previous),
       actual:           e.actual ? parsePrevToNumeric(e.actual) : null,
       consensus:        null,
