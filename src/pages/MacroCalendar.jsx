@@ -271,6 +271,7 @@ export default function MacroCalendar() {
   const {
     data: liveEvents = [],
     isLoading: calLoading,
+    isFetching: calFetching,
     isError: calError,
     refetch: calRefetch,
     dataUpdatedAt: calUpdatedAt,
@@ -327,7 +328,7 @@ export default function MacroCalendar() {
             )}
             <RefreshButton
               onRefresh={() => calRefetch()}
-              isLoading={calLoading}
+              isLoading={calFetching}
               lastUpdated={calUpdatedAt}
               label="Atualizar Calendário Macro"
             />

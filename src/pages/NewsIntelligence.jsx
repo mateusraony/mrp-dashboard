@@ -370,6 +370,7 @@ export default function NewsIntelligence() {
   const {
     data: gdeltArticles = [],
     isLoading: gdeltLoading,
+    isFetching: gdeltFetching,
     isError: gdeltError,
     error: gdeltRawError,
     refetch: gdeltRefetch,
@@ -380,6 +381,7 @@ export default function NewsIntelligence() {
   const {
     data: instArticles = [],
     isLoading: instLoading,
+    isFetching: instFetching,
     isError: instError,
     refetch: instRefetch,
     dataUpdatedAt: instUpdatedAt,
@@ -438,7 +440,7 @@ export default function NewsIntelligence() {
             )}
             <RefreshButton
               onRefresh={() => gdeltRefetch()}
-              isLoading={gdeltLoading}
+              isLoading={gdeltFetching}
               lastUpdated={gdeltUpdatedAt}
               label="Atualizar Feed Geral"
             />
@@ -573,7 +575,7 @@ export default function NewsIntelligence() {
             <div style={{ marginLeft: 'auto' }}>
               <RefreshButton
                 onRefresh={() => instRefetch()}
-                isLoading={instLoading}
+                isLoading={instFetching}
                 lastUpdated={instUpdatedAt}
                 label="Atualizar Inteligência AI"
               />
