@@ -15,6 +15,62 @@ import { logInfo, logError, logWarn } from '@/lib/debugLog';
 
 const FRED_BASE = 'https://api.stlouisfed.org/fred';
 
+// ─── Persistência Supabase (raw fetch — sem import circular) ─────────────────
+
+const _env = (typeof import.meta !== 'undefined'
+  ? (import.meta as Record<string, unknown>).env
+  : {}) as Record<string, string>;
+
+const _supUrl = _env?.VITE_SUPABASE_URL ?? '';
+const _supKey = _env?.VITE_SUPABASE_ANON_KEY ?? '';
+
+/** Converte string formatada ("+ 0.3%", "+185K", "4.25%") para numeric ou null. */
+function parsePrevToNumeric(prev: string | null): number | null {
+  if (!prev) return null;
+  const cleaned = prev.replace(/[^0-9.\-+]/g, '');
+  const n = parseFloat(cleaned);
+  return isNaN(n) ? null : n;
+}
+
+/**
+ * Persiste eventos macro em macro_event_schedule (upsert idempotente por
+ * event_code + release_time_utc). Fire-and-forget — não bloqueia a UI.
+ */
+async function persistMacroSchedule(events: MacroCalendarEvent[]): Promise<void> {
+  if (!_supUrl || !_supKey || events.length === 0) return;
+  try {
+    const now = new Date();
+    const rows = events.map(e => ({
+      event_code:       e.code,
+      release_time_utc: e.datetime_utc,
+      // Deriva status do timestamp UTC completo para evitar que eventos de hoje
+      // sejam marcados como 'released' antes de sua hora real de publicação.
+      status:           new Date(e.datetime_utc) <= now ? 'released' : 'scheduled',
+      previous:         parsePrevToNumeric(e.previous),
+      actual:           e.actual ? parsePrevToNumeric(e.actual) : null,
+      consensus:        null,
+      unit:             e.unit,
+      source:           e.source,
+      raw_payload:      e,
+    }));
+    await fetch(
+      `${_supUrl}/rest/v1/macro_event_schedule?on_conflict=event_code,release_time_utc`,
+      {
+        method:  'POST',
+        headers: {
+          apikey:         _supKey,
+          Authorization:  `Bearer ${_supKey}`,
+          'Content-Type': 'application/json',
+          Prefer:         'resolution=merge-duplicates,return=minimal',
+        },
+        body: JSON.stringify(rows),
+      },
+    );
+  } catch {
+    // Silencia falhas de persistência para não impactar a UI
+  }
+}
+
 // ─── Datas FOMC 2026 (Fed Reserve — federalreserve.gov/monetarypolicy/fomccalendars.htm) ─
 const FOMC_2026: Array<{ date: string; time_et: string; note: string }> = [
   { date: '2026-01-28', time_et: '14:00', note: 'FOMC + Coletiva Powell' },
@@ -435,5 +491,9 @@ export async function fetchMacroCalendarEvents(): Promise<MacroCalendarEvent[]> 
   events.sort((a, b) => a.datetime_utc.localeCompare(b.datetime_utc));
 
   logInfo('MacroCalendar fetched', { count: events.length, source: 'FRED' }, 'macroCalendar');
+
+  // Persiste eventos no pipeline bronze em background — não bloqueia a UI
+  void persistMacroSchedule(events);
+
   return events;
 }

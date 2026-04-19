@@ -11,6 +11,49 @@ import { z } from 'zod';
 import { DATA_MODE } from '@/lib/env';
 import { logInfo, logError } from '@/lib/debugLog';
 
+// ─── Persistência Supabase (raw fetch — sem import circular) ─────────────────
+
+const _env = (typeof import.meta !== 'undefined'
+  ? (import.meta as Record<string, unknown>).env
+  : {}) as Record<string, string>;
+
+const _supUrl = _env?.VITE_SUPABASE_URL ?? '';
+const _supKey = _env?.VITE_SUPABASE_ANON_KEY ?? '';
+
+/**
+ * Persiste artigos GDELT no Supabase (upsert por URL, ignora duplicatas).
+ * Fire-and-forget — não bloqueia o retorno do hook.
+ */
+async function persistGdeltArticles(
+  articles: GdeltArticleEnriched[],
+  query: string,
+): Promise<void> {
+  if (!_supUrl || !_supKey || articles.length === 0) return;
+  try {
+    const rows = articles.map(a => ({
+      url:             a.url,
+      title:           a.title,
+      domain:          a.domain,
+      published_at:    a.published_at,
+      sentiment:       a.sentiment,
+      sentiment_label: a.sentiment_label,
+      query,
+    }));
+    await fetch(`${_supUrl}/rest/v1/gdelt_articles?on_conflict=url`, {
+      method:  'POST',
+      headers: {
+        apikey:         _supKey,
+        Authorization:  `Bearer ${_supKey}`,
+        'Content-Type': 'application/json',
+        Prefer:         'resolution=ignore-duplicates,return=minimal',
+      },
+      body: JSON.stringify(rows),
+    });
+  } catch {
+    // Silencia falhas de persistência para não impactar a UI
+  }
+}
+
 const BASE = 'https://api.gdeltproject.org/api/v2/doc/doc';
 
 // ─── Schemas ──────────────────────────────────────────────────────────────────
@@ -144,6 +187,9 @@ export async function fetchGdeltNews(
   const enriched = filtered.map(enrichArticle);
 
   logInfo('GDELT fetch', { count: enriched.length, query }, 'gdelt');
+
+  // Persiste no Supabase em background — não bloqueia o retorno
+  void persistGdeltArticles(enriched, query ?? 'bitcoin crypto');
 
   return enriched;
 }
