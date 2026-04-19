@@ -1,19 +1,46 @@
 // ─── NEWS INTELLIGENCE PAGE ───────────────────────────────────────────────────
-// Notícias institucionais com AI Sentiment Score + correlação BTC + Bull-Bear Index
-import { useState, useMemo } from 'react';
-import { institutionalNews, newsSentimentAggregate, impactCategoryConfig } from '../components/data/mockDataNews';
+// Notícias institucionais (GDELT live) + Feed Geral com AI Sentiment Score
+import { useState } from 'react';
 import { optionsTakerFlow } from '../components/data/mockDataExtended';
-import { ModeBadge, GradeBadge } from '../components/ui/DataBadge';
+import { ModeBadge } from '../components/ui/DataBadge';
+import { RefreshButton } from '../components/ui/RefreshButton';
 import { IS_LIVE } from '@/lib/env';
 import { useGdeltNews } from '@/hooks/useGdelt';
 import { formatDistanceToNow } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell, ReferenceLine,
 } from 'recharts';
 
-const SOURCES = ['Todos', 'Bloomberg', 'Reuters', 'CoinDesk', 'The Block', 'WSJ', 'FT', 'Cointelegraph'];
-const CATEGORIES = ['Todos', ...Object.keys(impactCategoryConfig)];
+// Categorias detectadas por keywords no título
+const CATEGORY_CONFIG = {
+  institutional: { icon: '🏦', label: 'Institucional', color: '#a78bfa' },
+  regulation:    { icon: '⚖️',  label: 'Regulação',     color: '#f59e0b' },
+  adoption:      { icon: '🚀',  label: 'Adoção',        color: '#10b981' },
+  risk:          { icon: '⚠️',  label: 'Risco',         color: '#ef4444' },
+  market:        { icon: '📊',  label: 'Mercado',       color: '#3b82f6' },
+};
+
+function detectCategory(title) {
+  const t = title.toLowerCase();
+  if (/etf|fund|blackrock|fidelity|grayscale|institutional|asset manager/.test(t)) return 'institutional';
+  if (/sec|regulation|regulatory|law|congress|ban|compliance|legal/.test(t)) return 'regulation';
+  if (/adoption|integration|payment|merchant|corporation|treasury/.test(t)) return 'adoption';
+  if (/hack|breach|exploit|scam|fraud|stolen|attack/.test(t)) return 'risk';
+  return 'market';
+}
+
+function computeScore(title) {
+  const POSITIVE = ['rally','surge','bullish','adoption','ath','gain','rise','record','breakthrough','approval','growth','soar','jump','high'];
+  const NEGATIVE = ['crash','drop','bearish','ban','hack','loss','fall','fear','plunge','sell-off','lawsuit','collapse','decline','slump'];
+  const lower = title.toLowerCase();
+  const pos = POSITIVE.filter(k => lower.includes(k)).length;
+  const neg = NEGATIVE.filter(k => lower.includes(k)).length;
+  const total = pos + neg;
+  if (total === 0) return 0;
+  return parseFloat(((pos - neg) / total).toFixed(2));
+}
 
 function SentimentGauge({ score }) {
   const pct = ((score + 1) / 2) * 100;
@@ -52,8 +79,41 @@ function CorrelationBadge({ value }) {
   );
 }
 
+// ─── GdeltAICard — card para aba Inteligência AI (GDELT institucional) ─────────
+function GdeltAICard({ article }) {
+  const score    = computeScore(article.title);
+  const cat      = detectCategory(article.title);
+  const cfg      = CATEGORY_CONFIG[cat];
+  const sentColor = score > 0.15 ? '#10b981' : score < -0.15 ? '#ef4444' : '#f59e0b';
+  let timeAgo = '';
+  try { timeAgo = formatDistanceToNow(new Date(article.published_at), { addSuffix: true, locale: ptBR }); } catch { /* */ }
+
+  return (
+    <div style={{
+      background: '#111827', border: `1px solid #1e2d45`,
+      borderLeft: `3px solid ${cfg.color}`,
+      borderRadius: 10, padding: '13px 15px', marginBottom: 8,
+    }}>
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 7, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 9, padding: '2px 7px', borderRadius: 4, background: `${cfg.color}18`, color: cfg.color, border: `1px solid ${cfg.color}30`, fontWeight: 700 }}>
+          {cfg.icon} {cfg.label}
+        </span>
+        <span style={{ fontSize: 10, color: '#60a5fa', background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.18)', borderRadius: 4, padding: '1px 6px', fontFamily: 'JetBrains Mono, monospace' }}>
+          {article.domain}
+        </span>
+        {timeAgo && <span style={{ fontSize: 9, color: '#334155', marginLeft: 'auto' }}>{timeAgo}</span>}
+      </div>
+      <a href={article.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0', lineHeight: 1.5, marginBottom: 9 }}>{article.title}</div>
+      </a>
+      <SentimentGauge score={score} />
+    </div>
+  );
+}
+
+// ─── [DEPRECATED] NewsCard — mantido temporariamente para evitar erros de build
 function NewsCard({ news, isSelected, onClick }) {
-  const cfg = impactCategoryConfig[news.impact_category] || { icon: '📰', color: '#64748b', label: 'News' };
+  const cfg = { icon: '📰', color: '#64748b', label: 'News' };
   const priceMoved = news.price_delta_pct;
   const priceColor = priceMoved > 0 ? '#10b981' : priceMoved < 0 ? '#ef4444' : '#64748b';
 
@@ -305,13 +365,8 @@ function GdeltNewsCard({ article, rank }) {
 
 export default function NewsIntelligence() {
   const [mainTab, setMainTab] = useState('intelligence');
-  const [selectedNews, setSelectedNews] = useState(null);
-  const [sourceFilter, setSourceFilter] = useState('Todos');
-  const [categoryFilter, setCategoryFilter] = useState('Todos');
-  const [sentimentFilter, setSentimentFilter] = useState('Todos');
-  const agg = newsSentimentAggregate;
 
-  // ─── GDELT real news feed ──────────────────────────────────────────────────
+  // ─── Feed Geral: query geral ───────────────────────────────────────────────
   const {
     data: gdeltArticles = [],
     isLoading: gdeltLoading,
@@ -321,23 +376,27 @@ export default function NewsIntelligence() {
     dataUpdatedAt: gdeltUpdatedAt,
   } = useGdeltNews('bitcoin crypto');
 
-  // Derivados para o resumo de sentimento do Feed Geral
-  const gdeltBullishCount  = gdeltArticles.filter(a => a.sentiment === 1).length;
-  const gdeltNeutralCount  = gdeltArticles.filter(a => a.sentiment === 0).length;
-  const gdeltBearishCount  = gdeltArticles.filter(a => a.sentiment === -1).length;
+  // ─── Inteligência AI: query institucional ──────────────────────────────────
+  const {
+    data: instArticles = [],
+    isLoading: instLoading,
+    isError: instError,
+    refetch: instRefetch,
+    dataUpdatedAt: instUpdatedAt,
+  } = useGdeltNews('bitcoin ETF institutional SEC BlackRock Fidelity Grayscale adoption regulatory');
 
-  const filtered = useMemo(() => {
-    return institutionalNews.filter(n => {
-      if (sourceFilter !== 'Todos' && n.source !== sourceFilter) return false;
-      if (categoryFilter !== 'Todos' && n.impact_category !== categoryFilter) return false;
-      if (sentimentFilter === 'Bullish' && n.sentiment_score <= 0.1) return false;
-      if (sentimentFilter === 'Bearish' && n.sentiment_score >= -0.1) return false;
-      if (sentimentFilter === 'Neutral' && Math.abs(n.sentiment_score) > 0.1) return false;
-      return true;
-    });
-  }, [sourceFilter, categoryFilter, sentimentFilter]);
+  // Derivados Feed Geral
+  const gdeltBullishCount = gdeltArticles.filter(a => a.sentiment === 1).length;
+  const gdeltNeutralCount = gdeltArticles.filter(a => a.sentiment === 0).length;
+  const gdeltBearishCount = gdeltArticles.filter(a => a.sentiment === -1).length;
 
-  const avgSentiment24h = agg.avg_score_24h;
+  // Derivados Inteligência AI (live)
+  const instBullishCount = instArticles.filter(a => a.sentiment === 1).length;
+  const instNeutralCount = instArticles.filter(a => a.sentiment === 0).length;
+  const instBearishCount = instArticles.filter(a => a.sentiment === -1).length;
+  const avgSentiment24h  = instArticles.length > 0
+    ? parseFloat(((instBullishCount - instBearishCount) / instArticles.length).toFixed(2))
+    : 0;
   const sentColor = avgSentiment24h > 0.1 ? '#10b981' : avgSentiment24h < -0.1 ? '#ef4444' : '#f59e0b';
 
   return (
@@ -367,9 +426,7 @@ export default function NewsIntelligence() {
                 </span>
               </div>
             </div>
-            {/* Modo badge */}
             <ModeBadge mode={IS_LIVE ? 'live' : 'mock'} />
-            {/* Contagem de artigos */}
             {!gdeltLoading && !gdeltError && (
               <span style={{
                 fontSize: 10, fontFamily: 'JetBrains Mono, monospace',
@@ -379,12 +436,12 @@ export default function NewsIntelligence() {
                 {gdeltArticles.length} artigos
               </span>
             )}
-            {/* Timestamp do último fetch */}
-            {gdeltUpdatedAt > 0 && (
-              <span style={{ fontSize: 10, color: '#4a5568', fontFamily: 'JetBrains Mono, monospace' }}>
-                atualizado {formatDistanceToNow(new Date(gdeltUpdatedAt), { addSuffix: true })}
-              </span>
-            )}
+            <RefreshButton
+              onRefresh={() => gdeltRefetch()}
+              isLoading={gdeltLoading}
+              lastUpdated={gdeltUpdatedAt}
+              label="Atualizar Feed Geral"
+            />
           </div>
 
           {/* Estado: loading */}
@@ -501,125 +558,124 @@ export default function NewsIntelligence() {
         </div>
       )}
 
-      {/* Inteligência AI (conteúdo original) */}
+      {/* ── Inteligência AI — GDELT Institucional (LIVE) ─────────────────── */}
       {mainTab === 'intelligence' && (
-      <div style={{ maxWidth: 1400, margin: '0 auto' }}>
-      {/* Header */}
-      <div style={{ marginBottom: 20 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
-          <h1 style={{ fontSize: 20, fontWeight: 900, color: '#f1f5f9', margin: 0, letterSpacing: '-0.03em' }}>
-            News Intelligence
-          </h1>
-          <ModeBadge mode="mock" />
-          <GradeBadge grade={agg.quality} />
-          <span style={{ fontSize: 10, color: '#a78bfa', background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.2)', borderRadius: 4, padding: '2px 8px', fontWeight: 700 }}>
-            🤖 AI Sentiment
-          </span>
-        </div>
-        <p style={{ fontSize: 11, color: '#475569', lineHeight: 1.5 }}>
-          Notícias institucionais filtradas por relevância · Bloomberg, Reuters, CoinDesk, The Block, WSJ, FT, Cointelegraph · Sentiment Score via NLP
-        </p>
-      </div>
-
-      {/* Summary bar */}
-      <div style={{
-        display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10, marginBottom: 16,
-      }}>
-        {[
-          { label: 'Sentiment 24h', value: `${avgSentiment24h > 0 ? '+' : ''}${avgSentiment24h.toFixed(2)}`, color: sentColor, sub: avgSentiment24h > 0 ? 'Net Bullish' : 'Net Bearish' },
-          { label: 'Bullish Today', value: agg.bullish_count, color: '#10b981', sub: 'notícias' },
-          { label: 'Bearish Today', value: agg.bearish_count, color: '#ef4444', sub: 'notícias' },
-          { label: 'Neutral Today', value: agg.neutral_count, color: '#f59e0b', sub: 'notícias' },
-          { label: 'Bull-Bear Index', value: `${optionsTakerFlow.bull_bear_index > 0 ? '+' : ''}${optionsTakerFlow.bull_bear_index.toFixed(3)}`, color: '#a78bfa', sub: 'Opções Taker Flow' },
-          { label: 'Corr. Média', value: `${agg.avg_price_correlation > 0 ? '+' : ''}${agg.avg_price_correlation.toFixed(2)}`, color: '#60a5fa', sub: 'News → Preço' },
-        ].map((item, i) => (
-          <div key={i} style={{ background: 'linear-gradient(135deg, #131e2e 0%, #111827 100%)', border: '1px solid #1e2d45', borderRadius: 10, padding: '12px 14px' }}>
-            <div style={{ fontSize: 9, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 4 }}>{item.label}</div>
-            <div style={{ fontSize: 22, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: item.color, letterSpacing: '-0.02em' }}>{item.value}</div>
-            <div style={{ fontSize: 9, color: '#334155', marginTop: 2 }}>{item.sub}</div>
+        <div style={{ maxWidth: 1200 }}>
+          {/* Header */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
+            <h1 style={{ fontSize: 20, fontWeight: 900, color: '#f1f5f9', margin: 0, letterSpacing: '-0.03em' }}>
+              Inteligência AI
+            </h1>
+            <ModeBadge mode={IS_LIVE ? 'live' : 'mock'} />
+            <span style={{ fontSize: 10, color: '#a78bfa', background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.2)', borderRadius: 4, padding: '2px 8px', fontWeight: 700 }}>
+              🤖 GDELT Institucional
+            </span>
+            <div style={{ marginLeft: 'auto' }}>
+              <RefreshButton
+                onRefresh={() => instRefetch()}
+                isLoading={instLoading}
+                lastUpdated={instUpdatedAt}
+                label="Atualizar Inteligência AI"
+              />
+            </div>
           </div>
-        ))}
-      </div>
 
-      {/* Sentiment history chart */}
-      <div style={{ background: 'linear-gradient(135deg, #131e2e 0%, #111827 100%)', border: '1px solid #1e2d45', borderRadius: 14, padding: 18, marginBottom: 16 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 12 }}>Sentiment Agregado — Últimos 7 dias</div>
-        <ResponsiveContainer width="100%" height={130}>
-          <BarChart data={agg.history_7d} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#1e2d45" vertical={false} />
-            <XAxis dataKey="day" tick={{ fontSize: 10, fill: '#475569' }} tickLine={false} />
-            <YAxis tick={{ fontSize: 9, fill: '#475569' }} tickLine={false} domain={[-1, 1]} tickFormatter={v => v.toFixed(1)} />
-            <Tooltip
-              contentStyle={{ background: '#0d1421', border: '1px solid #2a3f5f', borderRadius: 6, fontSize: 11 }}
-              formatter={(v) => [Number(v).toFixed(2), 'Score']}
-            />
-            <ReferenceLine y={0} stroke="#2a3f5f" />
-            <Bar dataKey="score" radius={[3, 3, 0, 0]}>
-              {agg.history_7d.map((entry, i) => (
-                <Cell key={i} fill={entry.score > 0 ? '#10b981' : '#ef4444'} />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-
-      {/* Filters */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
-        <span style={{ fontSize: 10, color: '#334155', fontWeight: 600 }}>Filtros:</span>
-        {/* Source */}
-        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-          {SOURCES.slice(0, 5).map(s => (
-            <button key={s} onClick={() => setSourceFilter(s)} style={{
-              fontSize: 10, padding: '3px 9px', borderRadius: 5, cursor: 'pointer',
-              background: sourceFilter === s ? 'rgba(59,130,246,0.2)' : 'transparent',
-              color: sourceFilter === s ? '#60a5fa' : '#475569',
-              border: `1px solid ${sourceFilter === s ? 'rgba(59,130,246,0.4)' : '#1e2d45'}`,
-              fontWeight: sourceFilter === s ? 700 : 400,
-            }}>{s}</button>
-          ))}
-        </div>
-        <div style={{ width: 1, height: 16, background: '#1e2d45' }} />
-        {['Todos', 'Bullish', 'Neutral', 'Bearish'].map(s => (
-          <button key={s} onClick={() => setSentimentFilter(s)} style={{
-            fontSize: 10, padding: '3px 9px', borderRadius: 5, cursor: 'pointer',
-            background: sentimentFilter === s ? (s === 'Bullish' ? 'rgba(16,185,129,0.2)' : s === 'Bearish' ? 'rgba(239,68,68,0.2)' : 'rgba(59,130,246,0.2)') : 'transparent',
-            color: sentimentFilter === s ? (s === 'Bullish' ? '#10b981' : s === 'Bearish' ? '#ef4444' : '#60a5fa') : '#475569',
-            border: `1px solid ${sentimentFilter === s ? '#2a3f5f' : '#1e2d45'}`,
-            fontWeight: sentimentFilter === s ? 700 : 400,
-          }}>{s}</button>
-        ))}
-      </div>
-
-      {/* Main grid: list + detail */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 420px', gap: 16, alignItems: 'start' }}>
-        {/* News list */}
-        <div>
-          <div style={{ fontSize: 11, color: '#334155', marginBottom: 10 }}>
-            {filtered.length} notícia{filtered.length !== 1 ? 's' : ''} encontrada{filtered.length !== 1 ? 's' : ''}
+          {/* Summary bar — live */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10, marginBottom: 16 }}>
+            {[
+              { label: 'Sentiment Net', value: `${avgSentiment24h >= 0 ? '+' : ''}${avgSentiment24h.toFixed(2)}`, color: sentColor, sub: avgSentiment24h > 0 ? 'Net Bullish' : avgSentiment24h < 0 ? 'Net Bearish' : 'Neutro' },
+              { label: 'Bullish',       value: instBullishCount,  color: '#10b981', sub: 'artigos' },
+              { label: 'Bearish',       value: instBearishCount,  color: '#ef4444', sub: 'artigos' },
+              { label: 'Neutro',        value: instNeutralCount,  color: '#f59e0b', sub: 'artigos' },
+              { label: 'Total',         value: instArticles.length, color: '#60a5fa', sub: 'GDELT inst.' },
+              { label: 'Bull-Bear Idx', value: `${optionsTakerFlow.bull_bear_index >= 0 ? '+' : ''}${optionsTakerFlow.bull_bear_index.toFixed(3)}`, color: '#a78bfa', sub: 'Opções Flow' },
+            ].map((item, i) => (
+              <div key={i} style={{ background: 'linear-gradient(135deg,#131e2e,#111827)', border: '1px solid #1e2d45', borderRadius: 10, padding: '12px 14px' }}>
+                <div style={{ fontSize: 9, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 4 }}>{item.label}</div>
+                <div style={{ fontSize: 22, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: item.color }}>{item.value}</div>
+                <div style={{ fontSize: 9, color: '#334155', marginTop: 2 }}>{item.sub}</div>
+              </div>
+            ))}
           </div>
-          {filtered.map(n => (
-            <NewsCard
-              key={n.id}
-              news={n}
-              isSelected={selectedNews?.id === n.id}
-              onClick={() => setSelectedNews(selectedNews?.id === n.id ? null : n)}
-            />
-          ))}
-        </div>
 
-        {/* Detail panel */}
-        <div style={{
-          background: 'linear-gradient(135deg, #131e2e 0%, #111827 100%)',
-          border: '1px solid #1e2d45', borderRadius: 14,
-          position: 'sticky', top: 20, maxHeight: '85vh', overflowY: 'auto',
-        }}>
-          <div style={{ padding: '12px 20px', borderBottom: '1px solid #1e2d45' }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0' }}>📋 Análise Detalhada</div>
-          </div>
-          <NewsDetail news={selectedNews} />
+          {/* Distribuição de sentimento — gráfico live */}
+          {instArticles.length > 0 && (
+            <div style={{ background: 'linear-gradient(135deg,#131e2e,#111827)', border: '1px solid #1e2d45', borderRadius: 14, padding: 18, marginBottom: 16 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 12 }}>
+                Distribuição de Sentimento — Batch Atual ({instArticles.length} artigos institucionais)
+              </div>
+              <ResponsiveContainer width="100%" height={110}>
+                <BarChart
+                  data={[
+                    { label: 'Bullish',  value: instBullishCount,  fill: '#10b981' },
+                    { label: 'Neutro',   value: instNeutralCount,  fill: '#f59e0b' },
+                    { label: 'Bearish',  value: instBearishCount,  fill: '#ef4444' },
+                  ]}
+                  margin={{ top: 4, right: 4, left: -20, bottom: 0 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1e2d45" vertical={false} />
+                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} />
+                  <YAxis tick={{ fontSize: 9, fill: '#475569' }} tickLine={false} />
+                  <Tooltip contentStyle={{ background: '#0d1421', border: '1px solid #2a3f5f', borderRadius: 6, fontSize: 11 }} />
+                  <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                    {[{ fill: '#10b981' }, { fill: '#f59e0b' }, { fill: '#ef4444' }].map((c, i) => (
+                      <Cell key={i} fill={c.fill} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+              <div style={{ fontSize: 9, color: '#334155', marginTop: 6 }}>
+                💡 Histórico 7d disponível após acúmulo no Supabase (gdelt_articles). Artigos salvos automaticamente a cada refetch.
+              </div>
+            </div>
+          )}
+
+          {/* Estado: loading */}
+          {instLoading && (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '48px 0', gap: 12 }}>
+              <div style={{ width: 32, height: 32, borderRadius: '50%', border: '3px solid #1e2d45', borderTopColor: '#a78bfa', animation: 'spin 0.8s linear infinite' }} />
+              <span style={{ fontSize: 13, color: '#475569' }}>Buscando notícias institucionais…</span>
+              <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+            </div>
+          )}
+
+          {/* Estado: erro */}
+          {instError && !instLoading && (
+            <div style={{ padding: '24px', background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 12, textAlign: 'center' }}>
+              <div style={{ fontSize: 13, color: '#ef4444', fontWeight: 600, marginBottom: 8 }}>Falha ao carregar GDELT institucional</div>
+              <button onClick={() => instRefetch()} style={{ padding: '6px 18px', borderRadius: 6, cursor: 'pointer', background: 'rgba(59,130,246,0.15)', color: '#60a5fa', border: '1px solid rgba(59,130,246,0.3)', fontSize: 11, fontWeight: 600 }}>
+                Tentar novamente
+              </button>
+            </div>
+          )}
+
+          {/* Estado: mock */}
+          {!instLoading && !instError && instArticles.length === 0 && (
+            <div style={{ padding: '48px 24px', background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 12, textAlign: 'center' }}>
+              <div style={{ fontSize: 20, marginBottom: 8 }}>🛰️</div>
+              <div style={{ fontSize: 14, color: '#f59e0b', fontWeight: 700 }}>Modo MOCK ativo</div>
+              <div style={{ fontSize: 12, color: '#64748b', marginTop: 6 }}>Ative o modo <strong style={{ color: '#e2e8f0' }}>LIVE</strong> em Configurações para ver notícias institucionais reais.</div>
+            </div>
+          )}
+
+          {/* Grid de artigos */}
+          {!instLoading && !instError && instArticles.length > 0 && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#a78bfa', marginBottom: 10 }}>Institucional — Parte 1</div>
+                {instArticles.slice(0, Math.ceil(instArticles.length / 2)).map((a) => (
+                  <GdeltAICard key={a.url} article={a} />
+                ))}
+              </div>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#a78bfa', marginBottom: 10 }}>Institucional — Parte 2</div>
+                {instArticles.slice(Math.ceil(instArticles.length / 2)).map((a) => (
+                  <GdeltAICard key={a.url} article={a} />
+                ))}
+              </div>
+            </div>
+          )}
         </div>
-      </div>
-    </div>
       )}
     </div>
   );
