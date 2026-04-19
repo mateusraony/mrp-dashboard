@@ -138,19 +138,57 @@ export interface MacroCalendarEvent {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /**
+ * Retorna o N-ésimo domingo de um dado mês/ano (1-indexed).
+ * Usado para calcular as fronteiras exatas do horário de verão dos EUA.
+ */
+function nthSunday(year: number, month: number, n: number): Date {
+  const d = new Date(year, month - 1, 1);
+  d.setDate(d.getDate() + ((7 - d.getDay()) % 7)); // primeiro domingo
+  d.setDate(d.getDate() + (n - 1) * 7);            // N-ésimo domingo
+  return d;
+}
+
+/**
+ * Retorna o offset ET→UTC em horas (4 = EDT, 5 = EST).
+ * DST começa no 2º domingo de março e termina no 1º domingo de novembro.
+ */
+function getEtOffsetHours(dateStr: string): number {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const dstStart = nthSunday(year, 3, 2);   // 2º domingo de março (spring forward)
+  const dstEnd   = nthSunday(year, 11, 1);  // 1º domingo de novembro (fall back)
+  const current  = new Date(year, month - 1, day);
+  return current >= dstStart && current < dstEnd ? 4 : 5;
+}
+
+/**
  * Converte data (YYYY-MM-DD) + horário ET para UTC e BRT ISO strings.
- * ET = UTC-4 (EDT, Mar–Out) ou UTC-5 (EST, Nov–Feb).
+ *
+ * P1 fix: datetime_brt usa offset "-03:00" explícito (não "Z") para que
+ * new Date(datetime_brt) preserve o instante UTC correto quando usado em
+ * contagens regressivas e cálculos de alerta no componente.
+ *
+ * P2 fix: offset ET calculado via fronteiras reais do DST (2º domingo/março,
+ * 1º domingo/novembro) em vez de aproximação por número do mês.
  */
 function etToBrt(dateStr: string, timeEt: string): { utc: string; brt: string } {
-  const month = parseInt(dateStr.slice(5, 7), 10);
-  const etToUtcHours = month >= 3 && month < 11 ? 4 : 5; // EDT=+4, EST=+5
+  const etToUtcHours = getEtOffsetHours(dateStr);
   const [hr, mn] = timeEt.split(':').map(Number);
-  const etAsUtcMs = new Date(`${dateStr}T${String(hr).padStart(2, '0')}:${String(mn).padStart(2, '0')}:00Z`).getTime();
-  const utcMs     = etAsUtcMs + etToUtcHours * 3_600_000;
-  const brtMs     = utcMs - 3 * 3_600_000;
+  // Trata o horário ET como se fosse UTC para obter um timestamp base,
+  // depois adiciona o offset para converter para UTC real.
+  const etAsUtcMs = new Date(
+    `${dateStr}T${String(hr).padStart(2, '0')}:${String(mn).padStart(2, '0')}:00Z`,
+  ).getTime();
+  const utcMs = etAsUtcMs + etToUtcHours * 3_600_000;
+
+  // BRT = UTC-3: subtrai 3h para obter o horário de parede em Brasília,
+  // depois serializa com offset "-03:00" para que new Date(brt) retorne
+  // o instante UTC correto (não 3h adiantado).
+  const brtWallMs = utcMs - 3 * 3_600_000;
+  const brtIso = new Date(brtWallMs).toISOString().replace(/Z$/, '-03:00');
+
   return {
     utc: new Date(utcMs).toISOString(),
-    brt: new Date(brtMs).toISOString(),
+    brt: brtIso,
   };
 }
 
