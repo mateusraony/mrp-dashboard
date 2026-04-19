@@ -2,9 +2,50 @@
  * debugLog.ts — Store in-memory de logs para diagnóstico em produção.
  * Intercepta window.onerror e unhandledrejection automaticamente.
  * Máximo de 100 entradas (FIFO). Não suprime os consoles originais.
+ *
+ * Erros (level='error') são persistidos no Supabase via raw fetch
+ * quando VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY estão configurados.
+ * Usa raw fetch para evitar dependência circular com services/supabase.ts.
  */
 
 export type LogLevel = 'error' | 'warn' | 'info';
+
+// ─── Persistência Supabase (raw fetch, sem import circular) ──────────────────
+
+const _SUP_URL = (typeof import.meta !== 'undefined'
+  ? (import.meta as Record<string, unknown>).env as Record<string, string>
+  : {}) as Record<string, string>;
+
+const _supUrl = _SUP_URL?.VITE_SUPABASE_URL ?? '';
+const _supKey = _SUP_URL?.VITE_SUPABASE_ANON_KEY ?? '';
+
+// ID único por sessão de browser para correlacionar logs
+const _sessionId = (typeof crypto !== 'undefined' && crypto.randomUUID)
+  ? crypto.randomUUID().slice(0, 8)
+  : Math.random().toString(36).slice(2, 10);
+
+async function _persistError(entry: {
+  level: string;
+  message: string;
+  source?: string;
+  detail?: string;
+}): Promise<void> {
+  if (!_supUrl || !_supKey) return;
+  try {
+    await fetch(`${_supUrl}/rest/v1/system_logs`, {
+      method: 'POST',
+      headers: {
+        apikey:          _supKey,
+        Authorization:   `Bearer ${_supKey}`,
+        'Content-Type':  'application/json',
+        Prefer:          'return=minimal',
+      },
+      body: JSON.stringify({ ...entry, session_id: _sessionId }),
+    });
+  } catch {
+    // Silencia falhas de persistência para evitar loop infinito
+  }
+}
 
 export interface LogEntry {
   id: string;
@@ -73,10 +114,13 @@ function _addEntry(level: LogLevel, message: string, detail?: unknown, source?: 
 
 // ─── API pública ──────────────────────────────────────────────────────────────
 
-/** Registra erro e também chama console.error original. */
+/** Registra erro, chama console.error original e persiste no Supabase (fire-and-forget). */
 export function logError(message: string, detail?: unknown, source?: string): void {
   _origError(`[DebugLog][error]${source ? ` [${source}]` : ''} ${message}`, detail ?? '');
   _addEntry('error', message, detail, source);
+  // Persiste no Supabase de forma assíncrona (não bloqueia, não propaga erros)
+  const serialized = _serializeDetail(detail);
+  void _persistError({ level: 'error', message, source, detail: serialized });
 }
 
 /** Registra aviso e também chama console.warn original. */

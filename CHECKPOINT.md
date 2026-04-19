@@ -1,6 +1,6 @@
 # CHECKPOINT.md — MRP Dashboard
 > Memória técnica viva do projeto. Atualizar ao final de cada bloco importante.
-> Última atualização: 2026-04-16 (Migration conflict resolvido — Supabase GitHub check ✅ — GDELT + SmartAlerts live)
+> Última atualização: 2026-04-19 (Sprint 7 — GDELT AI live, MacroCalendar FRED, RefreshButton orbital, Debug→Supabase)
 
 ---
 
@@ -24,6 +24,13 @@
 | GDELT News | ✅ LIVE | `src/services/gdelt.ts` + `src/hooks/useGdelt.ts` — NewsIntelligence usa dados reais |
 | SmartAlerts gauges | ✅ LIVE | Conectados a useBtcTicker + useLiquidations + useRiskScore + useMultiVenueSnapshot |
 | Debug Panel | ✅ IMPLEMENTADO | `src/lib/debugLog.ts` + `src/components/ui/DebugPanel.jsx` — logs internos visíveis em prod |
+| Debug→Supabase | ✅ SPRINT 7 | `logError()` persiste erros em `system_logs` via raw fetch (sem import circular) |
+| GDELT AI tab | ✅ SPRINT 7 | Aba "Inteligência AI" usa `useGdeltNews` real (query institucional) — fora de mock |
+| MacroCalendar FRED | ✅ SPRINT 7 | `macroCalendarService.ts` + `useMacroCalendar.ts` — FRED release dates + FOMC hardcoded |
+| RefreshButton orbital | ✅ SPRINT 7 | `src/components/ui/RefreshButton.jsx` — botão animado com órbitas, ripple, halo verde |
+| gdelt_articles table | ✅ SPRINT 7 | Migration `20260420000100` — tabela pronta para persistir artigos GDELT |
+| system_logs table | ✅ SPRINT 7 | Migration `20260420000200` — persiste erros do DebugLog em produção |
+| macro_pipeline tables | ✅ SPRINT 7 | Migration `20260420000300` — 5 tabelas bronze/silver + seeds catalog (8 eventos) |
 
 ---
 
@@ -63,6 +70,11 @@
 | **SmartAlerts live** | ✅ | Gauges: Funding (multi-venue avg), Flush/Squeeze (liquidações SELL/BUY), Risk Score, DataQualityBadge |
 | **Debug/log interno** | ✅ | `debugLog.ts` intercepta window.onerror + DebugPanel.jsx flutuante com badge de erros |
 | **Render SPA fix** | ✅ | `public/_redirects` → sem 404 em refresh de rota |
+| **Sprint 7 — GDELT AI** | ✅ | Aba "Inteligência AI" live via `useGdeltNews` query institucional + `GdeltAICard` + RefreshButton |
+| **Sprint 7 — MacroCalendar** | ✅ | `macroCalendarService.ts` + `useMacroCalendar.ts` — FRED API + FOMC 2026 hardcoded |
+| **Sprint 7 — RefreshButton** | ✅ | `RefreshButton.jsx` orbital animado — 2 abas NewsIntelligence + 2 abas MacroCalendar |
+| **Sprint 7 — Debug→Supabase** | ✅ | `logError()` persiste em `system_logs` via raw fetch sem import circular |
+| **Sprint 7 — Migrations (3)** | ✅ | `gdelt_articles`, `system_logs`, `macro_pipeline` (5 tabelas + 8 seeds) — preview em apply |
 
 ---
 
@@ -133,10 +145,20 @@ src/
   services/
     alternative.ts, bcb.ts, binance.ts, bybit.ts, coingecko.ts,
     coinmetrics.ts, deribit.ts, fred.ts, mempool.ts, okx.ts, supabase.ts
+    gdelt.ts                          ← Sprint 6.8 — feed GDELT DOC 2.0
+    macroCalendarService.ts           ← Sprint 7 — FRED releases + FOMC hardcoded
+  hooks/
+    ...anteriores...
+    useGdelt.ts                       ← Sprint 6.8
+    useMacroCalendar.ts               ← Sprint 7
+  components/
+    ui/
+      RefreshButton.jsx               ← Sprint 7 — botão orbital animado
   utils/
     index.ts, riskCalculations.ts (+ computeGreeks/Vanna/Charm), sessionAnalytics.ts
   lib/
     env.ts, errorBoundary.tsx, AuthContext.jsx (stub anônimo)
+    debugLog.ts                       ← Sprint 6.8+7 — persiste erros em system_logs
   __tests__/
     services/coinmetrics.test.ts      ← 10 testes
     utils/sessionAnalytics.test.ts    ← 15 testes
@@ -196,7 +218,7 @@ refetchInterval: IS_LIVE ? 30_000 : false,
 
 ---
 
-## 📊 TABELAS SUPABASE ATIVAS (5 total)
+## 📊 TABELAS SUPABASE ATIVAS (13 total)
 
 | Tabela | Sprint | RLS | Uso |
 |--------|--------|-----|-----|
@@ -205,6 +227,13 @@ refetchInterval: IS_LIVE ? 30_000 : false,
 | `user_settings` | 3.7 | ✅ | Configurações gerais (tema, data_mode, etc.) |
 | `alert_events` | 6.5 | ✅ | Log de disparos de alertas (governança) |
 | `threshold_history` | 6.5 | ✅ | Histórico de mudanças de limiares |
+| `gdelt_articles` | 7 | ✅ | Artigos GDELT persistidos (url UNIQUE, sentiment, query) |
+| `system_logs` | 7 | ✅ | Erros do DebugLog em produção (session_id, level) |
+| `macro_event_catalog` | 7 | ✅ | Catálogo de 8 eventos macro (CPI, NFP, FOMC, GDP, PCE…) |
+| `macro_event_schedule` | 7 | ✅ | Datas/hora UTC das releases FRED por evento |
+| `macro_event_market_reaction` | 7 | ✅ | Reação histórica BTC por janela de tempo |
+| `feature_store_macro` | 7 | ✅ | Features derivadas para inference de AI |
+| `ai_inference_log` | 7 | ✅ | Log de inferências/predições do modelo |
 
 ---
 
@@ -218,10 +247,12 @@ refetchInterval: IS_LIVE ? 30_000 : false,
 
 ---
 
-## 🗺 O QUE FALTA (único item não bloqueado por código)
+## 🗺 O QUE FALTA
 
 | Item | Descrição | Bloqueio |
 |------|-----------|---------|
 | **Telegram Digest (Sprint 6.6)** | ✅ CONCLUÍDO | Edge Function + Settings persistence. Falta apenas: deploy via CLI/Dashboard + ativar pg_cron |
+| **GDELT→Supabase wiring** | `useGdelt.ts` busca artigos mas não faz upsert em `gdelt_articles` ainda | Tabela criada (Sprint 7) — falta wiring no hook |
+| **MacroCalendar bronze pipeline** | `macro_event_schedule` não é populado automaticamente ainda | `macroCalendarService.ts` gera eventos em memória; persitência é Sprint 8 |
 | **Auth real** | Login com email/Google via Supabase Auth | Decisão de negócio — quando quiser ativar |
 | **APIs pagas** | SOPR, Netflow, Whale via Glassnode/CryptoQuant | Custo ~$29/mês — confirmar se vale |

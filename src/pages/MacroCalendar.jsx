@@ -4,12 +4,15 @@ import {
   ComposedChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, Cell, BarChart, Legend,
 } from 'recharts';
-import { macroEvents, eventVolatilityData, avgVolatilityByEvent, getNextTier1Event } from '../components/data/mockDataMacroCalendar';
+import { eventVolatilityData, avgVolatilityByEvent } from '../components/data/mockDataMacroCalendar';
 import { ModeBadge } from '../components/ui/DataBadge';
+import { RefreshButton } from '../components/ui/RefreshButton';
 import GoldenRule from '../components/ui/GoldenRule';
 import { format, differenceInHours, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { sendNotificationEmail } from '@/lib/notificationClient';
+import { useMacroCalendar } from '@/hooks/useMacroCalendar';
+import { IS_LIVE } from '@/lib/env';
 
 const AGENCY_COLOR = {
   BLS: '#3b82f6', Fed: '#a78bfa', BEA: '#10b981', ISM: '#f59e0b', default: '#64748b',
@@ -59,8 +62,14 @@ function timeUntil(dt) {
 }
 
 // ─── COUNTDOWN BANNER ─────────────────────────────────────────────────────────
-function CountdownBanner() {
-  const next = getNextTier1Event();
+function CountdownBanner({ events }) {
+  const next = useMemo(() => {
+    const now = new Date();
+    return events
+      .filter(e => e.tier === 1 && new Date(e.datetime_brt) > now)
+      .sort((a, b) => a.datetime_utc.localeCompare(b.datetime_utc))[0] ?? null;
+  }, [events]);
+
   if (!next) return null;
   const h = differenceInHours(new Date(next.datetime_brt), new Date());
   const d = Math.floor(h / 24);
@@ -73,7 +82,12 @@ function CountdownBanner() {
       <div>
         <div style={{ fontSize: 10, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Próximo Evento Tier-1</div>
         <div style={{ fontSize: 15, fontWeight: 800, color: '#e2e8f0' }}>{next.title}</div>
-        <div style={{ fontSize: 10, color: '#64748b' }}>{format(new Date(next.datetime_brt), "EEE dd/MM HH:mm", { locale: ptBR })} BRT · Prev: {next.expected}</div>
+        <div style={{ fontSize: 10, color: '#64748b' }}>
+          {format(new Date(next.datetime_brt), "EEE dd/MM HH:mm", { locale: ptBR })} BRT
+          {next.previous ? ` · Prev: ${next.previous}` : ''}
+          {next.source === 'FRED' && <span style={{ color: '#10b981', marginLeft: 6 }}>· FRED ✓</span>}
+          {next.source === 'FOMC_STATIC' && <span style={{ color: '#a78bfa', marginLeft: 6 }}>· Fed Oficial ✓</span>}
+        </div>
       </div>
       <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
         <div style={{ fontSize: 32, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color, lineHeight: 1 }}>
@@ -117,12 +131,16 @@ function EventCard({ event, onToggleAlert }) {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
         <div style={{ background: '#0d1421', borderRadius: 6, padding: '6px 9px' }}>
-          <div style={{ fontSize: 8, color: '#334155', marginBottom: 2 }}>Esperado</div>
-          <div style={{ fontSize: 11, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', color: '#94a3b8' }}>{event.expected}</div>
+          <div style={{ fontSize: 8, color: '#334155', marginBottom: 2 }}>Consenso</div>
+          <div style={{ fontSize: 11, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', color: '#64748b' }}>
+            {event.consensus ?? event.expected ?? '—'}
+          </div>
         </div>
         <div style={{ background: '#0d1421', borderRadius: 6, padding: '6px 9px' }}>
           <div style={{ fontSize: 8, color: '#334155', marginBottom: 2 }}>Anterior</div>
-          <div style={{ fontSize: 11, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', color: '#64748b' }}>{event.previous}</div>
+          <div style={{ fontSize: 11, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', color: '#94a3b8' }}>
+            {event.previous ?? '—'}
+          </div>
         </div>
         <div style={{ background: '#0d1421', borderRadius: 6, padding: '6px 9px' }}>
           <div style={{ fontSize: 8, color: '#334155', marginBottom: 2 }}>Impacto BTC (hist.)</div>
@@ -245,9 +263,24 @@ const TABS = ['Agenda', 'Surpresa', 'Volatilidade', 'Alertas'];
 
 export default function MacroCalendar() {
   const [tab, setTab] = useState('Agenda');
-  const [events, setEvents] = useState(macroEvents);
+  const [alertOverrides, setAlertOverrides] = useState({});
   const [selectedHistEvent, setSelectedHistEvent] = useState(eventVolatilityData[0]);
   const [toast, setToast] = useState(null);
+
+  // ─── Hook live — FRED API + FOMC estático ─────────────────────────────────
+  const {
+    data: liveEvents = [],
+    isLoading: calLoading,
+    isError: calError,
+    refetch: calRefetch,
+    dataUpdatedAt: calUpdatedAt,
+  } = useMacroCalendar();
+
+  // Mescla alertOverrides locais (toggle pelo user) com dados do hook
+  const events = useMemo(
+    () => liveEvents.map(e => ({ ...e, ...alertOverrides[e.id] })),
+    [liveEvents, alertOverrides],
+  );
 
   // Enriquece eventVolatilityData com Z-Score de surpresa (fórmula validada Python)
   const surpriseData = useMemo(() => computeSurpriseZScores(eventVolatilityData), []);
@@ -258,7 +291,10 @@ export default function MacroCalendar() {
   };
 
   const toggleAlert = (id) => {
-    setEvents(ev => ev.map(e => e.id === id ? { ...e, alert_enabled: !e.alert_enabled } : e));
+    setAlertOverrides(prev => ({
+      ...prev,
+      [id]: { alert_enabled: !((prev[id]?.alert_enabled) ?? liveEvents.find(e => e.id === id)?.alert_enabled ?? false) },
+    }));
   };
 
   const sendTestAlert = async (event) => {
@@ -266,7 +302,7 @@ export default function MacroCalendar() {
     await sendNotificationEmail({
       to: 'alerts@cryptowatch.io',
       subject: `🚨 [TESTE] Evento Macro em ${event.alert_minutes_before}min: ${event.title}`,
-      body: `ALERTA MACRO — TESTE\n\nEvento: ${event.title}\nAgência: ${event.agency} · TIER-${event.tier}\nData: ${format(new Date(event.datetime_brt), "dd/MM/yyyy HH:mm")} BRT\nEsperado: ${event.expected}\nAnterior: ${event.previous}\n\nImpacto histórico médio BTC: ${event.btc_impact_hist_avg > 0 ? '+' : ''}${event.btc_impact_hist_avg}%\n\n— CryptoWatch Macro Calendar`,
+      body: `ALERTA MACRO — TESTE\n\nEvento: ${event.title}\nAgência: ${event.agency} · TIER-${event.tier}\nData: ${format(new Date(event.datetime_brt), "dd/MM/yyyy HH:mm")} BRT\nAnterior: ${event.previous ?? '—'}\n\nImpacto histórico médio BTC: ${event.btc_impact_hist_avg > 0 ? '+' : ''}${event.btc_impact_hist_avg}%\n\n— CryptoWatch Macro Calendar`,
     });
     showToast(`✅ Alerta de teste enviado!`, '#10b981');
   };
@@ -281,9 +317,20 @@ export default function MacroCalendar() {
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
         <div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4, flexWrap: 'wrap' }}>
             <h1 style={{ fontSize: 20, fontWeight: 900, color: '#f1f5f9', margin: 0, letterSpacing: '-0.03em' }}>📅 Calendário Macro</h1>
-            <ModeBadge mode="mock" />
+            <ModeBadge mode={IS_LIVE ? 'live' : 'mock'} />
+            {IS_LIVE && (
+              <span style={{ fontSize: 9, color: '#10b981', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 4, padding: '2px 7px', fontWeight: 700 }}>
+                FRED + FOMC Oficial
+              </span>
+            )}
+            <RefreshButton
+              onRefresh={() => calRefetch()}
+              isLoading={calLoading}
+              lastUpdated={calUpdatedAt}
+              label="Atualizar Calendário Macro"
+            />
           </div>
           <p style={{ fontSize: 11, color: '#475569', margin: 0 }}>CPI · FOMC · NFP · PCE · GDP · Volatilidade Histórica BTC · Alertas Push</p>
         </div>
@@ -292,8 +339,24 @@ export default function MacroCalendar() {
       {/* Regra de Ouro */}
       <GoldenRule />
 
+      {/* Loading state */}
+      {calLoading && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px', marginBottom: 14, background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.15)', borderRadius: 10 }}>
+          <div style={{ width: 16, height: 16, borderRadius: '50%', border: '2px solid #1e2d45', borderTopColor: '#3b82f6', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
+          <span style={{ fontSize: 12, color: '#475569' }}>Buscando eventos macro via FRED API…</span>
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        </div>
+      )}
+
+      {/* Error state */}
+      {calError && !calLoading && (
+        <div style={{ padding: '12px 16px', marginBottom: 14, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 10, fontSize: 12, color: '#ef4444' }}>
+          ⚠ Falha ao buscar datas FRED. Exibindo dados locais. <button onClick={() => calRefetch()} style={{ marginLeft: 10, fontSize: 10, color: '#60a5fa', background: 'none', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 4, padding: '2px 8px', cursor: 'pointer' }}>Tentar novamente</button>
+        </div>
+      )}
+
       {/* Countdown */}
-      <CountdownBanner />
+      <CountdownBanner events={events} />
 
       {/* Summary stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 14 }}>
