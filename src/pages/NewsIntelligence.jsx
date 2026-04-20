@@ -1,6 +1,6 @@
 // ─── NEWS INTELLIGENCE PAGE ───────────────────────────────────────────────────
 // Notícias institucionais (GDELT live) + Feed Geral com AI Sentiment Score
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { optionsTakerFlow } from '../components/data/mockDataExtended';
 import { ModeBadge } from '../components/ui/DataBadge';
 import { RefreshButton } from '../components/ui/RefreshButton';
@@ -42,6 +42,16 @@ function computeScore(title) {
   return parseFloat(((pos - neg) / total).toFixed(2));
 }
 
+function getTriggeredKeywords(title) {
+  const POSITIVE = ['rally','surge','bullish','adoption','ath','gain','rise','record','breakthrough','approval','growth','soar','jump','high'];
+  const NEGATIVE = ['crash','drop','bearish','ban','hack','loss','fall','fear','plunge','sell-off','lawsuit','collapse','decline','slump'];
+  const lower = title.toLowerCase();
+  return {
+    positive: POSITIVE.filter(k => lower.includes(k)),
+    negative: NEGATIVE.filter(k => lower.includes(k)),
+  };
+}
+
 function SentimentGauge({ score }) {
   const pct = ((score + 1) / 2) * 100;
   const color = score > 0.2 ? '#10b981' : score < -0.2 ? '#ef4444' : '#f59e0b';
@@ -65,219 +75,121 @@ function SentimentGauge({ score }) {
   );
 }
 
-function CorrelationBadge({ value }) {
-  const color = value > 0.3 ? '#10b981' : value < -0.3 ? '#ef4444' : '#64748b';
-  const label = value > 0.3 ? '↑ Positiva' : value < -0.3 ? '↓ Negativa' : '→ Neutra';
+function MarketNarrative({ articles }) {
+  const stats = useMemo(() => {
+    if (!articles.length) return null;
+    const bullish = articles.filter(a => a.sentiment === 1).length;
+    const bearish = articles.filter(a => a.sentiment === -1).length;
+    const net = bullish - bearish;
+    const ratio = net / articles.length;
+    const catCounts = {};
+    articles.forEach(a => {
+      const c = detectCategory(a.title);
+      catCounts[c] = (catCounts[c] || 0) + 1;
+    });
+    const dominant = Object.keys(catCounts).sort((a, b) => catCounts[b] - catCounts[a])[0] || 'market';
+    return { bullish, bearish, net, ratio, catCounts, dominant };
+  }, [articles]);
+
+  if (!stats) return null;
+  const { bullish, bearish, net, ratio, catCounts, dominant } = stats;
+  const signal = ratio > 0.25 ? 'BULLISH' : ratio < -0.25 ? 'BEARISH' : 'NEUTRO';
+  const sc = ratio > 0.25 ? '#10b981' : ratio < -0.25 ? '#ef4444' : '#f59e0b';
+  const narrativeMap = {
+    institutional: `Participação institucional ${net >= 0 ? 'crescente' : 'recuando'} — ${catCounts.institutional || 0} artigos sobre ETF/gestoras.`,
+    regulation:    `Foco regulatório ${net >= 0 ? 'favorável' : 'desfavorável'} — ${catCounts.regulation || 0} artigos sobre legislação.`,
+    adoption:      `Adoção em destaque — ${catCounts.adoption || 0} artigos sobre integração e pagamentos.`,
+    risk:          `Alertas de risco: ${catCounts.risk || 0} eventos de segurança ou fraude reportados.`,
+    market:        `Dinâmica de mercado ${net > 0 ? 'positiva' : net < 0 ? 'negativa' : 'lateral'} — ${catCounts.market || 0} artigos de análise.`,
+  };
+
   return (
-    <span style={{
-      fontSize: 9, padding: '2px 6px', borderRadius: 4,
-      background: `${color}12`, border: `1px solid ${color}28`,
-      color, fontFamily: 'JetBrains Mono, monospace', fontWeight: 600,
-    }}>
-      {label} ({value > 0 ? '+' : ''}{value.toFixed(2)})
-    </span>
+    <div style={{ background: `linear-gradient(135deg,${sc}08,#111827)`, border: `1px solid ${sc}25`, borderLeft: `3px solid ${sc}`, borderRadius: 12, padding: 18, marginBottom: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+        <span style={{ fontSize: 9, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700 }}>🤖 Narrativa de Mercado AI</span>
+        <span style={{ fontSize: 14, fontWeight: 900, color: sc, fontFamily: 'JetBrains Mono, monospace' }}>{signal}</span>
+        <span style={{ fontSize: 10, color: '#334155', marginLeft: 'auto' }}>{articles.length} artigos GDELT</span>
+      </div>
+      <div style={{ height: 5, borderRadius: 3, background: '#1a2535', marginBottom: 10, overflow: 'hidden', position: 'relative' }}>
+        <div style={{ position: 'absolute', left: '50%', top: 0, height: '100%', width: `${Math.abs(ratio) * 50}%`, marginLeft: ratio < 0 ? `-${Math.abs(ratio) * 50}%` : 0, background: sc, borderRadius: 3 }} />
+      </div>
+      <div style={{ fontSize: 12, color: '#94a3b8', lineHeight: 1.7, marginBottom: 10 }}>
+        {narrativeMap[dominant]}{' '}
+        {bullish > 0 && <span style={{ color: '#10b981' }}>{bullish} positivos</span>}
+        {bullish > 0 && bearish > 0 && ' · '}
+        {bearish > 0 && <span style={{ color: '#ef4444' }}>{bearish} negativos</span>}
+        {' '}no batch atual.
+      </div>
+      <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+        {Object.entries(catCounts).sort((a, b) => b[1] - a[1]).map(([cat, count]) => {
+          const cfg = CATEGORY_CONFIG[cat];
+          if (!cfg) return null;
+          return (
+            <span key={cat} style={{ fontSize: 9, padding: '2px 7px', borderRadius: 4, background: `${cfg.color}14`, border: `1px solid ${cfg.color}28`, color: cfg.color, fontWeight: 600 }}>
+              {cfg.icon} {cfg.label}: {count}
+            </span>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
-// ─── GdeltAICard — card para aba Inteligência AI (GDELT institucional) ─────────
+// ─── GdeltAICard — expandível com sinal de mercado e keywords ────────────────
 function GdeltAICard({ article }) {
-  const score    = computeScore(article.title);
-  const cat      = detectCategory(article.title);
-  const cfg      = CATEGORY_CONFIG[cat];
-  const sentColor = score > 0.15 ? '#10b981' : score < -0.15 ? '#ef4444' : '#f59e0b';
+  const [expanded, setExpanded] = useState(false);
+  const score = computeScore(article.title);
+  const cat   = detectCategory(article.title);
+  const cfg   = CATEGORY_CONFIG[cat];
+  const { positive: posKw, negative: negKw } = getTriggeredKeywords(article.title);
   let timeAgo = '';
   try { timeAgo = formatDistanceToNow(new Date(article.published_at), { addSuffix: true, locale: ptBR }); } catch { /* */ }
 
+  const signalMap = {
+    institutional: score > 0 ? 'Fluxo institucional positivo — suporte potencial ao BTC' : score < 0 ? 'Cautela institucional — risco de saída de capital' : 'Posicionamento institucional neutro',
+    regulation:    score > 0 ? 'Desenvolvimento regulatório favorável ao setor cripto' : score < 0 ? 'Risco regulatório elevado — monitorar de perto' : 'Cenário regulatório ambíguo — aguardar clareza',
+    adoption:      score > 0 ? 'Expansão de adoção — sinal bullish de longo prazo' : 'Obstáculo de adoção identificado — impacto moderado',
+    risk:          'Evento de risco ativo — hedge e gestão de posição recomendados',
+    market:        score > 0 ? 'Momentum de mercado positivo — viés comprador' : score < 0 ? 'Pressão vendedora detectada — atenção ao suporte' : 'Mercado sem direção clara — aguardar confirmação',
+  };
+  const impact      = (cat === 'institutional' || cat === 'regulation' || cat === 'risk') ? 'Alto' : 'Médio';
+  const impactColor = impact === 'Alto' ? '#ef4444' : '#f59e0b';
+
   return (
-    <div style={{
-      background: '#111827', border: `1px solid #1e2d45`,
-      borderLeft: `3px solid ${cfg.color}`,
-      borderRadius: 10, padding: '13px 15px', marginBottom: 8,
-    }}>
+    <div style={{ background: '#111827', border: `1px solid ${expanded ? cfg.color + '50' : '#1e2d45'}`, borderLeft: `3px solid ${cfg.color}`, borderRadius: 10, padding: '13px 15px', marginBottom: 8, transition: 'border-color 0.2s' }}>
       <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 7, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 9, padding: '2px 7px', borderRadius: 4, background: `${cfg.color}18`, color: cfg.color, border: `1px solid ${cfg.color}30`, fontWeight: 700 }}>
-          {cfg.icon} {cfg.label}
-        </span>
-        <span style={{ fontSize: 10, color: '#60a5fa', background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.18)', borderRadius: 4, padding: '1px 6px', fontFamily: 'JetBrains Mono, monospace' }}>
-          {article.domain}
-        </span>
+        <span style={{ fontSize: 9, padding: '2px 7px', borderRadius: 4, background: `${cfg.color}18`, color: cfg.color, border: `1px solid ${cfg.color}30`, fontWeight: 700 }}>{cfg.icon} {cfg.label}</span>
+        <span style={{ fontSize: 10, color: '#60a5fa', background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.18)', borderRadius: 4, padding: '1px 6px', fontFamily: 'JetBrains Mono, monospace' }}>{article.domain}</span>
         {timeAgo && <span style={{ fontSize: 9, color: '#334155', marginLeft: 'auto' }}>{timeAgo}</span>}
+        <button onClick={() => setExpanded(v => !v)} title={expanded ? 'Fechar análise' : 'Ver análise detalhada'} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', fontSize: 11, padding: '0 2px', flexShrink: 0 }}>
+          {expanded ? '▲' : '▼'}
+        </button>
       </div>
       <a href={article.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0', lineHeight: 1.5, marginBottom: 9 }}>{article.title}</div>
       </a>
       <SentimentGauge score={score} />
-    </div>
-  );
-}
-
-// ─── [DEPRECATED] NewsCard — mantido temporariamente para evitar erros de build
-function NewsCard({ news, isSelected, onClick }) {
-  const cfg = { icon: '📰', color: '#64748b', label: 'News' };
-  const priceMoved = news.price_delta_pct;
-  const priceColor = priceMoved > 0 ? '#10b981' : priceMoved < 0 ? '#ef4444' : '#64748b';
-
-  return (
-    <div
-      onClick={onClick}
-      style={{
-        background: isSelected ? 'rgba(59,130,246,0.06)' : 'rgba(13,20,33,0.6)',
-        border: `1px solid ${isSelected ? 'rgba(59,130,246,0.4)' : '#1e2d45'}`,
-        borderLeft: `4px solid ${cfg.color}`,
-        borderRadius: 10, padding: '14px 16px', marginBottom: 8,
-        cursor: 'pointer', transition: 'all 0.15s',
-      }}
-    >
-      {/* Source + time + tier */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
-        <span style={{
-          fontSize: 10, fontFamily: 'JetBrains Mono, monospace', fontWeight: 700,
-          color: '#60a5fa', background: 'rgba(59,130,246,0.1)',
-          border: '1px solid rgba(59,130,246,0.2)', borderRadius: 4, padding: '1px 6px',
-        }}>{news.source}</span>
-        {news.tier === 1 && (
-          <span style={{ fontSize: 9, color: '#f59e0b', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 3, padding: '1px 5px', fontWeight: 700 }}>
-            TIER 1
-          </span>
-        )}
-        <span style={{ fontSize: 9, color: cfg.color, background: `${cfg.color}12`, border: `1px solid ${cfg.color}25`, borderRadius: 3, padding: '1px 5px', fontWeight: 600 }}>
-          {cfg.icon} {cfg.label}
-        </span>
-        <span style={{ fontSize: 10, color: '#334155', marginLeft: 'auto' }}>
-          {formatDistanceToNow(news.published, { addSuffix: true })}
-        </span>
-      </div>
-
-      {/* Title */}
-      <div style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0', lineHeight: 1.5, marginBottom: 10 }}>
-        {news.title}
-      </div>
-
-      {/* Metrics row */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-        <SentimentGauge score={news.sentiment_score} />
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <span style={{ fontSize: 9, color: '#334155' }}>Δ BTC:</span>
-          <span style={{ fontSize: 10, color: priceColor, fontFamily: 'JetBrains Mono, monospace', fontWeight: 700 }}>
-            {priceMoved > 0 ? '+' : ''}{priceMoved.toFixed(2)}%
-          </span>
-        </div>
-        <CorrelationBadge value={news.bull_bear_correlation} />
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4 }}>
-          <span style={{ fontSize: 9, color: '#334155' }}>Rel:</span>
-          <div style={{ width: 40, height: 4, borderRadius: 2, background: '#1a2535', overflow: 'hidden' }}>
-            <div style={{ height: '100%', width: `${news.relevance * 100}%`, background: '#3b82f6' }} />
+      {expanded && (
+        <div style={{ marginTop: 12, borderTop: '1px solid #1a2535', paddingTop: 12 }}>
+          <div style={{ background: `${cfg.color}0c`, border: `1px solid ${cfg.color}22`, borderRadius: 8, padding: '8px 12px', marginBottom: 10 }}>
+            <div style={{ fontSize: 9, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 3 }}>🎯 Sinal de Mercado</div>
+            <div style={{ fontSize: 12, color: '#e2e8f0', fontWeight: 600 }}>{signalMap[cat]}</div>
           </div>
-          <span style={{ fontSize: 9, color: '#475569', fontFamily: 'JetBrains Mono, monospace' }}>{(news.relevance * 100).toFixed(0)}%</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function NewsDetail({ news }) {
-  if (!news) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300, color: '#334155', fontSize: 12 }}>
-      ← Selecione uma notícia para ver análise detalhada
-    </div>
-  );
-  const cfg = impactCategoryConfig[news.impact_category] || { icon: '📰', color: '#64748b', label: 'News' };
-  return (
-    <div>
-      {/* Header */}
-      <div style={{ padding: '16px 20px', borderBottom: '1px solid #1e2d45' }}>
-        <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 10, color: '#60a5fa', background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: 4, padding: '2px 8px', fontFamily: 'JetBrains Mono, monospace', fontWeight: 700 }}>{news.source}</span>
-          <span style={{ fontSize: 10, color: cfg.color, background: `${cfg.color}12`, border: `1px solid ${cfg.color}25`, borderRadius: 4, padding: '2px 8px', fontWeight: 600 }}>{cfg.icon} {cfg.label}</span>
-          {news.tier === 1 && <span style={{ fontSize: 10, color: '#f59e0b', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 4, padding: '2px 8px', fontWeight: 700 }}>TIER 1</span>}
-        </div>
-        <div style={{ fontSize: 14, fontWeight: 700, color: '#f1f5f9', lineHeight: 1.5 }}>{news.title}</div>
-        <div style={{ fontSize: 10, color: '#334155', marginTop: 4 }}>{formatDistanceToNow(news.published, { addSuffix: true })}</div>
-      </div>
-
-      <div style={{ padding: '16px 20px' }}>
-        {/* Sentiment Score */}
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 10, color: '#475569', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>
-            🤖 AI Sentiment Score
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <div style={{ fontSize: 36, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: news.sentiment_color, lineHeight: 1 }}>
-              {news.sentiment_score > 0 ? '+' : ''}{news.sentiment_score.toFixed(2)}
-            </div>
-            <div>
-              <div style={{ fontSize: 12, fontWeight: 700, color: news.sentiment_color }}>{news.sentiment_label}</div>
-              <SentimentGauge score={news.sentiment_score} />
-            </div>
-          </div>
-        </div>
-
-        {/* Price impact */}
-        <div style={{ background: '#0d1421', borderRadius: 9, padding: '12px 14px', marginBottom: 14 }}>
-          <div style={{ fontSize: 10, color: '#475569', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>
-            📈 Impacto no Preço
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
-            <div>
-              <div style={{ fontSize: 9, color: '#334155', marginBottom: 2 }}>BTC na Publicação</div>
-              <div style={{ fontSize: 14, fontFamily: 'JetBrains Mono, monospace', color: '#94a3b8', fontWeight: 700 }}>${news.btc_price_at_publish.toLocaleString()}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: 9, color: '#334155', marginBottom: 2 }}>BTC Atual</div>
-              <div style={{ fontSize: 14, fontFamily: 'JetBrains Mono, monospace', color: '#e2e8f0', fontWeight: 700 }}>${news.btc_price_now.toLocaleString()}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: 9, color: '#334155', marginBottom: 2 }}>Δ Preço</div>
-              <div style={{ fontSize: 16, fontFamily: 'JetBrains Mono, monospace', color: news.price_delta_pct >= 0 ? '#10b981' : '#ef4444', fontWeight: 800 }}>
-                {news.price_delta_pct >= 0 ? '+' : ''}{news.price_delta_pct.toFixed(2)}%
+          {(posKw.length > 0 || negKw.length > 0) && (
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ fontSize: 9, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 5 }}>🔑 Keywords detectadas</div>
+              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                {posKw.map(k => <span key={k} style={{ fontSize: 9, padding: '2px 6px', borderRadius: 3, background: 'rgba(16,185,129,0.1)', color: '#10b981', border: '1px solid rgba(16,185,129,0.2)', fontFamily: 'JetBrains Mono, monospace' }}>+{k}</span>)}
+                {negKw.map(k => <span key={k} style={{ fontSize: 9, padding: '2px 6px', borderRadius: 3, background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)', fontFamily: 'JetBrains Mono, monospace' }}>-{k}</span>)}
               </div>
             </div>
-          </div>
-          <div style={{ marginTop: 10, fontSize: 10, color: '#64748b', lineHeight: 1.6, borderTop: '1px solid #1a2535', paddingTop: 8 }}>
-            <span style={{ color: '#94a3b8', fontWeight: 600 }}>Sinal: </span>{news.correlation_signal}
-          </div>
-        </div>
-
-        {/* Bull-Bear Correlation */}
-        <div style={{ background: '#0d1421', borderRadius: 9, padding: '12px 14px', marginBottom: 14 }}>
-          <div style={{ fontSize: 10, color: '#475569', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>
-            🎯 Correlação com Bull-Bear Index
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ fontSize: 28, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: news.bull_bear_correlation > 0 ? '#10b981' : '#ef4444' }}>
-              {news.bull_bear_correlation > 0 ? '+' : ''}{news.bull_bear_correlation.toFixed(2)}
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ height: 6, borderRadius: 3, background: '#1a2535', overflow: 'hidden', marginBottom: 4 }}>
-                <div style={{
-                  height: '100%', borderRadius: 3,
-                  marginLeft: news.bull_bear_correlation < 0 ? `${50 + news.bull_bear_correlation * 50}%` : '50%',
-                  width: `${Math.abs(news.bull_bear_correlation) * 50}%`,
-                  background: news.bull_bear_correlation > 0 ? '#10b981' : '#ef4444',
-                }} />
-              </div>
-              <div style={{ fontSize: 9, color: '#334155', textAlign: 'center' }}>
-                Bull-Bear Index atual (Opções): <span style={{ fontFamily: 'JetBrains Mono, monospace', color: '#94a3b8' }}>
-                  {optionsTakerFlow.bull_bear_index > 0 ? '+' : ''}{optionsTakerFlow.bull_bear_index.toFixed(3)}
-                </span>
-              </div>
-            </div>
+          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 9, padding: '2px 7px', borderRadius: 4, background: `${impactColor}12`, color: impactColor, border: `1px solid ${impactColor}25`, fontWeight: 700 }}>Impacto {impact}</span>
+            <a href={article.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 10, color: '#60a5fa', textDecoration: 'none', marginLeft: 'auto' }}>Ver artigo completo ↗</a>
           </div>
         </div>
-
-        {/* AI Summary */}
-        <div style={{ background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.18)', borderRadius: 9, padding: '12px 14px', marginBottom: 12 }}>
-          <div style={{ fontSize: 10, color: '#60a5fa', fontWeight: 700, marginBottom: 6 }}>🤖 Análise AI</div>
-          <div style={{ fontSize: 11, color: '#64748b', lineHeight: 1.7 }}>{news.ai_summary}</div>
-        </div>
-
-        {/* Tags */}
-        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-          {news.tags.map(t => (
-            <span key={t} style={{ fontSize: 9, padding: '2px 6px', borderRadius: 3, background: '#0d1421', color: '#475569', border: '1px solid #1a2535', fontFamily: 'JetBrains Mono, monospace' }}>{t}</span>
-          ))}
-        </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -599,6 +511,9 @@ export default function NewsIntelligence() {
               </div>
             ))}
           </div>
+
+          {/* Narrativa de mercado — agregada dos artigos institucionais */}
+          {instArticles.length > 0 && <MarketNarrative articles={instArticles} />}
 
           {/* Distribuição de sentimento — gráfico live */}
           {instArticles.length > 0 && (

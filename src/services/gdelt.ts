@@ -68,7 +68,11 @@ const GdeltArticleSchema = z.object({
 });
 
 const GdeltResponseSchema = z.object({
-  articles: z.array(GdeltArticleSchema).default([]),
+  // GDELT retorna null quando não há artigos — preprocess normaliza para []
+  articles: z.preprocess(
+    (v) => (Array.isArray(v) ? v : []),
+    z.array(GdeltArticleSchema),
+  ),
 });
 
 export type GdeltArticle = z.infer<typeof GdeltArticleSchema>;
@@ -174,7 +178,14 @@ export async function fetchGdeltNews(
     throw err;
   }
 
-  const raw: unknown = await res.json();
+  let raw: unknown;
+  try {
+    raw = await res.json();
+  } catch {
+    const err = new Error('GDELT retornou resposta inválida (não-JSON). API pode estar indisponível.');
+    logError('GDELT parse error', err, 'gdelt');
+    throw err;
+  }
   const parsed = GdeltResponseSchema.parse(raw);
 
   // Filtra para inglês e português (lang=english | portuguese)
