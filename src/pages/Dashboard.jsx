@@ -10,13 +10,14 @@ import { useMempoolState } from '@/hooks/useMempool';
 
 // ─── DATA LAYER (live > mock fallback) ───────────────────────────────────────
 function useDashboardLiveData() {
-  const { data: ticker }    = useBtcTicker();
-  const { data: fng }       = useFearGreedHook();
-  const { data: riskScore } = useRiskScore();
+  const { data: ticker,    isError: tickerError } = useBtcTicker();
+  const { data: fng,       isError: fngError }    = useFearGreedHook();
+  const { data: riskScore, isError: riskError }   = useRiskScore();
   return {
     btcFutures: ticker ? { ...btcFutures, mark_price: ticker.mark_price, funding_rate: ticker.last_funding_rate, oi_delta_pct: ticker.oi_delta_pct, open_interest: ticker.open_interest } : btcFutures,
     fearGreed:  fng    ? { ...fearGreed,  value: fng.value, label: fng.label, classification: fng.label } : fearGreed,
     riskScore:  riskScore ?? null,
+    errors: { ticker: tickerError, fng: fngError, risk: riskError },
   };
 }
 import RiskMeter from '../components/ui/RiskMeter';
@@ -78,8 +79,9 @@ function SectionTitle({ icon, label, sub = '', action = null }) {
 }
 
 // ─── FEAR & GREED ─────────────────────────────────────────────────────────────
-function FearGreedGauge({ liveValue }) {
-  const v = liveValue ?? fearGreed.value;
+function FearGreedGauge({ liveValue, fngError }) {
+  const hasError = fngError && DATA_MODE === 'live';
+  const v = (!hasError && liveValue != null) ? liveValue : fearGreed.value;
   const zones = [
     { label: 'Extreme Fear', max: 25, color: '#60a5fa' },
     { label: 'Fear',         max: 45, color: '#10b981' },
@@ -88,7 +90,7 @@ function FearGreedGauge({ liveValue }) {
     { label: 'Ext. Greed',   max: 100, color: '#ef4444' },
   ];
   const zone = zones.find(z => v <= z.max) || zones[zones.length - 1];
-  const color = zone.color;
+  const color = hasError ? '#4a5568' : zone.color;
 
   return (
     <div style={{ background: '#111827', border: `1px solid ${color}25`, borderRadius: 14, padding: 18 }}>
@@ -100,11 +102,14 @@ function FearGreedGauge({ liveValue }) {
           fontSize: 52, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace',
           color, lineHeight: 1, letterSpacing: '-0.05em',
           textShadow: `0 0 30px ${color}55`,
-        }}>{v}</div>
+        }}>{hasError ? '***' : v}</div>
         <div style={{ paddingBottom: 4 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color, marginBottom: 2 }}>{zone.label}</div>
-          {v > 65 && <div style={{ fontSize: 9, color: '#f59e0b', fontWeight: 600 }}>⚠ Risco de reversão</div>}
-          {v < 35 && <div style={{ fontSize: 9, color: '#60a5fa', fontWeight: 600 }}>⚠ Possível capitulação</div>}
+          <div style={{ fontSize: 13, fontWeight: 700, color, marginBottom: 2 }}>
+            {hasError ? 'Dados indisponíveis' : zone.label}
+          </div>
+          {!hasError && v > 65 && <div style={{ fontSize: 9, color: '#f59e0b', fontWeight: 600 }}>⚠ Risco de reversão</div>}
+          {!hasError && v < 35 && <div style={{ fontSize: 9, color: '#60a5fa', fontWeight: 600 }}>⚠ Possível capitulação</div>}
+          {hasError && <div style={{ fontSize: 9, color: '#4a5568', fontWeight: 600 }}>Verifique o Debug Log</div>}
         </div>
       </div>
       {/* Gauge bar */}
@@ -142,10 +147,14 @@ function FearGreedGauge({ liveValue }) {
 }
 
 // ─── BTC SNAPSHOT ─────────────────────────────────────────────────────────────
-function BTCSnapshot({ liveData }) {
+function BTCSnapshot({ liveData, tickerError }) {
+  const err = tickerError && DATA_MODE === 'live';
   const fr = liveData ?? btcFutures;
-  const fundingColor = fr.funding_rate > 0.0005 ? '#ef4444' : fr.funding_rate > 0 ? '#f59e0b' : '#10b981';
-  const oiColor = '#f59e0b';
+  const fundingColor = err ? '#4a5568' : (fr.funding_rate > 0.0005 ? '#ef4444' : fr.funding_rate > 0 ? '#f59e0b' : '#10b981');
+  const oiColor = err ? '#4a5568' : '#f59e0b';
+  const priceStr   = err ? '***' : `$${fmtNum(fr.mark_price, 0)}`;
+  const fundingStr = err ? '***' : fmtPct(fr.funding_rate, 4);
+  const oiStr      = err ? '***' : `$${(fr.open_interest_usdt / 1e9).toFixed(2)}B`;
 
   return (
     <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 14, padding: 18 }}>
@@ -157,8 +166,8 @@ function BTCSnapshot({ liveData }) {
       <div style={{ marginBottom: 14, paddingBottom: 12, borderBottom: '1px solid #1a2535' }}>
         <div style={{ fontSize: 9, color: '#334155', marginBottom: 3 }}>MARK PRICE</div>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-          <span style={{ fontSize: 26, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: '#f1f5f9', letterSpacing: '-0.03em' }}>
-            ${fmtNum(fr.mark_price, 0)}
+          <span style={{ fontSize: 26, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: err ? '#4a5568' : '#f1f5f9', letterSpacing: '-0.03em' }}>
+            {priceStr}
           </span>
           <DeltaPill value={btcSpotFlow.ret_1d * 100} suffix="% 1D" />
           <DeltaPill value={btcSpotFlow.ret_1w * 100} suffix="% 1W" compact />
@@ -167,10 +176,10 @@ function BTCSnapshot({ liveData }) {
 
       {/* Key metrics grid */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 16px' }}>
-        <Stat label="Funding Rate" value={fmtPct(fr.funding_rate, 4)} color={fundingColor} big
-          sub={`${fr.funding_rate > 0 ? 'Longs pagam' : 'Shorts pagam'} · ${Math.round((fr.next_funding_time.getTime() - Date.now()) / 3600000)}h`}
+        <Stat label="Funding Rate" value={fundingStr} color={fundingColor} big
+          sub={err ? '—' : `${fr.funding_rate > 0 ? 'Longs pagam' : 'Shorts pagam'} · ${Math.round((fr.next_funding_time.getTime() - Date.now()) / 3600000)}h`}
           help={{ title: 'Funding Rate', content: 'Taxa paga entre longs e shorts a cada 8h. Acima de +0.07% = mercado sobrecomprado — sinal de risco para flush.' }} />
-        <Stat label="Open Interest" value={`$${(fr.open_interest_usdt/1e9).toFixed(2)}B`} big
+        <Stat label="Open Interest" value={oiStr} color={oiColor} big
           sub={<span style={{ display: 'flex', gap: 4, marginTop: 2 }}>
             <DeltaPill value={fr.oi_delta_pct} suffix="% 1D" compact />
             <DeltaPill value={fr.oi_delta_pct_1w} suffix="% 1W" compact />
@@ -191,7 +200,8 @@ function BTCSnapshot({ liveData }) {
 const MACRO_ICONS = { SP500: '📈', DXY: '💵', GOLD: '🥇', VIX: '🌡️', US10Y: '📊', US2Y: '📉' };
 
 function MacroRow() {
-  const { data: liveMacro } = useMacroBoard();
+  const { data: liveMacro, isError: macroError } = useMacroBoard();
+  const err = macroError && DATA_MODE === 'live';
   const series = liveMacro?.series ?? macroBoard.series;
   const invertColors = { DXY: true, VIX: true };
 
@@ -215,8 +225,8 @@ function MacroRow() {
             <div style={{ fontSize: 10, color: '#64748b', marginBottom: 5, display: 'flex', alignItems: 'center', gap: 4 }}>
               <span>{s.icon ?? MACRO_ICONS[s.id] ?? '📊'}</span> {s.name}
             </div>
-            <div style={{ fontSize: 16, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: '#f1f5f9', letterSpacing: '-0.02em', marginBottom: 5 }}>
-              {valStr}
+            <div style={{ fontSize: 16, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: err ? '#4a5568' : '#f1f5f9', letterSpacing: '-0.02em', marginBottom: 5 }}>
+              {err ? '***' : valStr}
             </div>
             <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
               <span style={{ fontSize: 9, color, background: `${color}12`, border: `1px solid ${color}25`, borderRadius: 3, padding: '1px 5px', fontFamily: 'JetBrains Mono, monospace', fontWeight: 700 }}>
@@ -410,8 +420,7 @@ function AITrackRecord() {
 
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
 export default function Dashboard() {
-  // eslint-disable-next-line no-unused-vars
-  const { btcFutures: _btcLive, fearGreed: _fngLive, riskScore: liveRiskScore } = useDashboardLiveData();
+  const { btcFutures: _btcLive, fearGreed: _fngLive, riskScore: liveRiskScore, errors: liveErrors } = useDashboardLiveData();
   const [lastUpdate, setLastUpdate] = useState(new Date());
   useEffect(() => {
     const t = setInterval(() => setLastUpdate(new Date()), 5000);
@@ -460,8 +469,8 @@ export default function Dashboard() {
           regime={activeRegime}
           moduleScores={liveRiskScore?.module_scores ?? globalRisk.module_scores}
         />
-        <FearGreedGauge liveValue={_fngLive?.value} />
-        <BTCSnapshot liveData={_btcLive} />
+        <FearGreedGauge liveValue={_fngLive?.value} fngError={liveErrors.fng} />
+        <BTCSnapshot liveData={_btcLive} tickerError={liveErrors.ticker} />
       </div>
 
       {/* ── Regra de Ouro ── */}
