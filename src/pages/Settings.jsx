@@ -389,7 +389,7 @@ function TelegramSection() {
       {/* Schedule */}
       {row(
         'TELEGRAM_SCHEDULE',
-        'Horário de envio diário (UTC). Configure pg_cron no Supabase para ativar.',
+        'Horário exibido no digest (UTC). O disparo automático ocorre às 11:00 UTC via pg_cron.',
         <select
           value={schedule}
           onChange={e => setSchedule(e.target.value)}
@@ -471,22 +471,19 @@ function TelegramSection() {
         )}
       </div>
 
-      {/* pg_cron hint */}
+      {/* pg_cron status */}
       <div style={{
         marginTop: 14, padding: '10px 12px', borderRadius: 7, fontSize: 11,
-        background: 'rgba(59,130,246,0.04)', border: '1px solid rgba(59,130,246,0.12)',
-        color: '#4a6580', lineHeight: 1.6,
+        background: 'rgba(16,185,129,0.04)', border: '1px solid rgba(16,185,129,0.18)',
+        color: '#4a6580', lineHeight: 1.6, display: 'flex', alignItems: 'flex-start', gap: 8,
       }}>
-        <strong style={{ color: '#60a5fa' }}>Agendamento automático (pg_cron):</strong>{' '}
-        Acesse o Supabase Dashboard → SQL Editor e execute:
-        <br />
-        <code style={{
-          display: 'block', marginTop: 6, padding: '6px 8px',
-          background: 'rgba(0,0,0,0.3)', borderRadius: 4,
-          color: '#94a3b8', fontFamily: 'JetBrains Mono, monospace', fontSize: 10,
-        }}>
-          {'SELECT cron.schedule(\'telegram-digest\', \'0 11 * * *\', $$SELECT net.http_post(url:=\'<SUPABASE_URL>/functions/v1/send-telegram-digest\', headers:=\'{"Authorization":"Bearer <ANON_KEY>"}\', body:=\'{}\'::jsonb)$$);'}
-        </code>
+        <span style={{ fontSize: 13, marginTop: 1 }}>✅</span>
+        <div>
+          <strong style={{ color: '#10b981' }}>Agendamento automático ativo</strong>
+          {' — '}job <code style={{ color: '#94a3b8', fontFamily: 'JetBrains Mono, monospace' }}>telegram-digest</code> configurado no pg_cron (todos os dias 11:00 UTC / 08:00 BRT).
+          O horário exibido no digest reflete o campo acima; para alterar o disparo do pg_cron edite no{' '}
+          <strong style={{ color: '#60a5fa' }}>Supabase Dashboard → Database → Cron Jobs</strong>.
+        </div>
       </div>
     </Section>
   );
