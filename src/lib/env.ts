@@ -29,15 +29,17 @@ export const env = parsed.success ? parsed.data : EnvSchema.parse({});
 
 /**
  * DATA_MODE global — prioridade:
- * 1. localStorage 'mrp_data_mode' (alterado em Settings sem rebuild)
- * 2. VITE_DATA_MODE do .env.local
- * 3. 'mock' (default)
+ * 1. VITE_DATA_MODE=live (padrão) — env var sempre vence quando é 'live'
+ * 2. localStorage 'mrp_data_mode' — só tem efeito quando env var é 'mock'
+ * 3. 'live' (default)
  */
 const _storedMode = typeof localStorage !== 'undefined'
   ? (localStorage.getItem('mrp_data_mode') as 'mock' | 'live' | null)
   : null;
 export const DATA_MODE: 'mock' | 'live' =
-  (_storedMode === 'mock' || _storedMode === 'live') ? _storedMode : env.VITE_DATA_MODE;
+  env.VITE_DATA_MODE === 'live' ? 'live' :
+  (_storedMode === 'mock' || _storedMode === 'live') ? _storedMode :
+  'live';
 
 /** true = usar APIs reais; false = usar mock data */
 export const IS_LIVE = DATA_MODE === 'live';
