@@ -3,6 +3,7 @@ import {
   btcFutures, btcSpotFlow, macroBoard, onChain,
   fearGreed, recentAlerts, globalRisk, sourceHealth, fmtNum, fmtPct, aiAnalysis,
 } from '../components/data/mockData';
+import { DATA_MODE } from '@/lib/env';
 import { useBtcTicker, useFearGreed as useFearGreedHook } from '@/hooks/useBtcData';
 import { useRiskScore } from '@/hooks/useRiskScore';
 import { useMacroBoard } from '@/hooks/useFred';
