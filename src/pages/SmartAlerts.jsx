@@ -452,13 +452,23 @@ export default function SmartAlerts() {
 
   // Estado local inicializado com dados do Supabase (ou mock como fallback)
   const [rules, setRules] = useState(defaultAlertRulesMock);
+  const _seededRef = useRef(false);
   useEffect(() => {
-    if (savedRules && savedRules.length > 0) {
-      // Adiciona campos de runtime ausentes no schema Supabase (current_value, triggered)
-      // @ts-ignore — Supabase AlertRule tem campos Zod opcionais; runtime sempre válido após parse()
+    if (savedRules === undefined) return; // ainda carregando
+    if (savedRules.length > 0) {
+      // @ts-ignore — campos runtime adicionados aqui
       setRules(savedRules.map(r => ({ ...r, id: r.id ?? crypto.randomUUID(), current_value: 0, triggered: false, last_triggered: r.last_triggered ? new Date(r.last_triggered) : null })));
+    } else if (!_seededRef.current) {
+      // Primeira carga com DB vazio: semeia as regras padrão no Supabase
+      _seededRef.current = true;
+      defaultAlertRulesMock.forEach(r => saveRule({
+        ...r,
+        last_triggered: r.last_triggered instanceof Date
+          ? r.last_triggered.toISOString()
+          : r.last_triggered ?? null,
+      }));
     }
-  }, [savedRules]);
+  }, [savedRules]); // eslint-disable-line react-hooks/exhaustive-deps
   const [prefs, setPrefs] = useState(DEFAULT_PREFS);
   const [history, setHistory] = useState(alertHistory);
   const [tab, setTab] = useState('ai');

@@ -15,14 +15,10 @@ import { logInfo, logError, logWarn } from '@/lib/debugLog';
 
 const FRED_BASE = 'https://api.stlouisfed.org/fred';
 
-// ─── Persistência Supabase (raw fetch — sem import circular) ─────────────────
+// ─── Persistência Supabase ────────────────────────────────────────────────────
 
-const _env = (typeof import.meta !== 'undefined'
-  ? (import.meta as Record<string, unknown>).env
-  : {}) as Record<string, string>;
-
-const _supUrl = _env?.VITE_SUPABASE_URL ?? '';
-const _supKey = _env?.VITE_SUPABASE_ANON_KEY ?? '';
+const _supUrl = env.VITE_SUPABASE_URL ?? '';
+const _supKey = env.VITE_SUPABASE_ANON_KEY ?? '';
 
 /** Converte string formatada ("+ 0.3%", "+185K", "4.25%") para numeric ou null. */
 function parsePrevToNumeric(prev: string | null): number | null {
@@ -53,7 +49,7 @@ async function persistMacroSchedule(events: MacroCalendarEvent[]): Promise<void>
       source:           e.source,
       raw_payload:      e,
     }));
-    await fetch(
+    const res = await fetch(
       `${_supUrl}/rest/v1/macro_event_schedule?on_conflict=event_code,release_time_utc`,
       {
         method:  'POST',
@@ -66,8 +62,14 @@ async function persistMacroSchedule(events: MacroCalendarEvent[]): Promise<void>
         body: JSON.stringify(rows),
       },
     );
-  } catch {
-    // Silencia falhas de persistência para não impactar a UI
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      logError('MacroCalendar persist failed', new Error(`HTTP ${res.status}: ${body}`), 'macro');
+    } else {
+      logInfo('MacroCalendar persist ok', { count: rows.length }, 'macro');
+    }
+  } catch (err) {
+    logError('MacroCalendar persist exception', err instanceof Error ? err : new Error(String(err)), 'macro');
   }
 }
 
