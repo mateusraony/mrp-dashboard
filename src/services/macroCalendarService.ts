@@ -13,12 +13,13 @@ import { z } from 'zod';
 import { env, DATA_MODE } from '@/lib/env';
 import { logInfo, logError, logWarn } from '@/lib/debugLog';
 
-const FRED_BASE = 'https://api.stlouisfed.org/fred';
-
-// ─── Persistência Supabase ────────────────────────────────────────────────────
+// ─── Supabase (persistência + proxy FRED) ────────────────────────────────────
 
 const _supUrl = env.VITE_SUPABASE_URL ?? '';
 const _supKey = env.VITE_SUPABASE_ANON_KEY ?? '';
+
+// Edge Function que faz proxy server-side para o FRED API (resolve CORS)
+const FRED_PROXY = _supUrl ? `${_supUrl}/functions/v1/fred-proxy` : null;
 
 /** Converte string formatada ("+ 0.3%", "+185K", "4.25%") para numeric ou null. */
 function parsePrevToNumeric(prev: string | null): number | null {
@@ -282,53 +283,53 @@ function formatPrevious(
 
 // ─── FRED fetchers ────────────────────────────────────────────────────────────
 
-async function fetchReleaseDates(releaseId: number, apiKey: string): Promise<string[]> {
-  const params = new URLSearchParams({
+// Chama o FRED via Edge Function proxy (resolve CORS do browser → servidor)
+async function fredProxy(type: 'observations' | 'release_dates', params: Record<string, string>) {
+  if (!FRED_PROXY) throw new Error('Supabase URL não configurado — fredProxy indisponível');
+  const res = await fetch(FRED_PROXY, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json', apikey: _supKey },
+    body:    JSON.stringify({ type, params }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`fred-proxy ${res.status}: ${body}`);
+  }
+  return res.json();
+}
+
+async function fetchReleaseDates(releaseId: number): Promise<string[]> {
+  const raw = await fredProxy('release_dates', {
     release_id:                         String(releaseId),
-    api_key:                            apiKey,
-    file_type:                          'json',
     sort_order:                         'desc',
     include_release_dates_with_no_data: 'true',
     limit:                              '24',
   });
-
-  const res = await fetch(`${FRED_BASE}/release/dates?${params}`);
-  if (!res.ok) throw new Error(`FRED release/dates ${res.status}: release_id=${releaseId}`);
-
-  const raw    = await res.json();
   const parsed = ReleaseDatesSchema.parse(raw);
   const today  = new Date().toISOString().slice(0, 10);
 
   return parsed.release_dates
-    .map(d => d.date)
-    .filter(d => d >= today)
-    .reverse() // asc
-    .slice(0, 4); // próximas 4 datas
+    .map((d: { date: string }) => d.date)
+    .filter((d: string) => d >= today)
+    .reverse()
+    .slice(0, 4);
 }
 
 async function fetchObservations(
   seriesId: string,
-  apiKey:   string,
   limit = 3,
 ): Promise<Array<{ date: string; value: number }>> {
-  const params = new URLSearchParams({
+  const raw = await fredProxy('observations', {
     series_id:  seriesId,
-    api_key:    apiKey,
-    file_type:  'json',
     sort_order: 'desc',
     limit:      String(limit),
   });
-
-  const res = await fetch(`${FRED_BASE}/series/observations?${params}`);
-  if (!res.ok) return [];
-
-  const raw    = await res.json();
   const parsed = ObservationsResponseSchema.parse(raw);
 
   return parsed.observations
-    .filter(o => o.value !== '.' && !isNaN(parseFloat(o.value)))
-    .map(o => ({ date: o.date, value: parseFloat(o.value) }))
-    .reverse(); // oldest first
+    .filter((o: { value: string; date: string }) => o.value !== '.' && !isNaN(parseFloat(o.value)))
+    .map((o: { value: string; date: string }) => ({ date: o.date, value: parseFloat(o.value) }))
+    .reverse();
 }
 
 // ─── Mock fallback (quando sem FRED key ou DATA_MODE=mock) ────────────────────
@@ -404,13 +405,12 @@ function buildMockEvents(): MacroCalendarEvent[] {
  *
  * Eventos FOMC sempre vêm de datas estáticas 2026 (hardcoded, mais confiável que FRED).
  */
-/** Constrói eventos FOMC a partir das datas estáticas 2026 (sem FRED key). */
-function buildFomcEvents(apiKey?: string): Promise<MacroCalendarEvent[]> {
+/** Constrói eventos FOMC a partir das datas estáticas 2026. */
+function buildFomcEvents(): Promise<MacroCalendarEvent[]> {
   const today = new Date().toISOString().slice(0, 10);
-  return (apiKey
-    ? fetchObservations('FEDFUNDS', apiKey, 2).catch(() => [] as Array<{ value: string; date: string }>)
-    : Promise.resolve([] as Array<{ value: string; date: string }>)
-  ).then(fedFundsObs => {
+  return fetchObservations('FEDFUNDS', 2)
+    .catch(() => [] as Array<{ value: string; date: string }>)
+    .then(fedFundsObs => {
     const fedFundsPrev = formatPrevious('US_FOMC', fedFundsObs, false);
     return FOMC_2026.filter(f => f.date >= today).map(fomc => {
       const { utc, brt } = etToBrt(fomc.date, fomc.time_et);
@@ -438,33 +438,27 @@ function buildFomcEvents(apiKey?: string): Promise<MacroCalendarEvent[]> {
 }
 
 export async function fetchMacroCalendarEvents(): Promise<MacroCalendarEvent[]> {
-  const apiKey = env.VITE_FRED_API_KEY;
-
   if (DATA_MODE === 'mock') {
     return buildMockEvents();
   }
 
-  if (!apiKey) {
-    logWarn('VITE_FRED_API_KEY ausente — MacroCalendar usa FOMC estático + mock para demais eventos', null, 'macroCalendar');
-    // Combina FOMC hardcoded (real) com mock para CPI/emprego/etc.
-    const fomcEvents = await buildFomcEvents();
-    const mockEvents = buildMockEvents().filter(e => e.code !== 'US_FOMC');
-    const merged = [...fomcEvents, ...mockEvents].sort((a, b) => a.datetime_utc.localeCompare(b.datetime_utc));
-    return merged;
+  if (!FRED_PROXY) {
+    logWarn('Supabase URL ausente — MacroCalendar usa mock', null, 'macroCalendar');
+    return buildMockEvents();
   }
 
   const today  = new Date().toISOString().slice(0, 10);
-  const fomcEvents = await buildFomcEvents(apiKey);
+  const fomcEvents = await buildFomcEvents();
   const events: MacroCalendarEvent[] = [...fomcEvents];
 
-  // ── Eventos FRED: busca release dates + observações em paralelo ──────────
+  // ── Eventos FRED via proxy Edge Function ─────────────────────────────────
   const fredCatalog = CATALOG.filter(c => c.fred_release_id !== null);
 
   const results = await Promise.allSettled(
     fredCatalog.map(async (cat) => {
       const [releaseDates, observations] = await Promise.all([
-        fetchReleaseDates(cat.fred_release_id!, apiKey),
-        fetchObservations(cat.fred_series!, apiKey, 3),
+        fetchReleaseDates(cat.fred_release_id!),
+        fetchObservations(cat.fred_series!, 3),
       ]);
       return { cat, releaseDates, observations };
     }),
