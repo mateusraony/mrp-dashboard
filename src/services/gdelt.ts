@@ -8,17 +8,13 @@
  */
 
 import { z } from 'zod';
-import { DATA_MODE } from '@/lib/env';
+import { env, DATA_MODE } from '@/lib/env';
 import { logInfo, logError } from '@/lib/debugLog';
 
-// ─── Persistência Supabase (raw fetch — sem import circular) ─────────────────
+// ─── Persistência Supabase ────────────────────────────────────────────────────
 
-const _env = (typeof import.meta !== 'undefined'
-  ? (import.meta as Record<string, unknown>).env
-  : {}) as Record<string, string>;
-
-const _supUrl = _env?.VITE_SUPABASE_URL ?? '';
-const _supKey = _env?.VITE_SUPABASE_ANON_KEY ?? '';
+const _supUrl = env.VITE_SUPABASE_URL ?? '';
+const _supKey = env.VITE_SUPABASE_ANON_KEY ?? '';
 
 /**
  * Persiste artigos GDELT no Supabase (upsert por URL, ignora duplicatas).
@@ -39,7 +35,7 @@ async function persistGdeltArticles(
       sentiment_label: a.sentiment_label,
       query,
     }));
-    await fetch(`${_supUrl}/rest/v1/gdelt_articles?on_conflict=url`, {
+    const res = await fetch(`${_supUrl}/rest/v1/gdelt_articles?on_conflict=url`, {
       method:  'POST',
       headers: {
         apikey:         _supKey,
@@ -49,8 +45,14 @@ async function persistGdeltArticles(
       },
       body: JSON.stringify(rows),
     });
-  } catch {
-    // Silencia falhas de persistência para não impactar a UI
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      logError('GDELT persist failed', new Error(`HTTP ${res.status}: ${body}`), 'gdelt');
+    } else {
+      logInfo('GDELT persist ok', { count: rows.length }, 'gdelt');
+    }
+  } catch (err) {
+    logError('GDELT persist exception', err instanceof Error ? err : new Error(String(err)), 'gdelt');
   }
 }
 
