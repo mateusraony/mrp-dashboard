@@ -404,45 +404,58 @@ function buildMockEvents(): MacroCalendarEvent[] {
  *
  * Eventos FOMC sempre vêm de datas estáticas 2026 (hardcoded, mais confiável que FRED).
  */
+/** Constrói eventos FOMC a partir das datas estáticas 2026 (sem FRED key). */
+function buildFomcEvents(apiKey?: string): Promise<MacroCalendarEvent[]> {
+  const today = new Date().toISOString().slice(0, 10);
+  return (apiKey
+    ? fetchObservations('FEDFUNDS', apiKey, 2).catch(() => [] as Array<{ value: string; date: string }>)
+    : Promise.resolve([] as Array<{ value: string; date: string }>)
+  ).then(fedFundsObs => {
+    const fedFundsPrev = formatPrevious('US_FOMC', fedFundsObs, false);
+    return FOMC_2026.filter(f => f.date >= today).map(fomc => {
+      const { utc, brt } = etToBrt(fomc.date, fomc.time_et);
+      return {
+        id:                   `fomc-${fomc.date}`,
+        code:                 'US_FOMC',
+        title:                'FOMC Interest Rate Decision',
+        agency:               'Fed',
+        tier:                 1 as const,
+        datetime_utc:         utc,
+        datetime_brt:         brt,
+        status:               'scheduled' as const,
+        previous:             fedFundsPrev,
+        actual:               null,
+        consensus:            null,
+        unit:                 '%',
+        btc_impact_hist_avg:  -3.2,
+        description:          fomc.note,
+        alert_enabled:        false,
+        alert_minutes_before: 30,
+        source:               'FOMC_STATIC',
+      };
+    });
+  });
+}
+
 export async function fetchMacroCalendarEvents(): Promise<MacroCalendarEvent[]> {
   const apiKey = env.VITE_FRED_API_KEY;
 
-  if (DATA_MODE === 'mock' || !apiKey) {
-    if (!apiKey && DATA_MODE === 'live') {
-      logWarn('VITE_FRED_API_KEY ausente — usando mock para MacroCalendar', null, 'macroCalendar');
-    }
+  if (DATA_MODE === 'mock') {
     return buildMockEvents();
   }
 
-  const today  = new Date().toISOString().slice(0, 10);
-  const events: MacroCalendarEvent[] = [];
-
-  // ── FOMC: sempre usa datas estáticas (mais confiável) ────────────────────
-  const fedFundsObs = await fetchObservations('FEDFUNDS', apiKey, 2).catch(() => []);
-  const fedFundsPrev = formatPrevious('US_FOMC', fedFundsObs, false);
-
-  for (const fomc of FOMC_2026.filter(f => f.date >= today)) {
-    const { utc, brt } = etToBrt(fomc.date, fomc.time_et);
-    events.push({
-      id:                   `fomc-${fomc.date}`,
-      code:                 'US_FOMC',
-      title:                'FOMC Interest Rate Decision',
-      agency:               'Fed',
-      tier:                 1,
-      datetime_utc:         utc,
-      datetime_brt:         brt,
-      status:               'scheduled',
-      previous:             fedFundsPrev,
-      actual:               null,
-      consensus:            null,
-      unit:                 '%',
-      btc_impact_hist_avg:  -3.2,
-      description:          fomc.note,
-      alert_enabled:        false,
-      alert_minutes_before: 30,
-      source:               'FOMC_STATIC',
-    });
+  if (!apiKey) {
+    logWarn('VITE_FRED_API_KEY ausente — MacroCalendar usa FOMC estático + mock para demais eventos', null, 'macroCalendar');
+    // Combina FOMC hardcoded (real) com mock para CPI/emprego/etc.
+    const fomcEvents = await buildFomcEvents();
+    const mockEvents = buildMockEvents().filter(e => e.code !== 'US_FOMC');
+    const merged = [...fomcEvents, ...mockEvents].sort((a, b) => a.datetime_utc.localeCompare(b.datetime_utc));
+    return merged;
   }
+
+  const today  = new Date().toISOString().slice(0, 10);
+  const fomcEvents = await buildFomcEvents(apiKey);
+  const events: MacroCalendarEvent[] = [...fomcEvents];
 
   // ── Eventos FRED: busca release dates + observações em paralelo ──────────
   const fredCatalog = CATALOG.filter(c => c.fred_release_id !== null);
