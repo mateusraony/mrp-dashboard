@@ -54,7 +54,7 @@ export const ALERT_TYPES = {
 // ─── DEFAULT ALERT RULES ──────────────────────────────────────────────────────
 export const defaultAlertRules = [
   {
-    id: 'ar001', type: 'LONG_FLUSH', enabled: true,
+    id: 'a0000001-0000-4000-8000-000000000001', type: 'LONG_FLUSH', enabled: true,
     label: 'Long Flush Score ≥ 70',
     condition: 'risk_score >= threshold',
     threshold: 70, threshold_unit: 'pontos',
@@ -65,7 +65,7 @@ export const defaultAlertRules = [
     last_triggered: null,
   },
   {
-    id: 'ar002', type: 'FUNDING_EXTREME', enabled: true,
+    id: 'a0000001-0000-4000-8000-000000000002', type: 'FUNDING_EXTREME', enabled: true,
     label: 'Funding Rate ≥ 0.10%',
     condition: 'funding_rate >= threshold',
     threshold: 0.10, threshold_unit: '%',
@@ -76,7 +76,7 @@ export const defaultAlertRules = [
     last_triggered: new Date(Date.now() - 6 * 3600000),
   },
   {
-    id: 'ar003', type: 'BASIS_DEVIATION', enabled: true,
+    id: 'a0000001-0000-4000-8000-000000000003', type: 'BASIS_DEVIATION', enabled: true,
     label: 'Basis Jun-26 ≥ 13% ann.',
     condition: 'basis_annualized >= threshold',
     threshold: 13.0, threshold_unit: '% ann.',
@@ -87,7 +87,7 @@ export const defaultAlertRules = [
     last_triggered: null,
   },
   {
-    id: 'ar004', type: 'SENTIMENT_SHOCK', enabled: true,
+    id: 'a0000001-0000-4000-8000-000000000004', type: 'SENTIMENT_SHOCK', enabled: true,
     label: 'Sentiment Score 24h ≤ −0.5',
     condition: 'sentiment_score <= threshold',
     threshold: -0.5, threshold_unit: 'score',
@@ -98,7 +98,7 @@ export const defaultAlertRules = [
     last_triggered: null,
   },
   {
-    id: 'ar005', type: 'LIQUIDATION_CLUSTER', enabled: true,
+    id: 'a0000001-0000-4000-8000-000000000005', type: 'LIQUIDATION_CLUSTER', enabled: true,
     label: 'Preço a ≤ 2% de cluster $83K',
     condition: 'price_distance_to_cluster <= threshold',
     threshold: 2.0, threshold_unit: '%',
@@ -109,7 +109,7 @@ export const defaultAlertRules = [
     last_triggered: new Date(Date.now() - 15 * 60000),
   },
   {
-    id: 'ar006', type: 'SHORT_SQUEEZE', enabled: false,
+    id: 'a0000001-0000-4000-8000-000000000006', type: 'SHORT_SQUEEZE', enabled: false,
     label: 'Short Squeeze Score ≥ 65',
     condition: 'short_score >= threshold',
     threshold: 65, threshold_unit: 'pontos',
@@ -120,7 +120,7 @@ export const defaultAlertRules = [
     last_triggered: null,
   },
   {
-    id: 'ar007', type: 'IV_SPIKE', enabled: true,
+    id: 'a0000001-0000-4000-8000-000000000007', type: 'IV_SPIKE', enabled: true,
     label: 'IV ATM +5% em 4h',
     condition: 'iv_change_4h >= threshold',
     threshold: 5.0, threshold_unit: '%',
@@ -131,7 +131,7 @@ export const defaultAlertRules = [
     last_triggered: null,
   },
   {
-    id: 'ar008', type: 'FUNDING_EXTREME', enabled: false,
+    id: 'a0000001-0000-4000-8000-000000000008', type: 'FUNDING_EXTREME', enabled: false,
     label: 'Funding Rate ≤ −0.05% (short squeeze setup)',
     condition: 'funding_rate <= negative_threshold',
     threshold: -0.05, threshold_unit: '%',
