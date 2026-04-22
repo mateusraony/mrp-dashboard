@@ -464,9 +464,24 @@ export default function SmartAlerts() {
   const [tab, setTab] = useState('ai');
   const [categoryFilter, setCategoryFilter] = useState('all');
 
-  const toggleRule = id => setRules(rs => rs.map(r => r.id === id ? { ...r, enabled: !r.enabled } : r));
+  const _toSavable = rule => ({
+    ...rule,
+    last_triggered: rule.last_triggered instanceof Date
+      ? rule.last_triggered.toISOString()
+      : rule.last_triggered,
+  });
+
+  const toggleRule = id => {
+    setRules(rs => rs.map(r => r.id === id ? { ...r, enabled: !r.enabled } : r));
+    const rule = rules.find(r => r.id === id);
+    if (rule) saveRule(_toSavable({ ...rule, enabled: !rule.enabled }));
+  };
   const changePriority = (type, p) => setPrefs(prev => ({ ...prev, [type]: p }));
-  const changeThreshold = (id, val) => setRules(rs => rs.map(r => r.id === id ? { ...r, threshold: val } : r));
+  const changeThreshold = (id, val) => {
+    setRules(rs => rs.map(r => r.id === id ? { ...r, threshold: val } : r));
+    const rule = rules.find(r => r.id === id);
+    if (rule) saveRule(_toSavable({ ...rule, threshold: val }));
+  };
   const dismissAlert = id => setHistory(h => h.map(a => a.id === id ? { ...a, resolved: true } : a));
 
   const activeAlerts = history.filter(a => !a.resolved);
