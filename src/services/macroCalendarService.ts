@@ -6,12 +6,46 @@
  *   - FOMC: datas oficiais 2026 (hardcoded — Fed publica um ano de antecedência)
  *
  * Sem chave FRED → retorna conjunto mock com datas calculadas programaticamente.
- * Sem consensus: dado pago (Bloomberg). Exibido como null/—.
+ * Sem consensus: dado pago (Bloomberg). Exibido como null com motivo explícito.
+ *
+ * Arquitetura de consensus:
+ *   IConsensusProvider.fetch() → null (provider gratuito padrão)
+ *   Provider externo opcional: setar VITE_CONSENSUS_PROVIDER=trading_economics|polygon
  */
 
 import { z } from 'zod';
 import { env, DATA_MODE } from '@/lib/env';
 import { logInfo, logError, logWarn } from '@/lib/debugLog';
+
+// ─── Consensus Provider Interface ────────────────────────────────────────────
+
+export interface ConsensusResult {
+  value:    number | null;
+  source:   string;        // ex: 'trading_economics', 'polygon', 'none_free_tier'
+  reason:   string | null; // motivo de null, se aplicável
+}
+
+export interface IConsensusProvider {
+  fetch(eventCode: string, releaseDateUtc: string): Promise<ConsensusResult>;
+}
+
+/** Provider padrão gratuito — retorna null honesto com motivo explícito. */
+class FreeConsensusProvider implements IConsensusProvider {
+  async fetch(_eventCode: string, _releaseDateUtc: string): Promise<ConsensusResult> {
+    return { value: null, source: 'none_free_tier', reason: 'Consenso requer API paga (Bloomberg/Trading Economics)' };
+  }
+}
+
+/** Factory: retorna provider externo se feature flag ativa, senão gratuito. */
+function createConsensusProvider(): IConsensusProvider {
+  const providerFlag = (env as Record<string, string | undefined>)['VITE_CONSENSUS_PROVIDER'];
+  if (providerFlag && providerFlag !== 'none') {
+    logWarn(`Consensus provider '${providerFlag}' configurado mas não implementado — usando free tier`, null, 'macroCalendar');
+  }
+  return new FreeConsensusProvider();
+}
+
+const consensusProvider: IConsensusProvider = createConsensusProvider();
 
 // ─── Supabase (persistência + proxy FRED) ────────────────────────────────────
 
@@ -184,8 +218,10 @@ export interface MacroCalendarEvent {
   datetime_brt:         string;
   status:               'scheduled' | 'released';
   previous:             string | null;   // último valor real formatado
-  actual:               string | null;   // null até release
-  consensus:            null;            // não disponível em fontes gratuitas
+  actual:               string | null;   // preenchido após release (via DB ou FRED)
+  actual_source:        string | null;   // ex: 'FRED:CPIAUCSL:2026-04-10', null=pendente
+  consensus:            null;
+  consensus_label:      string;          // 'N/D (fonte gratuita)' ou provider name
   unit:                 string;
   btc_impact_hist_avg:  number;
   description:          string;
@@ -281,6 +317,112 @@ function formatPrevious(
   }
 }
 
+// ─── DB fetchers (actuals + alert preferences) ───────────────────────────────
+
+/**
+ * Busca valores actual já preenchidos pelo macro-actual-fetcher na tabela
+ * macro_event_schedule. Retorna map: "<event_code>|<release_time_utc>" → { actual, source }.
+ * Chamada fire-and-forget pelo fetchMacroCalendarEvents para enriquecer dados locais.
+ */
+async function fetchActualsFromDb(): Promise<Map<string, { actual: number; source: string }>> {
+  const map = new Map<string, { actual: number; source: string }>();
+  if (!_supUrl || !_supKey) return map;
+
+  try {
+    const res = await fetch(
+      `${_supUrl}/rest/v1/macro_event_schedule?select=event_code,release_time_utc,actual,actual_source&actual=not.is.null&limit=100`,
+      {
+        headers: {
+          apikey:        _supKey,
+          Authorization: `Bearer ${_supKey}`,
+        },
+      },
+    );
+    if (!res.ok) return map;
+    const rows = await res.json() as Array<{
+      event_code: string; release_time_utc: string; actual: number; actual_source: string;
+    }>;
+    for (const row of rows) {
+      const key = `${row.event_code}|${row.release_time_utc}`;
+      map.set(key, { actual: row.actual, source: row.actual_source ?? 'DB' });
+    }
+  } catch {
+    // falha silenciosa — actuals ficam null, UI mostra "—"
+  }
+  return map;
+}
+
+/**
+ * Busca preferências de alerta do usuário de macro_alert_preferences.
+ * Retorna map: event_code → { alert_enabled, alert_minutes_before }.
+ */
+export async function fetchAlertPreferences(
+  sentinel: string,
+): Promise<Map<string, { alert_enabled: boolean; alert_minutes_before: number }>> {
+  const map = new Map<string, { alert_enabled: boolean; alert_minutes_before: number }>();
+  if (!_supUrl || !_supKey || !sentinel) return map;
+
+  try {
+    const res = await fetch(
+      `${_supUrl}/rest/v1/macro_alert_preferences?user_sentinel=eq.${sentinel}&select=event_code,alert_enabled,alert_minutes_before`,
+      {
+        headers: {
+          apikey:        _supKey,
+          Authorization: `Bearer ${_supKey}`,
+        },
+      },
+    );
+    if (!res.ok) return map;
+    const rows = await res.json() as Array<{
+      event_code: string; alert_enabled: boolean; alert_minutes_before: number;
+    }>;
+    for (const row of rows) {
+      map.set(row.event_code, {
+        alert_enabled:        row.alert_enabled,
+        alert_minutes_before: row.alert_minutes_before,
+      });
+    }
+  } catch {
+    // falha silenciosa — alertas ficam com defaults
+  }
+  return map;
+}
+
+/**
+ * Persiste (upsert) preferência de alerta de um evento específico.
+ * Chamado pelo toggle no MacroCalendar.jsx.
+ */
+export async function upsertAlertPreference(
+  sentinel:           string,
+  eventCode:          string,
+  alertEnabled:       boolean,
+  alertMinutesBefore: number = 30,
+): Promise<void> {
+  if (!_supUrl || !_supKey || !sentinel) return;
+  try {
+    await fetch(
+      `${_supUrl}/rest/v1/macro_alert_preferences?on_conflict=user_sentinel,event_code`,
+      {
+        method:  'POST',
+        headers: {
+          apikey:         _supKey,
+          Authorization:  `Bearer ${_supKey}`,
+          'Content-Type': 'application/json',
+          Prefer:         'resolution=merge-duplicates,return=minimal',
+        },
+        body: JSON.stringify([{
+          user_sentinel:        sentinel,
+          event_code:           eventCode,
+          alert_enabled:        alertEnabled,
+          alert_minutes_before: alertMinutesBefore,
+        }]),
+      },
+    );
+  } catch (err) {
+    logError('upsertAlertPreference failed', err instanceof Error ? err : new Error(String(err)), 'macro');
+  }
+}
+
 // ─── FRED fetchers ────────────────────────────────────────────────────────────
 
 // Chama o FRED via Edge Function proxy (resolve CORS do browser → servidor)
@@ -351,7 +493,7 @@ function buildMockEvents(): MacroCalendarEvent[] {
     events.push({
       id: `mock-cpi-${m}`, code: 'US_CPI', title: 'CPI (MoM)',
       agency: 'BLS', tier: 1, datetime_utc: utc, datetime_brt: brt,
-      status: 'scheduled', previous: '+0.3%', actual: null, consensus: null,
+      status: 'scheduled', previous: '+0.3%', actual: null, actual_source: null, consensus: null, consensus_label: 'N/D (fonte gratuita)',
       unit: '%', btc_impact_hist_avg: -2.5,
       description: 'Inflação ao consumidor.',
       alert_enabled: false, alert_minutes_before: 30, source: 'MOCK',
@@ -365,7 +507,7 @@ function buildMockEvents(): MacroCalendarEvent[] {
       id: `mock-fomc-${fomc.date}`, code: 'US_FOMC',
       title: 'FOMC Interest Rate Decision',
       agency: 'Fed', tier: 1, datetime_utc: utc, datetime_brt: brt,
-      status: 'scheduled', previous: '4.25%', actual: null, consensus: null,
+      status: 'scheduled', previous: '4.25%', actual: null, actual_source: null, consensus: null, consensus_label: 'N/D (fonte gratuita)',
       unit: '%', btc_impact_hist_avg: -3.2,
       description: fomc.note,
       alert_enabled: false, alert_minutes_before: 30, source: 'MOCK',
@@ -384,7 +526,7 @@ function buildMockEvents(): MacroCalendarEvent[] {
     events.push({
       id: `mock-nfp-${m}`, code: 'US_NFP', title: 'Nonfarm Payrolls',
       agency: 'BLS', tier: 1, datetime_utc: utc, datetime_brt: brt,
-      status: 'scheduled', previous: '+185K', actual: null, consensus: null,
+      status: 'scheduled', previous: '+185K', actual: null, actual_source: null, consensus: null, consensus_label: 'N/D (fonte gratuita)',
       unit: 'K', btc_impact_hist_avg: -1.8,
       description: 'Empregos não-agrícolas criados.',
       alert_enabled: false, alert_minutes_before: 30, source: 'MOCK',
@@ -406,34 +548,37 @@ function buildMockEvents(): MacroCalendarEvent[] {
  * Eventos FOMC sempre vêm de datas estáticas 2026 (hardcoded, mais confiável que FRED).
  */
 /** Constrói eventos FOMC a partir das datas estáticas 2026. */
-function buildFomcEvents(): Promise<MacroCalendarEvent[]> {
+async function buildFomcEvents(
+  actualsDb: Map<string, { actual: number; source: string }>,
+): Promise<MacroCalendarEvent[]> {
   const today = new Date().toISOString().slice(0, 10);
-  return fetchObservations('FEDFUNDS', 2)
-    .catch(() => [] as Array<{ value: string; date: string }>)
-    .then(fedFundsObs => {
-    const fedFundsPrev = formatPrevious('US_FOMC', fedFundsObs, false);
-    return FOMC_2026.filter(f => f.date >= today).map(fomc => {
-      const { utc, brt } = etToBrt(fomc.date, fomc.time_et);
-      return {
-        id:                   `fomc-${fomc.date}`,
-        code:                 'US_FOMC',
-        title:                'FOMC Interest Rate Decision',
-        agency:               'Fed',
-        tier:                 1 as const,
-        datetime_utc:         utc,
-        datetime_brt:         brt,
-        status:               'scheduled' as const,
-        previous:             fedFundsPrev,
-        actual:               null,
-        consensus:            null,
-        unit:                 '%',
-        btc_impact_hist_avg:  -3.2,
-        description:          fomc.note,
-        alert_enabled:        false,
-        alert_minutes_before: 30,
-        source:               'FOMC_STATIC',
-      };
-    });
+  const fedFundsObs = await fetchObservations('FEDFUNDS', 2).catch(() => []);
+  const fedFundsPrev = formatPrevious('US_FOMC', fedFundsObs, false);
+
+  return FOMC_2026.filter(f => f.date >= today).map(fomc => {
+    const { utc, brt } = etToBrt(fomc.date, fomc.time_et);
+    const dbActual = actualsDb.get(`US_FOMC|${utc}`);
+    return {
+      id:                   `fomc-${fomc.date}`,
+      code:                 'US_FOMC',
+      title:                'FOMC Interest Rate Decision',
+      agency:               'Fed',
+      tier:                 1 as const,
+      datetime_utc:         utc,
+      datetime_brt:         brt,
+      status:               'scheduled' as const,
+      previous:             fedFundsPrev,
+      actual:               dbActual ? String(dbActual.actual) : null,
+      actual_source:        dbActual?.source ?? null,
+      consensus:            null,
+      consensus_label:      'N/D (fonte gratuita)',
+      unit:                 '%',
+      btc_impact_hist_avg:  -3.2,
+      description:          fomc.note,
+      alert_enabled:        false,
+      alert_minutes_before: 30,
+      source:               'FOMC_STATIC',
+    };
   });
 }
 
@@ -447,9 +592,23 @@ export async function fetchMacroCalendarEvents(): Promise<MacroCalendarEvent[]> 
     return buildMockEvents();
   }
 
-  const today  = new Date().toISOString().slice(0, 10);
-  const fomcEvents = await buildFomcEvents();
+  const today     = new Date().toISOString().slice(0, 10);
+
+  // Busca actuals já preenchidos pelo worker (DB tem precedência sobre FRED direto)
+  const actualsDb = await fetchActualsFromDb();
+
+  const fomcEvents = await buildFomcEvents(actualsDb);
   const events: MacroCalendarEvent[] = [...fomcEvents];
+
+  // ── Consensus provider (gratuito retorna null honesto) ───────────────────
+  // Pré-fetcha para todos os códigos de uma vez se provider externo for impl.
+  // Por ora, cada evento recebe o label padrão sem chamada extra.
+  const consensusDefault = await consensusProvider.fetch('__probe__', today).catch(
+    () => ({ value: null, source: 'none_free_tier', reason: null } as ConsensusResult),
+  );
+  const consensusLabel = consensusDefault.source === 'none_free_tier'
+    ? 'N/D (fonte gratuita)'
+    : consensusDefault.source;
 
   // ── Eventos FRED via proxy Edge Function ─────────────────────────────────
   const fredCatalog = CATALOG.filter(c => c.fred_release_id !== null);
@@ -475,6 +634,7 @@ export async function fetchMacroCalendarEvents(): Promise<MacroCalendarEvent[]> 
 
     for (const dateStr of releaseDates) {
       const { utc, brt } = etToBrt(dateStr, cat.release_time_et);
+      const dbActual = actualsDb.get(`${cat.code}|${utc}`);
       events.push({
         id:                   `${cat.code}-${dateStr}`,
         code:                 cat.code,
@@ -485,8 +645,10 @@ export async function fetchMacroCalendarEvents(): Promise<MacroCalendarEvent[]> 
         datetime_brt:         brt,
         status:               dateStr <= today ? 'released' : 'scheduled',
         previous,
-        actual:               null,
+        actual:               dbActual ? String(dbActual.actual) : null,
+        actual_source:        dbActual?.source ?? null,
         consensus:            null,
+        consensus_label:      consensusLabel,
         unit:                 cat.unit,
         btc_impact_hist_avg:  cat.btc_impact_hist_avg,
         description:          cat.description,
