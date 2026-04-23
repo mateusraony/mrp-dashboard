@@ -445,16 +445,18 @@ async function fetchReleaseDates(releaseId: number): Promise<string[]> {
     release_id:                         String(releaseId),
     sort_order:                         'desc',
     include_release_dates_with_no_data: 'true',
-    limit:                              '24',
+    limit:                              '12',
   });
   const parsed = ReleaseDatesSchema.parse(raw);
-  const today  = new Date().toISOString().slice(0, 10);
+  // Inclui 45 dias passados (releases publicados recentemente com actual real)
+  // mais todos os próximos até ~90 dias à frente.
+  const cutoff = new Date(Date.now() - 45 * 86_400_000).toISOString().slice(0, 10);
 
   return parsed.release_dates
     .map((d: { date: string }) => d.date)
-    .filter((d: string) => d >= today)
-    .reverse()
-    .slice(0, 4);
+    .filter((d: string) => d >= cutoff)
+    .reverse()          // ascendente para exibição cronológica
+    .slice(0, 6);       // 1-2 passados + 3-4 futuros
 }
 
 async function fetchObservations(
@@ -551,11 +553,13 @@ function buildMockEvents(): MacroCalendarEvent[] {
 async function buildFomcEvents(
   actualsDb: Map<string, { actual: number; source: string }>,
 ): Promise<MacroCalendarEvent[]> {
-  const today = new Date().toISOString().slice(0, 10);
-  const fedFundsObs = await fetchObservations('FEDFUNDS', 2).catch(() => []);
+  const today   = new Date().toISOString().slice(0, 10);
+  // Inclui FOMC dos últimos 45 dias para mostrar decisões passadas recentes
+  const cutoff  = new Date(Date.now() - 45 * 86_400_000).toISOString().slice(0, 10);
+  const fedFundsObs = await fetchObservations('FEDFUNDS', 4).catch(() => []);
   const fedFundsPrev = formatPrevious('US_FOMC', fedFundsObs, false);
 
-  return FOMC_2026.filter(f => f.date >= today).map(fomc => {
+  return FOMC_2026.filter(f => f.date >= cutoff).map(fomc => {
     const { utc, brt } = etToBrt(fomc.date, fomc.time_et);
     const dbActual = actualsDb.get(`US_FOMC|${utc}`);
     return {
@@ -566,8 +570,9 @@ async function buildFomcEvents(
       tier:                 1 as const,
       datetime_utc:         utc,
       datetime_brt:         brt,
-      status:               'scheduled' as const,
+      status:               fomc.date <= today ? 'released' as const : 'scheduled' as const,
       previous:             fedFundsPrev,
+      // FEDFUNDS mensal tem delay: usamos como indicador de taxa após a decisão
       actual:               dbActual ? String(dbActual.actual) : null,
       actual_source:        dbActual?.source ?? null,
       consensus:            null,
@@ -615,9 +620,11 @@ export async function fetchMacroCalendarEvents(): Promise<MacroCalendarEvent[]> 
 
   const results = await Promise.allSettled(
     fredCatalog.map(async (cat) => {
+      // 4 observações: permite derivar actual do FRED para eventos released
+      // sem depender do worker server-side.
       const [releaseDates, observations] = await Promise.all([
         fetchReleaseDates(cat.fred_release_id!),
-        fetchObservations(cat.fred_series!, 3),
+        fetchObservations(cat.fred_series!, 4),
       ]);
       return { cat, releaseDates, observations };
     }),
@@ -630,11 +637,36 @@ export async function fetchMacroCalendarEvents(): Promise<MacroCalendarEvent[]> 
     }
 
     const { cat, releaseDates, observations } = result.value;
-    const previous = formatPrevious(cat.code, observations, cat.mom_computed);
 
     for (const dateStr of releaseDates) {
+      const isReleased = dateStr <= today;
       const { utc, brt } = etToBrt(dateStr, cat.release_time_et);
       const dbActual = actualsDb.get(`${cat.code}|${utc}`);
+
+      // Para eventos released: actual = mudança mais recente (obs[-1]),
+      //   previous = mudança anterior (obs sem o último elemento).
+      // Para scheduled: actual=null, previous = mudança mais recente disponível.
+      let actual: string | null = null;
+      let previous: string | null = null;
+      let actualSource: string | null = null;
+
+      if (dbActual) {
+        // DB tem precedência — preenchido pelo worker server-side
+        actual       = String(dbActual.actual);
+        actualSource = dbActual.source;
+        previous     = formatPrevious(cat.code, observations.slice(0, -1), cat.mom_computed);
+      } else if (isReleased && observations.length >= 2) {
+        // Deriva actual direto do FRED: obs[-1] é o valor publicado
+        actual       = formatPrevious(cat.code, observations, cat.mom_computed);
+        actualSource = `FRED:${cat.fred_series}:client`;
+        previous     = observations.length >= 3
+          ? formatPrevious(cat.code, observations.slice(0, -1), cat.mom_computed)
+          : null;
+      } else {
+        // Scheduled: actual ainda não existe, previous é o mais recente disponível
+        previous = formatPrevious(cat.code, observations, cat.mom_computed);
+      }
+
       events.push({
         id:                   `${cat.code}-${dateStr}`,
         code:                 cat.code,
@@ -643,10 +675,10 @@ export async function fetchMacroCalendarEvents(): Promise<MacroCalendarEvent[]> 
         tier:                 cat.tier,
         datetime_utc:         utc,
         datetime_brt:         brt,
-        status:               dateStr <= today ? 'released' : 'scheduled',
+        status:               isReleased ? 'released' : 'scheduled',
         previous,
-        actual:               dbActual ? String(dbActual.actual) : null,
-        actual_source:        dbActual?.source ?? null,
+        actual,
+        actual_source:        actualSource,
         consensus:            null,
         consensus_label:      consensusLabel,
         unit:                 cat.unit,
