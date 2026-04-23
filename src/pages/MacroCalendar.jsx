@@ -11,7 +11,7 @@ import GoldenRule from '../components/ui/GoldenRule';
 import { format, differenceInHours, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { sendNotificationEmail } from '@/lib/notificationClient';
-import { useMacroCalendar } from '@/hooks/useMacroCalendar';
+import { useMacroCalendar, useMacroAlertPreferences, useToggleMacroAlert } from '@/hooks/useMacroCalendar';
 import { IS_LIVE } from '@/lib/env';
 
 const AGENCY_COLOR = {
@@ -129,12 +129,15 @@ function EventCard({ event, onToggleAlert }) {
         </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
         <div style={{ background: '#0d1421', borderRadius: 6, padding: '6px 9px' }}>
           <div style={{ fontSize: 8, color: '#334155', marginBottom: 2 }}>Consenso</div>
           <div style={{ fontSize: 11, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', color: '#64748b' }}>
-            {event.consensus ?? event.expected ?? '—'}
+            {event.consensus ?? '—'}
           </div>
+          {event.consensus_label && (
+            <div style={{ fontSize: 7, color: '#334155', marginTop: 1 }}>{event.consensus_label}</div>
+          )}
         </div>
         <div style={{ background: '#0d1421', borderRadius: 6, padding: '6px 9px' }}>
           <div style={{ fontSize: 8, color: '#334155', marginBottom: 2 }}>Anterior</div>
@@ -143,7 +146,18 @@ function EventCard({ event, onToggleAlert }) {
           </div>
         </div>
         <div style={{ background: '#0d1421', borderRadius: 6, padding: '6px 9px' }}>
-          <div style={{ fontSize: 8, color: '#334155', marginBottom: 2 }}>Impacto BTC (hist.)</div>
+          <div style={{ fontSize: 8, color: event.actual ? '#10b981' : '#334155', marginBottom: 2 }}>
+            {event.actual ? '✓ Atual' : 'Atual'}
+          </div>
+          <div style={{ fontSize: 11, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', color: event.actual ? '#10b981' : '#334155' }}>
+            {event.actual ?? (event.status === 'released' ? 'Aguardando...' : '—')}
+          </div>
+          {event.actual_source && (
+            <div style={{ fontSize: 7, color: '#334155', marginTop: 1 }}>{event.actual_source.split(':')[0]}</div>
+          )}
+        </div>
+        <div style={{ background: '#0d1421', borderRadius: 6, padding: '6px 9px' }}>
+          <div style={{ fontSize: 8, color: '#334155', marginBottom: 2 }}>Impacto BTC</div>
           <div style={{ fontSize: 11, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', color: impactColor }}>
             {event.btc_impact_hist_avg > 0 ? '+' : ''}{event.btc_impact_hist_avg}%
           </div>
@@ -263,11 +277,10 @@ const TABS = ['Agenda', 'Surpresa', 'Volatilidade', 'Alertas'];
 
 export default function MacroCalendar() {
   const [tab, setTab] = useState('Agenda');
-  const [alertOverrides, setAlertOverrides] = useState({});
   const [selectedHistEvent, setSelectedHistEvent] = useState(eventVolatilityData[0]);
   const [toast, setToast] = useState(null);
 
-  // ─── Hook live — FRED API + FOMC estático ─────────────────────────────────
+  // ─── Hooks live — FRED API + FOMC estático + alertas persistidos ──────────
   const {
     data: liveEvents = [],
     isLoading: calLoading,
@@ -277,10 +290,20 @@ export default function MacroCalendar() {
     dataUpdatedAt: calUpdatedAt,
   } = useMacroCalendar();
 
-  // Mescla alertOverrides locais (toggle pelo user) com dados do hook
+  const { data: alertPrefs } = useMacroAlertPreferences();
+  const toggleAlertMutation  = useToggleMacroAlert();
+
+  // Mescla preferências de alerta persistidas com dados do hook
   const events = useMemo(
-    () => liveEvents.map(e => ({ ...e, ...alertOverrides[e.id] })),
-    [liveEvents, alertOverrides],
+    () => liveEvents.map(e => {
+      const pref = alertPrefs?.get(e.code);
+      return {
+        ...e,
+        alert_enabled:        pref ? pref.alert_enabled        : e.alert_enabled,
+        alert_minutes_before: pref ? pref.alert_minutes_before : e.alert_minutes_before,
+      };
+    }),
+    [liveEvents, alertPrefs],
   );
 
   // Enriquece eventVolatilityData com Z-Score de surpresa (fórmula validada Python)
@@ -292,10 +315,14 @@ export default function MacroCalendar() {
   };
 
   const toggleAlert = (id) => {
-    setAlertOverrides(prev => ({
-      ...prev,
-      [id]: { alert_enabled: !((prev[id]?.alert_enabled) ?? liveEvents.find(e => e.id === id)?.alert_enabled ?? false) },
-    }));
+    const event = events.find(e => e.id === id);
+    if (!event) return;
+    const newEnabled = !event.alert_enabled;
+    toggleAlertMutation.mutate({
+      eventCode:          event.code,
+      alertEnabled:       newEnabled,
+      alertMinutesBefore: event.alert_minutes_before,
+    });
   };
 
   const sendTestAlert = async (event) => {

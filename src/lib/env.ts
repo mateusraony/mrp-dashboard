@@ -29,17 +29,20 @@ export const env = parsed.success ? parsed.data : EnvSchema.parse({});
 
 /**
  * DATA_MODE global — prioridade:
- * 1. VITE_DATA_MODE=live (padrão) — env var sempre vence quando é 'live'
- * 2. localStorage 'mrp_data_mode' — só tem efeito quando env var é 'mock'
- * 3. 'live' (default)
+ * 1. VITE_DATA_MODE=mock → força mock (testes, dev sem rede)
+ * 2. VITE_DATA_MODE=live → live, mas localStorage pode sobrescrever para mock
+ * 3. localStorage 'mrp_data_mode' — override do usuário em runtime
+ * 4. 'live' (default de produção)
  */
 const _storedMode = typeof localStorage !== 'undefined'
   ? (localStorage.getItem('mrp_data_mode') as 'mock' | 'live' | null)
   : null;
 export const DATA_MODE: 'mock' | 'live' =
-  env.VITE_DATA_MODE === 'live' ? 'live' :
-  (_storedMode === 'mock' || _storedMode === 'live') ? _storedMode :
-  'live';
+  env.VITE_DATA_MODE === 'mock' ? 'mock' :
+  env.VITE_DATA_MODE === 'live'
+    ? (_storedMode === 'mock' ? 'mock' : 'live')
+    : (_storedMode === 'mock' || _storedMode === 'live') ? _storedMode
+    : 'live';
 
 /** true = usar APIs reais; false = usar mock data */
 export const IS_LIVE = DATA_MODE === 'live';
