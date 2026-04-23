@@ -84,7 +84,15 @@ vitest.config.ts
 - Resume consenso técnico e toma decisão final sem conflito.
 - Se houver divergência: resume os caminhos e pede decisão do usuário.
 - Impede saída de escopo. Garante que nenhuma fase seja pulada.
-- Skills: writing-plans, dispatching-parallel-agents, brainstorming, ralph loop, xquads-squads.
+- Skills: writing-plans, dispatching-parallel-agents, brainstorming, ralph loop, xquads-squads, **karpathy-guidelines** (ativo permanentemente).
+
+#### Karpathy Guidelines (obrigatório para o Líder e todos os agentes)
+> Fonte: https://github.com/forrestchang/andrej-karpathy-skills — instalado em `.claude/skills/karpathy-guidelines.md`
+
+1. **Think Before Coding** — Explicitar suposições antes de implementar. Se houver interpretações múltiplas, apresentá-las. Se existir abordagem mais simples, dizê-la. Se algo estiver confuso, parar e perguntar.
+2. **Simplicity First** — Código mínimo que resolve o problema. Sem features além do pedido, sem abstrações para uso único, sem tratamento de erros impossíveis. Se 200 linhas podem ser 50, reescrever.
+3. **Surgical Changes** — Tocar apenas o que a tarefa exige. Não melhorar código adjacente, não reformatar o que não foi pedido. Cada linha alterada deve rastrear diretamente ao pedido do usuário.
+4. **Goal-Driven Execution** — Transformar tarefas em critérios verificáveis: "escrever testes para inputs inválidos, depois fazê-los passar" em vez de "adicionar validação". Para tarefas multi-etapa, declarar plano com checkpoints antes de executar.
 
 ### 2. Arquiteto de Sistemas (Sistemas)
 - Infraestrutura, escalabilidade, arquitetura geral.
