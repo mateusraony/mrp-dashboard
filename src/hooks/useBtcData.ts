@@ -119,6 +119,8 @@ export function useLiquidations(limit = 50) {
     queryFn:  () => fetchLiquidations('BTCUSDT', limit),
     staleTime: 25_000,
     refetchInterval: OI_INTERVAL,
+    retry: 0,                    // sem retry: endpoint requer auth, falha é permanente
+    refetchOnWindowFocus: false,
   });
 }
 

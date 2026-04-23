@@ -292,6 +292,10 @@ export async function fetchLiquidations(symbol = 'BTCUSDT', limit = 50): Promise
 
   const url = `${FUTURES_BASE}/fapi/v1/forceOrders?symbol=${symbol}&limit=${limit}`;
   const res = await fetch(url);
+
+  // /fapi/v1/forceOrders requer autenticação (não é endpoint público).
+  // Retorna [] sem lançar erro para evitar retry loop.
+  if (res.status === 401 || res.status === 403) return [];
   if (!res.ok) throw new Error(`Binance Liquidations error ${res.status}`);
 
   const raw = await res.json();
