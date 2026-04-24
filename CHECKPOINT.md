@@ -1,6 +1,6 @@
 # CHECKPOINT.md — MRP Dashboard
 > Memória técnica viva do projeto. Atualizar ao final de cada bloco importante.
-> Última atualização: 2026-04-19 (Sprint 7 — GDELT AI live, MacroCalendar FRED, RefreshButton orbital, Debug→Supabase)
+> Última atualização: 2026-04-23 (Sprint 8 — MacroCalendar production hardening + fix exibição de eventos passados)
 
 ---
 
@@ -11,7 +11,7 @@
 | Build (`npm run build`) | ✅ PASSA | 0 erros — index.js 90KB |
 | Lint (`eslint . --quiet`) | ✅ PASSA | 0 erros |
 | TypeCheck (`tsc -p jsconfig.json`) | ✅ PASSA | 0 erros |
-| Testes (`npm test`) | ✅ 52/52 | 3 suites: sessionAnalytics(15) + coinmetrics(10) + dealerGreeks(27) |
+| Testes (`npm test`) | ✅ 79/79 | 4 suites: sessionAnalytics(15) + coinmetrics(10) + dealerGreeks(27) + macroCalendar(27) |
 | Deploy (Render) | ✅ ONLINE | https://mrp-dashboard.onrender.com |
 | DATA_MODE | ✅ live | .env.local: VITE_DATA_MODE=live |
 | FRED API Key | ✅ CONFIGURADA | VITE_FRED_API_KEY presente em .env.local |
@@ -26,7 +26,15 @@
 | Debug Panel | ✅ IMPLEMENTADO | `src/lib/debugLog.ts` + `src/components/ui/DebugPanel.jsx` — logs internos visíveis em prod |
 | Debug→Supabase | ✅ SPRINT 7 | `logError()` persiste erros em `system_logs` via raw fetch (sem import circular) |
 | GDELT AI tab | ✅ SPRINT 7 | Aba "Inteligência AI" usa `useGdeltNews` real (query institucional) — fora de mock |
-| MacroCalendar FRED | ✅ SPRINT 7 | `macroCalendarService.ts` + `useMacroCalendar.ts` — FRED release dates + FOMC hardcoded |
+| MacroCalendar FRED | ✅ SPRINT 8 | `macroCalendarService.ts` — eventos passados 45d + actual derivado FRED client-side + FOMC passados |
+| MacroCalendar RLS | ✅ SPRINT 8 | RLS endurecido: INSERT/UPDATE restrito a service_role em tabelas críticas |
+| MacroCalendar alertas | ✅ SPRINT 8 | `macro_alert_preferences` — persistência real em Supabase; toggle não reseta no refresh |
+| macro-actual-fetcher | ✅ SPRINT 8 | Edge Function deploy-ready — job 15min busca actuals FRED pós-release |
+| macro-alert-worker | ✅ SPRINT 8 | Edge Function deploy-ready — cron 5min envia Telegram 60/30/15min antes, dedup |
+| telegram-ping | ✅ SPRINT 8 | Edge Function deploy-ready — teste isolado de token + chat_id |
+| telegram_delivery_log | ✅ SPRINT 8 | Tabela de auditoria de envios Telegram com dedup por delivery_key |
+| system_job_log | ✅ SPRINT 8 | Tabela de saúde de jobs + views v_job_health + v_macro_actual_pending |
+| DATA_MODE bug | ✅ SPRINT 8 | Fix: `env.ts` agora respeita `VITE_DATA_MODE=mock` via env var (não só localStorage) |
 | RefreshButton orbital | ✅ SPRINT 7 | `src/components/ui/RefreshButton.jsx` — botão animado com órbitas, ripple, halo verde |
 | gdelt_articles table | ✅ SPRINT 7 | Migration `20260420000100` — tabela pronta para persistir artigos GDELT |
 | system_logs table | ✅ SPRINT 7 | Migration `20260420000200` — persiste erros do DebugLog em produção |
@@ -234,16 +242,20 @@ refetchInterval: IS_LIVE ? 30_000 : false,
 | `macro_event_market_reaction` | 7 | ✅ | Reação histórica BTC por janela de tempo |
 | `feature_store_macro` | 7 | ✅ | Features derivadas para inference de AI |
 | `ai_inference_log` | 7 | ✅ | Log de inferências/predições do modelo |
+| `macro_alert_preferences` | 8 | ✅ | Alertas macro persistidos por usuário/evento (sentinel UUID) |
+| `telegram_delivery_log` | 8 | ✅ | Auditoria de envios Telegram (dedup por delivery_key) |
+| `system_job_log` | 8 | ✅ | Saúde de jobs agendados (correlation_id, latência, contadores) |
 
 ---
 
-## 🧪 COBERTURA DE TESTES (52 testes — 3 suites)
+## 🧪 COBERTURA DE TESTES (79 testes — 4 suites)
 
 | Arquivo | Testes | O que cobre |
 |---------|--------|-------------|
 | `sessionAnalytics.test.ts` | 15 | `getSessionForHour` + `computeSessionStats` (Ásia/Europa/EUA CVD) |
 | `coinmetrics.test.ts` | 10 | Shape, ranges MVRV/NUPL, zonas, history, updated_at |
 | `dealerGreeks.test.ts` | 27 | `computeGreeks` null guards, delta ATM, put-call parity, GEX sign |
+| `macroCalendar.test.ts` | 27 | parsePrevToNumeric, dedup delivery key, DST ET→BRT, janelas de alerta |
 
 ---
 
