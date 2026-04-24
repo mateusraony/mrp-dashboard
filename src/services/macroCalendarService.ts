@@ -570,7 +570,8 @@ async function buildFomcEvents(
       tier:                 1 as const,
       datetime_utc:         utc,
       datetime_brt:         brt,
-      status:               fomc.date <= today ? 'released' as const : 'scheduled' as const,
+      // Compara instante UTC completo para não marcar como released antes das 14h ET
+      status:               utc <= new Date().toISOString() ? 'released' as const : 'scheduled' as const,
       previous:             fedFundsPrev,
       // FEDFUNDS mensal tem delay: usamos como indicador de taxa após a decisão
       actual:               dbActual ? String(dbActual.actual) : null,
@@ -639,13 +640,11 @@ export async function fetchMacroCalendarEvents(): Promise<MacroCalendarEvent[]> 
     const { cat, releaseDates, observations } = result.value;
 
     for (const dateStr of releaseDates) {
-      const isReleased = dateStr <= today;
       const { utc, brt } = etToBrt(dateStr, cat.release_time_et);
+      // Compara instante UTC completo para não marcar como released antes do horário real
+      const isReleased = utc <= new Date().toISOString();
       const dbActual = actualsDb.get(`${cat.code}|${utc}`);
 
-      // Para eventos released: actual = mudança mais recente (obs[-1]),
-      //   previous = mudança anterior (obs sem o último elemento).
-      // Para scheduled: actual=null, previous = mudança mais recente disponível.
       let actual: string | null = null;
       let previous: string | null = null;
       let actualSource: string | null = null;
@@ -654,14 +653,23 @@ export async function fetchMacroCalendarEvents(): Promise<MacroCalendarEvent[]> 
         // DB tem precedência — preenchido pelo worker server-side
         actual       = String(dbActual.actual);
         actualSource = dbActual.source;
-        previous     = formatPrevious(cat.code, observations.slice(0, -1), cat.mom_computed);
-      } else if (isReleased && observations.length >= 2) {
-        // Deriva actual direto do FRED: obs[-1] é o valor publicado
-        actual       = formatPrevious(cat.code, observations, cat.mom_computed);
-        actualSource = `FRED:${cat.fred_series}:client`;
-        previous     = observations.length >= 3
-          ? formatPrevious(cat.code, observations.slice(0, -1), cat.mom_computed)
+        // previous = observações disponíveis antes deste release
+        const obsAtRelease = observations.filter(o => o.date <= dateStr);
+        previous = obsAtRelease.length >= 2
+          ? formatPrevious(cat.code, obsAtRelease.slice(0, -1), cat.mom_computed)
           : null;
+      } else if (isReleased) {
+        // Filtra obs disponíveis NA DATA do release para cada evento individual.
+        // Sem isso, múltiplos released na janela 45d receberiam todos o obs[-1] mais recente.
+        const obsAtRelease = observations.filter(o => o.date <= dateStr);
+        if (obsAtRelease.length >= 2) {
+          actual       = formatPrevious(cat.code, obsAtRelease, cat.mom_computed);
+          actualSource = `FRED:${cat.fred_series}:client`;
+          previous     = formatPrevious(cat.code, obsAtRelease.slice(0, -1), cat.mom_computed);
+        } else if (obsAtRelease.length === 1) {
+          actual       = formatPrevious(cat.code, obsAtRelease, cat.mom_computed);
+          actualSource = `FRED:${cat.fred_series}:client`;
+        }
       } else {
         // Scheduled: actual ainda não existe, previous é o mais recente disponível
         previous = formatPrevious(cat.code, observations, cat.mom_computed);
