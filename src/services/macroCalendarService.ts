@@ -137,12 +137,20 @@ interface CatalogEntry {
 }
 
 const CATALOG: CatalogEntry[] = [
+  // ── Tier 1 — Alta impacto (3 estrelas investing.com) ───────────────────────
   {
     code: 'US_CPI', name: 'CPI (MoM)', agency: 'BLS', tier: 1,
     fred_release_id: 10, fred_series: 'CPIAUCSL',
     unit: '%', release_time_et: '08:30',
     btc_impact_hist_avg: -2.5, mom_computed: true,
     description: 'Inflação ao consumidor. Mais impactante para o Fed e BTC.',
+  },
+  {
+    code: 'US_CORE_CPI', name: 'Core CPI (MoM)', agency: 'BLS', tier: 1,
+    fred_release_id: 10, fred_series: 'CPILFESL',
+    unit: '%', release_time_et: '08:30',
+    btc_impact_hist_avg: -2.8, mom_computed: true,
+    description: 'CPI excluindo alimentos e energia — métrica preferida do Fed para inflação subjacente.',
   },
   {
     code: 'US_NFP', name: 'Nonfarm Payrolls', agency: 'BLS', tier: 1,
@@ -152,7 +160,7 @@ const CATALOG: CatalogEntry[] = [
     description: 'Empregos não-agrícolas criados. Indicador líder do mercado de trabalho.',
   },
   {
-    code: 'US_UNEMPLOYMENT', name: 'Unemployment Rate', agency: 'BLS', tier: 2,
+    code: 'US_UNEMPLOYMENT', name: 'Unemployment Rate', agency: 'BLS', tier: 1,
     fred_release_id: 50, fred_series: 'UNRATE',
     unit: '%', release_time_et: '08:30',
     btc_impact_hist_avg: 0.8, mom_computed: false,
@@ -166,12 +174,27 @@ const CATALOG: CatalogEntry[] = [
     description: 'PIB dos EUA (variação trimestral anualizada). Publicação: fim de cada trimestre.',
   },
   {
-    code: 'US_PCE', name: 'PCE Price Index (MoM)', agency: 'BEA', tier: 2,
-    fred_release_id: 54, fred_series: 'PCEPI',
+    code: 'US_PCE', name: 'Core PCE (MoM)', agency: 'BEA', tier: 1,
+    fred_release_id: 54, fred_series: 'PCEPILFE',
     unit: '%', release_time_et: '08:30',
-    btc_impact_hist_avg: -1.9, mom_computed: true,
-    description: 'Indicador de inflação preferido do Federal Reserve.',
+    btc_impact_hist_avg: -2.1, mom_computed: true,
+    description: 'PCE Core — indicador de inflação preferido do Fed (exclui alimentos/energia).',
   },
+  {
+    code: 'US_CLAIMS', name: 'Initial Jobless Claims', agency: 'DOL', tier: 1,
+    fred_release_id: 40, fred_series: 'ICSA',
+    unit: 'K', release_time_et: '08:30',
+    btc_impact_hist_avg: 0.4, mom_computed: false,
+    description: 'Pedidos semanais de seguro-desemprego. Publicado toda quinta-feira — termômetro em tempo real do mercado de trabalho.',
+  },
+  {
+    code: 'US_JOLTS', name: 'JOLTS Job Openings', agency: 'BLS', tier: 1,
+    fred_release_id: 383, fred_series: 'JTSJOL',
+    unit: 'K', release_time_et: '10:00',
+    btc_impact_hist_avg: -0.9, mom_computed: false,
+    description: 'Vagas de emprego abertas — indicador antecedente do mercado de trabalho e decisões do Fed.',
+  },
+  // ── Tier 2 — Médio impacto (2–3 estrelas investing.com) ────────────────────
   {
     code: 'US_PPI', name: 'PPI (MoM)', agency: 'BLS', tier: 2,
     fred_release_id: 62, fred_series: 'PPIACO',
@@ -185,6 +208,27 @@ const CATALOG: CatalogEntry[] = [
     unit: '%', release_time_et: '08:30',
     btc_impact_hist_avg: 0.6, mom_computed: true,
     description: 'Vendas no varejo — proxy de consumo e crescimento econômico.',
+  },
+  {
+    code: 'US_DURABLE', name: 'Durable Goods Orders (MoM)', agency: 'Census', tier: 2,
+    fred_release_id: 84, fred_series: 'DGORDER',
+    unit: '%', release_time_et: '08:30',
+    btc_impact_hist_avg: 0.5, mom_computed: true,
+    description: 'Encomendas de bens duráveis — proxy de investimento industrial e confiança empresarial.',
+  },
+  {
+    code: 'US_UMICH', name: 'U of Michigan Consumer Sentiment', agency: 'UMich', tier: 2,
+    fred_release_id: 380, fred_series: 'UMCSENT',
+    unit: 'pts', release_time_et: '10:00',
+    btc_impact_hist_avg: 0.3, mom_computed: false,
+    description: 'Confiança do consumidor americano — expectativas de inflação de 1 e 5 anos impactam Fed.',
+  },
+  {
+    code: 'US_HOUSING', name: 'Housing Starts', agency: 'Census', tier: 2,
+    fred_release_id: 16, fred_series: 'HOUST',
+    unit: 'K', release_time_et: '08:30',
+    btc_impact_hist_avg: 0.2, mom_computed: false,
+    description: 'Início de construções residenciais — indicador de saúde do setor imobiliário e crédito.',
   },
 ];
 
@@ -313,6 +357,10 @@ function formatPrevious(
     case 'US_UNEMPLOYMENT': return `${latest.value.toFixed(1)}%`;
     case 'US_GDP':          return `${latest.value >= 0 ? '+' : ''}${latest.value.toFixed(1)}%`;
     case 'US_FOMC':         return `${latest.value.toFixed(2)}%`;
+    case 'US_CLAIMS':       return `${Math.round(latest.value / 1000)}K`; // ICSA em unidades, converte p/ K
+    case 'US_JOLTS':        return `${(latest.value / 1000).toFixed(1)}M`; // JTSJOL em milhares
+    case 'US_HOUSING':      return `${Math.round(latest.value)}K`; // HOUST em milhares
+    case 'US_UMICH':        return `${latest.value.toFixed(1)} pts`;
     default:                return `${latest.value.toFixed(2)}`;
   }
 }
@@ -445,18 +493,17 @@ async function fetchReleaseDates(releaseId: number): Promise<string[]> {
     release_id:                         String(releaseId),
     sort_order:                         'desc',
     include_release_dates_with_no_data: 'true',
-    limit:                              '12',
+    limit:                              '20',  // 20 para acomodar eventos semanais (Initial Claims)
   });
   const parsed = ReleaseDatesSchema.parse(raw);
-  // Inclui 45 dias passados (releases publicados recentemente com actual real)
-  // mais todos os próximos até ~90 dias à frente.
   const cutoff = new Date(Date.now() - 45 * 86_400_000).toISOString().slice(0, 10);
+  const ahead  = new Date(Date.now() + 60 * 86_400_000).toISOString().slice(0, 10);
 
   return parsed.release_dates
     .map((d: { date: string }) => d.date)
-    .filter((d: string) => d >= cutoff)
+    .filter((d: string) => d >= cutoff && d <= ahead)
     .reverse()          // ascendente para exibição cronológica
-    .slice(0, 6);       // 1-2 passados + 3-4 futuros
+    .slice(0, 8);       // até 8: ~2 passados + ~6 futuros para mensais; ~6 semanas para semanais
 }
 
 async function fetchObservations(

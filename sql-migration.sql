@@ -95,10 +95,8 @@ WHERE created_at >= now() - interval '7 days'
 GROUP BY job_name ORDER BY job_name;
 
 CREATE OR REPLACE VIEW public.v_macro_actual_pending AS
-SELECT s.id, s.event_code, s.release_time_utc, s.actual, s.retry_count, s.last_error,
-       c.fred_series, c.name AS event_name
+SELECT s.id, s.event_code, s.release_time_utc, s.actual, s.retry_count, s.last_error
 FROM public.macro_event_schedule s
-JOIN public.macro_event_catalog  c ON c.code = s.event_code
 WHERE s.actual IS NULL
   AND s.release_time_utc <= now() - interval '2 hours'
   AND s.retry_count < 5
