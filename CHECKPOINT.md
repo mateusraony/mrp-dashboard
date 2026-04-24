@@ -1,10 +1,10 @@
 # CHECKPOINT.md — MRP Dashboard
 > Memória técnica viva do projeto. Atualizar ao final de cada bloco importante.
-> Última atualização: 2026-04-23 (Sprint 8 — MacroCalendar production hardening + fix exibição de eventos passados)
+> Última atualização: 2026-04-24 (PR #34 merged — fixes P1/P2 Codex review + MacroCalendar production hardening completo no código)
 
 ---
 
-## 🗂 ESTADO GERAL (verificado por auditoria em 2026-04-14)
+## 🗂 ESTADO GERAL (verificado por auditoria em 2026-04-24)
 
 | Aspecto | Status | Evidência Real |
 |---------|--------|---------------|
@@ -29,9 +29,11 @@
 | MacroCalendar FRED | ✅ SPRINT 8 | `macroCalendarService.ts` — eventos passados 45d + actual derivado FRED client-side + FOMC passados |
 | MacroCalendar RLS | ✅ SPRINT 8 | RLS endurecido: INSERT/UPDATE restrito a service_role em tabelas críticas |
 | MacroCalendar alertas | ✅ SPRINT 8 | `macro_alert_preferences` — persistência real em Supabase; toggle não reseta no refresh |
-| macro-actual-fetcher | ✅ SPRINT 8 | Edge Function deploy-ready — job 15min busca actuals FRED pós-release |
-| macro-alert-worker | ✅ SPRINT 8 | Edge Function deploy-ready — cron 5min envia Telegram 60/30/15min antes, dedup |
-| telegram-ping | ✅ SPRINT 8 | Edge Function deploy-ready — teste isolado de token + chat_id |
+| PR #34 | ✅ MERGED | fix(macro-calendar): actual por release date + status FOMC/FRED por UTC completo (P1+P2 Codex) |
+| macro-actual-fetcher | ⏳ AGUARDA DEPLOY | Edge Function pronta — precisa: `supabase functions deploy macro-actual-fetcher` + pg_cron |
+| macro-alert-worker | ⏳ AGUARDA DEPLOY | Edge Function pronta — precisa: `supabase functions deploy macro-alert-worker` + pg_cron |
+| telegram-ping | ⏳ AGUARDA DEPLOY | Edge Function pronta — precisa: `supabase functions deploy telegram-ping` |
+| Migration hardening | ⏳ AGUARDA APPLY | `20260423000000_macro_production_hardening.sql` — precisa: `npx supabase db push` |
 | telegram_delivery_log | ✅ SPRINT 8 | Tabela de auditoria de envios Telegram com dedup por delivery_key |
 | system_job_log | ✅ SPRINT 8 | Tabela de saúde de jobs + views v_job_health + v_macro_actual_pending |
 | DATA_MODE bug | ✅ SPRINT 8 | Fix: `env.ts` agora respeita `VITE_DATA_MODE=mock` via env var (não só localStorage) |
