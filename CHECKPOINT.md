@@ -1,6 +1,6 @@
 # CHECKPOINT.md — MRP Dashboard
 > Memória técnica viva do projeto. Atualizar ao final de cada bloco importante.
-> Última atualização: 2026-04-25 (Sprint 9 — 13 eventos MacroCalendar, segurança, Telegram ping, rotas — PRs #35/#36/#37 merged)
+> Última atualização: 2026-04-25 (Sprint 9 — Edge Functions deployed + pg_cron ativo — MacroCalendar 100% operacional)
 
 ---
 
@@ -15,15 +15,16 @@
 | Supabase URL + ANON_KEY | ✅ CONFIGURADO | .env.local presente |
 | MacroCalendar eventos | ✅ 13 eventos | CPI, Core CPI, NFP, Unemployment, GDP, Core PCE, Initial Claims (semanal), JOLTS, PPI, Retail Sales, Durable Goods, UMich, Housing Starts, FOMC |
 | MacroCalendar agenda | ✅ REAL | Eventos passados 45d + actual via FRED client-side |
-| MacroCalendar alertas | ✅ CÓDIGO OK | macro_alert_preferences no Supabase (tabela criada pelo usuário) |
+| MacroCalendar alertas | ✅ ATIVO | macro_alert_preferences + macro-alert-worker rodando a cada 5min |
 | Secrets expostos | ✅ CORRIGIDO | Removidos de sql-migration.sql e deploy-supabase.sh |
 | persistMacroSchedule | ✅ REMOVIDO | Client-side não tenta mais escrever em macro_event_schedule (RLS) |
 | Telegram test Settings | ✅ CORRIGIDO | Usa telegram-ping (token+chat_id no body, retorna latência) |
 | Rota alert worker | ✅ CORRIGIDO | /MacroCalendar (era /macro-calendar) |
 | pg_cron UI | ✅ CORRIGIDO | Badge falso removido, instrução honesta |
 | Migration hardening | ✅ APLICADA | 3 tabelas criadas pelo usuário no SQL Editor |
-| Edge Functions | ⏳ AGUARDA DEPLOY | fred-proxy, macro-actual-fetcher, macro-alert-worker, telegram-ping, send-telegram-digest |
-| pg_cron jobs | ⏳ AGUARDA | Só após Edge Functions deployadas |
+| Edge Functions | ✅ DEPLOYED | telegram-ping, macro-alert-worker, macro-actual-fetcher, send-telegram-digest |
+| pg_cron jobs | ✅ ATIVO | 3 jobs ativos: macro-actual-fetcher (*/15min), macro-alert-worker (*/5min), send-telegram-digest (11h UTC) |
+| pg_cron duplicata | ⚠️ PENDENTE | Job antigo `telegram-digest` duplica o `send-telegram-digest` — remover com SELECT cron.unschedule('telegram-digest') |
 | Auth real | ❌ AUSENTE | Stub anônimo — aguarda decisão futura |
 
 ---
@@ -204,7 +205,7 @@ refetchInterval: IS_LIVE ? 30_000 : false,
 | Item | Severidade | Status | Ação |
 |------|------------|--------|------|
 | Auth stub anônimo (`AuthContext.jsx`) | Alta | Pendente | Supabase Auth (email/OAuth) — aguarda decisão |
-| Telegram deploy | Baixa | Pendente | `supabase functions deploy send-telegram-digest` + pg_cron SQL no Dashboard |
+| pg_cron duplicata | Baixa | Pendente | `SELECT cron.unschedule('telegram-digest');` no SQL Editor — remove job antigo duplicado |
 | SOPR/Netflow/Whale via Glassnode | Média | Pendente | Requer plano pago ~$29/mês |
 | Base44 favicon residual (`index.html`) | Baixa | Pendente | 1 linha — remover quando conveniente |
 | Rate limiting CoinGecko | Baixa | Pendente | Debounce/queue ≤30 req/min no free tier |
@@ -249,7 +250,7 @@ refetchInterval: IS_LIVE ? 30_000 : false,
 
 | Item | Descrição | Bloqueio |
 |------|-----------|---------|
-| **Telegram Digest (Sprint 6.6)** | ✅ CONCLUÍDO | Edge Function + Settings persistence. Falta apenas: deploy via CLI/Dashboard + ativar pg_cron |
+| **Telegram Digest (Sprint 6.6)** | ✅ CONCLUÍDO | Edge Functions deployed + pg_cron ativo. Pendente: remover job duplicado `telegram-digest` |
 | **GDELT→Supabase wiring** | `useGdelt.ts` busca artigos mas não faz upsert em `gdelt_articles` ainda | Tabela criada (Sprint 7) — falta wiring no hook |
 | **MacroCalendar bronze pipeline** | `macro_event_schedule` não é populado automaticamente ainda | `macroCalendarService.ts` gera eventos em memória; persitência é Sprint 8 |
 | **Auth real** | Login com email/Google via Supabase Auth | Decisão de negócio — quando quiser ativar |
