@@ -281,6 +281,65 @@ function mockLiquidations(): LiquidationEntry[] {
   });
 }
 
+// ─── Long/Short Ratio ─────────────────────────────────────────────────────────
+
+export interface LongShortRatioData {
+  symbol:        string;
+  longAccount:   number;  // proporção de contas long (0-1)
+  shortAccount:  number;
+  timestamp:     number;
+  ls_ratio_pct:  number;  // longAccount * 100 (0-100)
+}
+
+const LongShortRatioItemSchema = z.object({
+  symbol:       z.string(),
+  longAccount:  z.coerce.number(),
+  shortAccount: z.coerce.number(),
+  timestamp:    z.coerce.number(),
+});
+
+function mockLongShortRatio(): LongShortRatioData {
+  return {
+    symbol:       'BTCUSDT',
+    longAccount:  0.5482,
+    shortAccount: 0.4518,
+    timestamp:    Date.now(),
+    ls_ratio_pct: 54.82,
+  };
+}
+
+/**
+ * fetchLongShortRatio — proporção de contas long vs short (Binance Futures)
+ *
+ * Endpoint público: GET /fapi/v1/globalLongShortAccountRatio
+ * Retorna null graciosamente se o endpoint exigir auth ou estiver indisponível.
+ */
+export async function fetchLongShortRatio(
+  symbol = 'BTCUSDT',
+  period = '5m',
+): Promise<LongShortRatioData | null> {
+  if (DATA_MODE === 'mock') return mockLongShortRatio();
+
+  const url = `${FUTURES_BASE}/fapi/v1/globalLongShortAccountRatio?symbol=${symbol}&period=${period}&limit=1`;
+  const res = await fetch(url);
+
+  if (res.status === 401 || res.status === 403) return null;
+  if (!res.ok) throw new Error(`Binance L/S Ratio error ${res.status}`);
+
+  const raw = await res.json() as unknown[];
+  const items = z.array(LongShortRatioItemSchema).parse(raw);
+  const item  = items[0];
+  if (!item) return null;
+
+  return {
+    symbol:       item.symbol,
+    longAccount:  item.longAccount,
+    shortAccount: item.shortAccount,
+    timestamp:    item.timestamp,
+    ls_ratio_pct: parseFloat((item.longAccount * 100).toFixed(2)),
+  };
+}
+
 /**
  * fetchLiquidations — liquidações forçadas recentes de BTCUSDT (Binance Futures)
  *

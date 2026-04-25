@@ -60,6 +60,7 @@ export interface AltcoinMarketData {
   market_cap:    number;
   price_change_percentage_7d:  number;
   price_change_percentage_30d: number;
+  price_change_percentage_90d: number;
   price_change_percentage_24h: number;
 }
 
@@ -71,6 +72,7 @@ const AltcoinSchema = z.object({
   market_cap:    z.coerce.number(),
   price_change_percentage_7d_in_currency:  z.coerce.number().optional().default(0),
   price_change_percentage_30d_in_currency: z.coerce.number().optional().default(0),
+  price_change_percentage_90d_in_currency: z.coerce.number().optional().default(0),
   price_change_percentage_24h: z.coerce.number().optional().default(0),
 });
 export const AltcoinsSchema = z.array(AltcoinSchema);
@@ -84,6 +86,7 @@ function mockAltcoins(): AltcoinMarketData[] {
     market_cap:    a.mcap_b * 1e9,
     price_change_percentage_7d:  a.ret_7d,
     price_change_percentage_30d: a.ret_30d,
+    price_change_percentage_90d: a.ret_30d * 2.5, // estimativa mock
     price_change_percentage_24h: a.ret_7d / 7,
   }));
 }
@@ -127,7 +130,7 @@ export async function fetchTopAltcoins(limit = 20): Promise<AltcoinMarketData[]>
     order:                    'market_cap_desc',
     per_page:                 String(limit),
     page:                     '1',
-    price_change_percentage:  '7d,30d',
+    price_change_percentage:  '7d,30d,90d',
   });
 
   const res = await fetch(`${BASE}/coins/markets?${params}`);
@@ -144,6 +147,7 @@ export async function fetchTopAltcoins(limit = 20): Promise<AltcoinMarketData[]>
     market_cap:    c.market_cap,
     price_change_percentage_7d:  c.price_change_percentage_7d_in_currency,
     price_change_percentage_30d: c.price_change_percentage_30d_in_currency,
+    price_change_percentage_90d: c.price_change_percentage_90d_in_currency,
     price_change_percentage_24h: c.price_change_percentage_24h,
   }));
 }

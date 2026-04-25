@@ -163,7 +163,7 @@ function requireApiKey(): string {
 /**
  * Busca observações de uma série FRED com histórico de N dias.
  */
-async function fetchSeries(
+export async function fetchSeries(
   seriesId: string,
   apiKey: string,
   days = 35,
