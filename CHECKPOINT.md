@@ -1,46 +1,30 @@
 # CHECKPOINT.md — MRP Dashboard
 > Memória técnica viva do projeto. Atualizar ao final de cada bloco importante.
-> Última atualização: 2026-04-24 (PR #34 merged — fixes P1/P2 Codex review + MacroCalendar production hardening completo no código)
+> Última atualização: 2026-04-25 (Sprint 9 — 13 eventos MacroCalendar, segurança, Telegram ping, rotas — PRs #35/#36/#37 merged)
 
 ---
 
-## 🗂 ESTADO GERAL (verificado por auditoria em 2026-04-24)
+## 🗂 ESTADO GERAL (verificado em 2026-04-25)
 
 | Aspecto | Status | Evidência Real |
 |---------|--------|---------------|
-| Build (`npm run build`) | ✅ PASSA | 0 erros — index.js 90KB |
-| Lint (`eslint . --quiet`) | ✅ PASSA | 0 erros |
-| TypeCheck (`tsc -p jsconfig.json`) | ✅ PASSA | 0 erros |
-| Testes (`npm test`) | ✅ 79/79 | 4 suites: sessionAnalytics(15) + coinmetrics(10) + dealerGreeks(27) + macroCalendar(27) |
+| Build (`npm run build`) | ✅ PASSA | 0 erros |
+| Testes (`npm test`) | ✅ 79/79 | 4 suites |
 | Deploy (Render) | ✅ ONLINE | https://mrp-dashboard.onrender.com |
-| DATA_MODE | ✅ live | .env.local: VITE_DATA_MODE=live |
-| FRED API Key | ✅ CONFIGURADA | VITE_FRED_API_KEY presente em .env.local |
-| Supabase | ✅ ATIVO | URL + ANON_KEY em .env.local; 5 tabelas com RLS corrigido |
-| Supabase RLS | ✅ CORRIGIDO | Políticas using(true) — dados salvam (FK constraint removida) |
-| Supabase GitHub Integration | ✅ RESOLVIDO | 5 stubs + full_schema consolidado — drift detection eliminada — PR check ✅ |
-| SPA routing (Render) | ✅ CORRIGIDO | `public/_redirects`: `/* /index.html 200` |
+| FRED API Key | ✅ CONFIGURADA | VITE_FRED_API_KEY em .env.local |
+| Supabase URL + ANON_KEY | ✅ CONFIGURADO | .env.local presente |
+| MacroCalendar eventos | ✅ 13 eventos | CPI, Core CPI, NFP, Unemployment, GDP, Core PCE, Initial Claims (semanal), JOLTS, PPI, Retail Sales, Durable Goods, UMich, Housing Starts, FOMC |
+| MacroCalendar agenda | ✅ REAL | Eventos passados 45d + actual via FRED client-side |
+| MacroCalendar alertas | ✅ CÓDIGO OK | macro_alert_preferences no Supabase (tabela criada pelo usuário) |
+| Secrets expostos | ✅ CORRIGIDO | Removidos de sql-migration.sql e deploy-supabase.sh |
+| persistMacroSchedule | ✅ REMOVIDO | Client-side não tenta mais escrever em macro_event_schedule (RLS) |
+| Telegram test Settings | ✅ CORRIGIDO | Usa telegram-ping (token+chat_id no body, retorna latência) |
+| Rota alert worker | ✅ CORRIGIDO | /MacroCalendar (era /macro-calendar) |
+| pg_cron UI | ✅ CORRIGIDO | Badge falso removido, instrução honesta |
+| Migration hardening | ✅ APLICADA | 3 tabelas criadas pelo usuário no SQL Editor |
+| Edge Functions | ⏳ AGUARDA DEPLOY | fred-proxy, macro-actual-fetcher, macro-alert-worker, telegram-ping, send-telegram-digest |
+| pg_cron jobs | ⏳ AGUARDA | Só após Edge Functions deployadas |
 | Auth real | ❌ AUSENTE | Stub anônimo — aguarda decisão futura |
-| Telegram | ✅ IMPLEMENTADO | Edge Function + Settings persistence + Bot Token configurado |
-| GDELT News | ✅ LIVE | `src/services/gdelt.ts` + `src/hooks/useGdelt.ts` — NewsIntelligence usa dados reais |
-| SmartAlerts gauges | ✅ LIVE | Conectados a useBtcTicker + useLiquidations + useRiskScore + useMultiVenueSnapshot |
-| Debug Panel | ✅ IMPLEMENTADO | `src/lib/debugLog.ts` + `src/components/ui/DebugPanel.jsx` — logs internos visíveis em prod |
-| Debug→Supabase | ✅ SPRINT 7 | `logError()` persiste erros em `system_logs` via raw fetch (sem import circular) |
-| GDELT AI tab | ✅ SPRINT 7 | Aba "Inteligência AI" usa `useGdeltNews` real (query institucional) — fora de mock |
-| MacroCalendar FRED | ✅ SPRINT 8 | `macroCalendarService.ts` — eventos passados 45d + actual derivado FRED client-side + FOMC passados |
-| MacroCalendar RLS | ✅ SPRINT 8 | RLS endurecido: INSERT/UPDATE restrito a service_role em tabelas críticas |
-| MacroCalendar alertas | ✅ SPRINT 8 | `macro_alert_preferences` — persistência real em Supabase; toggle não reseta no refresh |
-| PR #34 | ✅ MERGED | fix(macro-calendar): actual por release date + status FOMC/FRED por UTC completo (P1+P2 Codex) |
-| macro-actual-fetcher | ⏳ AGUARDA DEPLOY | Edge Function pronta — precisa: `supabase functions deploy macro-actual-fetcher` + pg_cron |
-| macro-alert-worker | ⏳ AGUARDA DEPLOY | Edge Function pronta — precisa: `supabase functions deploy macro-alert-worker` + pg_cron |
-| telegram-ping | ⏳ AGUARDA DEPLOY | Edge Function pronta — precisa: `supabase functions deploy telegram-ping` |
-| Migration hardening | ⏳ AGUARDA APPLY | `20260423000000_macro_production_hardening.sql` — precisa: `npx supabase db push` |
-| telegram_delivery_log | ✅ SPRINT 8 | Tabela de auditoria de envios Telegram com dedup por delivery_key |
-| system_job_log | ✅ SPRINT 8 | Tabela de saúde de jobs + views v_job_health + v_macro_actual_pending |
-| DATA_MODE bug | ✅ SPRINT 8 | Fix: `env.ts` agora respeita `VITE_DATA_MODE=mock` via env var (não só localStorage) |
-| RefreshButton orbital | ✅ SPRINT 7 | `src/components/ui/RefreshButton.jsx` — botão animado com órbitas, ripple, halo verde |
-| gdelt_articles table | ✅ SPRINT 7 | Migration `20260420000100` — tabela pronta para persistir artigos GDELT |
-| system_logs table | ✅ SPRINT 7 | Migration `20260420000200` — persiste erros do DebugLog em produção |
-| macro_pipeline tables | ✅ SPRINT 7 | Migration `20260420000300` — 5 tabelas bronze/silver + seeds catalog (8 eventos) |
 
 ---
 
