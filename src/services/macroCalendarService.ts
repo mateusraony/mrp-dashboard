@@ -478,7 +478,11 @@ async function fredProxy(type: 'observations' | 'release_dates', params: Record<
   if (!FRED_PROXY) throw new Error('Supabase URL não configurado — fredProxy indisponível');
   const res = await fetch(FRED_PROXY, {
     method:  'POST',
-    headers: { 'Content-Type': 'application/json', apikey: _supKey },
+    headers: {
+      'Content-Type': 'application/json',
+      apikey:         _supKey,
+      Authorization:  `Bearer ${_supKey}`,
+    },
     body:    JSON.stringify({ type, params }),
   });
   if (!res.ok) {
