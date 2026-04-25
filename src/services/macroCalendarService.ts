@@ -750,8 +750,8 @@ export async function fetchMacroCalendarEvents(): Promise<MacroCalendarEvent[]> 
 
   logInfo('MacroCalendar fetched', { count: events.length, source: 'FRED' }, 'macroCalendar');
 
-  // Persiste eventos no pipeline bronze em background — não bloqueia a UI
-  void persistMacroSchedule(events);
+  // persistMacroSchedule removido: RLS restringe INSERT a service_role.
+  // Persistência server-side é feita pelo macro-actual-fetcher Edge Function.
 
   return events;
 }

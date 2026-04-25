@@ -260,22 +260,24 @@ function TelegramSection() {
         telegram_schedule:  schedule,
       });
 
-      const res = await fetch(`${supabaseUrl}/functions/v1/send-telegram-digest`, {
+      // telegram-ping: valida token + chat_id e envia mensagem de teste isolada
+      const res = await fetch(`${supabaseUrl}/functions/v1/telegram-ping`, {
         method:  'POST',
         headers: {
           'Authorization': `Bearer ${anonKey}`,
           'Content-Type':  'application/json',
         },
+        body: JSON.stringify({ token: token.trim(), chat_id: chatId.trim() }),
       });
 
       const body = await res.json().catch(() => ({}));
 
-      if (res.ok && body.status === 'sent') {
+      if (res.ok && body.ok) {
         setTestStatus('sent');
-        setTestMsg('Mensagem enviada com sucesso!');
+        setTestMsg(`Mensagem enviada! (latência: ${body.latency_ms ?? '?'}ms)`);
       } else {
         setTestStatus('error');
-        setTestMsg(body.reason ?? body.error ?? `HTTP ${res.status}`);
+        setTestMsg(body.hint ?? body.error ?? body.reason ?? `HTTP ${res.status}`);
       }
     } catch (/** @type {any} */ err) {
       setTestStatus('error');
@@ -471,18 +473,19 @@ function TelegramSection() {
         )}
       </div>
 
-      {/* pg_cron status */}
+      {/* pg_cron status — instrução honesta, sem falso "ativo" */}
       <div style={{
         marginTop: 14, padding: '10px 12px', borderRadius: 7, fontSize: 11,
-        background: 'rgba(16,185,129,0.04)', border: '1px solid rgba(16,185,129,0.18)',
+        background: 'rgba(245,158,11,0.04)', border: '1px solid rgba(245,158,11,0.18)',
         color: '#4a6580', lineHeight: 1.6, display: 'flex', alignItems: 'flex-start', gap: 8,
       }}>
-        <span style={{ fontSize: 13, marginTop: 1 }}>✅</span>
+        <span style={{ fontSize: 13, marginTop: 1 }}>⚙️</span>
         <div>
-          <strong style={{ color: '#10b981' }}>Agendamento automático ativo</strong>
-          {' — '}job <code style={{ color: '#94a3b8', fontFamily: 'JetBrains Mono, monospace' }}>telegram-digest</code> configurado no pg_cron (todos os dias 11:00 UTC / 08:00 BRT).
-          O horário exibido no digest reflete o campo acima; para alterar o disparo do pg_cron edite no{' '}
-          <strong style={{ color: '#60a5fa' }}>Supabase Dashboard → Database → Cron Jobs</strong>.
+          <strong style={{ color: '#f59e0b' }}>Agendamento automático</strong>
+          {' — '}para ativar os jobs automáticos (digest diário + alertas por evento), execute o SQL da{' '}
+          <strong>Parte 4</strong> do arquivo <code style={{ color: '#94a3b8', fontFamily: 'JetBrains Mono, monospace' }}>sql-migration.sql</code>{' '}
+          no{' '}<strong style={{ color: '#60a5fa' }}>Supabase Dashboard → SQL Editor</strong>{' '}
+          após o deploy das Edge Functions.
         </div>
       </div>
     </Section>

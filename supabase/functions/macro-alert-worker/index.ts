@@ -90,7 +90,7 @@ function buildAlertMessage(
     `🤖 *Impacto histórico BTC:*`,
     `• Avg: ${impactSign}${catalog.btc_impact_hist_avg}%`,
     ``,
-    `🔗 [Abrir Dashboard](https://mrp-dashboard.onrender.com/macro-calendar)`,
+    `🔗 [Abrir Dashboard](https://mrp-dashboard.onrender.com/MacroCalendar)`,
     ``,
     `_CryptoWatch Intelligence · ${now.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' })} BRT_`,
   ].join('\n');
