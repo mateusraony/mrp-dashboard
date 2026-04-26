@@ -128,7 +128,9 @@ export function useMarketSentiment() {
         },
       ];
 
-      const prev24h   = fng?.previous_close ?? score;
+      // Constrói prev composto usando previous_close do FnG (única fonte com dado anterior)
+      const fngPrev   = fng?.previous_close ?? fngScore;
+      const prev24h   = Math.round(fngPrev * 0.50 + fundScore * 0.30 + gdeltScore * 0.20);
       const delta24h  = score - prev24h;
 
       return { score, classification, label_pt, color, prev_24h: prev24h, delta_24h: delta24h, sources, updated_at: Date.now() };

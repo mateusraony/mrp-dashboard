@@ -84,15 +84,10 @@ export function useMarketRegime() {
   const { data: onchain } = useOnChainCycle();
 
   return useQuery({
-    queryKey: [
-      'market-regime',
-      ticker?.last_funding_rate,
-      macro?.updated_at,
-      onchain?.nupl,
-    ],
+    queryKey: ['market-regime'],
     queryFn: (): MarketRegimeResult => {
-      // Sem dados mínimos → fallback
-      if (!ticker && !macro) return FALLBACK;
+      // Exige ambas as fontes primárias; NUPL pode usar fallback (peso 13%)
+      if (!ticker || !macro) return FALLBACK;
 
       // Extrai séries do macro board
       const us10y  = macro?.series?.find(s => s.id === 'US10Y');
