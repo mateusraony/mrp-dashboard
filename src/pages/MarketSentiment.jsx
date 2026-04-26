@@ -5,7 +5,6 @@ import {
   ResponsiveContainer, ReferenceLine, Cell, BarChart,
 } from 'recharts';
 import { useMarketSentiment } from '../hooks/useMarketSentiment';
-import { useFearGreed } from '../hooks/useBtcData';
 import { IS_LIVE } from '../lib/env';
 import { ModeBadge } from '../components/ui/DataBadge';
 
