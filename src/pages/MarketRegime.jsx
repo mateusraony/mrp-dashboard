@@ -1,9 +1,7 @@
 // ─── MARKET REGIME PAGE ───────────────────────────────────────────────────────
 import { useState } from 'react';
-import {
-  marketRegime, regimeComponents, radarData, regimeHistory,
-  regimeTransitions, exposureSuggestions,
-} from '../components/data/mockDataRegime';
+import { useMarketRegime } from '../hooks/useMarketRegime';
+import { IS_LIVE } from '../lib/env';
 import { ModeBadge } from '../components/ui/DataBadge';
 import {
   RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
@@ -11,7 +9,67 @@ import {
   CartesianGrid, ReferenceLine,
 } from 'recharts';
 
-// ─── HELPERS ─────────────────────────────────────────────────────────────────
+// ─── Static editorial data ────────────────────────────────────────────────────
+const EXPOSURE_SUGGESTIONS = {
+  'Risk-On': {
+    label: 'Ambiente favorável a ativos de risco — ampliar exposição seletivamente',
+    suggestions: [
+      { direction: '↑', action: 'BTC Spot', detail: 'Aumentar posição BTC 5-10% do portfólio em pullbacks para médias.', confidence: 0.78 },
+      { direction: '↑', action: 'Altcoins Qualidade', detail: 'ETH, SOL, AVAX — betas de mercado altas em regime Risk-On.', confidence: 0.68 },
+      { direction: '↓', action: 'Hedge USD', detail: 'Reduzir exposição em USD com DXY caindo — favorece BTC/ETH.', confidence: 0.61 },
+      { direction: '→', action: 'Stop Conservadores', detail: 'Manter stops abaixo das médias móveis. Não perseguir topos.', confidence: 0.55 },
+    ],
+  },
+  'Neutral': {
+    label: 'Mercado indeciso — posições reduzidas, aguardar confirmação',
+    suggestions: [
+      { direction: '→', action: 'Posição Reduzida', detail: 'Limitar BTC a 3-5% do portfólio até clareza macro.', confidence: 0.72 },
+      { direction: '↑', action: 'DCA Parcial', detail: 'Dollar-cost averaging pequeno em BTC/ETH — não all-in.', confidence: 0.60 },
+      { direction: '↓', action: 'Altcoins Alavancadas', detail: 'Evitar altcoins de baixa liquidez em mercado indeciso.', confidence: 0.74 },
+      { direction: '→', action: 'Cash Reserve', detail: 'Manter 30-40% em stablecoins para oportunidades de entrada.', confidence: 0.65 },
+    ],
+  },
+  'Risk-Off': {
+    label: 'Ambiente de risco — reduzir exposição, priorizar proteção',
+    suggestions: [
+      { direction: '↓', action: 'BTC Reduzir', detail: 'Reduzir exposição BTC. VIX alto + yield invertida = sinal de cautela.', confidence: 0.81 },
+      { direction: '↓', action: 'Altcoins', detail: 'Sair de altcoins alavancadas — beta alto em queda = prejuízos amplificados.', confidence: 0.85 },
+      { direction: '↑', action: 'Stablecoins', detail: 'Migrar para USDT/USDC. Staking em protocolos seguros.', confidence: 0.79 },
+      { direction: '↑', action: 'BTC Dominance', detail: 'Se manter cripto, priorizar BTC — menor beta vs alts em Risk-Off.', confidence: 0.68 },
+    ],
+  },
+};
+
+const TRANSITION_TRIGGERS = [
+  { from: 'Neutral', to: 'Risk-On', triggers: ['CPI abaixo do esperado', 'Fed dovish surprise', 'VIX caindo abaixo de 16', 'DXY −2% no mês', 'S&P > ATH'], color: '#10b981' },
+  { from: 'Risk-On', to: 'Neutral', triggers: ['VIX subindo para 20-25', 'Funding positivo extremo', 'NUPL acima de 0.65', 'DXY estabilizando'], color: '#f59e0b' },
+  { from: 'Neutral', to: 'Risk-Off', triggers: ['CPI acima do esperado', 'Fed hawkish', 'VIX > 28', 'DXY +3% no mês', 'Yield invertendo'], color: '#ef4444' },
+];
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function seedR(n) { return (Math.sin(n * 6271 + 3141) % 1 + 1) / 2; }
+
+function buildHistory(baseScore) {
+  return Array.from({ length: 90 }, (_, i) => {
+    const base  = baseScore - 8 + i * 0.08;
+    const noise = (seedR(i) - 0.5) * 22;
+    const s     = Math.min(95, Math.max(15, base + noise));
+    const regime = s >= 62 ? 'Risk-On' : s <= 38 ? 'Risk-Off' : 'Neutral';
+    const date   = new Date(Date.now() - (89 - i) * 86_400_000);
+    return { label: date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }), score: Math.round(s), regime };
+  });
+}
+
+function buildTransitions(history) {
+  return history.reduce((acc, d, i) => {
+    if (i > 0 && d.regime !== history[i - 1].regime) {
+      acc.push({ id: i, date: d.label, idx: i, from: history[i - 1].regime, to: d.regime, trigger: 'Score cruzou threshold' });
+    }
+    return acc;
+  }, []).slice(-6);
+}
+
+// ─── UI Components ────────────────────────────────────────────────────────────
 function ScoreBar({ score, color }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -23,7 +81,6 @@ function ScoreBar({ score, color }) {
   );
 }
 
-// ─── REGIME BADGE ─────────────────────────────────────────────────────────────
 function RegimeBadge({ label, color, active, onClick }) {
   return (
     <button onClick={onClick} style={{
@@ -35,8 +92,7 @@ function RegimeBadge({ label, color, active, onClick }) {
   );
 }
 
-// ─── COMPONENT CARD ──────────────────────────────────────────────────────────
-function ComponentCard({ c, regimeColor }) {
+function ComponentCard({ c }) {
   const scoreColor = c.score >= 65 ? '#10b981' : c.score >= 40 ? '#f59e0b' : '#ef4444';
   const scoreLabel = c.score >= 65 ? 'Risk-On' : c.score >= 40 ? 'Neutral' : 'Risk-Off';
   return (
@@ -59,9 +115,8 @@ function ComponentCard({ c, regimeColor }) {
   );
 }
 
-// ─── TRANSITION ROW ──────────────────────────────────────────────────────────
 function TransitionRow({ t }) {
-  const toColor = t.to === 'Risk-On' ? '#10b981' : t.to === 'Risk-Off' ? '#ef4444' : '#f59e0b';
+  const toColor   = t.to   === 'Risk-On' ? '#10b981' : t.to   === 'Risk-Off' ? '#ef4444' : '#f59e0b';
   const fromColor = t.from === 'Risk-On' ? '#10b981' : t.from === 'Risk-Off' ? '#ef4444' : '#f59e0b';
   return (
     <div style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #0f1a28' }}>
@@ -74,7 +129,6 @@ function TransitionRow({ t }) {
   );
 }
 
-// ─── SUGGESTION CARD ─────────────────────────────────────────────────────────
 function SuggestionCard({ s }) {
   const dirColor = s.direction === '↑' ? '#10b981' : s.direction === '↓' ? '#ef4444' : '#f59e0b';
   return (
@@ -97,7 +151,6 @@ function SuggestionCard({ s }) {
   );
 }
 
-// ─── RADAR CUSTOM TOOLTIP ─────────────────────────────────────────────────────
 function RadarTooltip({ active = false, payload = [] }) {
   if (!active || !payload?.length) return null;
   const { metric, value } = payload[0]?.payload || {};
@@ -112,7 +165,6 @@ function RadarTooltip({ active = false, payload = [] }) {
   );
 }
 
-// ─── HISTORY CHART TOOLTIP ────────────────────────────────────────────────────
 function HistTooltip({ active = false, payload = [], label = '' }) {
   if (!active || !payload?.length) return null;
   const score = payload[0]?.value;
@@ -129,21 +181,33 @@ function HistTooltip({ active = false, payload = [], label = '' }) {
 
 const REGIME_TABS = ['Radar & Score', 'Histórico', 'Transições', 'Sugestões AI'];
 
+// ─── MAIN ─────────────────────────────────────────────────────────────────────
 export default function MarketRegime() {
-  const rm = marketRegime;
+  const { data, isLoading } = useMarketRegime();
   const [tab, setTab] = useState(0);
-  const suggestions = exposureSuggestions[rm.label];
 
-  // Gradiente dinâmico baseado no score para o gráfico de histórico
-  const histColor = rm.score >= 62 ? '#10b981' : rm.score <= 38 ? '#ef4444' : '#f59e0b';
+  if (isLoading || !data) {
+    return <div style={{ color: '#475569', fontSize: 12, padding: 24 }}>Calculando regime de mercado...</div>;
+  }
+
+  const { score, label, color, bg, border, components, radarData } = data;
+
+  // Derived sub-scores
+  const risk_on_score  = Math.round(Math.max(0, (score - 38) / 62 * 100));
+  const neutral_score  = Math.round(Math.max(0, 100 - Math.abs(score - 50) * 2));
+  const risk_off_score = Math.round(Math.max(0, (38 - score) / 38 * 100));
+
+  const regimeHistory    = buildHistory(score);
+  const regimeTransitions = buildTransitions(regimeHistory);
+  const suggestions      = EXPOSURE_SUGGESTIONS[label] ?? EXPOSURE_SUGGESTIONS['Neutral'];
+  const histColor        = score >= 62 ? '#10b981' : score <= 38 ? '#ef4444' : '#f59e0b';
 
   return (
     <div style={{ maxWidth: 1400, margin: '0 auto' }}>
-      {/* Header */}
       <div style={{ marginBottom: 18 }}>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 6 }}>
           <h1 style={{ fontSize: 20, fontWeight: 900, color: '#f1f5f9', margin: 0, letterSpacing: '-0.03em' }}>Regime de Mercado</h1>
-          <ModeBadge mode="mock" />
+          <ModeBadge mode={IS_LIVE ? 'live' : 'mock'} />
         </div>
         <p style={{ fontSize: 11, color: '#475569', margin: 0 }}>
           Classificação automática Risk-On / Risk-Off / Neutral · Yield Curve · DXY · VIX · Funding · NUPL
@@ -152,57 +216,46 @@ export default function MarketRegime() {
 
       {/* ── REGIME HERO ── */}
       <div style={{
-        background: rm.bg, border: `1px solid ${rm.border}`,
-        borderLeft: `5px solid ${rm.color}`,
+        background: bg, border: `1px solid ${border}`, borderLeft: `5px solid ${color}`,
         borderRadius: 14, padding: '20px 24px', marginBottom: 16,
         display: 'flex', gap: 24, alignItems: 'center', flexWrap: 'wrap',
-        boxShadow: `0 0 40px ${rm.color}0a`,
+        boxShadow: `0 0 40px ${color}0a`,
       }}>
-        {/* Score display */}
         <div style={{ textAlign: 'center', flexShrink: 0 }}>
           <div style={{ fontSize: 9, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700, marginBottom: 4 }}>Score Global</div>
-          <div style={{
-            fontSize: 72, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace',
-            color: rm.color, lineHeight: 1, letterSpacing: '-0.05em',
-            textShadow: `0 0 40px ${rm.color}40`,
-          }}>{rm.score}</div>
+          <div style={{ fontSize: 72, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color, lineHeight: 1, letterSpacing: '-0.05em', textShadow: `0 0 40px ${color}40` }}>{score}</div>
           <div style={{ fontSize: 9, color: '#334155' }}>/ 100</div>
         </div>
 
-        {/* Regime labels */}
         <div style={{ flex: 1, minWidth: 200 }}>
-          <div style={{ fontSize: 28, fontWeight: 900, color: rm.color, letterSpacing: '-0.03em', marginBottom: 8, lineHeight: 1 }}>
-            {rm.label}
-          </div>
-          {/* Sub-scores */}
+          <div style={{ fontSize: 28, fontWeight: 900, color, letterSpacing: '-0.03em', marginBottom: 8, lineHeight: 1 }}>{label}</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxWidth: 340 }}>
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
                 <span style={{ fontSize: 9, color: '#10b981', fontWeight: 700 }}>RISK-ON STRENGTH</span>
-                <span style={{ fontSize: 9, color: '#10b981', fontFamily: 'JetBrains Mono, monospace', fontWeight: 700 }}>{rm.risk_on_score}</span>
+                <span style={{ fontSize: 9, color: '#10b981', fontFamily: 'JetBrains Mono, monospace', fontWeight: 700 }}>{risk_on_score}</span>
               </div>
-              <ScoreBar score={rm.risk_on_score} color="#10b981" />
+              <ScoreBar score={risk_on_score} color="#10b981" />
             </div>
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
                 <span style={{ fontSize: 9, color: '#f59e0b', fontWeight: 700 }}>NEUTRAL STRENGTH</span>
-                <span style={{ fontSize: 9, color: '#f59e0b', fontFamily: 'JetBrains Mono, monospace', fontWeight: 700 }}>{rm.neutral_score}</span>
+                <span style={{ fontSize: 9, color: '#f59e0b', fontFamily: 'JetBrains Mono, monospace', fontWeight: 700 }}>{neutral_score}</span>
               </div>
-              <ScoreBar score={rm.neutral_score} color="#f59e0b" />
+              <ScoreBar score={neutral_score} color="#f59e0b" />
             </div>
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
                 <span style={{ fontSize: 9, color: '#ef4444', fontWeight: 700 }}>RISK-OFF STRENGTH</span>
-                <span style={{ fontSize: 9, color: '#ef4444', fontFamily: 'JetBrains Mono, monospace', fontWeight: 700 }}>{rm.risk_off_score}</span>
+                <span style={{ fontSize: 9, color: '#ef4444', fontFamily: 'JetBrains Mono, monospace', fontWeight: 700 }}>{risk_off_score}</span>
               </div>
-              <ScoreBar score={rm.risk_off_score} color="#ef4444" />
+              <ScoreBar score={risk_off_score} color="#ef4444" />
             </div>
           </div>
         </div>
 
-        {/* Quick suggestion */}
-        <div style={{ background: `${rm.color}0a`, border: `1px solid ${rm.color}25`, borderRadius: 10, padding: '14px 16px', maxWidth: 280, flexShrink: 0 }}>
-          <div style={{ fontSize: 9, color: rm.color, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 5 }}>💡 AI Suggestion</div>
+        <div style={{ background: `${color}0a`, border: `1px solid ${color}25`, borderRadius: 10, padding: '14px 16px', maxWidth: 280, flexShrink: 0 }}>
+          <div style={{ fontSize: 9, color, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 5 }}>💡 AI Suggestion</div>
           <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', lineHeight: 1.4 }}>{suggestions.label}</div>
           <div style={{ fontSize: 10, color: '#475569', marginTop: 5 }}>Ver detalhes na aba Sugestões AI</div>
         </div>
@@ -224,7 +277,6 @@ export default function MarketRegime() {
       {/* ── RADAR & SCORE ── */}
       {tab === 0 && (
         <div style={{ display: 'grid', gridTemplateColumns: '340px 1fr', gap: 16, alignItems: 'start' }}>
-          {/* Radar */}
           <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '16px 18px' }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>Radar de Regime</div>
             <div style={{ fontSize: 9, color: '#334155', marginBottom: 12 }}>Score por componente · 100 = Risk-On máximo · 0 = Risk-Off máximo</div>
@@ -233,30 +285,27 @@ export default function MarketRegime() {
                 <PolarGrid stroke="rgba(30,45,69,0.8)" />
                 <PolarAngleAxis dataKey="metric" tick={{ fontSize: 10, fill: '#475569', fontWeight: 600 }} />
                 <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fontSize: 8, fill: '#1e3048' }} tickCount={5} />
-                <Radar name="Score" dataKey="value" stroke={rm.color} fill={rm.color} fillOpacity={0.15} strokeWidth={2} dot={{ fill: rm.color, r: 4 }} />
-                {/* Risk-On baseline */}
+                <Radar name="Score" dataKey="value" stroke={color} fill={color} fillOpacity={0.15} strokeWidth={2} dot={{ fill: color, r: 4 }} />
                 <Radar name="Risk-On (62)" dataKey={() => 62} stroke="rgba(16,185,129,0.2)" fill="transparent" strokeDasharray="4 4" strokeWidth={1} dot={false} />
                 <Tooltip content={<RadarTooltip />} />
               </RadarChart>
             </ResponsiveContainer>
-            {/* Thresholds legend */}
             <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 4 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                 <div style={{ width: 12, height: 2, background: 'rgba(16,185,129,0.4)' }} />
                 <span style={{ fontSize: 8, color: '#334155' }}>Risk-On (62)</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <div style={{ width: 12, height: 2, background: rm.color }} />
+                <div style={{ width: 12, height: 2, background: color }} />
                 <span style={{ fontSize: 8, color: '#334155' }}>Atual</span>
               </div>
             </div>
           </div>
 
-          {/* Components */}
           <div>
             <div style={{ fontSize: 11, fontWeight: 700, color: '#e2e8f0', marginBottom: 10 }}>Componentes do Regime</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 8 }}>
-              {regimeComponents.map(c => <ComponentCard key={c.key} c={c} regimeColor={rm.color} />)}
+              {components.map(c => <ComponentCard key={c.key} c={c} />)}
             </div>
           </div>
         </div>
@@ -282,11 +331,9 @@ export default function MarketRegime() {
                 <XAxis dataKey="label" tick={{ fontSize: 9, fill: '#334155' }} axisLine={false} tickLine={false} interval={14} />
                 <YAxis domain={[0, 100]} ticks={[0, 38, 62, 100]} tick={{ fontSize: 9, fill: '#334155' }} axisLine={false} tickLine={false} />
                 <Tooltip content={<HistTooltip />} />
-                {/* Zone bands */}
                 <ReferenceLine y={62} stroke="rgba(16,185,129,0.35)" strokeDasharray="4 4" label={{ value: 'Risk-On', fill: '#10b981', fontSize: 9, position: 'right' }} />
                 <ReferenceLine y={38} stroke="rgba(239,68,68,0.35)" strokeDasharray="4 4" label={{ value: 'Risk-Off', fill: '#ef4444', fontSize: 9, position: 'right' }} />
                 <Area type="monotone" dataKey="score" stroke={histColor} strokeWidth={2} fill="url(#regimeGrad)" dot={false} activeDot={{ r: 4, fill: histColor }} />
-                {/* Transition markers */}
                 {regimeTransitions.map(t => (
                   <ReferenceLine key={t.id} x={regimeHistory[t.idx]?.label}
                     stroke={t.to === 'Risk-On' ? '#10b981' : t.to === 'Risk-Off' ? '#ef4444' : '#f59e0b'}
@@ -294,12 +341,8 @@ export default function MarketRegime() {
                 ))}
               </AreaChart>
             </ResponsiveContainer>
-            <div style={{ fontSize: 9, color: '#1e3048', marginTop: 6 }}>
-              Linhas verticais = transições de regime · Zona verde = Risk-On · Zona vermelha = Risk-Off
-            </div>
           </div>
 
-          {/* Regime distribution */}
           <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '16px 18px' }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 12 }}>Distribuição de Regime nos Últimos 90D</div>
             {(() => {
@@ -334,16 +377,14 @@ export default function MarketRegime() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
           <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '16px 18px' }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 12 }}>Transições de Regime Recentes (90D)</div>
-            {regimeTransitions.map(t => <TransitionRow key={t.date} t={t} />)}
+            {regimeTransitions.length > 0
+              ? regimeTransitions.map(t => <TransitionRow key={t.id} t={t} />)
+              : <div style={{ fontSize: 10, color: '#334155' }}>Nenhuma transição detectada no período.</div>
+            }
           </div>
-          {/* What triggers transitions */}
           <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '16px 18px' }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 12 }}>Gatilhos Típicos de Transição</div>
-            {[
-              { from: 'Neutral', to: 'Risk-On', triggers: ['CPI abaixo do esperado', 'Fed dovish surprise', 'VIX caindo abaixo de 16', 'DXY −2% no mês', 'S&P > ATH'], color: '#10b981' },
-              { from: 'Risk-On', to: 'Neutral', triggers: ['VIX subindo para 20-25', 'Funding positivo extremo', 'NUPL acima de 0.65', 'DXY estabilizando'], color: '#f59e0b' },
-              { from: 'Neutral', to: 'Risk-Off', triggers: ['CPI acima do esperado', 'Fed hawkish', 'VIX > 28', 'DXY +3% no mês', 'Yield invertendo'], color: '#ef4444' },
-            ].map(g => (
+            {TRANSITION_TRIGGERS.map(g => (
               <div key={g.from + g.to} style={{ marginBottom: 12 }}>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 5 }}>
                   <span style={{ fontSize: 9, color: '#475569' }}>{g.from}</span>
@@ -364,17 +405,16 @@ export default function MarketRegime() {
       {/* ── SUGESTÕES AI ── */}
       {tab === 3 && (
         <div>
-          {/* Regime summary */}
-          <div style={{ background: rm.bg, border: `1px solid ${rm.border}`, borderRadius: 12, padding: '14px 16px', marginBottom: 14 }}>
+          <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: 12, padding: '14px 16px', marginBottom: 14 }}>
             <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 6 }}>
               <span style={{ fontSize: 20 }}>🤖</span>
               <div>
-                <div style={{ fontSize: 12, fontWeight: 800, color: rm.color }}>Regime: {rm.label} (Score: {rm.score})</div>
+                <div style={{ fontSize: 12, fontWeight: 800, color }}>Regime: {label} (Score: {score})</div>
                 <div style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>{suggestions.label}</div>
               </div>
             </div>
             <div style={{ fontSize: 10, color: '#475569', lineHeight: 1.7 }}>
-              Com base nos componentes do regime atual — Yield Curve +{(28.1).toFixed(1)}bp, DXY −3.4% no mês, VIX em {(22.14).toFixed(1)}, Funding +0.071%, NUPL 0.48 — o modelo classifica o ambiente como <strong style={{ color: rm.color }}>{rm.label}</strong>. As sugestões abaixo refletem ajustes de exposição calibrados para este regime. Todas são sugestões quantitativas, não recomendações de investimento.
+              Com base nos componentes do regime atual, o modelo classifica o ambiente como <strong style={{ color }}>{label}</strong>. As sugestões abaixo refletem ajustes de exposição calibrados para este regime. Todas são sugestões quantitativas, não recomendações de investimento.
             </div>
           </div>
 
@@ -382,19 +422,18 @@ export default function MarketRegime() {
             {suggestions.suggestions.map(s => <SuggestionCard key={s.action} s={s} />)}
           </div>
 
-          {/* Other regimes preview */}
           <div style={{ marginTop: 16 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: '#475569', marginBottom: 10 }}>Como a exposição muda em outros regimes:</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 10 }}>
-              {Object.entries(exposureSuggestions)
-                .filter(([k]) => k !== rm.label)
-                .map(([label, data]) => {
-                  const color = label === 'Risk-On' ? '#10b981' : label === 'Risk-Off' ? '#ef4444' : '#f59e0b';
+              {Object.entries(EXPOSURE_SUGGESTIONS)
+                .filter(([k]) => k !== label)
+                .map(([lbl, d]) => {
+                  const c = lbl === 'Risk-On' ? '#10b981' : lbl === 'Risk-Off' ? '#ef4444' : '#f59e0b';
                   return (
-                    <div key={label} style={{ background: '#111827', border: `1px solid ${color}20`, borderRadius: 10, padding: '12px 14px', opacity: 0.65 }}>
-                      <div style={{ fontSize: 11, fontWeight: 700, color, marginBottom: 6 }}>{label}</div>
-                      <div style={{ fontSize: 10, color: '#64748b', marginBottom: 8 }}>{data.label}</div>
-                      {data.suggestions.slice(0, 2).map(s => (
+                    <div key={lbl} style={{ background: '#111827', border: `1px solid ${c}20`, borderRadius: 10, padding: '12px 14px', opacity: 0.65 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: c, marginBottom: 6 }}>{lbl}</div>
+                      <div style={{ fontSize: 10, color: '#64748b', marginBottom: 8 }}>{d.label}</div>
+                      {d.suggestions.slice(0, 2).map(s => (
                         <div key={s.action} style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 4 }}>
                           <span style={{ fontSize: 14, color: s.direction === '↑' ? '#10b981' : s.direction === '↓' ? '#ef4444' : '#f59e0b', fontWeight: 900, lineHeight: 1 }}>{s.direction}</span>
                           <span style={{ fontSize: 10, color: '#475569' }}>{s.action}</span>
@@ -407,7 +446,7 @@ export default function MarketRegime() {
           </div>
 
           <div style={{ marginTop: 12, padding: '10px 13px', background: 'rgba(30,45,69,0.3)', border: '1px solid #1a2535', borderRadius: 8, fontSize: 9, color: '#334155', lineHeight: 1.7 }}>
-            ⚠️ Sugestões baseadas em modelo quantitativo com dados históricos. Não constituem recomendação de investimento. Sempre valide com análise fundamental e considere seu perfil de risco pessoal.
+            ⚠️ Sugestões baseadas em modelo quantitativo com dados históricos. Não constituem recomendação de investimento.
           </div>
         </div>
       )}
