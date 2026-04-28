@@ -17,7 +17,7 @@ import {
   Newspaper, Brain,
   Zap, Bell, Bot, Briefcase, CandlestickChart,
   Settings, ChevronLeft, ChevronRight, Bitcoin,
-  MoreHorizontal, X,
+  MoreHorizontal, X, Database,
 } from 'lucide-react';
 import { btcFutures } from '@/components/data/mockData';
 import DebugPanel from '@/components/ui/DebugPanel';
@@ -71,7 +71,8 @@ const NAV_GROUPS = [
   {
     label: '',
     items: [
-      { label: 'Settings', icon: Settings, page: 'Settings', desc: 'Config · API · Alertas' },
+      { label: 'Settings',      icon: Settings,  page: 'Settings',     desc: 'Config · API · Alertas' },
+      { label: 'Fontes de Dados', icon: Database, page: 'DataSources', desc: 'LIVE · MOCK · Confiança · APIs' },
     ],
   },
 ];

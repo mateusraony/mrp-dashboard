@@ -130,6 +130,12 @@ export interface MiningPoolEntry {
 
 /** Métricas on-chain avançadas — NUPL, SOPR, MVRV, Netflow, Whales */
 export interface OnChainAdvancedData {
+  /** Metadados de confiabilidade — sempre paid_required (sem API pública gratuita) */
+  _meta: {
+    mode: 'paid_required';
+    reason: string;
+    confidence: 'D';
+  };
   nupl: {
     value:       number;
     zone:        string;
@@ -209,6 +215,11 @@ function mockHashrateData(): HashrateData {
 
 function mockOnChainAdvanced(): OnChainAdvancedData {
   return {
+    _meta: {
+      mode: 'paid_required',
+      reason: 'NUPL/SOPR/Netflow/Whales requerem Glassnode (~$29/mês). Exibindo dados de demonstração.',
+      confidence: 'D',
+    },
     nupl: {
       value:      btcNUPL.value,
       zone:       btcNUPL.zone,

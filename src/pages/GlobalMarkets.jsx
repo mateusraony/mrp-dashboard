@@ -7,8 +7,9 @@ import {
 import { useGlobalMarkets } from '../hooks/useGlobalMarkets';
 import { useBcbData } from '../hooks/useBcb';
 import { useBtcTicker } from '../hooks/useBtcData';
-import { IS_LIVE } from '../lib/env';
+import { IS_LIVE, env } from '../lib/env';
 import { ModeBadge } from '../components/ui/DataBadge';
+import { DataTrustBadge } from '../components/ui/DataTrustBadge';
 import GoldenRule from '../components/ui/GoldenRule';
 
 // ─── Static news (editorial — não requer API) ─────────────────────────────────
@@ -275,6 +276,13 @@ export default function GlobalMarkets() {
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4 }}>
             <h1 style={{ fontSize: 20, fontWeight: 900, color: '#f1f5f9', margin: 0, letterSpacing: '-0.03em' }}>🌍 Mercados Globais</h1>
             <ModeBadge mode={IS_LIVE ? 'live' : 'mock'} />
+            <DataTrustBadge
+              mode={IS_LIVE ? (env.VITE_FRED_API_KEY ? 'live' : 'error') : 'mock'}
+              confidence={IS_LIVE && env.VITE_FRED_API_KEY ? 'A' : 'D'}
+              source="FRED API"
+              sourceUrl="https://api.stlouisfed.org/fred"
+              reason={!env.VITE_FRED_API_KEY && IS_LIVE ? 'VITE_FRED_API_KEY não configurada — dados macro indisponíveis' : !IS_LIVE ? 'DATA_MODE=mock' : undefined}
+            />
           </div>
           <p style={{ fontSize: 11, color: '#475569', margin: 0 }}>EUR · BRL · GBP · JPY · Ouro · Petróleo · Bancos Centrais · Correlações com BTC</p>
         </div>
@@ -373,7 +381,15 @@ export default function GlobalMarkets() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: 14 }}>
           <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '18px 20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>🔗 Correlação BTC vs Ativos Globais</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', display: 'flex', alignItems: 'center', gap: 8 }}>
+                🔗 Correlação BTC vs Ativos Globais
+                <DataTrustBadge
+                  mode="estimated"
+                  confidence="B"
+                  source="Correlações (calculado)"
+                  reason="Pearson de séries FRED — cálculo proxy, não fonte direta"
+                />
+              </div>
               <div style={{ display: 'flex', gap: 4 }}>
                 {['7d', '30d', '90d'].map(p => (
                   <button key={p} onClick={() => setCorrPeriod(p)} style={{ padding: '4px 10px', borderRadius: 5, border: '1px solid', cursor: 'pointer', fontSize: 9, fontWeight: corrPeriod === p ? 700 : 500, background: corrPeriod === p ? 'rgba(59,130,246,0.15)' : 'transparent', borderColor: corrPeriod === p ? 'rgba(59,130,246,0.4)' : '#1a2535', color: corrPeriod === p ? '#60a5fa' : '#475569' }}>{p}</button>
