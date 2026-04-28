@@ -6,6 +6,8 @@ import {
 import { useBtcTicker, useOiByExchange, useLiquidations } from '@/hooks/useBtcData';
 import { useMultiVenueSnapshot } from '@/hooks/useMultiVenue';
 import { DataQualityBadge } from '../components/ui/DataQualityBadge';
+import { DataTrustBadge } from '../components/ui/DataTrustBadge';
+import { IS_LIVE } from '@/lib/env';
 
 // ─── DATA LAYER (live > mock fallback) ───────────────────────────────────────
 // oiByExchange live → mapeia oi_usd para oi_b (shape do mock) para compatibilidade do UI
@@ -145,8 +147,15 @@ export function DerivativesOverview() {
         <h1 style={{ fontSize: 20, fontWeight: 800, color: '#e2e8f0', margin: 0, letterSpacing: '-0.02em' }}>
           BTC Derivatives
         </h1>
-        <p style={{ fontSize: 12, color: '#4a5568', marginTop: 3 }}>
+        <p style={{ fontSize: 12, color: '#4a5568', marginTop: 3, display: 'flex', alignItems: 'center', gap: 8 }}>
           Binance USDⓈ-M Futures · BTCUSDT · <ModeBadge />
+          <DataTrustBadge
+            mode={IS_LIVE ? 'live' : 'mock'}
+            confidence={IS_LIVE ? 'A' : 'D'}
+            source="Binance Futures"
+            sourceUrl="https://fapi.binance.com"
+            reason={!IS_LIVE ? 'DATA_MODE=mock' : undefined}
+          />
         </p>
       </div>
 

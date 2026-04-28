@@ -9,6 +9,7 @@ import { useOnChainAdvanced, useMempoolState, useHashrate } from '@/hooks/useMem
 import { useOnChainCycle, useOnChainExtended } from '@/hooks/useCoinMetrics';
 import { IS_LIVE } from '@/lib/env';
 import { DataQualityBadge } from '../components/ui/DataQualityBadge';
+import { DataTrustBadge } from '../components/ui/DataTrustBadge';
 
 // ─── DATA LAYER (live > mock fallback) ───────────────────────────────────────
 function useOnChainLiveData() {
@@ -78,7 +79,7 @@ const G = {
 
 // ─── COMPONENTES ─────────────────────────────────────────────────────────────
 
-function OnChainCard({ title, glossKey, accent = '#3b82f6', grade, children }) {
+function OnChainCard({ title, glossKey, accent = '#3b82f6', grade, trustBadge, children }) {
   return (
     <div style={{
       background: 'linear-gradient(135deg, #131e2e 0%, #111827 100%)',
@@ -91,7 +92,10 @@ function OnChainCard({ title, glossKey, accent = '#3b82f6', grade, children }) {
           {title}
           {glossKey && <HelpIcon title={G[glossKey].title} content={G[glossKey].content} width={300} />}
         </div>
-        {grade && <GradeBadge grade={grade} />}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {trustBadge}
+          {grade && <GradeBadge grade={grade} />}
+        </div>
       </div>
       {children}
     </div>
@@ -144,7 +148,17 @@ function NuplZoneBar({ value }) {
 function NuplCard() {
   const n = btcNUPL;
   return (
-    <OnChainCard title="NUPL" glossKey="nupl" accent={n.zone_color} grade={n.quality}>
+    <OnChainCard title="NUPL" glossKey="nupl" accent={n.zone_color} grade={n.quality}
+      trustBadge={
+        <DataTrustBadge
+          mode="paid_required"
+          confidence="D"
+          source="Glassnode"
+          sourceUrl="https://glassnode.com"
+          reason="NUPL/SOPR/Netflow/Whales requerem Glassnode (~$29/mês). Exibindo dados de demonstração."
+        />
+      }
+    >
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 8 }}>
         <span style={{ fontSize: 32, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: n.zone_color, letterSpacing: '-0.04em' }}>
           {n.value.toFixed(3)}
@@ -299,7 +313,18 @@ function MvrvCard({ liveCycle }) {
   const distPct   = rPrice > 0 ? ((cPrice - rPrice) / rPrice * 100) : 0;
   const rDelta30d = btcRealizedMetrics.realized_price_delta_30d;
   return (
-    <OnChainCard title="Realized Price · MVRV" glossKey="mvrv" accent={color} grade={grade}>
+    <OnChainCard title="Realized Price · MVRV" glossKey="mvrv" accent={color} grade={grade}
+      trustBadge={
+        <DataTrustBadge
+          mode={IS_LIVE && liveCycle ? 'estimated' : IS_LIVE ? 'live' : 'mock'}
+          confidence={IS_LIVE && liveCycle ? 'B' : 'A'}
+          source="CoinMetrics"
+          sourceUrl="https://community-api.coinmetrics.io/v4"
+          updatedAt={liveCycle?.updated_at}
+          reason="NUPL derivado de (MCap−RCap)/MCap — proxy, não fórmula oficial Glassnode"
+        />
+      }
+    >
       {liveCycle && (
         <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
           <DataQualityBadge

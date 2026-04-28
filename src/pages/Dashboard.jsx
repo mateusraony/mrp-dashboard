@@ -3,7 +3,8 @@ import {
   btcFutures, btcSpotFlow, macroBoard, onChain,
   fearGreed, recentAlerts, globalRisk, sourceHealth, fmtNum, fmtPct, aiAnalysis,
 } from '../components/data/mockData';
-import { DATA_MODE } from '@/lib/env';
+import { DATA_MODE, IS_LIVE, env } from '@/lib/env';
+import { DataTrustBadge } from '../components/ui/DataTrustBadge';
 import { useBtcTicker, useFearGreed as useFearGreedHook } from '@/hooks/useBtcData';
 import { useRiskScore } from '@/hooks/useRiskScore';
 import { useMacroBoard } from '@/hooks/useFred';
@@ -95,8 +96,18 @@ function FearGreedGauge({ liveValue, fngError }) {
 
   return (
     <div style={{ background: '#111827', border: `1px solid ${color}25`, borderRadius: 14, padding: 18 }}>
-      <div style={{ fontSize: 9, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700, marginBottom: 12 }}>
-        Fear &amp; Greed Index
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+        <span style={{ fontSize: 9, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700 }}>
+          Fear &amp; Greed Index
+        </span>
+        <DataTrustBadge
+          mode={hasError ? 'error' : IS_LIVE ? 'live' : 'mock'}
+          confidence={hasError ? 'D' : IS_LIVE ? 'A' : 'D'}
+          source="Alternative.me"
+          sourceUrl="https://api.alternative.me/fng/"
+          updatedAt={Date.now()}
+          reason={hasError ? 'Alternative.me API indisponível' : !IS_LIVE ? 'DATA_MODE=mock' : undefined}
+        />
       </div>
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12, marginBottom: 12 }}>
         <div style={{
@@ -159,8 +170,18 @@ function BTCSnapshot({ liveData, tickerError }) {
 
   return (
     <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 14, padding: 18 }}>
-      <div style={{ fontSize: 9, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700, marginBottom: 14 }}>
-        BTC · Snapshot de Mercado
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+        <span style={{ fontSize: 9, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700 }}>
+          BTC · Snapshot de Mercado
+        </span>
+        <DataTrustBadge
+          mode={err ? 'error' : IS_LIVE ? 'live' : 'mock'}
+          confidence={err ? 'D' : IS_LIVE ? 'A' : 'D'}
+          source="Binance Futures"
+          sourceUrl="https://fapi.binance.com"
+          updatedAt={Date.now()}
+          reason={err ? 'Binance Futures API indisponível' : !IS_LIVE ? 'DATA_MODE=mock' : undefined}
+        />
       </div>
 
       {/* Price */}
@@ -480,7 +501,18 @@ export default function Dashboard() {
       {/* ── ZONA B: Macro Board ── */}
       <div style={{ marginBottom: 20 }}>
         <SectionTitle icon="⊞" label="Macro Board" sub="FRED Daily — S&P 500 · DXY · Gold · VIX · US Yields"
-          action={<Link to={createPageUrl('Macro')} style={{ fontSize: 11, color: '#475569', textDecoration: 'none', border: '1px solid #1e2d45', padding: '3px 9px', borderRadius: 5 }}>Ver Detalhes →</Link>} />
+          action={
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <DataTrustBadge
+                mode={IS_LIVE ? (env.VITE_FRED_API_KEY ? 'live' : 'error') : 'mock'}
+                confidence={IS_LIVE && env.VITE_FRED_API_KEY ? 'A' : 'D'}
+                source="FRED API"
+                sourceUrl="https://api.stlouisfed.org/fred"
+                reason={!env.VITE_FRED_API_KEY && IS_LIVE ? 'VITE_FRED_API_KEY não configurada — dados indisponíveis' : !IS_LIVE ? 'DATA_MODE=mock' : undefined}
+              />
+              <Link to={createPageUrl('Macro')} style={{ fontSize: 11, color: '#475569', textDecoration: 'none', border: '1px solid #1e2d45', padding: '3px 9px', borderRadius: 5 }}>Ver Detalhes →</Link>
+            </div>
+          } />
         <MacroRow />
       </div>
 

@@ -181,6 +181,28 @@ function DataModeToggle() {
           </div>
         </div>
       )}
+
+      {/* Botão: restaurar padrão do servidor */}
+      <div style={{ paddingTop: 12, borderTop: '1px solid rgba(30,45,69,0.4)', marginTop: 12 }}>
+        <div style={{ fontSize: 10, color: '#334155', marginBottom: 6 }}>
+          Se o modo acima não reflete o esperado, pode haver um override salvo no localStorage.
+          Clique abaixo para removê-lo e usar o padrão configurado no build do Render (<code style={{ fontFamily: 'JetBrains Mono, monospace', color: '#475569' }}>VITE_DATA_MODE</code>).
+        </div>
+        <button
+          onClick={() => {
+            localStorage.removeItem('mrp_data_mode');
+            window.location.reload();
+          }}
+          style={{
+            background: 'rgba(239,68,68,0.07)',
+            color: '#ef4444',
+            border: '1px solid rgba(239,68,68,0.25)',
+            borderRadius: 6, padding: '5px 13px', fontSize: 11, cursor: 'pointer', fontWeight: 600,
+          }}
+        >
+          Restaurar padrão do servidor (Render)
+        </button>
+      </div>
     </div>
   );
 }

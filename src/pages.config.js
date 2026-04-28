@@ -36,6 +36,7 @@ export const PAGE_IMPORTS = {
   MarketSentiment:    () => import('./pages/MarketSentiment'),
   GlobalMarkets:      () => import('./pages/GlobalMarkets'),
   Altcoins:           () => import('./pages/Altcoins'),
+  DataSources:        () => import('./pages/DataSources'),
 };
 
 export const PAGES = Object.fromEntries(
