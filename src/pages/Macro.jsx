@@ -1,4 +1,4 @@
-import { macroBoard as macroBoardMock, macroHistory, fmtNum, aiAnalysis } from '../components/data/mockData';
+import { macroBoard as macroBoardMock, fmtNum, aiAnalysis } from '../components/data/mockData';
 import { useMacroBoard, useGlobalLiquidity } from '@/hooks/useFred';
 import { useBcbData } from '@/hooks/useBcb';
 import { DataQualityBadge } from '../components/ui/DataQualityBadge';
@@ -25,6 +25,13 @@ import {
   ReferenceLine, Legend,
 } from 'recharts';
 
+// Converts live series history [{date, value}] to MiniTimeChart format {1d, 1w, 1m}
+function historyToWindows(history) {
+  if (!history || history.length === 0) return null;
+  const pts = history.map(h => ({ t: h.date, v: h.value }));
+  return { '1d': pts.slice(-5), '1w': pts.slice(-7), '1m': pts };
+}
+
 function SeriesCard({ s }) {
   const isYield = s.format === 'yield';
   const d1Color = s.delta_1d >= 0 ? '#10b981' : '#ef4444';
@@ -38,7 +45,7 @@ function SeriesCard({ s }) {
     ? (s.delta_1d >= 0 ? '#ef4444' : '#10b981')
     : (s.delta_1d >= 0 ? '#10b981' : '#ef4444');
 
-  const hist = macroHistory[s.id];
+  const hist = s.history ? historyToWindows(s.history) : null;
   const fmtVal = (v) => isYield ? `${v.toFixed(3)}%` : fmtNum(v, s.id === 'VIX' || s.id === 'DXY' ? 2 : 0);
 
   return (
