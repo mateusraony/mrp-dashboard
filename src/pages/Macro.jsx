@@ -1,4 +1,4 @@
-import { macroBoard as macroBoardMock, fmtNum, aiAnalysis } from '../components/data/mockData';
+import { macroBoard as macroBoardMock, macroHistory, fmtNum, aiAnalysis } from '../components/data/mockData';
 import { useMacroBoard, useGlobalLiquidity } from '@/hooks/useFred';
 import { useBcbData } from '@/hooks/useBcb';
 import { DataQualityBadge } from '../components/ui/DataQualityBadge';
@@ -45,7 +45,7 @@ function SeriesCard({ s }) {
     ? (s.delta_1d >= 0 ? '#ef4444' : '#10b981')
     : (s.delta_1d >= 0 ? '#10b981' : '#ef4444');
 
-  const hist = s.history ? historyToWindows(s.history) : null;
+  const hist = s.history ? historyToWindows(s.history) : (macroHistory[s.id] ?? null);
   const fmtVal = (v) => isYield ? `${v.toFixed(3)}%` : fmtNum(v, s.id === 'VIX' || s.id === 'DXY' ? 2 : 0);
 
   return (
