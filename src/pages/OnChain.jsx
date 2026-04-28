@@ -316,12 +316,16 @@ function MvrvCard({ liveCycle }) {
     <OnChainCard title="Realized Price · MVRV" glossKey="mvrv" accent={color} grade={grade}
       trustBadge={
         <DataTrustBadge
-          mode={IS_LIVE && liveCycle ? 'estimated' : IS_LIVE ? 'live' : 'mock'}
-          confidence={IS_LIVE && liveCycle ? 'B' : 'A'}
+          mode={IS_LIVE ? (liveCycle ? 'estimated' : 'mock') : 'mock'}
+          confidence={IS_LIVE && liveCycle ? 'B' : 'D'}
           source="CoinMetrics"
           sourceUrl="https://community-api.coinmetrics.io/v4"
           updatedAt={liveCycle?.updated_at}
-          reason="NUPL derivado de (MCap−RCap)/MCap — proxy, não fórmula oficial Glassnode"
+          reason={
+            !liveCycle && IS_LIVE
+              ? 'CoinMetrics não disponível — exibindo fallback mock'
+              : 'NUPL derivado de (MCap−RCap)/MCap — proxy, não fórmula oficial Glassnode'
+          }
         />
       }
     >

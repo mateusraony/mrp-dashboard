@@ -7,7 +7,7 @@
  * Distinto do DataQualityBadge (score numérico 0–100):
  * este badge comunica a ORIGEM e o TIPO do dado.
  */
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import type { DataMode, DataConfidence } from '@/types/dataStatus';
 
 // ─── Configuração visual por mode ─────────────────────────────────────────────
@@ -40,14 +40,18 @@ interface TooltipProps {
   sourceUrl?: string;
   updatedAt?: number;
   reason?: string;
+  onMouseEnter: () => void;
+  onMouseLeave: () => void;
 }
 
-function TrustTooltip({ visible, pos, mode, source, sourceUrl, updatedAt, reason }: TooltipProps) {
+function TrustTooltip({ visible, pos, mode, source, sourceUrl, updatedAt, reason, onMouseEnter, onMouseLeave }: TooltipProps) {
   if (!visible) return null;
   const cfg = MODE_CONFIG[mode];
 
   return (
     <div
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
       style={{
         position: 'fixed',
         top: pos.top,
@@ -59,7 +63,7 @@ function TrustTooltip({ visible, pos, mode, source, sourceUrl, updatedAt, reason
         padding: '12px 14px',
         zIndex: 9999,
         boxShadow: '0 8px 32px rgba(0,0,0,0.7)',
-        pointerEvents: sourceUrl ? 'auto' : 'none',
+        pointerEvents: 'auto',
       }}
     >
       {/* Header */}
@@ -143,9 +147,15 @@ export function DataTrustBadge({
   const [visible, setVisible] = useState(false);
   const [pos, setPos] = useState({ top: 0, left: 0 });
   const ref = useRef<HTMLSpanElement>(null);
+  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cfg = MODE_CONFIG[mode];
 
-  const show = () => {
+  const cancelHide = useCallback(() => {
+    if (hideTimer.current) clearTimeout(hideTimer.current);
+  }, []);
+
+  const show = useCallback(() => {
+    cancelHide();
     if (!ref.current) return;
     const rect = ref.current.getBoundingClientRect();
     setPos({
@@ -153,9 +163,12 @@ export function DataTrustBadge({
       left: Math.min(rect.left + window.scrollX - 60, window.innerWidth - 260),
     });
     setVisible(true);
-  };
+  }, [cancelHide]);
 
-  const hide = () => setVisible(false);
+  // Delay hide so the user can move the cursor from badge into the tooltip
+  const hide = useCallback(() => {
+    hideTimer.current = setTimeout(() => setVisible(false), 150);
+  }, []);
 
   return (
     <>
@@ -214,6 +227,8 @@ export function DataTrustBadge({
         sourceUrl={sourceUrl}
         updatedAt={updatedAt}
         reason={reason}
+        onMouseEnter={cancelHide}
+        onMouseLeave={hide}
       />
     </>
   );
