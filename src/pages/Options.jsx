@@ -7,8 +7,31 @@ import { computeGex, computeMaxPain } from '@/utils/riskCalculations';
 function useOptionsPageData() {
   const { data: live } = useOptionsData();
 
+  // Derived fields computed from live chain
+  const chainSkew = live && live.chain.length > 0
+    ? live.chain.reduce((acc, c) => acc + (c.put_iv - c.call_iv), 0) / live.chain.length
+    : null;
+  const skew_direction = chainSkew != null
+    ? (chainSkew > 0.005 ? 'put_skew' : chainSkew < -0.005 ? 'call_skew' : 'neutral')
+    : null;
+  const regime = live
+    ? (live.iv_atm < 0.35 ? 'low_vol' : live.iv_atm < 0.55 ? 'normal' : live.iv_atm < 0.80 ? 'elevated_vol' : 'crisis')
+    : null;
+  const nearestExpiry = live?.term_structure?.[0] ?? null;
+
   const btcOptions = live
-    ? { ...btcOptionsMock, spot: live.spot, iv_atm: live.iv_atm, strikes: live.chain.map(c => ({ strike: c.strike, call_iv: c.call_iv, put_iv: c.put_iv })) }
+    ? {
+        ...btcOptionsMock,
+        spot:          live.spot,
+        iv_atm:        live.iv_atm,
+        strikes:       live.chain.map(c => ({ strike: c.strike, call_iv: c.call_iv, put_iv: c.put_iv })),
+        skew:          chainSkew ?? btcOptionsMock.skew,
+        skew_direction: skew_direction ?? btcOptionsMock.skew_direction,
+        regime:        regime ?? btcOptionsMock.regime,
+        expiry:        nearestExpiry?.label ?? btcOptionsMock.expiry,
+        expiry_hours:  nearestExpiry ? Math.round(nearestExpiry.days_to * 24) : btcOptionsMock.expiry_hours,
+        quality:       live.quality,
+      }
     : btcOptionsMock;
 
   // GEX calculado da chain viva (fórmula validada em scripts/validate_gex.py)
@@ -18,7 +41,7 @@ function useOptionsPageData() {
           strike:  c.strike,
           call_oi: c.call_oi,
           put_oi:  c.put_oi,
-          gamma:   c.call_gamma,  // gamma da call (Deribit retorna por contrato)
+          gamma:   c.call_gamma,
           call_iv: c.call_iv,
           put_iv:  c.put_iv,
         })),
@@ -34,7 +57,23 @@ function useOptionsPageData() {
       )
     : btcOptionsExtended.max_pain;
 
-  return { btcOptions, liveGex: gexData, liveMaxPain: maxPain, liveChain: live?.chain ?? null };
+  const liveOiByStrike = live
+    ? live.chain.map(c => ({ strike: c.strike, call_oi: c.call_oi, put_oi: c.put_oi }))
+    : null;
+  const livePcrVol  = live?.put_call_ratio_vol  ?? null;
+  const livePcrOi   = live?.put_call_ratio_oi   ?? null;
+  const liveMaxPainDistancePct = live ? ((maxPain - live.spot) / live.spot * 100) : null;
+
+  return {
+    btcOptions,
+    liveGex:               gexData,
+    liveMaxPain:           maxPain,
+    liveChain:             live?.chain ?? null,
+    liveOiByStrike,
+    livePcrVol,
+    livePcrOi,
+    liveMaxPainDistancePct,
+  };
 }
 import { AIModuleCard } from '../components/ui/AIAnalysisPanel';
 import SectionHeader from '../components/ui/SectionHeader';
@@ -56,7 +95,7 @@ const regimeLabels = {
 };
 
 export default function Options() {
-  const { btcOptions, liveGex, liveMaxPain } = useOptionsPageData();
+  const { btcOptions, liveGex, liveMaxPain, liveOiByStrike, livePcrVol, livePcrOi, liveMaxPainDistancePct } = useOptionsPageData();
   const o = btcOptions;
   const regime = regimeLabels[o.regime];
 
@@ -181,32 +220,38 @@ export default function Options() {
       {/* Put/Call Ratio + Max Pain */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, marginBottom: 16 }}>
         {/* Put/Call Ratio */}
-        <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: 20 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 14 }}>Put/Call Ratio</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 14 }}>
-            <div>
-              <div style={{ fontSize: 10, color: '#4a5568', marginBottom: 3 }}>Por Volume</div>
-              <div style={{ fontSize: 28, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: btcOptionsExtended.put_call_ratio_vol < 0.8 ? '#10b981' : btcOptionsExtended.put_call_ratio_vol > 1.2 ? '#ef4444' : '#f59e0b' }}>
-                {btcOptionsExtended.put_call_ratio_vol.toFixed(2)}
+        {(() => {
+          const pcrVol = livePcrVol ?? btcOptionsExtended.put_call_ratio_vol;
+          const pcrOi  = livePcrOi  ?? btcOptionsExtended.put_call_ratio_oi;
+          return (
+            <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: 20 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 14 }}>Put/Call Ratio</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 14 }}>
+                <div>
+                  <div style={{ fontSize: 10, color: '#4a5568', marginBottom: 3 }}>Por Volume</div>
+                  <div style={{ fontSize: 28, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: pcrVol < 0.8 ? '#10b981' : pcrVol > 1.2 ? '#ef4444' : '#f59e0b' }}>
+                    {pcrVol.toFixed(2)}
+                  </div>
+                  <div style={{ fontSize: 10, color: '#4a5568', marginTop: 2 }}>Média 7d: {btcOptionsExtended.put_call_ratio_7d_avg.toFixed(2)}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 10, color: '#4a5568', marginBottom: 3 }}>Por OI</div>
+                  <div style={{ fontSize: 28, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: pcrOi < 0.8 ? '#10b981' : pcrOi > 1.2 ? '#ef4444' : '#f59e0b' }}>
+                    {pcrOi.toFixed(2)}
+                  </div>
+                </div>
               </div>
-              <div style={{ fontSize: 10, color: '#4a5568', marginTop: 2 }}>Média 7d: {btcOptionsExtended.put_call_ratio_7d_avg.toFixed(2)}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: 10, color: '#4a5568', marginBottom: 3 }}>Por OI</div>
-              <div style={{ fontSize: 28, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: btcOptionsExtended.put_call_ratio_oi < 0.8 ? '#10b981' : btcOptionsExtended.put_call_ratio_oi > 1.2 ? '#ef4444' : '#f59e0b' }}>
-                {btcOptionsExtended.put_call_ratio_oi.toFixed(2)}
+              <div style={{ padding: '8px 12px', borderRadius: 7, background: pcrVol < 1 ? 'rgba(16,185,129,0.06)' : 'rgba(239,68,68,0.06)', border: `1px solid ${pcrVol < 1 ? 'rgba(16,185,129,0.18)' : 'rgba(239,68,68,0.18)'}` }}>
+                <div style={{ fontSize: 11, color: pcrVol < 1 ? '#10b981' : '#ef4444', fontWeight: 600, marginBottom: 3 }}>
+                  {pcrVol < 0.8 ? '🟢 Mercado priorizando Calls — viés bullish' : pcrVol < 1.0 ? '🟡 Levemente bullish — mais calls que puts' : '🔴 Puts dominando — hedging ativo, viés bearish'}
+                </div>
+                <div style={{ fontSize: 10, color: '#4a5568' }}>
+                  P/C &lt; 0.7 = otimismo excessivo. P/C &gt; 1.2 = medo/hedging extremo.
+                </div>
               </div>
             </div>
-          </div>
-          <div style={{ padding: '8px 12px', borderRadius: 7, background: btcOptionsExtended.put_call_ratio_vol < 1 ? 'rgba(16,185,129,0.06)' : 'rgba(239,68,68,0.06)', border: `1px solid ${btcOptionsExtended.put_call_ratio_vol < 1 ? 'rgba(16,185,129,0.18)' : 'rgba(239,68,68,0.18)'}` }}>
-            <div style={{ fontSize: 11, color: btcOptionsExtended.put_call_ratio_vol < 1 ? '#10b981' : '#ef4444', fontWeight: 600, marginBottom: 3 }}>
-              {btcOptionsExtended.put_call_ratio_vol < 0.8 ? '🟢 Mercado priorizando Calls — viés bullish' : btcOptionsExtended.put_call_ratio_vol < 1.0 ? '🟡 Levemente bullish — mais calls que puts' : '🔴 Puts dominando — hedging ativo, viés bearish'}
-            </div>
-            <div style={{ fontSize: 10, color: '#4a5568' }}>
-              P/C &lt; 0.7 = otimismo excessivo. P/C &gt; 1.2 = medo/hedging extremo.
-            </div>
-          </div>
-        </div>
+          );
+        })()}
 
         {/* Max Pain */}
         <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: 20 }}>
@@ -222,8 +267,8 @@ export default function Options() {
               O que é Max Pain?
             </div>
             <div style={{ fontSize: 10, color: '#4a5568', lineHeight: 1.6 }}>
-              Strike onde o maior número de opções expiram sem valor — maior prejuízo para compradores de opções. 
-              Preço tende a ser "atraído" para este nível próximo ao vencimento. Distância atual: {Math.abs(btcOptionsExtended.max_pain_distance_pct).toFixed(1)}%.
+              Strike onde o maior número de opções expiram sem valor — maior prejuízo para compradores de opções.
+              Preço tende a ser "atraído" para este nível próximo ao vencimento. Distância atual: {Math.abs(liveMaxPainDistancePct ?? btcOptionsExtended.max_pain_distance_pct).toFixed(1)}%.
             </div>
           </div>
           {(() => {
@@ -254,7 +299,7 @@ export default function Options() {
       <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: 20, marginBottom: 16 }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 14 }}>OI por Strike — Calls vs Puts</div>
         <ResponsiveContainer width="100%" height={160}>
-          <BarChart data={btcOptionsExtended.oi_by_strike} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+          <BarChart data={liveOiByStrike ?? btcOptionsExtended.oi_by_strike} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#1e2d45" vertical={false} />
             <XAxis dataKey="strike" tick={{ fontSize: 9, fill: '#4a5568' }} tickLine={false}
               tickFormatter={v => `$${(v/1000).toFixed(0)}K`} />
@@ -264,7 +309,7 @@ export default function Options() {
               formatter={(v, n) => [v.toLocaleString() + ' contratos', n === 'call_oi' ? 'Call OI' : 'Put OI']}
               labelFormatter={v => `Strike: $${v.toLocaleString()}`}
             />
-            <ReferenceLine x={84000} stroke="#a78bfa" strokeDasharray="4 4" label={{ value: 'Max Pain', fill: '#a78bfa', fontSize: 9 }} />
+            <ReferenceLine x={liveMaxPain} stroke="#a78bfa" strokeDasharray="4 4" label={{ value: 'Max Pain', fill: '#a78bfa', fontSize: 9 }} />
             <Bar dataKey="call_oi" fill="rgba(16,185,129,0.7)" radius={[2,2,0,0]} name="call_oi" />
             <Bar dataKey="put_oi" fill="rgba(239,68,68,0.7)" radius={[2,2,0,0]} name="put_oi" />
           </BarChart>
@@ -272,7 +317,7 @@ export default function Options() {
         <div style={{ display: 'flex', gap: 16, marginTop: 6 }}>
           <span style={{ fontSize: 11, color: '#10b981' }}>■ Calls</span>
           <span style={{ fontSize: 11, color: '#ef4444' }}>■ Puts</span>
-          <span style={{ fontSize: 11, color: '#a78bfa' }}>│ Max Pain ($81K)</span>
+          <span style={{ fontSize: 11, color: '#a78bfa' }}>│ Max Pain (${(liveMaxPain / 1000).toFixed(0)}K)</span>
         </div>
       </div>
 

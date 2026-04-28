@@ -1,10 +1,10 @@
 # CHECKPOINT.md — MRP Dashboard
 > Memória técnica viva do projeto. Atualizar ao final de cada bloco importante.
-> Última atualização: 2026-04-25 (Sprint 9 — Edge Functions deployed + pg_cron ativo — MacroCalendar 100% operacional)
+> Última atualização: 2026-04-28 (Sprint 10 — Data Reliability Audit + Live Wiring: Options / SpotFlow / Macro)
 
 ---
 
-## 🗂 ESTADO GERAL (verificado em 2026-04-25)
+## 🗂 ESTADO GERAL (verificado em 2026-04-28)
 
 | Aspecto | Status | Evidência Real |
 |---------|--------|---------------|
@@ -58,6 +58,8 @@
 | **6.5** | ✅ | `AlertAuditPanel.jsx` (Disparos / Limiares / Data Lineage). `useAlertEvents()` + `useThresholdHistory()`. Aba "Auditoria" em SmartAlerts.jsx |
 | **6.6** | ✅ CONCLUÍDO | Edge Function deploy-ready. Settings.jsx com persistência real. Bot Token configurado. |
 | **6.7** | ✅ ANTECIPADO | build ✅ · tsc ✅ · eslint ✅ · 52/52 testes ✅ |
+| **Sprint 10 — Data Reliability Audit** | ✅ | `DataTrustBadge.tsx`, `DataSources.jsx`, `dataStatus.ts`, badges em Dashboard/OnChain/Derivatives/GlobalMarkets/Settings |
+| **Sprint 10 — Live Wiring** | ✅ | Options: PCR/skew/regime/oi_by_strike from Deribit chain. SpotFlow: ret_1h/4h/1d + volume_* + CVD from Binance klines. Macro: historyToWindows (macroHistory mock removed) |
 | **Bundle split** | ✅ | `vite.config.js` manualChunks: index.js 284KB→90KB |
 | **Migration** | ✅ | `alert_events` + `threshold_history` aplicadas via MCP Supabase |
 | **Migration conflict fix** | ✅ | 5 stubs (`SELECT 1`) + `20260420000000_full_schema.sql` + versões pré-registradas em prod + preview via execute_sql |

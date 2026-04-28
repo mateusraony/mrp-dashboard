@@ -11,13 +11,53 @@ import { format } from 'date-fns';
 import { useKlines, useBtcTicker } from '@/hooks/useBtcData';
 import { computeSessionStats } from '@/utils/sessionAnalytics';
 
-export default function SpotFlow() {
-  const s = btcSpotFlow;
+// Derives spot metrics from 1h klines.
+// 1W fields (volume_1w_usdt, cvd_1w) require ≥168 candles; omitted when partial
+// so the mock 1W values are preserved rather than understating weekly flow.
+// ret_15m / ret_1m require finer / wider timeframes — always stay mock.
+function computeSpotMetrics(klines, btcPrice) {
+  if (!klines || klines.length < 2) return null;
+  const last  = klines[klines.length - 1];
+  const price = btcPrice ?? last.close;
 
+  const retSince = (n) => {
+    const idx = klines.length - 1 - n;
+    return idx >= 0 ? (last.close - klines[idx].close) / klines[idx].close : null;
+  };
+
+  const sumVolUsdt = (n) =>
+    klines.slice(-Math.min(n, klines.length)).reduce((s, k) => s + k.volume * k.close, 0);
+
+  const sumCvd = (n) =>
+    klines.slice(-Math.min(n, klines.length)).reduce((s, k) => s + (2 * k.taker_buy - k.volume), 0);
+
+  const hasFullWeek = klines.length >= 168;
+
+  return {
+    price,
+    ret_1h:         retSince(1)  ?? 0,
+    ret_4h:         retSince(4)  ?? 0,
+    ret_1d:         retSince(24) ?? 0,
+    volume_1h_usdt: sumVolUsdt(1),
+    volume_1d_usdt: sumVolUsdt(24),
+    ...(hasFullWeek ? { volume_1w_usdt: sumVolUsdt(168) } : {}),
+    cvd:            sumCvd(4),
+    cvd_1d:         sumCvd(24),
+    ...(hasFullWeek ? { cvd_1w: sumCvd(168) } : {}),
+    taker_buy:      klines.reduce((a, k) => a + k.taker_buy, 0),
+    taker_sell:     klines.reduce((a, k) => a + (k.volume - k.taker_buy), 0),
+  };
+}
+
+export default function SpotFlow() {
   // ── Sprint 5.4: live session analytics from Binance klines ──────────────────
-  const { data: klines }  = useKlines('1h', 72);   // 72h = 3 ciclos garantidos
+  const { data: klines }  = useKlines('1h', 168);  // 168h = 7 days — needed for accurate 1W aggregates
   const { data: ticker }  = useBtcTicker();
   const btcPrice          = ticker?.mark_price ?? btcSpotFlow.price;
+
+  // Live spot metrics derived from klines; fallback to mock for uncovered fields
+  const liveSpot = computeSpotMetrics(klines, btcPrice);
+  const s = liveSpot ? { ...btcSpotFlow, ...liveSpot } : btcSpotFlow;
 
   // Calcula sessões live quando klines disponíveis; fallback para mock
   const liveSessions = klines && klines.length >= 24
