@@ -1,5 +1,7 @@
 // DataBadge — v2 — shows 🧪 MOCK / 🛰️ LIVE + Grade A/B/C
-export function ModeBadge({ mode = 'mock' }) {
+import { DATA_MODE } from '@/lib/env';
+
+export function ModeBadge({ mode = DATA_MODE }) {
   if (mode === 'live') {
     return (
       <span style={{
