@@ -6,6 +6,9 @@ import {
 import { btcOptionsExtended } from '../components/data/mockData';
 import { ModeBadge, GradeBadge } from '../components/ui/DataBadge';
 import AIInsightPanel from '../components/ai/AIInsightPanel';
+import { useOptionsData } from '@/hooks/useDeribit';
+import { useBtcTicker } from '@/hooks/useBtcData';
+import { DATA_MODE, IS_LIVE } from '@/lib/env';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   ReferenceLine, Cell, ComposedChart, Line,
@@ -21,13 +24,13 @@ function fmtM(v) {
   return `$${v.toLocaleString()}`;
 }
 
-function SectionTitle({ title, sub, badge }) {
+function SectionTitle({ title, sub, badge, mode }) {
   return (
     <div style={{ marginBottom: 12 }}>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 2 }}>
         <div style={{ fontSize: 13, fontWeight: 800, color: '#e2e8f0' }}>{title}</div>
         {badge && <GradeBadge grade={badge} />}
-        <ModeBadge mode="mock" />
+        <ModeBadge mode={mode ?? DATA_MODE} />
       </div>
       {sub && <div style={{ fontSize: 10, color: '#475569' }}>{sub}</div>}
     </div>
@@ -37,6 +40,8 @@ function SectionTitle({ title, sub, badge }) {
 // ─── LIQ HEATMAP — Gráfico de barras horizontal duplo (longs ← | → shorts) ──
 function LiqHeatmapFull() {
   const d = liquidationClusters;
+  const { data: ticker } = useBtcTicker();
+  const SPOT_LIVE = ticker?.mark_price ?? SPOT;
   const [hover, setHover] = useState(null);
 
   // Ordenar por preço crescente para o gráfico
@@ -50,17 +55,18 @@ function LiqHeatmapFull() {
   const probLongFlush = Math.round((longRisk / totalRisk) * 100);
 
   // Maior ameaça imediata (cluster abaixo/acima mais próximo)
-  const closestLong  = [...sorted].filter(c => c.price < SPOT).sort((a, b) => b.price - a.price)[0];
-  const closestShort = [...sorted].filter(c => c.price > SPOT).sort((a, b) => a.price - b.price)[0];
-  const distLong  = ((SPOT - closestLong?.price) / SPOT * 100).toFixed(1);
-  const distShort = ((closestShort?.price - SPOT) / SPOT * 100).toFixed(1);
+  const closestLong  = [...sorted].filter(c => c.price < SPOT_LIVE).sort((a, b) => b.price - a.price)[0];
+  const closestShort = [...sorted].filter(c => c.price > SPOT_LIVE).sort((a, b) => a.price - b.price)[0];
+  const distLong  = ((SPOT_LIVE - closestLong?.price) / SPOT_LIVE * 100).toFixed(1);
+  const distShort = ((closestShort?.price - SPOT_LIVE) / SPOT_LIVE * 100).toFixed(1);
 
   return (
     <div>
       <SectionTitle
         title="Liquidation Cluster Heatmap"
-        sub={`Spot atual: $${SPOT.toLocaleString()} · Barras VERMELHAS = longs que serão liquidados se preço CAIR · VERDES = shorts se preço SUBIR`}
+        sub={`Spot atual: $${SPOT_LIVE.toLocaleString()} · Barras VERMELHAS = longs que serão liquidados se preço CAIR · VERDES = shorts se preço SUBIR`}
         badge={d.quality}
+        mode="mock"
       />
 
       {/* KPIs */}
@@ -100,8 +106,8 @@ function LiqHeatmapFull() {
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
           <div style={{ fontSize: 8, color: '#ef4444', textAlign: 'right', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>← LONGS EM RISCO (se preço cair)</div>
           {sorted.slice().reverse().map((c) => {
-            const isAbove = c.price > SPOT;
-            const isSpot = Math.abs(c.price - SPOT) < 200;
+            const isAbove = c.price > SPOT_LIVE;
+            const isSpot = Math.abs(c.price - SPOT_LIVE) < 200;
             const val = c.longs_usd;
             const pct = (val / maxVal) * 100;
             const isHov = hover === c.price;
@@ -128,7 +134,7 @@ function LiqHeatmapFull() {
         {/* Centro — PRICE LABELS */}
         <div style={{ width: 70, display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center', marginTop: 22 }}>
           {sorted.slice().reverse().map((c) => {
-            const isSpot = Math.abs(c.price - SPOT) < 200;
+            const isSpot = Math.abs(c.price - SPOT_LIVE) < 200;
             const isHov = hover === c.price;
             return (
               <div key={`P-${c.price}`} style={{ height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -153,7 +159,7 @@ function LiqHeatmapFull() {
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
           <div style={{ fontSize: 8, color: '#10b981', textAlign: 'left', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>SHORTS EM RISCO (se preço subir) →</div>
           {sorted.slice().reverse().map((c) => {
-            const isAbove = c.price > SPOT;
+            const isAbove = c.price > SPOT_LIVE;
             const val = c.shorts_usd;
             const pct = (val / maxVal) * 100;
             const isHov = hover === c.price;
@@ -185,7 +191,7 @@ function LiqHeatmapFull() {
             <span style={{ color: '#94a3b8', fontWeight: 700 }}>${c.price.toLocaleString()}</span>
             <span>Longs: <strong style={{ color: '#ef4444' }}>{fmtM(c.longs_usd)}</strong></span>
             <span>Shorts: <strong style={{ color: '#10b981' }}>{fmtM(c.shorts_usd)}</strong></span>
-            <span style={{ color: '#475569' }}>{c.price > SPOT ? `+${((c.price - SPOT)/SPOT*100).toFixed(1)}% acima do spot` : `−${((SPOT - c.price)/SPOT*100).toFixed(1)}% abaixo do spot`}</span>
+            <span style={{ color: '#475569' }}>{c.price > SPOT_LIVE ? `+${((c.price - SPOT_LIVE)/SPOT_LIVE*100).toFixed(1)}% acima do spot` : `−${((SPOT_LIVE - c.price)/SPOT_LIVE*100).toFixed(1)}% abaixo do spot`}</span>
           </div>
         );
       })()}
@@ -213,15 +219,26 @@ function LiqHeatmapFull() {
 function OIByStrike() {
   const [asset, setAsset] = useState('BTC');
   const d = btcOptionsExtended;
+  const { data: ticker } = useBtcTicker();
+  const { data: liveOptions } = useOptionsData();
+
+  const spotBtc = ticker?.mark_price ?? SPOT;
+  const liveChain = liveOptions?.chain ?? [];
+  const isLiveBtc = IS_LIVE && asset === 'BTC' && liveChain.length > 0;
 
   // ETH mock OI (scaled down)
   const ethStrikes = d.oi_by_strike.map(s => ({
-    strike: Math.round(s.strike * 0.0381), // BTC/ETH ratio ~26x, adjusted
+    strike: Math.round(s.strike * 0.0381),
     call_oi: Math.round(s.call_oi * 0.12),
     put_oi: Math.round(s.put_oi * 0.12),
   }));
 
-  const strikes = asset === 'BTC' ? d.oi_by_strike : ethStrikes.map((s, i) => ({
+  // BTC: prefer live chain, fall back to mock
+  const btcStrikes = isLiveBtc
+    ? liveChain.map(c => ({ strike: c.strike, call_oi: c.call_oi, put_oi: c.put_oi }))
+    : d.oi_by_strike;
+
+  const strikes = asset === 'BTC' ? btcStrikes : ethStrikes.map((s, i) => ({
     ...s, strike: [2800, 2900, 3000, 3100, 3200, 3300, 3400, 3500, 3600][i] || s.strike,
   }));
 
@@ -229,13 +246,15 @@ function OIByStrike() {
     strike: `$${(s.strike / 1000).toFixed(0)}K`,
     strikeRaw: s.strike,
     call_oi: s.call_oi,
-    put_oi: -s.put_oi,   // negativo = abaixo do eixo
+    put_oi: -s.put_oi,
     net: s.call_oi - s.put_oi,
-    isAtm: Math.abs(s.strike - (asset === 'BTC' ? SPOT : 3200)) < (asset === 'BTC' ? 300 : 100),
+    isAtm: Math.abs(s.strike - (asset === 'BTC' ? spotBtc : 3200)) < (asset === 'BTC' ? 300 : 100),
   }));
 
-  const maxPain = asset === 'BTC' ? d.max_pain : 3200;
-  const gamma = asset === 'BTC' ? d.gamma_exposure_usd : -28_000_000;
+  const maxPain = asset === 'BTC' ? (liveOptions?.max_pain ?? d.max_pain) : 3200;
+  const gamma = asset === 'BTC' ? (liveOptions?.gex ?? d.gamma_exposure_usd) : -28_000_000;
+  const pcrVol = asset === 'BTC' ? (liveOptions?.put_call_ratio_vol ?? d.put_call_ratio_vol) : d.put_call_ratio_vol;
+  const pcrOi = asset === 'BTC' ? (liveOptions?.put_call_ratio_oi ?? d.put_call_ratio_oi) : d.put_call_ratio_oi;
 
   return (
     <div>
@@ -243,7 +262,8 @@ function OIByStrike() {
         <SectionTitle
           title="Open Interest por Strike"
           sub={`${asset} Options — Calls (verde, acima) · Puts (vermelho, abaixo)`}
-          badge={d.quality}
+          badge={isLiveBtc ? 'A' : d.quality}
+          mode={isLiveBtc ? 'live' : undefined}
         />
         <div style={{ display: 'flex', gap: 4 }}>
           {['BTC', 'ETH'].map(a => (
@@ -261,8 +281,8 @@ function OIByStrike() {
       {/* Summary stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 8, marginBottom: 12 }}>
         {[
-          { label: 'Put/Call Ratio (Vol)', value: d.put_call_ratio_vol.toFixed(2), color: '#f59e0b', sub: 'Por volume' },
-          { label: 'Put/Call Ratio (OI)',  value: d.put_call_ratio_oi.toFixed(2),  color: '#a78bfa', sub: 'Por OI' },
+          { label: 'Put/Call Ratio (Vol)', value: pcrVol.toFixed(2), color: '#f59e0b', sub: 'Por volume' },
+          { label: 'Put/Call Ratio (OI)',  value: pcrOi.toFixed(2),  color: '#a78bfa', sub: 'Por OI' },
           { label: 'Max Pain',             value: `$${(maxPain / 1000).toFixed(0)}K`, color: '#ef4444', sub: 'Maior expiração s/valor' },
           { label: 'GEX',                  value: `${(gamma / 1e6).toFixed(0)}M`,  color: gamma < 0 ? '#ef4444' : '#10b981', sub: gamma < 0 ? 'Short gamma dealer' : 'Long gamma dealer' },
         ].map(s => (
@@ -336,6 +356,7 @@ function CarryCalculator() {
         title="Carry Calculator — Custo de Basis por Vencimento"
         sub={`Basis anualizado vs US10Y (${US10Y}%) · Spot: $${SPOT.toLocaleString()}`}
         badge={futuresBasis.quality}
+        mode="mock"
       />
 
       {/* Basis chart */}
@@ -442,6 +463,51 @@ function CarryCalculator() {
 
 // ─── TERM STRUCTURE ───────────────────────────────────────────────────────────
 function TermStructurePanel() {
+  const { data: liveOptions } = useOptionsData();
+  const liveTerm = IS_LIVE && liveOptions?.term_structure?.length ? liveOptions.term_structure : null;
+
+  if (liveTerm) {
+    const ivFront = liveTerm[0]?.atm_iv ?? 0;
+    const ivBack = liveTerm[liveTerm.length - 1]?.atm_iv ?? 0;
+    const isContango = ivFront > ivBack;
+    const interpretation = isContango
+      ? 'Contango — IV curto prazo acima do longo. Mercado precificando risco imediato ou evento próximo.'
+      : 'Backwardation — IV cresce com o prazo. Estrutura normal, incerteza maior no longo prazo.';
+    return (
+      <div>
+        <SectionTitle
+          title="Term Structure — IV por Prazo"
+          sub={`Deribit BTC · ${liveTerm.length} vencimentos · ${isContango ? 'Contango' : 'Backwardation'}`}
+          badge="A"
+          mode="live"
+        />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {liveTerm.map((e, i) => {
+            const label = e.label.replace('BTC-', '');
+            const ivPct = e.atm_iv * 100;
+            const barW = Math.min(100, ivPct);
+            return (
+              <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '7px 10px', background: '#0d1421', border: '1px solid #1a2535', borderRadius: 7 }}>
+                <div style={{ width: 60, fontSize: 10, fontWeight: 800, color: '#94a3b8', flexShrink: 0 }}>{label}</div>
+                <div style={{ width: 40, fontSize: 9, color: '#334155', flexShrink: 0 }}>{e.days_to}d</div>
+                <div style={{ width: 60, textAlign: 'right', fontSize: 12, fontFamily: 'JetBrains Mono, monospace', color: '#a78bfa', fontWeight: 800, flexShrink: 0 }}>{ivPct.toFixed(1)}%</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ height: 8, borderRadius: 2, background: '#111827', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${barW}%`, background: '#a78bfa', opacity: 0.7 }} />
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ marginTop: 10, fontSize: 9, color: '#64748b', lineHeight: 1.7, padding: '9px 11px', background: 'rgba(167,139,250,0.04)', border: '1px solid rgba(167,139,250,0.15)', borderRadius: 7 }}>
+          <span style={{ color: '#a78bfa', fontWeight: 700 }}>📊 Interpretação: </span>{interpretation}
+        </div>
+      </div>
+    );
+  }
+
+  // Fallback: mock data
   const ts = termStructure;
   const maxOI = Math.max(...ts.expirations.map(e => e.oi_contracts));
   return (
@@ -450,6 +516,7 @@ function TermStructurePanel() {
         title="Term Structure — IV por Prazo"
         sub={`Estrutura: ${ts.structure_type} · 1W-1Y spread: +${(ts.front_back_spread * 100).toFixed(1)}pp`}
         badge={ts.quality}
+        mode="mock"
       />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {ts.expirations.map((e, i) => {
@@ -492,7 +559,7 @@ export function AdvancedContent() {
       <div style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
           <h1 style={{ fontSize: 20, fontWeight: 900, color: '#f1f5f9', margin: 0, letterSpacing: '-0.03em' }}>Derivatives Advanced</h1>
-          <ModeBadge mode="mock" />
+          <ModeBadge />
         </div>
         <p style={{ fontSize: 11, color: '#475569', margin: 0 }}>
           Liquidation Clusters · OI por Strike (BTC/ETH) · Carry Calculator · Term Structure de IV

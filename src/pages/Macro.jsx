@@ -1,6 +1,10 @@
-import { macroBoard as macroBoardMock, macroHistory, fmtNum, aiAnalysis } from '../components/data/mockData';
+import { macroBoard as macroBoardMock, macroHistory, fmtNum, aiAnalysis as aiAnalysisMock } from '../components/data/mockData';
 import { useMacroBoard, useGlobalLiquidity } from '@/hooks/useFred';
 import { useBcbData } from '@/hooks/useBcb';
+import { useFearGreed } from '@/hooks/useBtcData';
+import { useRiskScore } from '@/hooks/useRiskScore';
+import { computeRuleBasedAnalysis } from '@/utils/ruleBasedAnalysis';
+import { IS_LIVE } from '@/lib/env';
 import { DataQualityBadge } from '../components/ui/DataQualityBadge';
 import { Area, AreaChart } from 'recharts';
 
@@ -11,8 +15,10 @@ function useMacroPageData() {
   const { data: live } = useMacroBoard();
   const { data: liquidity } = useGlobalLiquidity();
   const { data: bcb, isLoading: bcbLoading, isError: bcbError } = useBcbData();
+  const { data: fng } = useFearGreed(1);
+  const { data: riskScore } = useRiskScore();
   const macroBoard = live ?? macroBoardMock;
-  return { macroBoard, liquidity, bcb, bcbLoading, bcbError };
+  return { macroBoard, liquidity, bcb, bcbLoading, bcbError, fng, riskScore };
 }
 import { AIModuleCard } from '../components/ui/AIAnalysisPanel';
 import GoldenRule from '../components/ui/GoldenRule';
@@ -519,8 +525,21 @@ function BrMacroPanel({ bcb, isLoading, isError }) {
 }
 
 export default function Macro() {
-  const { macroBoard, liquidity, bcb, bcbLoading, bcbError } = useMacroPageData();
+  const { macroBoard, liquidity, bcb, bcbLoading, bcbError, fng, riskScore } = useMacroPageData();
   const m = macroBoard;
+
+  // Rule-based AI analysis from live macro data
+  const liveAnalysis = IS_LIVE && fng != null
+    ? computeRuleBasedAnalysis({
+        macro: {
+          fngValue:   fng.value,
+          fngLabel:   fng.label,
+          riskScore:  riskScore?.score ?? 50,
+          riskRegime: riskScore?.regime ?? 'MODERADO',
+        },
+      })
+    : null;
+  const aiAnalysis = liveAnalysis ?? aiAnalysisMock;
   const yieldSpread = m.series.find(s => s.id === 'US10Y').value - m.series.find(s => s.id === 'US2Y').value;
   const yieldSpreadBp = (yieldSpread * 100).toFixed(1);
   const isInverted = yieldSpread < 0;

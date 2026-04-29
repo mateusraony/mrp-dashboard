@@ -1,6 +1,8 @@
-import { btcOptions as btcOptionsMock, btcOptionsExtended, aiAnalysis } from '../components/data/mockData';
+import { btcOptions as btcOptionsMock, btcOptionsExtended, aiAnalysis as aiAnalysisMock } from '../components/data/mockData';
 import { useOptionsData } from '@/hooks/useDeribit';
 import { computeGex, computeMaxPain } from '@/utils/riskCalculations';
+import { computeRuleBasedAnalysis } from '@/utils/ruleBasedAnalysis';
+import { IS_LIVE } from '@/lib/env';
 
 // ─── DATA LAYER (live > mock fallback) ───────────────────────────────────────
 // useOptionsData() retorna OptionsData com chain incluindo gammas reais do Deribit.
@@ -98,6 +100,19 @@ export default function Options() {
   const { btcOptions, liveGex, liveMaxPain, liveOiByStrike, livePcrVol, livePcrOi, liveMaxPainDistancePct } = useOptionsPageData();
   const o = btcOptions;
   const regime = regimeLabels[o.regime];
+
+  // Rule-based AI analysis from live options data
+  const liveAnalysis = IS_LIVE && o.iv_atm !== btcOptionsMock.iv_atm
+    ? computeRuleBasedAnalysis({
+        options: {
+          ivAtm:              o.iv_atm,
+          skew:               o.skew,
+          pcrVol:             livePcrVol ?? btcOptionsExtended.put_call_ratio_vol,
+          maxPainDistancePct: liveMaxPainDistancePct ?? btcOptionsExtended.max_pain_distance_pct,
+        },
+      })
+    : null;
+  const aiAnalysis = liveAnalysis ?? aiAnalysisMock;
 
   const smileData = o.strikes.map(s => ({
     strike: s.strike / 1000,
