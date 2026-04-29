@@ -39,7 +39,7 @@ export default function TakerFlowPanel() {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: '#e2e8f0' }}>Options Taker Flow</div>
-            <ModeBadge mode="mock" />
+            <ModeBadge />
             <GradeBadge grade={d.quality} />
           </div>
           <div style={{ fontSize: 11, color: '#475569' }}>Premium líquido 24h · Buy vs Sell por tipo · Deribit</div>

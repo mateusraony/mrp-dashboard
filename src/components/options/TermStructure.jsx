@@ -52,7 +52,7 @@ export default function TermStructure() {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: '#e2e8f0' }}>Term Structure — IV ATM</div>
-            <ModeBadge mode="mock" />
+            <ModeBadge />
             <GradeBadge grade={d.quality} />
           </div>
           <div style={{ fontSize: 11, color: '#475569' }}>Curva de volatilidade implícita por prazo · Deribit BTC</div>
