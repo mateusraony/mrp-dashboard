@@ -8,6 +8,7 @@ import {
 import { usePortfolioPositions, useUpsertPosition, useDeletePosition } from '@/hooks/useSupabase';
 import { useBtcTicker, useKlines } from '@/hooks/useBtcData';
 import { computeLiveRiskMetrics } from '@/utils/riskCalculations';
+import { IS_LIVE } from '@/lib/env';
 import { ModeBadge } from '../components/ui/DataBadge';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -53,10 +54,10 @@ function GreekCard({ label, value, unit, color, sub, description }) {
   );
 }
 
-function AddPositionForm({ onAdd, onCancel }) {
+function AddPositionForm({ onAdd, onCancel, spotPrice = SPOT_PRICE }) {
   const [form, setForm] = useState({
     type: 'spot', side: 'long', asset: '', size: 1,
-    entry_price: SPOT_PRICE, strike: 84000, expiry_days: 18,
+    entry_price: spotPrice, strike: Math.round(spotPrice / 1000) * 1000, expiry_days: 18,
     delta: 1.0, gamma: 0, theta: 0, vega: 0,
   });
 
@@ -152,7 +153,7 @@ function AddPositionForm({ onAdd, onCancel }) {
 
       <div style={{ display: 'flex', gap: 8 }}>
         <button onClick={() => {
-          onAdd({ ...form, id: `p${Date.now()}`, current_price: form.type === 'cash' ? 1 : SPOT_PRICE, color: '#' + Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, '0') });
+          onAdd({ ...form, id: `p${Date.now()}`, current_price: form.type === 'cash' ? 1 : spotPrice, color: '#' + Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, '0') });
         }} style={{
           padding: '8px 18px', borderRadius: 7, border: 'none', cursor: 'pointer',
           background: 'linear-gradient(135deg, #3b82f6, #6366f1)', color: '#fff', fontWeight: 700, fontSize: 12,
@@ -200,6 +201,9 @@ export default function Portfolio() {
       ));
     }
   }, [ticker?.mark_price]);
+
+  // Preço spot live para o formulário e cabeçalho — fallback para SPOT_PRICE quando não disponível
+  const liveSpotPrice = (IS_LIVE && ticker?.mark_price) ? ticker.mark_price : SPOT_PRICE;
 
   const [showAddForm, setShowAddForm] = useState(false);
   const [stressMove, setStressMove] = useState(null);
@@ -268,13 +272,13 @@ export default function Portfolio() {
       <div style={{ marginBottom: 20 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
           <h1 style={{ fontSize: 20, fontWeight: 900, color: '#f1f5f9', margin: 0, letterSpacing: '-0.03em' }}>Portfolio Manager</h1>
-          <ModeBadge mode="mock" />
+          <ModeBadge mode={IS_LIVE ? 'live' : 'mock'} />
           <span style={{ fontSize: 10, color: totalPnL >= 0 ? '#10b981' : '#ef4444', background: totalPnL >= 0 ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)', border: `1px solid ${totalPnL >= 0 ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)'}`, borderRadius: 4, padding: '2px 8px', fontWeight: 700, fontFamily: 'JetBrains Mono, monospace' }}>
             P&L {totalPnL >= 0 ? '+' : ''}{fmtUSD(totalPnL)}
           </span>
         </div>
         <p style={{ fontSize: 11, color: '#475569' }}>
-          Simulação de portfólio com Greeks ponderados · BTC Spot + Futuros + Opções · Spot: <span style={{ fontFamily: 'JetBrains Mono, monospace', color: '#f59e0b' }}>${SPOT_PRICE.toLocaleString()}</span>
+          Simulação de portfólio com Greeks ponderados · BTC Spot + Futuros + Opções · Spot: <span style={{ fontFamily: 'JetBrains Mono, monospace', color: '#f59e0b' }}>${liveSpotPrice.toLocaleString()}</span>
         </p>
       </div>
 
@@ -394,7 +398,7 @@ export default function Portfolio() {
             {showAddForm ? '✕ Cancelar' : '+ Adicionar Posição'}
           </button>
         </div>
-        {showAddForm && <AddPositionForm onAdd={addPosition} onCancel={() => setShowAddForm(false)} />}
+        {showAddForm && <AddPositionForm onAdd={addPosition} onCancel={() => setShowAddForm(false)} spotPrice={liveSpotPrice} />}
 
         {/* Table */}
         <div style={{ background: 'linear-gradient(135deg, #131e2e 0%, #111827 100%)', border: '1px solid #1e2d45', borderRadius: 12, overflow: 'hidden' }}>
