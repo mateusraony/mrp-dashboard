@@ -380,7 +380,9 @@ function DerivativesSection({ period, liveTicker }) {
   const basis = futuresBasis;
   const liq = liquidationClusters;
   const fundingRate = liveTicker?.last_funding_rate ?? f.funding_rate;
-  const openInterest = liveTicker?.open_interest ?? f.open_interest_usdt;
+  const openInterest = liveTicker
+    ? liveTicker.open_interest * liveTicker.mark_price
+    : f.open_interest_usdt;
   const oiDelta1d = liveTicker?.oi_delta_pct ?? f.oi_delta_pct;
   const fundingAnn = fundingRate * 3 * 365 * 100;
   const carrySpread = (basis.futures[1]?.basis_annualized || 0) - 4.512;

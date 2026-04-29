@@ -252,7 +252,7 @@ function OIByStrike() {
   }));
 
   const maxPain = asset === 'BTC' ? (liveOptions?.max_pain ?? d.max_pain) : 3200;
-  const gamma = asset === 'BTC' ? (liveOptions?.gex ?? d.gamma_exposure_usd) : -28_000_000;
+  const gamma = asset === 'BTC' ? (liveOptions?.gamma_exposure_usd ?? d.gamma_exposure_usd) : -28_000_000;
   const pcrVol = asset === 'BTC' ? (liveOptions?.put_call_ratio_vol ?? d.put_call_ratio_vol) : d.put_call_ratio_vol;
   const pcrOi = asset === 'BTC' ? (liveOptions?.put_call_ratio_oi ?? d.put_call_ratio_oi) : d.put_call_ratio_oi;
 

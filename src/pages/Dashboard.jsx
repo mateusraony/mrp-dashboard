@@ -456,7 +456,7 @@ export default function Dashboard() {
           openInterest: liveTicker.open_interest,
         } : undefined,
         spot: liveTicker ? {
-          ret1d:         liveTicker.price_change_pct ?? 0,
+          ret1d:         (liveTicker.price_change_pct ?? 0) / 100,
           cvd1d:         0,
           volume1dUsdt:  liveTicker.volume_24h_usdt ?? 0,
           price:         liveTicker.mark_price,
