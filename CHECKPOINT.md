@@ -1,10 +1,10 @@
 # CHECKPOINT.md — MRP Dashboard
 > Memória técnica viva do projeto. Atualizar ao final de cada bloco importante.
-> Última atualização: 2026-04-28 (Sprint 10 — Data Reliability Audit + Live Wiring: Options / SpotFlow / Macro)
+> Última atualização: 2026-04-29 (Sprint 7.1–7.4 iniciados — Portfolio / PredictivePanel / Automações / Opportunities live)
 
 ---
 
-## 🗂 ESTADO GERAL (verificado em 2026-04-28)
+## 🗂 ESTADO GERAL (verificado em 2026-04-29)
 
 | Aspecto | Status | Evidência Real |
 |---------|--------|---------------|
@@ -26,6 +26,7 @@
 | pg_cron jobs | ✅ ATIVO | 3 jobs ativos: macro-actual-fetcher (*/15min), macro-alert-worker (*/5min), send-telegram-digest (11h UTC) |
 | pg_cron duplicata | ⚠️ PENDENTE | Job antigo `telegram-digest` duplica o `send-telegram-digest` — remover com SELECT cron.unschedule('telegram-digest') |
 | Auth real | ❌ AUSENTE | Stub anônimo — aguarda decisão futura |
+| **Rule-based AI Analysis** | ✅ MERGEADO (PR #49) | `ruleBasedAnalysis.ts` + wiring em Dashboard/Derivatives/SpotFlow/Options/Macro/DerivativesAdvanced/SmartAlerts/ExecutiveReport |
 
 ---
 
@@ -39,8 +40,9 @@
 | Fase 4 — Cálculos Python + Wiring Live (Sprints 4.1–4.5) | ✅ CONCLUÍDA | 2026-04-12 |
 | Fase 5 — APIs Gratuitas + Testes (Sprints 5.1–5.6) | ✅ CONCLUÍDA | 2026-04-12 |
 | Fase 6 — Expansão OnChain/Macro/Governance | ✅ CONCLUÍDA* | 2026-04-14 |
+| **Fase 7 — Live Wiring: Portfolio / Predictive / Automações / Opportunities** | 🔄 EM ANDAMENTO | 2026-04-29 |
 
-*Sprint 6.6 (Telegram) bloqueado externamente — aguarda Bot Token do usuário.
+*Sprint 6.6 (Telegram) desbloqueado — Bot Token configurado.
 
 ---
 
@@ -248,12 +250,16 @@ refetchInterval: IS_LIVE ? 30_000 : false,
 
 ---
 
-## 🗺 O QUE FALTA
+## 🗺 O QUE FALTA / EM ANDAMENTO
 
 | Item | Descrição | Bloqueio |
 |------|-----------|---------|
+| **Sprint 7.1 — Portfolio Live** | 🔄 Wire useBtcTicker mark_price + useKlines(1d,30) em VaR/Sharpe/Drawdown/Beta (SPOT_PRICE constante → live) | Em execução |
+| **Sprint 7.2 — PredictivePanel Live** | 🔄 Cenários 24h a partir de ATR(14) via useKlines; probabilities via computeRuleBasedAnalysis; ETF/stablecoin → DataTrustBadge paid_required | Em execução |
+| **Sprint 7.3 — Automações Live** | 🔄 Wire useBtcTicker/useFearGreed/useRiskScore em AVAILABLE_METRICS; useEffect avalia regras vs dados live | Em execução |
+| **Sprint 7.4 — Opportunities Rule-Based** | 🔄 Gerar oportunidades de trade do output de computeRuleBasedAnalysis; grade A/B/C por confluência de módulos | Em execução |
 | **Telegram Digest (Sprint 6.6)** | ✅ CONCLUÍDO | Edge Functions deployed + pg_cron ativo. Pendente: remover job duplicado `telegram-digest` |
 | **GDELT→Supabase wiring** | `useGdelt.ts` busca artigos mas não faz upsert em `gdelt_articles` ainda | Tabela criada (Sprint 7) — falta wiring no hook |
-| **MacroCalendar bronze pipeline** | `macro_event_schedule` não é populado automaticamente ainda | `macroCalendarService.ts` gera eventos em memória; persitência é Sprint 8 |
+| **MacroCalendar bronze pipeline** | `macro_event_schedule` não é populado automaticamente ainda | `macroCalendarService.ts` gera eventos em memória; persistência é Sprint 8 |
 | **Auth real** | Login com email/Google via Supabase Auth | Decisão de negócio — quando quiser ativar |
 | **APIs pagas** | SOPR, Netflow, Whale via Glassnode/CryptoQuant | Custo ~$29/mês — confirmar se vale |

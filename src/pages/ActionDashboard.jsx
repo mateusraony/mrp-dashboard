@@ -1,5 +1,5 @@
 // ─── DASHBOARD DE AÇÕES ───────────────────────────────────────────────────────
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import {
@@ -12,6 +12,10 @@ import {
 import { globalRisk, fearGreed, btcFutures } from '../components/data/mockData';
 import AIInsightPanel from '../components/ai/AIInsightPanel';
 import { ModeBadge } from '../components/ui/DataBadge';
+import { useBtcTicker, useFearGreed } from '@/hooks/useBtcData';
+import { useRiskScore } from '@/hooks/useRiskScore';
+import { computeRuleBasedAnalysis } from '@/utils/ruleBasedAnalysis';
+import { IS_LIVE } from '@/lib/env';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const TYPE_STYLE = {
@@ -231,9 +235,51 @@ export function ActionsContent() {
   const [typeFilter, setTypeFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
 
-  const regColor = globalRisk.regime === 'RISK-ON' ? '#10b981' : globalRisk.regime === 'RISK-OFF' ? '#ef4444' : '#f59e0b';
+  const { data: ticker } = useBtcTicker();
+  const { data: fng } = useFearGreed(1);
+  const { data: riskScore } = useRiskScore();
 
-  const filtered = tradeOpportunities.filter(op => {
+  // Regime live > mock fallback
+  const liveRegime = riskScore
+    ? (riskScore.regime === 'RISCO ELEVADO' ? 'RISK-OFF' : riskScore.regime === 'SAUDÁVEL' ? 'RISK-ON' : 'NEUTRAL')
+    : globalRisk.regime;
+  const liveScore = riskScore?.score ?? globalRisk.score;
+  const regColor = liveRegime === 'RISK-ON' ? '#10b981' : liveRegime === 'RISK-OFF' ? '#ef4444' : '#f59e0b';
+
+  // Live opportunities from rule-based analysis
+  const liveOpportunities = useMemo(() => {
+    if (!IS_LIVE || !ticker) return [];
+    const analysis = computeRuleBasedAnalysis({
+      derivatives: { fundingRate: ticker.last_funding_rate, oiDeltaPct: ticker.oi_delta_pct },
+      spot: { ret1d: (ticker.price_change_pct ?? 0) / 100, cvd1d: 0, volume1dUsdt: ticker.volume_24h_usdt ?? 0, price: ticker.mark_price },
+      macro: fng ? { fngValue: fng.value, fngLabel: fng.label, riskScore: riskScore?.score ?? 50, riskRegime: riskScore?.regime ?? 'MODERADO' } : undefined,
+    });
+    return Object.entries(analysis.modules)
+      .filter(([, m]) => m.direction !== 'neutral' && m.score > 55)
+      .map(([key, m]) => ({
+        id:          `live-${key}`,
+        type:        m.direction.startsWith('bull') ? 'LONG' : 'SHORT',
+        ai_grade:    m.score >= 75 ? 'A' : m.score >= 60 ? 'B' : 'C',
+        asset:       'BTC',
+        strategy:    m.signal,
+        probability: m.probability,
+        tags:        [key, m.direction.replace('_', ' ')],
+        source:      'Rule Engine (live)',
+        rationale:   `${m.analysis} — ${m.trigger}`,
+        timeframe:   m.timeframe,
+        entry:       ticker.mark_price,
+        target:      null,
+        stop:        null,
+        rr:          null,
+        status:      'active',
+        pnl_pct:     null,
+        isLive:      true,
+      }));
+  }, [ticker, fng, riskScore]);
+
+  const allOpportunities = [...liveOpportunities, ...tradeOpportunities];
+
+  const filtered = allOpportunities.filter(op => {
     const typeOk = typeFilter === 'ALL' || op.type === typeFilter;
     const statusOk = statusFilter === 'ALL' || op.status === statusFilter;
     return typeOk && statusOk;
@@ -248,7 +294,7 @@ export function ActionsContent() {
             <h1 style={{ fontSize: 20, fontWeight: 900, color: '#f1f5f9', margin: 0, letterSpacing: '-0.03em' }}>
               ⚡ Dashboard de Ações
             </h1>
-            <ModeBadge mode="mock" />
+            <ModeBadge mode={IS_LIVE && ticker ? 'live' : 'mock'} />
           </div>
           <p style={{ fontSize: 11, color: '#475569', margin: 0 }}>
             Feed de oportunidades · AI-driven · Performance em tempo real
@@ -256,7 +302,7 @@ export function ActionsContent() {
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <span style={{ fontSize: 11, padding: '5px 12px', borderRadius: 7, background: `${regColor}12`, color: regColor, border: `1px solid ${regColor}30`, fontWeight: 700 }}>
-            {globalRisk.regime} · {globalRisk.score}/100
+            {liveRegime} · {liveScore}/100
           </span>
           <Link to={createPageUrl('Automations')} style={{ fontSize: 11, padding: '7px 14px', borderRadius: 7, background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.3)', color: '#a78bfa', textDecoration: 'none', fontWeight: 700 }}>
             ⚙️ Automações
