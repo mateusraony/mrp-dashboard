@@ -1,8 +1,9 @@
 import {
   btcFutures, liquidityBins,
   oiByExchange as oiByExchangeMock,
-  fmtNum, fmtPct, aiAnalysis,
+  fmtNum, fmtPct, aiAnalysis as aiAnalysisMock,
 } from '../components/data/mockData';
+import { computeRuleBasedAnalysis } from '@/utils/ruleBasedAnalysis';
 import { useBtcTicker, useOiByExchange, useLiquidations } from '@/hooks/useBtcData';
 import { useMultiVenueSnapshot } from '@/hooks/useMultiVenue';
 import { DataQualityBadge } from '../components/ui/DataQualityBadge';
@@ -131,9 +132,13 @@ function LiquidityHeatmap({ bins }) {
 
 export function DerivativesOverview() {
   const { btcFutures: liveBtc, oiByExchange: liveOi } = useDerivativesData();
-  // eslint-disable-next-line no-unused-vars
-  const _liveBtc = liveBtc; // cache ativo; UI usa btcFutures (module-level) diretamente
-  const f = btcFutures;
+  const f = liveBtc; // use live data if available
+
+  // Rule-based AI analysis from live ticker
+  const liveAnalysis = IS_LIVE && liveBtc.mark_price !== btcFutures.mark_price
+    ? computeRuleBasedAnalysis({ derivatives: { fundingRate: liveBtc.funding_rate, oiDeltaPct: liveBtc.oi_delta_pct, openInterest: liveBtc.open_interest } })
+    : null;
+  const aiAnalysis = liveAnalysis ?? aiAnalysisMock;
   const fundingPos = f.funding_rate > 0;
   const nextFundHours = Math.round((f.next_funding_time.getTime() - Date.now()) / 3600000);
 

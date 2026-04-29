@@ -10,7 +10,7 @@ import { ModeBadge, GradeBadge } from '../components/ui/DataBadge';
 import { DataQualityBadge } from '@/components/ui/DataQualityBadge';
 import { formatDistanceToNow } from 'date-fns';
 // ── Hooks de dados reais ────────────────────────────────────────────────────
-import { useBtcTicker, useLiquidations } from '@/hooks/useBtcData';
+import { useBtcTicker, useLiquidations, useFearGreed } from '@/hooks/useBtcData';
 import { useRiskScore } from '@/hooks/useRiskScore';
 import { useMultiVenueSnapshot } from '@/hooks/useMultiVenue';
 import { IS_LIVE } from '@/lib/env';
@@ -404,6 +404,7 @@ export default function SmartAlerts() {
   const { data: ticker,       isLoading: tickerLoading,  isError: tickerError  } = useBtcTicker();
   const { data: liquidations, isLoading: liqLoading,    isError: liqError     } = useLiquidations(100);
   const { data: riskScore,    isLoading: riskLoading,   isError: riskError    } = useRiskScore();
+  const { data: fngData } = useFearGreed(1);
   const multiVenue = useMultiVenueSnapshot();
 
   // ── Logging quando dados live carregam ───────────────────────────────────
@@ -588,13 +589,23 @@ export default function SmartAlerts() {
           </div>
         </div>
 
-        {/* Sentimento — sem hook real; mantém mock com badge explícito */}
-        <div>
-          <RiskGauge label="Sentimento" icon="🧠" value={Math.abs(rd.sentiment_24h)} max={1} threshold={0.5} color="#06b6d4" sub={`Score: ${rd.sentiment_24h > 0 ? '+' : ''}${rd.sentiment_24h.toFixed(2)}`} />
-          <div style={{ marginTop: 3, display: 'flex', justifyContent: 'flex-end' }}>
-            <DataQualityBadge freshness={0} completeness={60} fallback_active={true} source="MOCK" />
-          </div>
-        </div>
+        {/* Sentimento — Fear & Greed real via Alternative.me quando disponível */}
+        {(() => {
+          const fngScore = fngData != null ? (fngData.value - 50) / 50 : null;
+          const sentimentVal = fngScore != null ? Math.abs(fngScore) : Math.abs(rd.sentiment_24h);
+          const sentimentSub = fngScore != null
+            ? `F&G: ${fngData.value} · ${fngData.label}`
+            : `Score: ${rd.sentiment_24h > 0 ? '+' : ''}${rd.sentiment_24h.toFixed(2)}`;
+          const isSentLive = fngScore != null && IS_LIVE;
+          return (
+            <div>
+              <RiskGauge label="Sentimento" icon="🧠" value={sentimentVal} max={1} threshold={0.5} color="#06b6d4" sub={sentimentSub} />
+              <div style={{ marginTop: 3, display: 'flex', justifyContent: 'flex-end' }}>
+                <DataQualityBadge freshness={isSentLive ? 100 : 0} completeness={isSentLive ? 100 : 60} fallback_active={!isSentLive} source={isSentLive ? 'Alternative.me' : 'MOCK'} />
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Cluster BTC — derivado de liquidações reais quando disponível */}
         <div>

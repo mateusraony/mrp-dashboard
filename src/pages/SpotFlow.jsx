@@ -1,8 +1,10 @@
-import { btcSpotFlow, fmtNum, aiAnalysis } from '../components/data/mockData';
+import { btcSpotFlow, fmtNum, aiAnalysis as aiAnalysisMock } from '../components/data/mockData';
 import { spotSessions } from '../components/data/mockDataAltcoins';
 import { AIModuleCard } from '../components/ui/AIAnalysisPanel';
 import SectionHeader from '../components/ui/SectionHeader';
 import { ModeBadge } from '../components/ui/DataBadge';
+import { computeRuleBasedAnalysis } from '@/utils/ruleBasedAnalysis';
+import { IS_LIVE } from '@/lib/env';
 import {
   AreaChart, Area, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, ComposedChart, Line,
@@ -58,6 +60,12 @@ export default function SpotFlow() {
   // Live spot metrics derived from klines; fallback to mock for uncovered fields
   const liveSpot = computeSpotMetrics(klines, btcPrice);
   const s = liveSpot ? { ...btcSpotFlow, ...liveSpot } : btcSpotFlow;
+
+  // Rule-based AI analysis from live data
+  const liveAnalysis = IS_LIVE && liveSpot
+    ? computeRuleBasedAnalysis({ spot: { ret1d: liveSpot.ret_1d, cvd1d: liveSpot.cvd_1d, volume1dUsdt: liveSpot.volume_1d_usdt, price: liveSpot.price } })
+    : null;
+  const aiAnalysis = liveAnalysis ?? aiAnalysisMock;
 
   // Calcula sessões live quando klines disponíveis; fallback para mock
   const liveSessions = klines && klines.length >= 24

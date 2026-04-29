@@ -18,6 +18,9 @@ import { liquidationClusters, futuresBasis, etfFlows, lthSthSupply, oiRatio } fr
 import AIInsightPanel from '../components/ai/AIInsightPanel';
 import { ModeBadge } from '../components/ui/DataBadge';
 import { sendNotificationEmail } from '@/lib/notificationClient';
+import { useBtcTicker, useFearGreed } from '@/hooks/useBtcData';
+import { useRiskScore } from '@/hooks/useRiskScore';
+import { IS_LIVE } from '@/lib/env';
 
 const TODAY = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
 
@@ -113,7 +116,7 @@ function PeriodSelector({ active, onChange }) {
 }
 
 // ─── GLOBAL OVERVIEW ──────────────────────────────────────────────────────────
-function GlobalOverview({ period }) {
+function GlobalOverview({ period, liveTicker, liveFng, liveRisk }) {
   const f = btcFutures;
   const sp = macroBoard.series.find(s => s.id === 'SP500');
   const vix = macroBoard.series.find(s => s.id === 'VIX');
@@ -121,7 +124,14 @@ function GlobalOverview({ period }) {
   const gold = macroBoard.series.find(s => s.id === 'GOLD');
   const us10y = macroBoard.series.find(s => s.id === 'US10Y');
 
-  const periodKey = period === 'Diário' ? '1d' : period === 'Semanal' ? '7d' : period === 'Mensal' ? '30d' : '30d';
+  // Merge live data over mock where available
+  const btcPrice = liveTicker?.mark_price ?? f.mark_price;
+  const btcRet1d = f.ret_1d; // only mock has historical returns
+  const fngValue = liveFng?.value ?? fearGreed.value;
+  const fngLabel = liveFng?.label ?? fearGreed.classification;
+  const riskScore = liveRisk?.score ?? globalRisk.score;
+  const riskRegime = liveRisk?.regime ?? globalRisk.regime;
+  const riskProb = globalRisk.prob; // live RiskScoreResult has no probability field
 
   const getSpDelta = () => period === 'Diário' ? sp?.delta_1d : period === 'Semanal' ? sp?.delta_7d : sp?.delta_30d;
   const getDxyDelta = () => period === 'Diário' ? dxy?.delta_1d : period === 'Semanal' ? dxy?.delta_7d : dxy?.delta_30d;
@@ -129,7 +139,10 @@ function GlobalOverview({ period }) {
   const getGoldDelta = () => period === 'Diário' ? gold?.delta_1d : period === 'Semanal' ? gold?.delta_7d : gold?.delta_30d;
   const getBtcRet = () => period === 'Diário' ? f.ret_1d : period === 'Semanal' ? f.ret_1w : f.ret_1m;
 
-  const regColor = globalRisk.regime === 'RISK-ON' ? '#10b981' : globalRisk.regime === 'RISK-OFF' ? '#ef4444' : '#f59e0b';
+  // riskRegime can be 'RISK-ON'/'RISK-OFF'/'NEUTRAL' (mock) or 'SAUDÁVEL'/'MODERADO'/'RISCO ELEVADO' (live)
+  const regColor = (riskRegime === 'RISK-ON' || riskRegime === 'SAUDÁVEL') ? '#10b981'
+    : (riskRegime === 'RISK-OFF' || riskRegime === 'RISCO ELEVADO') ? '#ef4444'
+    : '#f59e0b';
 
   return (
     <SectionCard
@@ -140,21 +153,21 @@ function GlobalOverview({ period }) {
     >
       {/* Regime badge grande */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14, padding: '12px 16px', borderRadius: 10, background: `${regColor}0d`, border: `1px solid ${regColor}25` }}>
-        <div style={{ fontSize: 32, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: regColor }}>{globalRisk.score}</div>
+        <div style={{ fontSize: 32, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: regColor }}>{riskScore}</div>
         <div>
-          <div style={{ fontSize: 16, fontWeight: 900, color: regColor }}>{globalRisk.regime}</div>
-          <div style={{ fontSize: 10, color: '#475569' }}>Score Global · Prob. squeeze: {globalRisk.prob}%</div>
+          <div style={{ fontSize: 16, fontWeight: 900, color: regColor }}>{riskRegime}</div>
+          <div style={{ fontSize: 10, color: '#475569' }}>Score Global · Prob. squeeze: {riskProb}%</div>
         </div>
         <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
           <div style={{ fontSize: 10, color: '#334155' }}>Fear & Greed</div>
-          <div style={{ fontSize: 22, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: fearGreed.value > 60 ? '#10b981' : '#f59e0b' }}>{fearGreed.value}</div>
-          <div style={{ fontSize: 9, color: '#475569' }}>{fearGreed.classification}</div>
+          <div style={{ fontSize: 22, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: fngValue > 60 ? '#10b981' : '#f59e0b' }}>{fngValue}</div>
+          <div style={{ fontSize: 9, color: '#475569' }}>{fngLabel}</div>
         </div>
       </div>
 
       {/* BTC + macro grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 8, marginBottom: 12 }}>
-        <Metric label="BTC" value={`$${fmt(f.mark_price, 0)}`} color="#f59e0b"
+        <Metric label="BTC" value={`$${fmt(btcPrice, 0)}`} color="#f59e0b"
           sub={`${sign(getBtcRet() * 100)}${fmt(getBtcRet() * 100, 2)}% ${period.toLowerCase()}`} />
         <Metric label="S&P 500" value={fmt(sp?.value, 0)} color={col(getSpDelta())}
           sub={`${sign(getSpDelta() * 100)}${fmt(getSpDelta() * 100, 1)}% ${period.toLowerCase()}`} />
@@ -362,11 +375,16 @@ function StablecoinSection({ period }) {
 }
 
 // ─── DERIVATIVES SECTION ──────────────────────────────────────────────────────
-function DerivativesSection({ period }) {
+function DerivativesSection({ period, liveTicker }) {
   const f = btcFutures;
   const basis = futuresBasis;
   const liq = liquidationClusters;
-  const fundingAnn = f.funding_rate * 3 * 365 * 100;
+  const fundingRate = liveTicker?.last_funding_rate ?? f.funding_rate;
+  const openInterest = liveTicker
+    ? liveTicker.open_interest * liveTicker.mark_price
+    : f.open_interest_usdt;
+  const oiDelta1d = liveTicker?.oi_delta_pct ?? f.oi_delta_pct;
+  const fundingAnn = fundingRate * 3 * 365 * 100;
   const carrySpread = (basis.futures[1]?.basis_annualized || 0) - 4.512;
 
   const histLen = period === 'Diário' ? 14 : period === 'Semanal' ? 21 : 30;
@@ -396,8 +414,8 @@ function DerivativesSection({ period }) {
     >
       {/* Top metrics */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 12 }}>
-        <Metric label="Funding Rate" value={`${(f.funding_rate * 100).toFixed(4)}%`} color={f.funding_rate > 0.0006 ? '#f59e0b' : '#10b981'} sub={`Ann: ${fundingAnn.toFixed(1)}%`} />
-        <Metric label="Open Interest" value={fmtM(f.open_interest_usdt)} color="#60a5fa" sub={`+${f.oi_delta_pct}% 1D · +${f.oi_delta_pct_1w}% 1W`} />
+        <Metric label="Funding Rate" value={`${(fundingRate * 100).toFixed(4)}%`} color={fundingRate > 0.0006 ? '#f59e0b' : '#10b981'} sub={`Ann: ${fundingAnn.toFixed(1)}%`} />
+        <Metric label="Open Interest" value={fmtM(openInterest)} color="#60a5fa" sub={`+${oiDelta1d}% 1D · +${f.oi_delta_pct_1w}% 1W`} />
         <Metric label="Basis Jun26" value={`${basis.futures[1]?.basis_annualized?.toFixed(1)}%`} color="#10b981" sub={`Carry vs US10Y: +${carrySpread.toFixed(1)}pp`} />
         <Metric label="OI/Mkt Cap" value={`${oiRatio.ratio_pct.toFixed(2)}%`} color={oiRatio.ratio_pct > 1.2 ? '#f59e0b' : '#10b981'} sub={oiRatio.zone} />
       </div>
@@ -896,6 +914,9 @@ function exportPDF() {
 export default function ExecutiveReport() {
   const [showEmail, setShowEmail] = useState(false);
   const [period, setPeriod] = useState('Diário');
+  const { data: liveTicker } = useBtcTicker();
+  const { data: liveFng } = useFearGreed(1);
+  const { data: liveRisk } = useRiskScore();
 
   return (
     <div style={{ maxWidth: 1280, margin: '0 auto' }}>
@@ -906,7 +927,7 @@ export default function ExecutiveReport() {
             <h1 style={{ fontSize: 20, fontWeight: 900, color: '#f1f5f9', margin: 0, letterSpacing: '-0.03em' }}>
               📊 Relatório Executivo
             </h1>
-            <ModeBadge mode="mock" />
+            <ModeBadge mode={IS_LIVE && (liveTicker || liveFng) ? 'live' : 'mock'} />
           </div>
           <p style={{ fontSize: 11, color: '#475569', margin: 0 }}>{TODAY}</p>
           <p style={{ fontSize: 10, color: '#334155', margin: '2px 0 0' }}>
@@ -949,10 +970,10 @@ export default function ExecutiveReport() {
 
       {/* Sections */}
       <div id="exec-report-content" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <GlobalOverview period={period} />
+        <GlobalOverview period={period} liveTicker={liveTicker} liveFng={liveFng} liveRisk={liveRisk} />
         <RegimeSection period={period} />
         <StablecoinSection period={period} />
-        <DerivativesSection period={period} />
+        <DerivativesSection period={period} liveTicker={liveTicker} />
         <OnChainSection period={period} />
         <ETFMacroSection period={period} />
         <PeriodSummaryTable />
@@ -979,7 +1000,7 @@ export default function ExecutiveReport() {
       {/* Footer */}
       <div style={{ marginTop: 12, padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
         <div style={{ fontSize: 9, color: '#1e3048', fontFamily: 'JetBrains Mono, monospace' }}>
-          CryptoWatch Intelligence Suite · 🧪 MOCK · {new Date().toISOString().slice(0, 19)}Z
+          CryptoWatch Intelligence Suite · {IS_LIVE ? '🛰️ LIVE' : '🧪 MOCK'} · {new Date().toISOString().slice(0, 19)}Z
         </div>
         <div style={{ fontSize: 9, color: '#1e3048' }}>Não é aconselhamento financeiro.</div>
       </div>

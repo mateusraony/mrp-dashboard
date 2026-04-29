@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   btcFutures, btcSpotFlow, macroBoard, onChain,
-  fearGreed, recentAlerts, globalRisk, sourceHealth, fmtNum, fmtPct, aiAnalysis,
+  fearGreed, recentAlerts, globalRisk, sourceHealth, fmtNum, fmtPct, aiAnalysis as aiAnalysisMockData,
 } from '../components/data/mockData';
 import { DATA_MODE, IS_LIVE, env } from '@/lib/env';
 import { DataTrustBadge } from '../components/ui/DataTrustBadge';
@@ -9,6 +9,7 @@ import { useBtcTicker, useFearGreed as useFearGreedHook } from '@/hooks/useBtcDa
 import { useRiskScore } from '@/hooks/useRiskScore';
 import { useMacroBoard } from '@/hooks/useFred';
 import { useMempoolState } from '@/hooks/useMempool';
+import { computeRuleBasedAnalysis } from '@/utils/ruleBasedAnalysis';
 
 // ─── DATA LAYER (live > mock fallback) ───────────────────────────────────────
 function useDashboardLiveData() {
@@ -16,9 +17,11 @@ function useDashboardLiveData() {
   const { data: fng,       isError: fngError }    = useFearGreedHook();
   const { data: riskScore, isError: riskError }   = useRiskScore();
   return {
+    ticker:     ticker ?? null,
+    fng:        fng    ?? null,
+    riskScore:  riskScore ?? null,
     btcFutures: ticker ? { ...btcFutures, mark_price: ticker.mark_price, funding_rate: ticker.last_funding_rate, oi_delta_pct: ticker.oi_delta_pct, open_interest: ticker.open_interest } : btcFutures,
     fearGreed:  fng    ? { ...fearGreed,  value: fng.value, label: fng.label, classification: fng.label } : fearGreed,
-    riskScore:  riskScore ?? null,
     errors: { ticker: tickerError, fng: fngError, risk: riskError },
   };
 }
@@ -442,7 +445,31 @@ function AITrackRecord() {
 
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
 export default function Dashboard() {
-  const { btcFutures: _btcLive, fearGreed: _fngLive, riskScore: liveRiskScore, errors: liveErrors } = useDashboardLiveData();
+  const { ticker: liveTicker, fng: liveFng, riskScore: liveRiskScore, btcFutures: _btcLive, fearGreed: _fngLive, errors: liveErrors } = useDashboardLiveData();
+
+  // Rule-based AI analysis — all four modules, live data when available
+  const liveAnalysis = IS_LIVE && (liveTicker != null || liveFng != null)
+    ? computeRuleBasedAnalysis({
+        derivatives: liveTicker ? {
+          fundingRate: liveTicker.last_funding_rate,
+          oiDeltaPct:  liveTicker.oi_delta_pct,
+          openInterest: liveTicker.open_interest,
+        } : undefined,
+        spot: liveTicker ? {
+          ret1d:         (liveTicker.price_change_pct ?? 0) / 100,
+          cvd1d:         0,
+          volume1dUsdt:  liveTicker.volume_24h_usdt ?? 0,
+          price:         liveTicker.mark_price,
+        } : undefined,
+        macro: liveFng ? {
+          fngValue:   liveFng.value,
+          fngLabel:   liveFng.label,
+          riskScore:  liveRiskScore?.score ?? 50,
+          riskRegime: liveRiskScore?.regime ?? 'MODERADO',
+        } : undefined,
+      })
+    : null;
+  const aiAnalysis = liveAnalysis ?? aiAnalysisMockData;
   const [lastUpdate, setLastUpdate] = useState(new Date());
   useEffect(() => {
     const t = setInterval(() => setLastUpdate(new Date()), 5000);
