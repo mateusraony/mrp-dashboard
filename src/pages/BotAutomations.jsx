@@ -6,7 +6,6 @@ import { automationRules, botConnections, recentBotMessages } from '../component
 import { globalRisk, fearGreed, btcFutures } from '../components/data/mockData';
 import { marketRegime } from '../components/data/mockDataRegime';
 import { ModeBadge } from '../components/ui/DataBadge';
-import { DATA_MODE } from '@/lib/env';
 import { sendNotificationEmail } from '@/lib/notificationClient';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -309,7 +308,7 @@ export function BotsContent() {
             <h1 style={{ fontSize: 20, fontWeight: 900, color: '#f1f5f9', margin: 0, letterSpacing: '-0.03em' }}>
               🤖 Automações & Bots
             </h1>
-            <ModeBadge mode={DATA_MODE} />
+            <ModeBadge mode="mock" />
           </div>
           <p style={{ fontSize: 11, color: '#475569', margin: 0 }}>Telegram · Discord · Webhooks · Regras baseadas em AI</p>
         </div>
