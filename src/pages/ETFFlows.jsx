@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { etfFlows } from '../components/data/mockDataExtended';
 import { ModeBadge, GradeBadge } from '../components/ui/DataBadge';
+import { DataTrustBadge } from '../components/ui/DataTrustBadge';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, Cell,
@@ -62,7 +63,7 @@ export function ETFContent() {
           <h1 style={{ fontSize: 20, fontWeight: 900, color: '#f1f5f9', margin: 0, letterSpacing: '-0.03em' }}>
             Bitcoin Spot ETF Flows
           </h1>
-          <ModeBadge mode="mock" />
+          <DataTrustBadge mode="paid_required" confidence="D" source="Bloomberg/BitMEX Research" reason="ETF flows requerem Bloomberg Terminal ou BitMEX Research (~$99/mês)" />
           <GradeBadge grade={d.quality} />
           <span style={{ fontSize: 10, color: '#10b981', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 4, padding: '2px 8px', fontWeight: 600 }}>
             {d.consec_inflow_days} dias consecutivos de entrada
@@ -123,7 +124,7 @@ export function ETFContent() {
             <div style={{ fontSize: 14, fontWeight: 700, color: '#e2e8f0' }}>Flows Diários — Últimos 30 dias</div>
             <div style={{ fontSize: 11, color: '#475569', marginTop: 2 }}>Entrada (verde) vs Saída (vermelho) · USD Milhões</div>
           </div>
-          <ModeBadge mode="mock" />
+          <DataTrustBadge mode="paid_required" confidence="D" source="Bloomberg/BitMEX Research" reason="ETF flows requerem Bloomberg Terminal ou BitMEX Research (~$99/mês)" />
         </div>
         <ResponsiveContainer width="100%" height={200}>
           <BarChart data={d.history_daily} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
