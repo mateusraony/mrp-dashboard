@@ -257,19 +257,23 @@ export function ActionsContent() {
     return Object.entries(analysis.modules)
       .filter(([, m]) => m.direction !== 'neutral' && m.score > 55)
       .map(([key, m]) => ({
-        id:        `live-${key}`,
-        type:      m.direction.startsWith('bull') ? 'LONG' : 'SHORT',
-        ai_grade:  m.score >= 75 ? 'A' : m.score >= 60 ? 'B' : 'C',
-        signal:    m.signal,
-        trigger:   m.trigger,
-        analysis:  m.analysis,
-        timeframe: m.timeframe,
-        entry_price: ticker.mark_price,
-        target_price: null,
-        stop_price:   null,
-        status:    'active',
-        pnl_pct:   null,
-        isLive:    true,
+        id:          `live-${key}`,
+        type:        m.direction.startsWith('bull') ? 'LONG' : 'SHORT',
+        ai_grade:    m.score >= 75 ? 'A' : m.score >= 60 ? 'B' : 'C',
+        asset:       'BTC',
+        strategy:    m.signal,
+        probability: m.probability,
+        tags:        [key, m.direction.replace('_', ' ')],
+        source:      'Rule Engine (live)',
+        rationale:   `${m.analysis} — ${m.trigger}`,
+        timeframe:   m.timeframe,
+        entry:       ticker.mark_price,
+        target:      null,
+        stop:        null,
+        rr:          null,
+        status:      'active',
+        pnl_pct:     null,
+        isLive:      true,
       }));
   }, [ticker, fng, riskScore]);
 
