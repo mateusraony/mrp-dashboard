@@ -1,10 +1,12 @@
 // ─── AUTOMATIONS — Rule Engine Page ──────────────────────────────────────────
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   defaultRules, fireLog, AVAILABLE_METRICS, NOTIFICATION_CHANNELS, PRIORITY_CONFIG,
 } from '../components/data/mockDataAutomations';
 import { ModeBadge } from '../components/ui/DataBadge';
 import { formatDistanceToNow } from 'date-fns';
+import { useBtcTicker } from '@/hooks/useBtcData';
+import { useRiskScore } from '@/hooks/useRiskScore';
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 const CATEGORIES = [...new Set(AVAILABLE_METRICS.map(m => m.category))];
@@ -330,17 +332,23 @@ function RuleDetail({ rule, onClose }) {
 }
 
 // ─── METRICS MONITOR PANEL ────────────────────────────────────────────────────
-function MetricsMonitor() {
-  const liveValues = {
-    'regime.label': 'Neutral', 'regime.score': 58, 'funding.rate': 0.0712,
+function MetricsMonitor({ liveMetrics }) {
+  // Valores estáticos de fallback para métricas ainda sem feed live
+  const staticFallback = {
+    'regime.label': 'Neutral', 'regime.score': 58,
     'oi.delta_1d': 2.34, 'basis.annualized': 10.2, 'risk.long_flush': 68,
     'vix.value': 22.14, 'dxy.delta_30d': -3.4, 'yield_spread': 28.1,
     'nupl.value': 0.48, 'netflow.24h': -4820, 'stable.net_24h': 420.6,
-    'stable.dev_7d': 287.7, 'btc.price': 84298.7, 'btc.ret_1h': 0.31,
+    'stable.dev_7d': 287.7, 'btc.ret_1h': 0.31,
   };
+  // Mescla: valores live sobrepõem o fallback estático
+  const liveValues = { ...staticFallback, ...liveMetrics };
   return (
     <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '14px 16px' }}>
-      <div style={{ fontSize: 11, fontWeight: 700, color: '#e2e8f0', marginBottom: 10 }}>📡 Métricas Monitoradas em Tempo Real</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: '#e2e8f0' }}>📡 Métricas Monitoradas em Tempo Real</span>
+        <ModeBadge />
+      </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
         {CATEGORIES.map(cat => (
           <div key={cat}>
@@ -364,6 +372,30 @@ function MetricsMonitor() {
   );
 }
 
+// ─── AVALIAÇÃO DE CONDIÇÃO ────────────────────────────────────────────────────
+function evalCondition(cond, metricsMap) {
+  const val = metricsMap[cond.metric_id];
+  if (val === undefined) return false;
+  switch (cond.operator) {
+    case '>':  return val >  cond.value;
+    case '>=': return val >= cond.value;
+    case '<':  return val <  cond.value;
+    case '<=': return val <= cond.value;
+    default:   return String(val) === String(cond.value);
+  }
+}
+
+function evaluateRule(rule, metricsMap) {
+  if (!rule.enabled) return false;
+  let result = evalCondition(rule.conditions[0], metricsMap);
+  for (let i = 1; i < rule.conditions.length; i++) {
+    const cond = rule.conditions[i];
+    const res  = evalCondition(cond, metricsMap);
+    result = cond.logic === 'OR' ? result || res : result && res;
+  }
+  return result;
+}
+
 // ─── MAIN PAGE ────────────────────────────────────────────────────────────────
 const TABS = ['Regras Ativas', 'Criar Regra', 'Histórico', 'Métricas'];
 
@@ -372,6 +404,36 @@ export default function Automations() {
   const [tab, setTab]             = useState(0);
   const [selectedId, setSelectedId] = useState(null);
   const [showBuilder, setShowBuilder] = useState(false);
+
+  // ── Hooks de dados live ──────────────────────────────────────────────────
+  const { data: ticker }    = useBtcTicker();
+  const { data: riskScore } = useRiskScore();
+
+  // ── Mapa de valores live para as métricas presentes no AVAILABLE_METRICS ──
+  const liveMetrics = useMemo(() => ({
+    'btc.price':    ticker?.mark_price        ?? 84312,
+    'funding.rate': ticker
+      ? ticker.last_funding_rate * 100        // decimal → percentual (%unit)
+      : 0.0712,
+    'risk.long_flush': riskScore?.score       ?? 68,
+  }), [ticker, riskScore]);
+
+  // ── Sincroniza current_values das regras com dados live ──────────────────
+  useEffect(() => {
+    setRules(prev => prev.map(rule => {
+      // Atualiza apenas as chaves que temos dado live
+      const updatedCurrentValues = { ...rule.current_values };
+      Object.keys(liveMetrics).forEach(key => {
+        if (key in updatedCurrentValues) {
+          updatedCurrentValues[key] = liveMetrics[key];
+        }
+      });
+      // Reavalia se a regra está disparada com dados atuais
+      const allMetrics = { ...rule.current_values, ...liveMetrics };
+      const triggered  = evaluateRule({ ...rule, current_values: updatedCurrentValues }, allMetrics);
+      return { ...rule, current_values: updatedCurrentValues, triggered };
+    }));
+  }, [liveMetrics]); // re-roda sempre que dado live chegar
 
   const selectedRule = rules.find(r => r.id === selectedId);
   const active = rules.filter(r => r.enabled).length;
@@ -399,7 +461,7 @@ export default function Automations() {
       <div style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
           <h1 style={{ fontSize: 20, fontWeight: 900, color: '#f1f5f9', margin: 0, letterSpacing: '-0.03em' }}>Automações & Alertas</h1>
-          <ModeBadge mode="mock" />
+          <ModeBadge />
         </div>
         <p style={{ fontSize: 11, color: '#475569', margin: 0 }}>Crie regras baseadas em métricas de mercado · Disparos via Telegram · In-App · Webhook</p>
       </div>
@@ -493,7 +555,7 @@ export default function Automations() {
       )}
 
       {/* ── MÉTRICAS ── */}
-      {tab === 3 && <MetricsMonitor />}
+      {tab === 3 && <MetricsMonitor liveMetrics={liveMetrics} />}
     </div>
   );
 }

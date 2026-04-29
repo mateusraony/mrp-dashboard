@@ -1,14 +1,19 @@
 // ─── PREDICTIVE PANEL — BTC 24h Price Projection ────────────────────────────
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   scenarios24h, breakoutTable, institutionalPressure, pricePaths,
 } from '../components/data/mockDataPredictive';
 import { ModeBadge } from '../components/ui/DataBadge';
+import { DataTrustBadge } from '../components/ui/DataTrustBadge';
 import { Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, ComposedChart, Line,
 } from 'recharts';
+import { useBtcTicker, useKlines, useFearGreed } from '@/hooks/useBtcData';
+import { useRiskScore } from '@/hooks/useRiskScore';
+import { computeRuleBasedAnalysis } from '@/utils/ruleBasedAnalysis';
+import { IS_LIVE } from '@/lib/env';
 
-const SPOT = 84298.70;
+const SPOT_FALLBACK = 84298.70;
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 function fmtK(v) { return `$${(v / 1000).toFixed(1)}K`; }
@@ -57,10 +62,10 @@ function ScenarioCard({ s, selected, onSelect }) {
 }
 
 // ─── BREAKOUT ROW ─────────────────────────────────────────────────────────────
-function BreakoutRow({ b }) {
+function BreakoutRow({ b, spotPrice: rowSpot = SPOT_FALLBACK }) {
   const isNow   = b.side === 'now';
   const isUp    = b.side === 'up';
-  const distPct = Math.abs((b.price - SPOT) / SPOT * 100);
+  const distPct = Math.abs((b.price - rowSpot) / rowSpot * 100);
   return (
     <tr style={{ borderBottom: '1px solid #0f1a28', background: isNow ? 'rgba(245,158,11,0.06)' : 'transparent' }}>
       <td style={{ padding: '8px 12px' }}>
@@ -96,13 +101,13 @@ function BreakoutRow({ b }) {
 }
 
 // ─── PATH CHART ───────────────────────────────────────────────────────────────
-function PathChart({ selected }) {
+function PathChart({ selected, spotPrice: chartSpot = SPOT_FALLBACK }) {
   const data = pricePaths.timestamps.map((t, i) => ({
     t,
     bull:    pricePaths.bull[i],
     neutral: pricePaths.neutral[i],
     bear:    pricePaths.bear[i],
-    spot:    SPOT,
+    spot:    chartSpot,
   }));
 
   return (
@@ -125,7 +130,7 @@ function PathChart({ selected }) {
         <Tooltip
           contentStyle={{ background: '#0d1421', border: '1px solid #2a3f5f', borderRadius: 8, fontSize: 10 }}
           formatter={(v, name) => [`$${v.toLocaleString()}`, name]} />
-        <ReferenceLine y={SPOT} stroke="#f59e0b" strokeDasharray="4 4" strokeWidth={1.5} label={{ value: 'SPOT', fill: '#f59e0b', fontSize: 9, position: 'right' }} />
+        <ReferenceLine y={chartSpot} stroke="#f59e0b" strokeDasharray="4 4" strokeWidth={1.5} label={{ value: 'SPOT', fill: '#f59e0b', fontSize: 9, position: 'right' }} />
         <Area type="monotone" dataKey="bull"    name="Bull"    stroke="#10b981" strokeWidth={selected === 'bull_strong' || selected === 'bull_mild' ? 2.5 : 1.5} fill="url(#bullGrad)"    dot={false} strokeOpacity={selected && !['bull_strong','bull_mild'].includes(selected) ? 0.3 : 1} />
         <Line  type="monotone" dataKey="neutral" name="Neutro" stroke="#f59e0b" strokeWidth={selected === 'neutral' ? 2.5 : 1.5}                                 dot={false} strokeOpacity={selected && selected !== 'neutral' ? 0.3 : 1} strokeDasharray="4 4" />
         <Area type="monotone" dataKey="bear"    name="Bear"    stroke="#ef4444" strokeWidth={selected === 'bear_mild' || selected === 'bear_strong' ? 2.5 : 1.5} fill="url(#bearGrad)" dot={false} strokeOpacity={selected && !['bear_mild','bear_strong'].includes(selected) ? 0.3 : 1} />
@@ -142,7 +147,15 @@ function InstitutionalPanel() {
     <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '16px 18px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
         <div>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 2 }}>Pressão Institucional de Compra</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0' }}>Pressão Institucional de Compra</div>
+            <DataTrustBadge
+              mode="paid_required"
+              confidence="C"
+              source="Glassnode/Bloomberg"
+              reason="ETF inflows e stablecoin flows requerem API paga"
+            />
+          </div>
           <div style={{ fontSize: 9, color: '#334155' }}>Score composto baseado em ETF, stablecoin, CME, VIX e funding</div>
         </div>
         <div style={{ textAlign: 'right' }}>
@@ -180,7 +193,63 @@ export default function PredictivePanel() {
   const [tab, setTab]         = useState(0);
   const [selected, setSelected] = useState('bull_mild');
 
-  const selectedScenario = scenarios24h.find(s => s.id === selected);
+  // ── Live data hooks ────────────────────────────────────────────────────
+  const { data: ticker }    = useBtcTicker();
+  const { data: klines }    = useKlines('1d', 30);
+  const { data: fng }       = useFearGreed(1);
+  const { data: riskScore } = useRiskScore();
+
+  // ── ATR(14): média de (high - low) dos últimos 14 candles diários ──────
+  const atr14 = useMemo(() => {
+    if (!klines || klines.length < 14) return null;
+    return klines.slice(-14).reduce((s, c) => s + (c.high - c.low), 0) / 14;
+  }, [klines]);
+
+  const spotPrice = ticker?.mark_price ?? null;
+
+  // ── Cenários com preços live (substituem mock quando disponíveis) ───────
+  const liveScenarioPrices = useMemo(() => {
+    if (!spotPrice || !atr14) return null;
+    return {
+      bull_strong: spotPrice + atr14 * 2.5,
+      bull_mild:   spotPrice + atr14 * 0.5,
+      neutral:     spotPrice,
+      bear_mild:   spotPrice - atr14 * 1.5,
+      bear_strong: spotPrice - atr14 * 3.5,
+    };
+  }, [spotPrice, atr14]);
+
+  // ── Análise direcional baseada em regras ────────────────────────────────
+  const liveAnalysis = useMemo(() => {
+    if (!IS_LIVE || !ticker || !fng) return null;
+    return computeRuleBasedAnalysis({
+      derivatives: {
+        fundingRate: ticker.last_funding_rate,
+        oiDeltaPct:  ticker.oi_delta_pct,
+      },
+      macro: {
+        fngValue:   fng.value,
+        fngLabel:   fng.label,
+        riskScore:  riskScore?.score ?? 50,
+        riskRegime: riskScore?.regime ?? 'MODERADO',
+      },
+    });
+  }, [ticker, fng, riskScore]);
+
+  // ── Cenários com preços mesclados (live quando disponível) ─────────────
+  const scenarios = useMemo(() => {
+    if (!liveScenarioPrices) return scenarios24h;
+    const SPOT = spotPrice;
+    return scenarios24h.map(s => {
+      const liveTarget = liveScenarioPrices[s.id];
+      if (liveTarget === undefined || liveTarget === null) return s;
+      const target_pct = parseFloat(((liveTarget - SPOT) / SPOT * 100).toFixed(1));
+      return { ...s, target_price: liveTarget, target_pct };
+    });
+  }, [liveScenarioPrices, spotPrice]);
+
+  const SPOT = spotPrice ?? SPOT_FALLBACK;
+  const selectedScenario = scenarios.find(s => s.id === selected);
 
   return (
     <div style={{ maxWidth: 1400, margin: '0 auto' }}>
@@ -188,11 +257,30 @@ export default function PredictivePanel() {
       <div style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
           <h1 style={{ fontSize: 20, fontWeight: 900, color: '#f1f5f9', margin: 0, letterSpacing: '-0.03em' }}>Painel Preditivo BTC 24H</h1>
-          <ModeBadge mode="mock" />
+          <ModeBadge mode={IS_LIVE && spotPrice ? 'live' : 'mock'} />
           <span style={{ fontSize: 9, color: '#a78bfa', background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.25)', borderRadius: 4, padding: '2px 8px', fontWeight: 700 }}>🧠 AI-Quantitative</span>
+          {liveAnalysis && (() => {
+            const d = liveAnalysis.overall.direction;
+            const isBull = d === 'bullish' || d === 'bullish_bias';
+            const isBear = d === 'bearish' || d === 'bearish_bias';
+            const c = isBull ? '#10b981' : isBear ? '#ef4444' : '#f59e0b';
+            const score = Math.round(liveAnalysis.overall.confidence * 100);
+            return (
+              <span style={{
+                fontSize: 9, fontWeight: 800, fontFamily: 'JetBrains Mono, monospace',
+                color: c,
+                background: `${c}1a`,
+                border: `1px solid ${c}4d`,
+                borderRadius: 4, padding: '2px 8px',
+              }}>
+                {isBull ? '↑ BULL' : isBear ? '↓ BEAR' : '→ NEUTRO'} · conf {score}%
+              </span>
+            );
+          })()}
         </div>
         <p style={{ fontSize: 11, color: '#475569', margin: 0 }}>
           Projeção baseada em correlações históricas, fluxo de stablecoin, pressão institucional e VIX · Spot: <span style={{ fontFamily: 'JetBrains Mono, monospace', color: '#f59e0b', fontWeight: 700 }}>${SPOT.toLocaleString()}</span>
+          {atr14 && <span style={{ marginLeft: 8, color: '#334155' }}>· ATR(14): <span style={{ fontFamily: 'JetBrains Mono, monospace', color: '#64748b' }}>${Math.round(atr14).toLocaleString()}</span></span>}
         </p>
       </div>
 
@@ -213,7 +301,7 @@ export default function PredictivePanel() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: 16 }}>
           {/* Scenario cards */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {scenarios24h.map(s => (
+            {scenarios.map(s => (
               <ScenarioCard key={s.id} s={s} selected={selected === s.id} onSelect={setSelected} />
             ))}
           </div>
@@ -273,7 +361,7 @@ export default function PredictivePanel() {
             <div style={{ fontSize: 9, color: '#334155', marginBottom: 12 }}>Clique em um cenário para destacar sua trajetória correspondente</div>
             {/* Scenario selector pills */}
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
-              {scenarios24h.map(s => (
+              {scenarios.map(s => (
                 <button key={s.id} onClick={() => setSelected(s.id)} style={{
                   padding: '4px 10px', borderRadius: 6,
                   background: selected === s.id ? `${s.color}18` : 'transparent',
@@ -283,7 +371,7 @@ export default function PredictivePanel() {
                 }}>{s.label} ({s.prob}%)</button>
               ))}
             </div>
-            <PathChart selected={selected} />
+            <PathChart selected={selected} spotPrice={SPOT} />
             <div style={{ display: 'flex', gap: 16, marginTop: 8, flexWrap: 'wrap' }}>
               {[
                 { color: '#10b981', label: 'Bull (alta)' },
@@ -313,7 +401,7 @@ export default function PredictivePanel() {
                 </tr>
               </thead>
               <tbody>
-                {scenarios24h.map(s => (
+                {scenarios.map(s => (
                   <tr key={s.id} onClick={() => setSelected(s.id)} style={{ borderBottom: '1px solid #0f1a28', cursor: 'pointer', background: selected === s.id ? '#131e2e' : 'transparent' }}>
                     <td style={{ padding: '9px 12px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -370,7 +458,7 @@ export default function PredictivePanel() {
                 </tr>
               </thead>
               <tbody>
-                {breakoutTable.map(b => <BreakoutRow key={b.price} b={b} />)}
+                {breakoutTable.map(b => <BreakoutRow key={b.price} b={b} spotPrice={SPOT} />)}
               </tbody>
             </table>
           </div>
