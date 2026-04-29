@@ -1,8 +1,11 @@
 // ─── STRATEGIES PAGE ──────────────────────────────────────────────────────────
 // Setups operacionais baseados em IV Rank, Basis, Funding, Sentiment
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { strategies, marketConditionsSummary } from '../components/data/mockDataStrategies';
 import { ModeBadge } from '../components/ui/DataBadge';
+import { useBtcTicker, useFearGreed } from '@/hooks/useBtcData';
+import { useOptionsData } from '@/hooks/useDeribit';
+import { IS_LIVE } from '@/lib/env';
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine,
 } from 'recharts';
@@ -272,7 +275,18 @@ function StrategyDetail({ strategy }) {
 export function StrategiesContent() {
   const [selectedStrategy, setSelectedStrategy] = useState(strategies[0]);
   const [filter, setFilter] = useState('Todos');
-  const mc = marketConditionsSummary;
+
+  const { data: ticker } = useBtcTicker();
+  const { data: fng } = useFearGreed(1);
+  const { data: optionsData } = useOptionsData();
+
+  // Live market conditions merged over mock fallback
+  const mc = useMemo(() => ({
+    ...marketConditionsSummary,
+    funding_rate:  ticker ? ticker.last_funding_rate * 100 : marketConditionsSummary.funding_rate,
+    iv_rank:       optionsData ? Math.round(optionsData.iv_atm * 100) : marketConditionsSummary.iv_rank,
+    sentiment:     fng ? fng.label : marketConditionsSummary.sentiment,
+  }), [ticker, fng, optionsData]);
 
   const filtered = filter === 'Todos' ? strategies
     : filter === 'ACTIVE' ? strategies.filter(s => s.status === 'ACTIVE')
@@ -287,7 +301,7 @@ export function StrategiesContent() {
           <h1 style={{ fontSize: 20, fontWeight: 900, color: '#f1f5f9', margin: 0, letterSpacing: '-0.03em' }}>
             Estratégias Operacionais
           </h1>
-          <ModeBadge mode="mock" />
+          <ModeBadge mode={IS_LIVE && ticker ? 'live' : 'mock'} />
           <span style={{ fontSize: 10, color: '#10b981', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 4, padding: '2px 8px', fontWeight: 700 }}>
             {mc.active_setups} ATIVOS
           </span>
