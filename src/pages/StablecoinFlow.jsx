@@ -5,6 +5,7 @@ import {
   stablecoinAnomalies, supplyByChain, mintVsBtcCorr,
 } from '../components/data/mockDataStablecoin';
 import { ModeBadge } from '../components/ui/DataBadge';
+import { DataTrustBadge } from '../components/ui/DataTrustBadge';
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, PieChart, Pie, Cell,
@@ -123,7 +124,7 @@ export function StablecoinContent() {
       <div style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
           <h1 style={{ fontSize: 20, fontWeight: 900, color: '#f1f5f9', margin: 0, letterSpacing: '-0.03em' }}>Stablecoin Flow Tracker</h1>
-          <ModeBadge mode="mock" />
+          <DataTrustBadge mode="paid_required" confidence="D" source="Glassnode/Nansen" reason="Mint/burn flows requerem Glassnode (~$29/mês) ou Nansen" />
           {stablecoinAnomalies.length > 0 && (
             <span style={{ fontSize: 10, color: '#ef4444', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 4, padding: '2px 8px', fontWeight: 800 }}>
               🚨 {stablecoinAnomalies.length} anomalia{stablecoinAnomalies.length > 1 ? 's' : ''}
