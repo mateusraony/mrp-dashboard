@@ -2,7 +2,7 @@
 // Bitcoin Spot ETF capital flows — BlackRock, Fidelity, ARK, Grayscale, etc.
 import { useState } from 'react';
 import { etfFlows } from '../components/data/mockDataExtended';
-import { ModeBadge, GradeBadge } from '../components/ui/DataBadge';
+import { GradeBadge } from '../components/ui/DataBadge';
 import { DataTrustBadge } from '../components/ui/DataTrustBadge';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,

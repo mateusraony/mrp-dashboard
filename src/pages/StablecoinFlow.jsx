@@ -4,7 +4,6 @@ import {
   dailyMintBurn, stablecoinSnapshot, largeMintEvents, largeBurnEvents,
   stablecoinAnomalies, supplyByChain, mintVsBtcCorr,
 } from '../components/data/mockDataStablecoin';
-import { ModeBadge } from '../components/ui/DataBadge';
 import { DataTrustBadge } from '../components/ui/DataTrustBadge';
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip,
