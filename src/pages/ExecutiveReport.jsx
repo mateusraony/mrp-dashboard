@@ -702,7 +702,9 @@ function EmailScheduler({ onClose, liveTicker, liveFng, liveRisk }) {
   const f = btcFutures;
   const btcPrice = liveTicker?.mark_price ?? f.mark_price;
   const fundingRate = liveTicker?.last_funding_rate ?? f.funding_rate;
-  const openInterest = liveTicker ? liveTicker.open_interest * liveTicker.mark_price : f.open_interest_usdt;
+  const openInterest = (liveTicker?.open_interest != null)
+    ? liveTicker.open_interest * liveTicker.mark_price
+    : f.open_interest_usdt;
   const fngValue = liveFng?.value ?? fearGreed.value;
   const fngLabel = liveFng?.label ?? fearGreed.classification;
   const riskScore = liveRisk?.score ?? globalRisk.score;
