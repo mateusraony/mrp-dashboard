@@ -692,7 +692,7 @@ const ALL_MODULES = [
 ];
 
 // ─── EMAIL SCHEDULER ──────────────────────────────────────────────────────────
-function EmailScheduler({ onClose }) {
+function EmailScheduler({ onClose, liveTicker, liveFng, liveRisk }) {
   const [email, setEmail] = useState('');
   const [time, setTime] = useState('08:00');
   const [freq, setFreq] = useState('daily');
@@ -700,6 +700,13 @@ function EmailScheduler({ onClose }) {
   const [sent, setSent] = useState(false);
 
   const f = btcFutures;
+  const btcPrice = liveTicker?.mark_price ?? f.mark_price;
+  const fundingRate = liveTicker?.last_funding_rate ?? f.funding_rate;
+  const openInterest = liveTicker ? liveTicker.open_interest * liveTicker.mark_price : f.open_interest_usdt;
+  const fngValue = liveFng?.value ?? fearGreed.value;
+  const fngLabel = liveFng?.label ?? fearGreed.classification;
+  const riskScore = liveRisk?.score ?? globalRisk.score;
+  const riskRegime = liveRisk?.regime ?? globalRisk.regime;
 
   const handleSend = async () => {
     if (!email) return;
@@ -714,9 +721,9 @@ Segue o Relatório Executivo do CryptoWatch — ${new Date().toLocaleString('pt-
 
 ══════════════════════════════════════════
 🌐 VISÃO GLOBAL
-Regime: ${globalRisk.regime} · Score: ${globalRisk.score}/100
-Fear & Greed: ${fearGreed.value} (${fearGreed.classification})
-BTC: $${fmt(f.mark_price, 0)} | 1D: ${sign(f.ret_1d * 100)}${fmt(f.ret_1d * 100, 2)}% | 1W: ${sign(f.ret_1w * 100)}${fmt(f.ret_1w * 100, 2)}%
+Regime: ${riskRegime} · Score: ${riskScore}/100
+Fear & Greed: ${fngValue} (${fngLabel})
+BTC: $${fmt(btcPrice, 0)} | 1D: ${sign(f.ret_1d * 100)}${fmt(f.ret_1d * 100, 2)}% | 1W: ${sign(f.ret_1w * 100)}${fmt(f.ret_1w * 100, 2)}%
 
 ══════════════════════════════════════════
 🎯 REGIME DE MERCADO
@@ -732,8 +739,8 @@ USDT: $${stablecoinSupply.usdt_supply_b.toFixed(1)}B | USDC: $${stablecoinSupply
 
 ══════════════════════════════════════════
 ⟆ DERIVATIVOS
-Funding Rate: ${(f.funding_rate * 100).toFixed(4)}% (ann: ${(f.funding_rate * 3 * 365 * 100).toFixed(1)}%)
-Open Interest: $${(f.open_interest_usdt / 1e9).toFixed(2)}B
+Funding Rate: ${(fundingRate * 100).toFixed(4)}% (ann: ${(fundingRate * 3 * 365 * 100).toFixed(1)}%)
+Open Interest: $${(openInterest / 1e9).toFixed(2)}B
   1D: +${f.oi_delta_pct}% | 1W: +${f.oi_delta_pct_1w}% | 1M: +${f.oi_delta_pct_1m}%
 Basis Jun26: ${futuresBasis.futures[1]?.basis_annualized.toFixed(1)}% vs US10Y 4.5%
 Longs em risco (−10%): $${(liquidationClusters.total_longs_at_risk_10pct / 1e9).toFixed(2)}B
@@ -951,7 +958,7 @@ export default function ExecutiveReport() {
       {showEmail && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 14, width: '100%', maxWidth: 440, boxShadow: '0 20px 60px rgba(0,0,0,0.6)' }}>
-            <EmailScheduler onClose={() => setShowEmail(false)} />
+            <EmailScheduler onClose={() => setShowEmail(false)} liveTicker={liveTicker} liveFng={liveFng} liveRisk={liveRisk} />
           </div>
         </div>
       )}
