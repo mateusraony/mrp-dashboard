@@ -318,9 +318,9 @@ export function ActionsContent() {
         <AIInsightPanel
           moduleId="ACTION_DASHBOARD"
           probability={globalRisk.prob}
-          regime={globalRisk.regime === 'RISK-ON' ? 'risk_on' : 'caution'}
+          regime={liveRegime === 'RISK-ON' ? 'risk_on' : 'caution'}
           recommendation={`${filtered.length} oportunidades ativas. ${tradeOpportunities.filter(o => o.ai_grade === 'A').length} com Grade A. Win rate histórico: ${performanceStats.win_rate.toFixed(0)}% · PnL acum: +${performanceStats.cumulative_pnl_pct.toFixed(1)}%.`}
-          reasoning={`Regime ${globalRisk.regime} com score ${globalRisk.score}/100. F&G ${fearGreed.value} (${fearGreed.classification}). Funding ${(btcFutures.funding_rate * 100).toFixed(4)}% — oportunidades de carry e flush em evidência. Grade A = Win rate 100% histórico.`}
+          reasoning={`Regime ${liveRegime} com score ${liveScore}/100. F&G ${fng?.value ?? fearGreed.value} (${fng?.label ?? fearGreed.classification}). Funding ${((ticker?.last_funding_rate ?? btcFutures.funding_rate) * 100).toFixed(4)}% — oportunidades de carry e flush em evidência. Grade A = Win rate 100% histórico.`}
           actions={['Ver Carry Trade', 'Monitorar Flush', 'Checar Hedge', 'Ver Arbitragem']}
           compact
         />
