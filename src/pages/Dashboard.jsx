@@ -383,8 +383,9 @@ const AI_HISTORY = [
 
 function AITrackRecord({ predictions = [] }) {
   const displayData = predictions.length > 0 ? predictions : AI_HISTORY;
-  const hits = displayData.filter(h => h.outcome === 'HIT').length;
-  const acc = ((hits / displayData.length) * 100).toFixed(0);
+  const resolved = displayData.filter(h => h.outcome !== 'PENDING');
+  const hits = resolved.filter(h => h.outcome === 'HIT').length;
+  const acc = resolved.length > 0 ? ((hits / resolved.length) * 100).toFixed(0) : '—';
 
   return (
     <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 14, overflow: 'hidden' }}>
@@ -396,8 +397,8 @@ function AITrackRecord({ predictions = [] }) {
           <div style={{ fontSize: 10, color: '#334155' }}>Histórico de previsões vs resultado real</div>
         </div>
         <div style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: 22, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: '#10b981', lineHeight: 1 }}>{acc}%</div>
-          <div style={{ fontSize: 9, color: '#334155' }}>{hits}/{displayData.length} acertos</div>
+          <div style={{ fontSize: 22, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: '#10b981', lineHeight: 1 }}>{acc}{acc !== '—' ? '%' : ''}</div>
+          <div style={{ fontSize: 9, color: '#334155' }}>{hits}/{resolved.length} resolvidos</div>
         </div>
       </div>
       {/* Rows */}

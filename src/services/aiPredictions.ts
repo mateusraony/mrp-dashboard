@@ -148,7 +148,8 @@ export async function evaluateOutcomes(
           outcome_ret_pct:      parseFloat((ret * 100).toFixed(3)),
           outcome_evaluated_at: new Date().toISOString(),
         })
-        .eq('id', p.id);
+        .eq('id', p.id)
+        .eq('outcome', 'PENDING'); // DB-side guard: never overwrite already-resolved rows
 
       if (error) console.warn('[aiPredictions] evaluateOutcomes update:', error.message);
     }),
