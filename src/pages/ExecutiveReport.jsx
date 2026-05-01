@@ -1,5 +1,5 @@
 // ─── RELATÓRIO EXECUTIVO COMPLETO ─────────────────────────────────────────────
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import {
@@ -21,6 +21,7 @@ import { sendNotificationEmail } from '@/lib/notificationClient';
 import { useBtcTicker, useFearGreed } from '@/hooks/useBtcData';
 import { useRiskScore } from '@/hooks/useRiskScore';
 import { IS_LIVE } from '@/lib/env';
+import { computeRuleBasedAnalysis } from '@/utils/ruleBasedAnalysis';
 
 const TODAY = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
 
@@ -927,6 +928,26 @@ export default function ExecutiveReport() {
   const { data: liveFng } = useFearGreed(1);
   const { data: liveRisk } = useRiskScore();
 
+  const liveAnalysis = useMemo(() => {
+    if (!IS_LIVE || (!liveTicker && !liveFng)) return null;
+    return computeRuleBasedAnalysis({
+      derivatives: liveTicker ? { fundingRate: liveTicker.last_funding_rate, oiDeltaPct: liveTicker.oi_delta_pct } : undefined,
+      spot: liveTicker ? { ret1d: (liveTicker.price_change_pct ?? 0) / 100, cvd1d: 0, volume1dUsdt: liveTicker.volume_24h_usdt ?? 0, price: liveTicker.mark_price } : undefined,
+      macro: liveFng ? { fngValue: liveFng.value, fngLabel: liveFng.label, riskScore: liveRisk?.score ?? 50, riskRegime: liveRisk?.regime ?? 'MODERADO' } : undefined,
+    });
+  }, [liveTicker, liveFng, liveRisk]);
+
+  const aiRegime = liveAnalysis
+    ? (liveAnalysis.overall.direction.startsWith('bull') ? 'risk_on' : liveAnalysis.overall.direction.startsWith('bear') ? 'risk_off' : 'caution')
+    : (globalRisk.regime === 'RISK-ON' ? 'risk_on' : globalRisk.regime === 'RISK-OFF' ? 'risk_off' : 'caution');
+  const aiProbability = liveAnalysis ? Math.round(liveAnalysis.overall.confidence * 100) : globalRisk.prob;
+  const aiRecommendation = liveAnalysis
+    ? `${liveAnalysis.overall.recommendation} · Período: ${period}.`
+    : `Score global ${globalRisk.score}/100 — ${globalRisk.regime}. Período analisado: ${period}. Funding elevado + OI crescente + stablecoin expansivo = atenção a flush de longs.`;
+  const aiReasoning = liveAnalysis
+    ? `${liveAnalysis.overall.rationale} — ${liveAnalysis.overall.trigger}`
+    : `Regime ${globalRisk.regime} confirmado por supply stablecoin +${stablecoinSupply.delta_7d_pct.toFixed(1)}% 7D e ETF inflows positivos ($${etfFlows.net_flow_7d_m.toFixed(0)}M semana). Contrapeso: VIX ${macroBoard.series.find(s => s.id === 'VIX')?.value.toFixed(1)} e funding ${(btcFutures.funding_rate * 100).toFixed(4)}% persistente — prob. flush longs 62%. Carry trade atrativo (+${((futuresBasis.futures[1]?.basis_annualized || 0) - 4.512).toFixed(1)}pp vs US10Y).`;
+
   return (
     <div style={{ maxWidth: 1280, margin: '0 auto' }}>
       {/* Header */}
@@ -969,10 +990,10 @@ export default function ExecutiveReport() {
       <div style={{ marginBottom: 14 }}>
         <AIInsightPanel
           moduleId="EXECUTIVE_REPORT"
-          probability={globalRisk.prob}
-          regime={globalRisk.regime === 'RISK-ON' ? 'risk_on' : globalRisk.regime === 'RISK-OFF' ? 'risk_off' : 'caution'}
-          recommendation={`Score global ${globalRisk.score}/100 — ${globalRisk.regime}. Período analisado: ${period}. Funding elevado + OI crescente + stablecoin expansivo = atenção a flush de longs.`}
-          reasoning={`Regime ${globalRisk.regime} confirmado por supply stablecoin +${stablecoinSupply.delta_7d_pct.toFixed(1)}% 7D e ETF inflows positivos ($${etfFlows.net_flow_7d_m.toFixed(0)}M semana). Contrapeso: VIX ${macroBoard.series.find(s => s.id === 'VIX')?.value.toFixed(1)} e funding ${(btcFutures.funding_rate * 100).toFixed(4)}% persistente — prob. flush longs 62%. Carry trade atrativo (+${((futuresBasis.futures[1]?.basis_annualized || 0) - 4.512).toFixed(1)}pp vs US10Y).`}
+          probability={aiProbability}
+          regime={aiRegime}
+          recommendation={aiRecommendation}
+          reasoning={aiReasoning}
           actions={['Reduzir Leverage', 'Monitorar VIX 25+', 'Carry Jun26', 'ETF Flows IBIT']}
         />
       </div>
