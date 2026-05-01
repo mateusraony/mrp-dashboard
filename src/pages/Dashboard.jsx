@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   btcFutures, btcSpotFlow, macroBoard, onChain,
   fearGreed, recentAlerts, globalRisk, sourceHealth, fmtNum, fmtPct, aiAnalysis as aiAnalysisMockData,
@@ -10,6 +10,7 @@ import { useRiskScore } from '@/hooks/useRiskScore';
 import { useMacroBoard } from '@/hooks/useFred';
 import { useMempoolState } from '@/hooks/useMempool';
 import { computeRuleBasedAnalysis } from '@/utils/ruleBasedAnalysis';
+import { useAiPredictions, usePersistPrediction } from '@/hooks/useAiPredictions';
 
 // ─── DATA LAYER (live > mock fallback) ───────────────────────────────────────
 function useDashboardLiveData() {
@@ -380,9 +381,10 @@ const AI_HISTORY = [
   { date: '2026-02-20', signal: 'SQUEEZE RISK ELEVADO', direction: 'bearish_bias', outcome: 'HIT', outcome_desc: 'Flush de $81K → $74K em 12h, $312M liquidados', confidence: 0.78, prob: 0.69, pct_move: -8.6 },
 ];
 
-function AITrackRecord() {
-  const hits = AI_HISTORY.filter(h => h.outcome === 'HIT').length;
-  const acc = ((hits / AI_HISTORY.length) * 100).toFixed(0);
+function AITrackRecord({ predictions = [] }) {
+  const displayData = predictions.length > 0 ? predictions : AI_HISTORY;
+  const hits = displayData.filter(h => h.outcome === 'HIT').length;
+  const acc = ((hits / displayData.length) * 100).toFixed(0);
 
   return (
     <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 14, overflow: 'hidden' }}>
@@ -395,25 +397,38 @@ function AITrackRecord() {
         </div>
         <div style={{ textAlign: 'right' }}>
           <div style={{ fontSize: 22, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: '#10b981', lineHeight: 1 }}>{acc}%</div>
-          <div style={{ fontSize: 9, color: '#334155' }}>{hits}/{AI_HISTORY.length} acertos</div>
+          <div style={{ fontSize: 9, color: '#334155' }}>{hits}/{displayData.length} acertos</div>
         </div>
       </div>
       {/* Rows */}
-      {AI_HISTORY.map((h, i) => {
+      {displayData.map((h, i) => {
+        const isPending = h.outcome === 'PENDING';
         const hit = h.outcome === 'HIT';
-        const oc = hit ? '#10b981' : '#ef4444';
-        const mc = h.pct_move >= 0 ? '#10b981' : '#ef4444';
+        const oc = isPending ? '#64748b' : hit ? '#10b981' : '#ef4444';
+        // pct_move comes from AI_HISTORY; outcome_ret_pct from AiPrediction DB rows
+        const pctMove = h.pct_move ?? h.outcome_ret_pct ?? 0;
+        const mc = pctMove >= 0 ? '#10b981' : '#ef4444';
         const dirCfg = {
           bearish_bias: { label: '↘ CAUTELA', color: '#f59e0b' },
+          bullish_bias: { label: '↗ OTIMISMO', color: '#60a5fa' },
           bearish: { label: '▼ BEARISH', color: '#ef4444' },
           bullish: { label: '▲ BULLISH', color: '#10b981' },
           neutral: { label: '◆ NEUTRO', color: '#64748b' },
         };
         const dc = dirCfg[h.direction] || dirCfg.neutral;
+        // outcome description: use stored field (AI_HISTORY) or synthesize from DB row
+        const outcomeDesc = h.outcome_desc
+          ?? (isPending
+            ? 'Aguardando avaliação (4h+ após previsão)…'
+            : h.outcome_ret_pct != null
+              ? `Retorno realizado: ${h.outcome_ret_pct >= 0 ? '+' : ''}${h.outcome_ret_pct}%`
+              : 'Resultado registrado');
+        // date: AI_HISTORY has h.date; DB rows have h.created_at
+        const dateLabel = h.date ?? (h.created_at ? h.created_at.slice(0, 10) : '—');
         return (
-          <div key={i} style={{
+          <div key={h.id ?? i} style={{
             display: 'flex', alignItems: 'flex-start', gap: 12, padding: '11px 18px',
-            borderBottom: i < AI_HISTORY.length - 1 ? '1px solid #0d1421' : 'none',
+            borderBottom: i < displayData.length - 1 ? '1px solid #0d1421' : 'none',
           }}>
             {/* Status */}
             <div style={{
@@ -422,18 +437,17 @@ function AITrackRecord() {
               background: `${oc}15`, border: `1px solid ${oc}35`,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: 10, color: oc, fontWeight: 900,
-            }}>{hit ? '✓' : '✗'}</div>
+            }}>{isPending ? '…' : hit ? '✓' : '✗'}</div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 3, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 9, color: '#334155', fontFamily: 'JetBrains Mono, monospace' }}>{h.date}</span>
+                <span style={{ fontSize: 9, color: '#334155', fontFamily: 'JetBrains Mono, monospace' }}>{dateLabel}</span>
                 <span style={{ fontSize: 9, color: dc.color, background: `${dc.color}10`, border: `1px solid ${dc.color}25`, borderRadius: 3, padding: '1px 5px', fontWeight: 700 }}>{dc.label}</span>
                 <span style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8' }}>{h.signal}</span>
               </div>
-              <div style={{ fontSize: 10, color: '#475569', lineHeight: 1.5 }}>{h.outcome_desc}</div>
+              <div style={{ fontSize: 10, color: '#475569', lineHeight: 1.5 }}>{outcomeDesc}</div>
               <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-                <span style={{ fontSize: 9, color: '#334155' }}>Prob: <span style={{ fontFamily: 'JetBrains Mono, monospace', color: '#64748b' }}>{Math.round(h.prob * 100)}%</span></span>
-                <span style={{ fontSize: 9, color: '#334155' }}>Conf: <span style={{ fontFamily: 'JetBrains Mono, monospace', color: '#64748b' }}>{Math.round(h.confidence * 100)}%</span></span>
-                <span style={{ fontSize: 9, color: mc, fontFamily: 'JetBrains Mono, monospace', fontWeight: 700 }}>{h.pct_move >= 0 ? '+' : ''}{h.pct_move}%</span>
+                <span style={{ fontSize: 9, color: '#334155' }}>Conf: <span style={{ fontFamily: 'JetBrains Mono, monospace', color: '#64748b' }}>{Math.round((h.confidence ?? 0) * 100)}%</span></span>
+                {!isPending && <span style={{ fontSize: 9, color: mc, fontFamily: 'JetBrains Mono, monospace', fontWeight: 700 }}>{pctMove >= 0 ? '+' : ''}{pctMove}%</span>}
               </div>
             </div>
           </div>
@@ -470,6 +484,25 @@ export default function Dashboard() {
       })
     : null;
   const aiAnalysis = liveAnalysis ?? aiAnalysisMockData;
+
+  // ── Sprint 8.2: AI Track Record persistence ──────────────────────────────────
+  const persistMutation = usePersistPrediction();
+  const { predictions } = useAiPredictions(liveTicker?.mark_price);
+  const lastPersistedHour = useRef('');
+
+  useEffect(() => {
+    if (!IS_LIVE || !liveAnalysis || !liveTicker) return;
+    const hour = new Date().toISOString().slice(0, 13);
+    if (hour === lastPersistedHour.current) return;
+    lastPersistedHour.current = hour;
+    persistMutation.mutate({
+      overall: liveAnalysis.overall,
+      price:   liveTicker.mark_price,
+      modules: liveAnalysis.modules,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveAnalysis, liveTicker]);
+
   const [lastUpdate, setLastUpdate] = useState(new Date());
   useEffect(() => {
     const t = setInterval(() => setLastUpdate(new Date()), 5000);
@@ -555,7 +588,7 @@ export default function Dashboard() {
         <SectionTitle icon="🤖" label="AI Analysis & Previsões" sub="Análise automática baseada em todos os módulos · Com histórico de acertos" />
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px,1fr))', gap: 14 }}>
           <AIAnalysisPanel analysis={aiAnalysis} compact={true} />
-          <AITrackRecord />
+          <AITrackRecord predictions={predictions} />
         </div>
       </div>
 
