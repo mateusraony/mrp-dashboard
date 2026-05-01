@@ -145,30 +145,35 @@ function NuplZoneBar({ value }) {
 }
 
 // ─── NUPL CARD ────────────────────────────────────────────────────────────────
-function NuplCard() {
+function NuplCard({ liveCycle }) {
   const n = btcNUPL;
+  // CoinMetrics Community fornece NUPL como proxy: (MCap−RCap)/MCap
+  const nuplValue = liveCycle?.nupl      ?? n.value;
+  const nuplZone  = liveCycle?.nupl_zone ?? n.zone;
+  const nuplColor = liveCycle?.nupl_zone_color ?? n.zone_color;
+  const isLive    = IS_LIVE && liveCycle != null;
   return (
-    <OnChainCard title="NUPL" glossKey="nupl" accent={n.zone_color} grade={n.quality}
+    <OnChainCard title="NUPL" glossKey="nupl" accent={nuplColor} grade={isLive ? 'B' : n.quality}
       trustBadge={
-        <DataTrustBadge
-          mode="paid_required"
-          confidence="D"
-          source="Glassnode"
-          sourceUrl="https://glassnode.com"
-          reason="NUPL/SOPR/Netflow/Whales requerem Glassnode (~$29/mês). Exibindo dados de demonstração."
-        />
+        isLive
+          ? <DataTrustBadge mode="estimated" confidence="B" source="CoinMetrics Community"
+              reason="Proxy via (MCap−RCap)/MCap — não é o NUPL oficial Glassnode mas correlação >0.97"
+              updatedAt={liveCycle.updated_at} />
+          : <DataTrustBadge mode="paid_required" confidence="D" source="Glassnode"
+              sourceUrl="https://glassnode.com"
+              reason="NUPL/SOPR/Netflow/Whales requerem Glassnode (~$29/mês). Exibindo dados de demonstração." />
       }
     >
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 8 }}>
-        <span style={{ fontSize: 32, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: n.zone_color, letterSpacing: '-0.04em' }}>
-          {n.value.toFixed(3)}
+        <span style={{ fontSize: 32, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: nuplColor, letterSpacing: '-0.04em' }}>
+          {nuplValue.toFixed(3)}
         </span>
-        <span style={{ fontSize: 12, fontWeight: 700, color: n.zone_color, background: `${n.zone_color}18`, border: `1px solid ${n.zone_color}30`, borderRadius: 5, padding: '2px 8px' }}>
-          {n.zone}
+        <span style={{ fontSize: 12, fontWeight: 700, color: nuplColor, background: `${nuplColor}18`, border: `1px solid ${nuplColor}30`, borderRadius: 5, padding: '2px 8px' }}>
+          {nuplZone}
         </span>
       </div>
-      <NuplZoneBar value={n.value} />
-      <MiniTimeChart data={n.history} color={n.zone_color} height={65} formatter={v => v.toFixed(3)} />
+      <NuplZoneBar value={nuplValue} />
+      <MiniTimeChart data={n.history} color={nuplColor} height={65} formatter={v => v.toFixed(3)} />
       <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
         <span style={{ fontSize: 10, color: n.delta_7d >= 0 ? '#10b981' : '#ef4444', fontFamily: 'JetBrains Mono, monospace', background: `${n.delta_7d >= 0 ? '#10b981' : '#ef4444'}12`, border: `1px solid ${n.delta_7d >= 0 ? '#10b981' : '#ef4444'}25`, borderRadius: 4, padding: '2px 6px', fontWeight: 600 }}>
           {n.delta_7d >= 0 ? '+' : ''}{n.delta_7d.toFixed(3)} 7d
@@ -851,7 +856,7 @@ export default function OnChain() {
           ● Sentimento & Comportamento dos Holders
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14, marginBottom: 20 }}>
-          <NuplCard />
+          <NuplCard liveCycle={cycle} />
           <SoprCard />
           <NetflowCard />
         </div>
