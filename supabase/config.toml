@@ -64,8 +64,6 @@ additional_redirect_urls = ["http://127.0.0.1:3000", "http://localhost:3000", "h
 jwt_expiry = 3600
 # If disabled, the refresh token will never expire.
 enable_refresh_token_rotation = true
-# Allows session invalidation via the `rev` claim in JWTs.
-enable_session_invalidation = true
 # Allow/disallow new user signups to your project.
 enable_signup = true
 # Allow/disallow anonymous sign-ins to your project.
