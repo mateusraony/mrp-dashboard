@@ -79,7 +79,7 @@ const G = {
 
 // ─── COMPONENTES ─────────────────────────────────────────────────────────────
 
-function OnChainCard({ title, glossKey, accent = '#3b82f6', grade, trustBadge, children }) {
+function OnChainCard({ title, glossKey, accent = '#3b82f6', grade, trustBadge = null, children }) {
   return (
     <div style={{
       background: 'linear-gradient(135deg, #131e2e 0%, #111827 100%)',
@@ -825,7 +825,7 @@ export default function OnChain() {
   const { cycle, mempool, hashrate, extended } = useOnChainLiveData();
   // Determina se algum dado live está disponível (para ajustar o badge)
   const hasLiveData = !!(cycle || mempool || hashrate || extended);
-  const modeLabel   = IS_LIVE ? (hasLiveData ? 'live' : 'loading') : 'mock';
+  const modeLabel   = (IS_LIVE && hasLiveData) ? 'live' : 'mock';
   return (
     <div style={{ maxWidth: 1400, margin: '0 auto' }}>
       {/* Header */}

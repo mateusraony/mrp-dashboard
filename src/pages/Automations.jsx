@@ -420,7 +420,7 @@ export default function Automations() {
 
   // ── Sincroniza current_values das regras com dados live ──────────────────
   useEffect(() => {
-    setRules(prev => prev.map(rule => {
+    setRules(/** @type {any} */ (prev => prev.map(rule => {
       // Atualiza apenas as chaves que temos dado live
       const updatedCurrentValues = { ...rule.current_values };
       Object.keys(liveMetrics).forEach(key => {
@@ -432,7 +432,7 @@ export default function Automations() {
       const allMetrics = { ...rule.current_values, ...liveMetrics };
       const triggered  = evaluateRule({ ...rule, current_values: updatedCurrentValues }, allMetrics);
       return { ...rule, current_values: updatedCurrentValues, triggered };
-    }));
+    })));
   }, [liveMetrics]); // re-roda sempre que dado live chegar
 
   const selectedRule = rules.find(r => r.id === selectedId);

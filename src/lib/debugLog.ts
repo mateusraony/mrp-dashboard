@@ -13,7 +13,7 @@ export type LogLevel = 'error' | 'warn' | 'info';
 // ─── Persistência Supabase (raw fetch, sem import circular) ──────────────────
 
 const _SUP_URL = (typeof import.meta !== 'undefined'
-  ? (import.meta as Record<string, unknown>).env as Record<string, string>
+  ? ((import.meta as unknown) as Record<string, unknown>).env as Record<string, string>
   : {}) as Record<string, string>;
 
 const _supUrl = _SUP_URL?.VITE_SUPABASE_URL ?? '';

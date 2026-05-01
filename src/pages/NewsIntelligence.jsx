@@ -351,7 +351,7 @@ export default function NewsIntelligence() {
               </span>
             )}
             <RefreshButton
-              onRefresh={() => gdeltRefetch()}
+              onRefresh={() => { gdeltRefetch(); }}
               isLoading={gdeltFetching}
               lastUpdated={gdeltUpdatedAt}
               label="Atualizar Feed Geral"
@@ -486,7 +486,7 @@ export default function NewsIntelligence() {
             </span>
             <div style={{ marginLeft: 'auto' }}>
               <RefreshButton
-                onRefresh={() => instRefetch()}
+                onRefresh={() => { instRefetch(); }}
                 isLoading={instFetching}
                 lastUpdated={instUpdatedAt}
                 label="Atualizar Inteligência AI"

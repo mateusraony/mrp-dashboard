@@ -354,7 +354,7 @@ export default function MacroCalendar() {
               </span>
             )}
             <RefreshButton
-              onRefresh={() => calRefetch()}
+              onRefresh={() => { calRefetch(); }}
               isLoading={calFetching}
               lastUpdated={calUpdatedAt}
               label="Atualizar Calendário Macro"
