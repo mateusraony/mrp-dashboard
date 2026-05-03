@@ -5,7 +5,7 @@ import { optionsTakerFlow } from '../components/data/mockDataExtended';
 import { ModeBadge } from '../components/ui/DataBadge';
 import { RefreshButton } from '../components/ui/RefreshButton';
 import { IS_LIVE } from '@/lib/env';
-import { useGdeltNews } from '@/hooks/useGdelt';
+import { useGdeltNews, useGdeltHistory } from '@/hooks/useGdelt';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
@@ -299,6 +299,8 @@ export default function NewsIntelligence() {
     dataUpdatedAt: instUpdatedAt,
   } = useGdeltNews('bitcoin ETF institutional SEC BlackRock Fidelity Grayscale adoption regulatory');
 
+  const { data: gdeltHistory = [] } = useGdeltHistory(7);
+
   // Derivados Feed Geral
   const gdeltBullishCount = gdeltArticles.filter(a => a.sentiment === 1).length;
   const gdeltNeutralCount = gdeltArticles.filter(a => a.sentiment === 0).length;
@@ -541,9 +543,35 @@ export default function NewsIntelligence() {
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
-              <div style={{ fontSize: 9, color: '#334155', marginTop: 6 }}>
-                💡 Histórico 7d disponível após acúmulo no Supabase (gdelt_articles). Artigos salvos automaticamente a cada refetch.
-              </div>
+              {gdeltHistory.length > 0 ? (
+                <div style={{ marginTop: 14 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', marginBottom: 8 }}>
+                    Histórico de Sentimento — últimos {gdeltHistory.length}d (Supabase)
+                  </div>
+                  <ResponsiveContainer width="100%" height={90}>
+                    <BarChart data={gdeltHistory} margin={{ top: 2, right: 4, left: -24, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#1e2d45" vertical={false} />
+                      <XAxis dataKey="date" tick={{ fontSize: 8, fill: '#475569' }} tickLine={false}
+                        tickFormatter={v => v.slice(5)} />
+                      <YAxis tick={{ fontSize: 8, fill: '#475569' }} tickLine={false} />
+                      <Tooltip
+                        contentStyle={{ background: '#0d1421', border: '1px solid #2a3f5f', borderRadius: 6, fontSize: 10 }}
+                        formatter={(v, name) => [v, name === 'bullish' ? 'Bullish' : name === 'bearish' ? 'Bearish' : 'Neutro']}
+                      />
+                      <Bar dataKey="bullish" stackId="a" fill="#10b981" radius={[0,0,0,0]} />
+                      <Bar dataKey="neutral" stackId="a" fill="#f59e0b" radius={[0,0,0,0]} />
+                      <Bar dataKey="bearish" stackId="a" fill="#ef4444" radius={[2,2,0,0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                  <div style={{ fontSize: 9, color: '#334155', marginTop: 4 }}>
+                    Acumulado de {gdeltHistory.reduce((s, d) => s + d.total, 0)} artigos nos últimos {gdeltHistory.length} dias · Supabase gdelt_articles
+                  </div>
+                </div>
+              ) : (
+                <div style={{ fontSize: 9, color: '#334155', marginTop: 6 }}>
+                  💡 Histórico 7d acumulará após primeiros fetches live (gdelt_articles Supabase).
+                </div>
+              )}
             </div>
           )}
 

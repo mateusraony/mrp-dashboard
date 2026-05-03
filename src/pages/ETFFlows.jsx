@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { etfFlows } from '../components/data/mockDataExtended';
 import { GradeBadge } from '../components/ui/DataBadge';
 import { DataTrustBadge } from '../components/ui/DataTrustBadge';
+import { useBtcTicker } from '@/hooks/useBtcData';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, Cell,
@@ -42,18 +43,41 @@ function SummaryCard({ label, value, sub, color = '#e2e8f0' }) {
   );
 }
 
+// BTC holdings por ETF — última atualização pública (SEC filings, etf.com)
+// Usado para estimar AUM live = holdings × preço BTC atual
+const ETF_BTC_HOLDINGS = {
+  IBIT: 524_000,   // BlackRock — ~$52.4B / $100k
+  FBTC: 218_000,   // Fidelity
+  ARKB:  84_000,   // ARK 21Shares
+  BITB:  51_000,   // Bitwise
+  GBTC: 198_000,   // Grayscale
+  HODL:  24_000,   // VanEck
+  BTCO:  25_000,   // Invesco
+};
+
 export function ETFContent() {
   const [sortBy, setSortBy] = useState('aum');
+  const { data: ticker } = useBtcTicker();
+  const livePrice = ticker?.mark_price ?? null;
   const d = etfFlows;
 
-  const sorted = [...d.funds].sort((a, b) => {
+  // Enriquece cada fundo com AUM estimado via preço live
+  const fundsWithLiveAum = d.funds.map(f => ({
+    ...f,
+    aum_b: livePrice && ETF_BTC_HOLDINGS[f.ticker]
+      ? (ETF_BTC_HOLDINGS[f.ticker] * livePrice) / 1e9
+      : f.aum_b,
+    aum_is_live: !!(livePrice && ETF_BTC_HOLDINGS[f.ticker]),
+  }));
+
+  const sorted = [...fundsWithLiveAum].sort((a, b) => {
     if (sortBy === 'aum') return b.aum_b - a.aum_b;
     if (sortBy === 'today') return b.flow_today_m - a.flow_today_m;
     if (sortBy === '7d') return b.flow_7d_m - a.flow_7d_m;
     return b.flow_30d_m - a.flow_30d_m;
   });
 
-  const totalNet = d.funds.reduce((s, f) => s + f.flow_today_m, 0);
+  const totalNet = fundsWithLiveAum.reduce((s, f) => s + f.flow_today_m, 0);
 
   return (
     <div style={{ maxWidth: 1400, margin: '0 auto' }}>
@@ -64,6 +88,9 @@ export function ETFContent() {
             Bitcoin Spot ETF Flows
           </h1>
           <DataTrustBadge mode="paid_required" confidence="D" source="Bloomberg/BitMEX Research" reason="ETF flows requerem Bloomberg Terminal ou BitMEX Research (~$99/mês)" />
+          {livePrice && (
+            <DataTrustBadge mode="estimated" confidence="B" source="Binance + SEC filings" reason="AUM = holdings BTC conhecidos (SEC) × preço live Binance" />
+          )}
           <GradeBadge grade={d.quality} />
           <span style={{ fontSize: 10, color: '#10b981', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 4, padding: '2px 8px', fontWeight: 600 }}>
             {d.consec_inflow_days} dias consecutivos de entrada
@@ -78,9 +105,15 @@ export function ETFContent() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12, marginBottom: 20 }}>
         <SummaryCard
           label="AUM Total"
-          value={`$${d.total_aum_b.toFixed(1)}B`}
-          sub={`+${((d.total_aum_b - d.total_aum_prev_30d_b) / d.total_aum_prev_30d_b * 100).toFixed(1)}% em 30d`}
-          color="#60a5fa"
+          value={livePrice
+            ? `$${fundsWithLiveAum.reduce((s, f) => s + f.aum_b, 0).toFixed(1)}B`
+            : `$${d.total_aum_b.toFixed(1)}B`
+          }
+          sub={livePrice
+            ? `estimado · BTC $${Math.round(livePrice / 1000)}k live`
+            : `+${((d.total_aum_b - d.total_aum_prev_30d_b) / d.total_aum_prev_30d_b * 100).toFixed(1)}% em 30d`
+          }
+          color={livePrice ? '#10b981' : '#60a5fa'}
         />
         <SummaryCard
           label="Flow Hoje"
@@ -108,7 +141,11 @@ export function ETFContent() {
         />
         <SummaryCard
           label="Dominância IBIT"
-          value={`${(d.funds.find(f => f.ticker === 'IBIT').aum_b / d.total_aum_b * 100).toFixed(1)}%`}
+          value={(() => {
+            const ibit = fundsWithLiveAum.find(f => f.ticker === 'IBIT');
+            const total = fundsWithLiveAum.reduce((s, f) => s + f.aum_b, 0);
+            return `${(ibit.aum_b / total * 100).toFixed(1)}%`;
+          })()}
           sub="BlackRock (maior)"
           color="#3b82f6"
         />
@@ -202,8 +239,13 @@ export function ETFContent() {
                     </div>
                   </td>
                   <td style={{ padding: '12px 16px', fontSize: 11, color: '#64748b' }}>{fund.issuer}</td>
-                  <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'JetBrains Mono, monospace', fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>
-                    ${fund.aum_b.toFixed(1)}B
+                  <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', color: '#e2e8f0' }}>
+                      ${fund.aum_b.toFixed(1)}B
+                    </span>
+                    {fund.aum_is_live && (
+                      <div style={{ fontSize: 8, color: '#10b981', marginTop: 1 }}>estimado live</div>
+                    )}
                   </td>
                   <td style={{ padding: '12px 16px', textAlign: 'right' }}>
                     <FlowBadge value={fund.flow_today_m} />
