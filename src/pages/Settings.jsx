@@ -282,14 +282,15 @@ function TelegramSection() {
         telegram_schedule:  schedule,
       });
 
-      // telegram-ping: valida token + chat_id e envia mensagem de teste isolada
+      // telegram-ping: lê token/chat_id do banco servidor-lado (service_role).
+      // Não enviamos token no body — a Edge Function não o aceita por segurança.
       const res = await fetch(`${supabaseUrl}/functions/v1/telegram-ping`, {
         method:  'POST',
         headers: {
           'Authorization': `Bearer ${anonKey}`,
           'Content-Type':  'application/json',
         },
-        body: JSON.stringify({ token: token.trim(), chat_id: chatId.trim() }),
+        body: JSON.stringify({}),
       });
 
       const body = await res.json().catch(() => ({}));
