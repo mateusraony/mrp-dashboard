@@ -9,6 +9,27 @@ export default defineConfig({
     env: {
       VITE_DATA_MODE: 'mock',
     },
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json', 'html'],
+      include: [
+        'src/services/**',
+        'src/utils/**',
+        'src/hooks/**',
+      ],
+      exclude: [
+        'src/components/data/**',
+        'src/**/__mocks__/**',
+      ],
+      // Thresholds calibrados ao estado atual (Phase 4 — 117 testes).
+      // Incrementar conforme novos testes forem adicionados.
+      thresholds: {
+        lines:      10,
+        functions:  10,
+        branches:    6,
+        statements:  9,
+      },
+    },
   },
   resolve: {
     alias: {

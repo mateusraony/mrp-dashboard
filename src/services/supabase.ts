@@ -155,8 +155,14 @@ function assertNoError<T>(result: { data: T | null; error: { message: string } |
  */
 export async function fetchAlertRules(): Promise<AlertRule[]> {
   if (!isSupabaseConfigured()) {
-    // Retorna mock com regras padrão (sem Supabase configurado)
-    return defaultAlertRules.map(r => AlertRuleSchema.parse(r));
+    // Retorna mock com regras padrão (sem Supabase configurado).
+    // Converte Date → ISO string para last_triggered (mock usa Date, schema espera string|null).
+    return defaultAlertRules.map(r => AlertRuleSchema.parse({
+      ...r,
+      last_triggered: r.last_triggered instanceof Date
+        ? r.last_triggered.toISOString()
+        : r.last_triggered ?? null,
+    }));
   }
 
   const sb = getClient();
