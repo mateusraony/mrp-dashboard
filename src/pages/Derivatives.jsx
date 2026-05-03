@@ -4,7 +4,7 @@ import {
   fmtNum, fmtPct, aiAnalysis as aiAnalysisMock,
 } from '../components/data/mockData';
 import { computeRuleBasedAnalysis } from '@/utils/ruleBasedAnalysis';
-import { useBtcTicker, useOiByExchange, useLiquidations } from '@/hooks/useBtcData';
+import { useBtcTicker, useOiByExchange, useLiquidations, useLongShortRatio, useDominance } from '@/hooks/useBtcData';
 import { useMultiVenueSnapshot } from '@/hooks/useMultiVenue';
 import { DataQualityBadge } from '../components/ui/DataQualityBadge';
 import { DataTrustBadge } from '../components/ui/DataTrustBadge';
@@ -134,6 +134,28 @@ export function DerivativesOverview() {
   const { btcFutures: liveBtc, oiByExchange: liveOi } = useDerivativesData();
   const f = liveBtc; // use live data if available
 
+  // ── Long/Short Ratio — live via Binance globalLongShortAccountRatio ──────────
+  const { data: lsData } = useLongShortRatio();
+  const liveLsRatio = lsData ? parseFloat((lsData.longAccount / lsData.shortAccount).toFixed(4)) : null;
+
+  // ── OI / Market Cap Ratio — computed from live OI + CoinGecko dominance ─────
+  const { data: dominance } = useDominance();
+  const totalOiUsd = IS_LIVE && liveOi.length > 0
+    ? liveOi.reduce((s, e) => s + (e.oi_usd ?? e.oi_b * 1e9), 0)
+    : null;
+  const btcMcapUsd = dominance ? dominance.total_mcap_usd * dominance.btc_dominance / 100 : null;
+  const liveRatioPct = (totalOiUsd && btcMcapUsd) ? (totalOiUsd / btcMcapUsd) * 100 : null;
+  const displayRatioPct = liveRatioPct ?? oiRatio.ratio_pct;
+  const displayZone = liveRatioPct !== null
+    ? (liveRatioPct < 0.5 ? 'Baixo' : liveRatioPct < 1.0 ? 'Moderado' : liveRatioPct < 1.5 ? 'Elevado' : 'Extremo')
+    : oiRatio.zone;
+  const displayZoneColor = liveRatioPct !== null
+    ? (liveRatioPct < 0.5 ? '#10b981' : liveRatioPct < 1.0 ? '#f59e0b' : '#ef4444')
+    : '#f59e0b';
+  const displaySignal = liveRatioPct !== null
+    ? `OI Binance / Market Cap BTC: ${liveRatioPct.toFixed(2)}% — zona ${displayZone.toLowerCase()}. (Somente OI Binance; total cross-exchange via CoinGlass requereria plano pago.)`
+    : oiRatio.signal;
+
   // Rule-based AI analysis from live ticker
   const liveAnalysis = IS_LIVE && liveBtc.mark_price !== btcFutures.mark_price
     ? computeRuleBasedAnalysis({ derivatives: { fundingRate: liveBtc.funding_rate, oiDeltaPct: liveBtc.oi_delta_pct, openInterest: liveBtc.open_interest } })
@@ -173,7 +195,7 @@ export function DerivativesOverview() {
           { label: 'Funding 7D avg', value: fmtPct(f.funding_avg_7d, 4), color: f.funding_avg_7d > 0.0005 ? '#f59e0b' : '#8899a6' },
           { label: 'Funding 30D avg', value: fmtPct(f.funding_avg_30d, 4), color: '#8899a6' },
           { label: 'Open Interest', value: `$${(f.open_interest_usdt/1e9).toFixed(2)}B`, color: '#e2e8f0' },
-          { label: 'L/S Ratio', value: f.long_short_ratio.toFixed(2), color: f.long_short_ratio > 1 ? '#10b981' : '#ef4444', sub: 'Global accounts' },
+          { label: 'L/S Ratio', value: (liveLsRatio ?? f.long_short_ratio).toFixed(2), color: (liveLsRatio ?? f.long_short_ratio) > 1 ? '#10b981' : '#ef4444', sub: lsData ? 'Binance live' : 'Global accounts' },
           { label: 'Top Trader L/S', value: f.top_trader_ls.toFixed(2), color: f.top_trader_ls > 1 ? '#60a5fa' : '#a78bfa' },
         ].map((m, i) => (
           <div key={i} style={{
@@ -342,23 +364,31 @@ export function DerivativesOverview() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
         {/* OI/Market Cap Ratio */}
         <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: 20 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 14 }}>OI / Market Cap Ratio</div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0' }}>OI / Market Cap Ratio</div>
+            <DataTrustBadge
+              mode={liveRatioPct !== null ? 'live' : 'mock'}
+              confidence={liveRatioPct !== null ? 'B' : 'D'}
+              source={liveRatioPct !== null ? 'Binance + CoinGecko' : 'Mock'}
+              reason={liveRatioPct !== null ? 'OI Binance / Market Cap BTC (CoinGecko)' : undefined}
+            />
+          </div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 8 }}>
-            <span style={{ fontSize: 32, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: '#f59e0b', letterSpacing: '-0.04em' }}>
-              {oiRatio.ratio_pct.toFixed(2)}%
+            <span style={{ fontSize: 32, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: displayZoneColor, letterSpacing: '-0.04em' }}>
+              {displayRatioPct.toFixed(2)}%
             </span>
-            <span style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: 5, padding: '2px 8px' }}>
-              {oiRatio.zone}
+            <span style={{ fontSize: 11, fontWeight: 700, color: displayZoneColor, background: `${displayZoneColor}18`, border: `1px solid ${displayZoneColor}40`, borderRadius: 5, padding: '2px 8px' }}>
+              {displayZone}
             </span>
           </div>
           <div style={{ height: 6, borderRadius: 3, background: '#1a2535', overflow: 'hidden', marginBottom: 8 }}>
-            <div style={{ height: '100%', borderRadius: 3, width: `${Math.min(100, oiRatio.ratio_pct / 2 * 100)}%`, background: 'linear-gradient(90deg, #10b981, #f59e0b, #ef4444)' }} />
+            <div style={{ height: '100%', borderRadius: 3, width: `${Math.min(100, displayRatioPct / 2 * 100)}%`, background: 'linear-gradient(90deg, #10b981, #f59e0b, #ef4444)' }} />
           </div>
           <div style={{ display: 'flex', gap: 12, fontSize: 10, color: '#475569', marginBottom: 10 }}>
             <span>7d atrás: <span style={{ fontFamily: 'JetBrains Mono, monospace', color: '#94a3b8' }}>{oiRatio.prev_7d_ratio.toFixed(2)}%</span></span>
             <span>30d atrás: <span style={{ fontFamily: 'JetBrains Mono, monospace', color: '#94a3b8' }}>{oiRatio.prev_30d_ratio.toFixed(2)}%</span></span>
           </div>
-          <div style={{ fontSize: 10, color: '#64748b', lineHeight: 1.6 }}>{oiRatio.signal}</div>
+          <div style={{ fontSize: 10, color: '#64748b', lineHeight: 1.6 }}>{displaySignal}</div>
         </div>
 
         {/* Perp vs Dated split */}
