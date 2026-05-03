@@ -27,6 +27,25 @@
 -- '00000000-0000-0000-0000-000000000000' = ANON_USER_ID em src/services/supabase.ts
 
 -- ══════════════════════════════════════════════════════════════════════════════
+-- BACKFILL: atribui sentinel UUID a linhas sem user_id (dados pré-migração).
+-- Necessário antes de ativar as novas políticas, caso existam linhas com
+-- user_id IS NULL gravadas por versões anteriores do app.
+-- As novas políticas SELECT/UPDATE/DELETE exigem user_id = sentinel —
+-- linhas com NULL se tornariam invisíveis sem este backfill.
+-- ══════════════════════════════════════════════════════════════════════════════
+UPDATE public.alert_rules
+  SET user_id = '00000000-0000-0000-0000-000000000000'
+  WHERE user_id IS NULL;
+
+UPDATE public.portfolio_positions
+  SET user_id = '00000000-0000-0000-0000-000000000000'
+  WHERE user_id IS NULL;
+
+-- user_settings já possui backfill equivalente em 20260420000000_full_schema.sql
+-- (DELETE FROM public.user_settings WHERE user_id IS NULL), portanto não
+-- é necessário repetir aqui.
+
+-- ══════════════════════════════════════════════════════════════════════════════
 -- TABELA: user_settings
 -- Contém telegram_bot_token e telegram_chat_id — dados mais sensíveis do app.
 -- ══════════════════════════════════════════════════════════════════════════════

@@ -175,12 +175,12 @@ export async function fetchAlertRules(): Promise<AlertRule[]> {
  */
 export async function upsertAlertRule(rule: AlertRule): Promise<AlertRule> {
   if (!isSupabaseConfigured()) {
-    // Simula persistência local em mock
     return AlertRuleSchema.parse({ ...rule, id: rule.id ?? crypto.randomUUID() });
   }
 
   const sb = getClient();
-  const payload = AlertRuleSchema.parse(rule);
+  // Garante que user_id seja sempre o sentinel — necessário para a política RLS de INSERT.
+  const payload = AlertRuleSchema.parse({ ...rule, user_id: ANON_USER_ID });
   const result = await sb
     .from('alert_rules')
     .upsert(payload, { onConflict: 'id' })
@@ -234,7 +234,8 @@ export async function upsertPortfolioPosition(pos: PortfolioPosition): Promise<P
   }
 
   const sb = getClient();
-  const payload = PortfolioPositionSchema.parse(pos);
+  // Garante que user_id seja sempre o sentinel — necessário para a política RLS de INSERT.
+  const payload = PortfolioPositionSchema.parse({ ...pos, user_id: ANON_USER_ID });
   const result = await sb
     .from('portfolio_positions')
     .upsert(payload, { onConflict: 'id' })

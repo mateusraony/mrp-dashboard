@@ -1,10 +1,10 @@
 # CHECKPOINT.md — MRP Dashboard
 > Memória técnica viva do projeto. Atualizar ao final de cada bloco importante.
-> Última atualização: 2026-04-30 (Sprint 7.1–7.4 concluídos · Supabase Preview CI fix · lint limpo)
+> Última atualização: 2026-05-03 (Auditoria Técnica completa · Fase 1 Segurança concluída — PRs #58 e #59)
 
 ---
 
-## 🗂 ESTADO GERAL (verificado em 2026-04-29)
+## 🗂 ESTADO GERAL (verificado em 2026-05-03)
 
 | Aspecto | Status | Evidência Real |
 |---------|--------|---------------|
@@ -13,12 +13,15 @@
 | Deploy (Render) | ✅ ONLINE | https://mrp-dashboard.onrender.com |
 | FRED API Key | ✅ CONFIGURADA | VITE_FRED_API_KEY em .env.local |
 | Supabase URL + ANON_KEY | ✅ CONFIGURADO | .env.local presente |
+| **RLS Supabase** | ✅ CORRIGIDO (PR #58+#59) | Policies `USING (true)` substituídas por sentinel UUID em alert_rules, portfolio_positions, user_settings |
+| **upsert user_id sentinel** | ✅ CORRIGIDO (PR #59) | `upsertAlertRule` e `upsertPortfolioPosition` injetam `ANON_USER_ID` antes do payload |
+| **Backfill user_id NULL** | ✅ CORRIGIDO (PR #59) | Migration backfilla linhas antigas sem user_id antes de ativar novas policies |
 | MacroCalendar eventos | ✅ 13 eventos | CPI, Core CPI, NFP, Unemployment, GDP, Core PCE, Initial Claims (semanal), JOLTS, PPI, Retail Sales, Durable Goods, UMich, Housing Starts, FOMC |
 | MacroCalendar agenda | ✅ REAL | Eventos passados 45d + actual via FRED client-side |
 | MacroCalendar alertas | ✅ ATIVO | macro_alert_preferences + macro-alert-worker rodando a cada 5min |
 | Secrets expostos | ✅ CORRIGIDO | Removidos de sql-migration.sql e deploy-supabase.sh |
 | persistMacroSchedule | ✅ REMOVIDO | Client-side não tenta mais escrever em macro_event_schedule (RLS) |
-| Telegram test Settings | ✅ CORRIGIDO | Usa telegram-ping (token+chat_id no body, retorna latência) |
+| Telegram test Settings | ✅ CORRIGIDO | telegram-ping lê token do banco server-side (service_role) — token nunca trafega no body |
 | Rota alert worker | ✅ CORRIGIDO | /MacroCalendar (era /macro-calendar) |
 | pg_cron UI | ✅ CORRIGIDO | Badge falso removido, instrução honesta |
 | Migration hardening | ✅ APLICADA | 3 tabelas criadas pelo usuário no SQL Editor |
@@ -50,6 +53,65 @@
 | **Fase 7 — Live Wiring: Portfolio / Predictive / Automações / Opportunities** | ✅ CONCLUÍDA | 2026-04-30 |
 
 *Sprint 6.6 (Telegram) desbloqueado — Bot Token configurado.
+
+---
+
+## 🔍 AUDITORIA TÉCNICA — 2026-05-03
+
+Auditoria fria e completa conduzida em 7 agentes especializados (arquitetura, dados, segurança, UI, QA, DevOps). Inventário de 176 arquivos, 31 hooks/services, 15 arquivos mock, 11 migrations, 5 Edge Functions.
+
+### Fases da Auditoria
+
+| Fase | Status | Data | PR |
+|------|--------|------|----|
+| **Fase 0 — Diagnóstico e inventário** | ✅ CONCLUÍDA | 2026-05-03 | — |
+| **Fase 1 — Segurança mínima séria** | ✅ CONCLUÍDA | 2026-05-03 | #58 + #59 |
+| **Fase 2 — Eliminar ilusão de dados** | 🔜 PRÓXIMA | — | — |
+| **Fase 3 — Dados reais gratuitos** | ⏳ PENDENTE | — | — |
+| **Fase 4 — Testes e CI** | ⏳ PENDENTE | — | — |
+| **Fase 5 — Deploy seguro** | ⏳ PENDENTE | — | — |
+| **Fase 6 — Observabilidade** | ⏳ PENDENTE | — | — |
+
+### Fase 0 — Diagnóstico (✅ CONCLUÍDA)
+
+Achados principais:
+- **Build/Testes/Lint/TypeCheck**: todos passando — confirmado com evidência
+- **RLS completamente aberta**: 5 tabelas com `USING (true)` — qualquer anon key = acesso total
+- **Telegram token plaintext**: coluna `text` sem criptografia em `user_settings`
+- **~70 chamadas a Math.random()** em mock data shippeado em produção (dist/assets/mockData*.js)
+- **15 arquivos mockData** com dados financeiros inventados — 20 de 29 páginas importam algum
+- **AI Recommendation hardcoded**: `"CAUTION — REDUCE LONGS"` é string fixa em mockData.jsx
+- **10 artigos de notícias fabricados**: atribuídos a Bloomberg/Reuters/CoinDesk — todos falsos
+- **Liquidações 24h sempre mock**: `/fapi/v1/forceOrders` requer auth, retorna `[]`
+- **FRED API key exposta**: prefixo `VITE_` inclui a chave no bundle JS visível no DevTools
+- **Auth stub completo**: `AuthContext.jsx` com `isAuthenticated: false` e logout vazio
+- **2 vulnerabilidades npm**: dompurify e postcss — severity moderate
+
+### Fase 1 — Segurança (✅ CONCLUÍDA — PRs #58 e #59)
+
+| Correção | Arquivo | PR |
+|----------|---------|-----|
+| RLS: `USING (true)` → sentinel UUID em `alert_rules`, `portfolio_positions`, `user_settings` | `supabase/migrations/20260502000001_fix_rls_policies.sql` | #58 |
+| Token Telegram: removido do body da requisição do cliente | `supabase/functions/telegram-ping/index.ts` | #58 |
+| Settings.jsx: body do ping agora vazio `{}` | `src/pages/Settings.jsx` | #58 |
+| Backfill: `UPDATE ... SET user_id = sentinel WHERE user_id IS NULL` | `supabase/migrations/20260502000001_fix_rls_policies.sql` | #59 |
+| upsertAlertRule: injeta `user_id: ANON_USER_ID` antes do payload | `src/services/supabase.ts` | #59 |
+| upsertPortfolioPosition: injeta `user_id: ANON_USER_ID` antes do payload | `src/services/supabase.ts` | #59 |
+
+**Ação manual necessária (usuário):** aplicar a migration `20260502000001_fix_rls_policies.sql` no Supabase Dashboard (prod e preview). É idempotente.
+
+### Riscos ainda abertos (pós Fase 1)
+
+| Risco | Severidade | Fase que resolve |
+|-------|------------|-----------------|
+| FRED API key exposta via `VITE_` no bundle | Alto | Fase 5 |
+| Auth stub sem isolamento real | Alto | Fase 5 / decisão de negócio |
+| Dados mock sem aviso visual claro | Crítico (UX) | **Fase 2** |
+| AI recommendation hardcoded | Crítico (UX) | **Fase 2** |
+| Artigos de notícias fabricados | Crítico (UX) | **Fase 2** |
+| NUPL/SOPR/Whales sempre mock | Médio | Fase 3 |
+| Liquidações sempre mock | Médio | Fase 3 |
+| 2 vulnerabilidades npm | Médio | Fase 5 |
 
 ---
 
@@ -215,9 +277,16 @@ refetchInterval: IS_LIVE ? 30_000 : false,
 
 | Item | Severidade | Status | Ação |
 |------|------------|--------|------|
-| Auth stub anônimo (`AuthContext.jsx`) | Alta | Pendente | Supabase Auth (email/OAuth) — aguarda decisão |
-| pg_cron duplicata | Baixa | Pendente | `SELECT cron.unschedule('telegram-digest');` no SQL Editor — remove job antigo duplicado |
-| SOPR/Netflow/Whale via Glassnode | Média | Pendente | Requer plano pago ~$29/mês |
+| ~~RLS `USING (true)` em todas as tabelas~~ | ~~Crítica~~ | ✅ RESOLVIDO (PR #58+#59) | Migration + backfill + upserts corrigidos |
+| ~~Token Telegram no body do cliente~~ | ~~Alta~~ | ✅ RESOLVIDO (PR #58) | telegram-ping lê do banco server-side |
+| **FRED API key exposta via VITE_** | Alta | Pendente (Fase 5) | Mover chamadas FRED para Edge Function fred-proxy |
+| **Auth stub anônimo** (`AuthContext.jsx`) | Alta | Pendente (decisão) | Supabase Auth (email/OAuth) — aguarda decisão de negócio |
+| **Dados mock sem aviso visual** | Alta | Pendente (Fase 2) | Banner DEMO global + remoção de dados fabricados |
+| **AI recommendation hardcoded** | Alta | Pendente (Fase 2) | String fixa `"CAUTION — REDUCE LONGS"` em mockData.jsx |
+| **Artigos de notícias fabricados** | Alta | Pendente (Fase 2) | mockDataNews.jsx com 10 artigos inventados |
+| pg_cron duplicata | Baixa | Pendente | `SELECT cron.unschedule('telegram-digest');` no SQL Editor |
+| SOPR/Netflow/Whale via Glassnode | Média | Pendente (Fase 3) | Requer plano pago ~$29/mês ou marcar PAID-ONLY |
+| 2 vulnerabilidades npm (dompurify, postcss) | Média | Pendente (Fase 5) | `npm audit fix` |
 | Base44 favicon residual (`index.html`) | Baixa | Pendente | 1 linha — remover quando conveniente |
 | Rate limiting CoinGecko | Baixa | Pendente | Debounce/queue ≤30 req/min no free tier |
 | ~~Migration conflict~~ | ~~Alta~~ | ✅ RESOLVIDO | 5 stubs + full_schema + pré-registro no preview DB |
@@ -266,3 +335,27 @@ refetchInterval: IS_LIVE ? 30_000 : false,
 | **MacroCalendar bronze pipeline** | `macro_event_schedule` não é populado automaticamente ainda | `macroCalendarService.ts` gera eventos em memória; persistência é Sprint 8 |
 | **Auth real** | Login com email/Google via Supabase Auth | Decisão de negócio — quando quiser ativar |
 | **APIs pagas** | SOPR, Netflow, Whale via Glassnode/CryptoQuant | Custo ~$29/mês — confirmar se vale |
+
+---
+
+## 🔜 FASE 2 — ELIMINAR ILUSÃO DE DADOS (PRÓXIMA)
+
+**Objetivo:** Garantir que o usuário nunca confunda dado falso com real. Nenhuma feature nova — apenas transparência.
+
+**Regra:** é melhor não mostrar um dado do que mostrar dado inventado bonito.
+
+### Tarefas em ordem de execução
+
+| # | Tarefa | Arquivo(s) | Critério de aceite |
+|---|--------|-----------|-------------------|
+| 2.1 | Adicionar banner global `"🧪 MODO DEMO"` sticky no Layout quando `DATA_MODE=mock` | `src/Layout.jsx` | Banner visível em todas as páginas quando DATA_MODE=mock; invisível em live |
+| 2.2 | Remover artigos fabricados de `mockDataNews.jsx` | `src/components/data/mockDataNews.jsx` | Array exportado vazio ou com placeholder sem fontes inventadas |
+| 2.3 | Remover AI recommendation hardcoded de `mockData.jsx` | `src/components/data/mockData.jsx` linha ~691 | `aiAnalysis.overall.recommendation` substituído por string vazia ou template explícito |
+| 2.4 | Adicionar badge/overlay DEMO no `ActionDashboard.jsx` | `src/pages/ActionDashboard.jsx` | Cards de oportunidades com selo visual "DEMO" e botões de ação desabilitados em mock |
+| 2.5 | Adicionar label DEMO no `Portfolio.jsx` | `src/pages/Portfolio.jsx` | Seção de posições com aviso "Portfólio Demo — sem posições reais" quando usando mock |
+| 2.6 | Adicionar label DEMO em `Strategies.jsx` | `src/pages/Strategies.jsx` | P&L histórico com label "Simulado" |
+
+**Risco:** Baixo — somente visual/lógica de exibição. Nenhuma API, hook ou schema de banco alterado.
+**Tempo estimado:** 3–5 horas.
+**Gratuito:** Sim — sem dependências pagas.
+**Build/Testes exigidos ao final:** `npm run build && npm run test && npm run lint`
