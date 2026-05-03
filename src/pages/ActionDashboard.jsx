@@ -100,6 +100,9 @@ function OpportunityCard({ op, onSelect, selected }) {
           <TypeBadge type={op.type} />
           <span style={{ fontSize: 12, fontWeight: 800, color: '#e2e8f0' }}>{op.asset}</span>
           <span style={{ fontSize: 10, color: '#475569' }}>{op.strategy}</span>
+          {!op.isLive && (
+            <span style={{ fontSize: 8, fontWeight: 800, padding: '1px 6px', borderRadius: 3, background: 'rgba(245,158,11,0.1)', color: '#d97706', border: '1px solid rgba(245,158,11,0.25)', letterSpacing: '0.06em' }}>DEMO</span>
+          )}
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           <GradeBadge grade={op.ai_grade} />
@@ -363,6 +366,16 @@ export function ActionsContent() {
             <span style={{ marginLeft: 'auto', fontSize: 10, color: '#334155' }}>{filtered.length} resultado{filtered.length !== 1 ? 's' : ''}</span>
           </div>
 
+          {filtered.some(op => !op.isLive) && (
+            <div style={{
+              marginBottom: 10, padding: '8px 14px',
+              background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.2)',
+              borderLeft: '3px solid rgba(245,158,11,0.5)', borderRadius: 7,
+              fontSize: 10, color: '#92400e',
+            }}>
+              🧪 Oportunidades marcadas como <strong>DEMO</strong> são simuladas e não representam sinais operacionais reais.
+            </div>
+          )}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {filtered.map(op => (
               <OpportunityCard key={op.id} op={op} onSelect={setSelected} selected={selected} />

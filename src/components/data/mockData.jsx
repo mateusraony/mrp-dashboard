@@ -688,7 +688,7 @@ export const aiAnalysis = {
   generated_at: new Date(),
   model: 'quant-risk-v2',
   overall: {
-    recommendation: 'CAUTION — REDUCE LONGS',
+    recommendation: '',
     direction: 'bearish_bias',
     confidence: 0.71,
     probability_correction: 0.62,

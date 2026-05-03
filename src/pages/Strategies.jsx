@@ -312,6 +312,14 @@ export function StrategiesContent() {
         <p style={{ fontSize: 11, color: '#475569', lineHeight: 1.5 }}>
           Setups gerados por engine quantitativa · baseados em IV Rank, Basis, Funding Rate, Sentiment e On-Chain · Não é recomendação de investimento.
         </p>
+        <div style={{
+          marginTop: 8, padding: '7px 14px',
+          background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.2)',
+          borderLeft: '3px solid rgba(245,158,11,0.5)', borderRadius: 7,
+          fontSize: 10, color: '#92400e',
+        }}>
+          🧪 <strong>Estratégias Simuladas</strong> — Setups, condições e probabilidades são dados de exemplo. Não representa análise real de mercado.
+        </div>
       </div>
 
       {/* Market conditions bar */}
