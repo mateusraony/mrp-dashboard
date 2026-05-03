@@ -11,7 +11,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { IS_LIVE } from '@/lib/env';
-import { fetchBtcTicker, fetchOiByExchange, fetchKlines, fetchLiquidations, type BtcTickerData } from '@/services/binance';
+import { fetchBtcTicker, fetchOiByExchange, fetchKlines, fetchLiquidations, fetchLongShortRatio, type BtcTickerData } from '@/services/binance';
 import { fetchDominance, fetchTopAltcoins } from '@/services/coingecko';
 import { fetchFearGreed } from '@/services/alternative';
 
@@ -106,6 +106,20 @@ export function useTopAltcoins(limit = 20) {
     queryFn:  () => fetchTopAltcoins(limit),
     staleTime: 290_000,
     refetchInterval: DOM_INTERVAL,
+  });
+}
+
+/**
+ * useLongShortRatio — proporção global de contas long vs short (Binance Futures)
+ * Atualiza a cada 1min em modo live. Retorna null se o endpoint exigir auth.
+ */
+export function useLongShortRatio(symbol = 'BTCUSDT') {
+  return useQuery({
+    queryKey:        ['btc', 'longShortRatio', symbol],
+    queryFn:         () => fetchLongShortRatio(symbol, '5m'),
+    staleTime:       55_000,
+    refetchInterval: IS_LIVE ? 60_000 : false,
+    retry:           1,
   });
 }
 
