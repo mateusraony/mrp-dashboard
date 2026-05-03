@@ -515,3 +515,51 @@ const MOCK_THRESHOLD_HISTORY: ThresholdChange[] = [
   { id: crypto.randomUUID(), rule_id: 'rule-002', rule_label: 'Long Flush Watch', old_value: 500, new_value: 1000, changed_at: hoursAgo(72), changed_by: 'user' },
   { id: crypto.randomUUID(), rule_id: 'rule-003', rule_label: 'MVRV Z-Score Crítico', old_value: 3.5, new_value: 3.7, changed_at: hoursAgo(120), changed_by: 'user' },
 ];
+
+// ─── GDELT — Histórico de sentimento ─────────────────────────────────────────
+
+export interface GdeltDaySentiment {
+  date:    string;  // 'YYYY-MM-DD'
+  bullish: number;
+  bearish: number;
+  neutral: number;
+  total:   number;
+}
+
+/**
+ * fetchGdeltSentimentHistory — agrega artigos GDELT do Supabase por dia.
+ * Retorna array vazio se Supabase não estiver configurado ou se a tabela estiver vazia.
+ */
+export async function fetchGdeltSentimentHistory(days = 7): Promise<GdeltDaySentiment[]> {
+  if (!isSupabaseConfigured()) return [];
+
+  const sb = getClient();
+  const since = new Date(Date.now() - days * 86_400_000).toISOString();
+
+  try {
+    const result = await sb
+      .from('gdelt_articles')
+      .select('published_at, sentiment')
+      .gte('published_at', since)
+      .order('published_at', { ascending: true });
+
+    if (result.error || !result.data || result.data.length === 0) return [];
+
+    const byDate = new Map<string, { bullish: number; bearish: number; neutral: number }>();
+    for (const row of result.data as { published_at: string | null; sentiment: number | null }[]) {
+      const date = row.published_at?.slice(0, 10) ?? '';
+      if (!date) continue;
+      if (!byDate.has(date)) byDate.set(date, { bullish: 0, bearish: 0, neutral: 0 });
+      const d = byDate.get(date)!;
+      if (row.sentiment === 1)       d.bullish++;
+      else if (row.sentiment === -1) d.bearish++;
+      else                           d.neutral++;
+    }
+
+    return Array.from(byDate.entries())
+      .map(([date, counts]) => ({ date, ...counts, total: counts.bullish + counts.bearish + counts.neutral }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+  } catch {
+    return [];
+  }
+}
