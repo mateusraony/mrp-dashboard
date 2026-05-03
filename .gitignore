@@ -30,3 +30,6 @@ dist-ssr
 .env.claude/
 supabase/.temp/
 .claude/worktrees/
+
+# Coverage reports
+coverage/
