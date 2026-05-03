@@ -77,7 +77,7 @@ function mockBtcTicker(): BtcTickerData {
     volume_24h_usdt:   btcSpotFlow.volume_1d_usdt,
     high_24h:          btcFutures.mark_price * 1.025,
     low_24h:           btcFutures.mark_price * 0.972,
-    open_interest:     btcFutures.open_interest,
+    open_interest:     btcFutures.open_interest_usdt,
     oi_delta_pct:      btcFutures.oi_delta_pct,
   };
 }

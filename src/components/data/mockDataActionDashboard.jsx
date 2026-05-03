@@ -22,6 +22,7 @@ export const tradeOpportunities = [
     status: 'active',
     pnl_pct: 0.42,
     ai_grade: 'A',
+    isLive: false,
   },
   {
     id: 'op002',
@@ -42,6 +43,7 @@ export const tradeOpportunities = [
     status: 'active',
     pnl_pct: -0.18,
     ai_grade: 'B',
+    isLive: false,
   },
   {
     id: 'op003',
@@ -62,6 +64,7 @@ export const tradeOpportunities = [
     status: 'watching',
     pnl_pct: null,
     ai_grade: 'A',
+    isLive: false,
   },
   {
     id: 'op004',
@@ -83,6 +86,7 @@ export const tradeOpportunities = [
     status: 'active',
     pnl_pct: 3.21,
     ai_grade: 'B',
+    isLive: false,
   },
   {
     id: 'op005',
@@ -104,6 +108,7 @@ export const tradeOpportunities = [
     status: 'active',
     pnl_pct: 0.89,
     ai_grade: 'A',
+    isLive: false,
   },
   {
     id: 'op006',
@@ -124,6 +129,7 @@ export const tradeOpportunities = [
     status: 'watching',
     pnl_pct: null,
     ai_grade: 'B',
+    isLive: false,
   },
 ];
 
