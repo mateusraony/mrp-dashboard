@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { btcFutures } from '@/components/data/mockData';
 import DebugPanel from '@/components/ui/DebugPanel';
+import { DATA_MODE } from '@/lib/env';
 
 // ─── NAVEGAÇÃO ─────────────────────────────────────────────────────────────────
 const NAV_GROUPS = [
@@ -498,6 +499,37 @@ export default function Layout({ children, currentPageName }) {
             </span>
           </div>
         </header>
+
+        {/* ── DEMO BANNER ─────────────────────────────────────────────── */}
+        {DATA_MODE === 'mock' && (
+          <div style={{
+            background: 'rgba(245,158,11,0.09)',
+            borderBottom: '1px solid rgba(245,158,11,0.2)',
+            padding: '6px 18px',
+            display: 'flex', alignItems: 'center', gap: 10,
+            flexShrink: 0,
+          }}>
+            <span style={{
+              fontSize: 9, fontWeight: 900, letterSpacing: '0.12em',
+              fontFamily: 'JetBrains Mono, monospace',
+              color: '#f59e0b',
+              background: 'rgba(245,158,11,0.15)',
+              border: '1px solid rgba(245,158,11,0.3)',
+              borderRadius: 4, padding: '2px 8px',
+            }}>
+              🧪 MODO DEMO
+            </span>
+            <span style={{ fontSize: 10, color: '#92400e', flex: 1 }}>
+              Dados simulados — não tome decisões financeiras com base nestes valores.
+            </span>
+            <Link
+              to={createPageUrl('DataSources')}
+              style={{ fontSize: 10, color: '#d97706', fontWeight: 700, textDecoration: 'none', flexShrink: 0 }}
+            >
+              Ver fontes →
+            </Link>
+          </div>
+        )}
 
         {/* ── CONTENT ─────────────────────────────────────────────────────── */}
         <div className="page-content" style={{ flex: 1, padding: '20px 22px', overflowY: 'auto' }}>

@@ -280,6 +280,16 @@ export default function Portfolio() {
         <p style={{ fontSize: 11, color: '#475569' }}>
           Simulação de portfólio com Greeks ponderados · BTC Spot + Futuros + Opções · Spot: <span style={{ fontFamily: 'JetBrains Mono, monospace', color: '#f59e0b' }}>${liveSpotPrice.toLocaleString()}</span>
         </p>
+        {(!savedPositions || savedPositions.length === 0) && (
+          <div style={{
+            marginTop: 10, padding: '8px 14px',
+            background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.2)',
+            borderLeft: '3px solid rgba(245,158,11,0.5)', borderRadius: 7,
+            fontSize: 10, color: '#92400e',
+          }}>
+            🧪 <strong>Portfólio Demo</strong> — Posições simuladas. Adicione posições reais usando o botão abaixo ou conecte uma carteira.
+          </div>
+        )}
       </div>
 
       {/* Greeks Cards */}
