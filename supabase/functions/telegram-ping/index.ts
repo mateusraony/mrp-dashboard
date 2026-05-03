@@ -2,10 +2,11 @@
  * telegram-ping — Edge Function Supabase (Deno)
  *
  * Endpoint de teste para validar configuração do Telegram.
- * Pode ser chamado com token/chat_id no body (prioridade) ou lê de user_settings.
+ * Lê token e chat_id exclusivamente de user_settings via service_role key.
+ * O token NUNCA é aceito no body da requisição — segurança por design.
  *
  * POST /functions/v1/telegram-ping
- * Body opcional: { token: string, chat_id: string }
+ * Body: ignorado (token lido do banco servidor-lado)
  *
  * Retorna:
  *   { ok, bot_info, chat_id, message_id, latency_ms } em caso de sucesso
@@ -75,35 +76,23 @@ Deno.serve(async (req: Request) => {
   const serviceKey  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
   try {
-    let token: string | null   = null;
-    let chatId: string | null  = null;
+    // Lê token e chat_id exclusivamente do banco via service_role.
+    // O token nunca deve trafegar no body da requisição do cliente.
+    const sb = createClient(supabaseUrl, serviceKey);
+    const { data: settings } = await sb
+      .from('user_settings')
+      .select('telegram_bot_token, telegram_chat_id')
+      .eq('user_id', '00000000-0000-0000-0000-000000000000')
+      .maybeSingle();
 
-    // Tenta ler do body primeiro
-    if (req.method === 'POST') {
-      const body = await req.json().catch(() => ({})) as { token?: string; chat_id?: string };
-      token  = body.token  ?? null;
-      chatId = body.chat_id ?? null;
-    }
-
-    // Fallback: lê de user_settings
-    if (!token || !chatId) {
-      const sb = createClient(supabaseUrl, serviceKey);
-      const { data: settings } = await sb
-        .from('user_settings')
-        .select('telegram_bot_token, telegram_chat_id')
-        .order('created_at', { ascending: true })
-        .limit(1)
-        .maybeSingle();
-
-      token  = token  ?? settings?.telegram_bot_token ?? null;
-      chatId = chatId ?? settings?.telegram_chat_id   ?? null;
-    }
+    const token: string | null  = settings?.telegram_bot_token ?? null;
+    const chatId: string | null = settings?.telegram_chat_id   ?? null;
 
     if (!token || !chatId) {
       return new Response(
         JSON.stringify({
           ok:    false,
-          error: 'Bot Token e Chat ID são obrigatórios. Informe no body ou configure em Configurações.',
+          error: 'Bot Token e Chat ID não configurados. Vá em Configurações → Telegram e salve o token e chat_id antes de testar.',
         }),
         { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } },
       );
