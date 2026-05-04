@@ -168,7 +168,7 @@ export function DerivativesOverview() {
   const directionLabel = f.risk_direction === 'long_flush' ? '⬇️ Long Flush' : '⬆️ Short Squeeze';
 
   return (
-    <div style={{ maxWidth: 1400, margin: '0 auto' }}>
+    <div style={{ maxWidth: 1400, margin: '0 auto' }} data-source="binance_futures" data-page="derivatives">
       {/* Header */}
       <div style={{ marginBottom: 20 }}>
         <h1 style={{ fontSize: 20, fontWeight: 800, color: '#e2e8f0', margin: 0, letterSpacing: '-0.02em' }}>
