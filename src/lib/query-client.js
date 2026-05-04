@@ -1,4 +1,20 @@
 import { QueryClient } from '@tanstack/react-query';
+import { reportApiFailure, reportApiRecovery } from './apiHealthMonitor';
+
+// Mapa de queryKey[0] → nome da fonte no SOURCE_REGISTRY
+const QUERY_KEY_TO_SOURCE = {
+  btc:       'binance_futures',
+  market:    'coingecko',
+  sentiment: 'alternative_me',
+  gdelt:     'gdelt',
+  macro:     'fred',
+  onchain:   'coinmetrics',
+  mempool:   'mempool_basic',
+  options:   'deribit',
+  multi:     'multi_venue',
+  risk:      'risk_score',
+  supabase:  'supabase',
+};
 
 export const queryClientInstance = new QueryClient({
   defaultOptions: {
@@ -17,4 +33,21 @@ export const queryClientInstance = new QueryClient({
       retry: 1,
     },
   },
+});
+
+// ─── Monitoramento global de saúde das queries ────────────────────────────────
+// Detecta erros/recuperações de qualquer useQuery e repassa ao health monitor.
+// O monitor loga no Supabase system_logs quando ≥3 APIs falham simultaneamente.
+
+queryClientInstance.getQueryCache().subscribe((event) => {
+  if (event.type !== 'updated') return;
+  const { state, queryKey } = event.query;
+  const keyPrefix = String(queryKey[0] ?? '');
+  const source = QUERY_KEY_TO_SOURCE[keyPrefix] ?? keyPrefix;
+
+  if (state.status === 'error') {
+    reportApiFailure(source);
+  } else if (state.status === 'success') {
+    reportApiRecovery(source);
+  }
 });

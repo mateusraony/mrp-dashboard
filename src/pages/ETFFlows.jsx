@@ -80,7 +80,7 @@ export function ETFContent() {
   const totalNet = fundsWithLiveAum.reduce((s, f) => s + f.flow_today_m, 0);
 
   return (
-    <div style={{ maxWidth: 1400, margin: '0 auto' }}>
+    <div style={{ maxWidth: 1400, margin: '0 auto' }} data-source="coingecko,binance_futures" data-page="etf-flows">
       {/* Header */}
       <div style={{ marginBottom: 24 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
