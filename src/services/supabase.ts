@@ -311,7 +311,7 @@ export async function fetchUserSettings(): Promise<UserSettings> {
   // Se não existe ainda nenhuma linha para este user_id, retorna defaults
   if (!result.data) {
     console.info('[Supabase] fetchUserSettings: nenhuma configuração encontrada para user_id sentinel — usando defaults. O upsert criará a linha no primeiro save.');
-    return UserSettingsSchema.parse({});
+    return UserSettingsSchema.parse(defaultSettings ?? {});
   }
 
   console.info('[Supabase] fetchUserSettings: configurações carregadas com sucesso.');

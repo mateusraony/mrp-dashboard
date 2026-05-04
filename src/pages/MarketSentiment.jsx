@@ -7,6 +7,7 @@ import {
 import { useMarketSentiment } from '../hooks/useMarketSentiment';
 import { IS_LIVE } from '../lib/env';
 import { ModeBadge } from '../components/ui/DataBadge';
+import { DataTrustBadge } from '../components/ui/DataTrustBadge';
 
 // ─── Static data (social APIs requerem plano pago) ────────────────────────────
 const wordCloudData = [
@@ -185,6 +186,7 @@ export default function MarketSentiment() {
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4 }}>
             <h1 style={{ fontSize: 20, fontWeight: 900, color: '#f1f5f9', margin: 0, letterSpacing: '-0.03em' }}>🧠 Sentimento Social</h1>
             <ModeBadge mode={IS_LIVE ? 'live' : 'mock'} />
+            {!IS_LIVE && <DataTrustBadge mode="mock" confidence="D" source="Demo" reason="Dados sociais simulados — Twitter/Reddit sem API real" />}
             <span style={{ fontSize: 9, padding: '2px 8px', borderRadius: 4, background: 'rgba(167,139,250,0.1)', color: '#a78bfa', border: '1px solid rgba(167,139,250,0.25)', fontWeight: 700 }}>AI-Powered</span>
           </div>
           <p style={{ fontSize: 11, color: '#475569', margin: 0 }}>Twitter/X · Reddit · Telegram · Notícias Cripto · Word Cloud · Correlação BTC</p>
