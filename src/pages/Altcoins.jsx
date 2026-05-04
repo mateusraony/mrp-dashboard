@@ -4,6 +4,7 @@ import { useDominance } from '../hooks/useBtcData';
 import { SECTOR_MAP } from '../services/altcoins';
 import { IS_LIVE } from '../lib/env';
 import { ModeBadge } from '../components/ui/DataBadge';
+import { DataTrustBadge } from '../components/ui/DataTrustBadge';
 import {
   BarChart, Bar, XAxis, YAxis,
   Tooltip, ResponsiveContainer, ReferenceLine, Cell,
@@ -145,6 +146,7 @@ export default function Altcoins() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4, flexWrap: 'wrap' }}>
           <h1 style={{ fontSize: 20, fontWeight: 900, color: '#f1f5f9', margin: 0, letterSpacing: '-0.03em' }}>Altcoins & Rotação</h1>
           <ModeBadge mode={IS_LIVE ? 'live' : 'mock'} />
+          {!IS_LIVE && <DataTrustBadge mode="mock" confidence="D" source="Demo" reason="Alt Season Index simulado — dados estáticos de exemplo" />}
         </div>
         <p style={{ fontSize: 11, color: '#475569', margin: 0 }}>
           Alt Season Index · BTC/ETH Dominância · Top Alts vs BTC · Rotação Setorial

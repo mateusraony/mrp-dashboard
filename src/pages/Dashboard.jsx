@@ -394,7 +394,10 @@ function AITrackRecord({ predictions = [] }) {
         <span style={{ width: 28, height: 28, borderRadius: 7, background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>🤖</span>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>AI — Track Record</div>
-          <div style={{ fontSize: 10, color: '#334155' }}>Histórico de previsões vs resultado real</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+            <span style={{ fontSize: 10, color: '#334155' }}>Histórico de previsões vs resultado real</span>
+            <DataTrustBadge mode="mock" confidence="D" source="Demo" reason="Histórico simulado — predições de exemplo para demonstração" />
+          </div>
         </div>
         <div style={{ textAlign: 'right' }}>
           <div style={{ fontSize: 22, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: '#10b981', lineHeight: 1 }}>{acc}{acc !== '—' ? '%' : ''}</div>

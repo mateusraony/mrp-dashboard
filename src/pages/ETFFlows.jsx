@@ -111,7 +111,9 @@ export function ETFContent() {
           }
           sub={livePrice
             ? `estimado · BTC $${Math.round(livePrice / 1000)}k live`
-            : `+${((d.total_aum_b - d.total_aum_prev_30d_b) / d.total_aum_prev_30d_b * 100).toFixed(1)}% em 30d`
+            : d.total_aum_prev_30d_b > 0
+              ? `+${((d.total_aum_b - d.total_aum_prev_30d_b) / d.total_aum_prev_30d_b * 100).toFixed(1)}% em 30d`
+              : 'N/A'
           }
           color={livePrice ? '#10b981' : '#60a5fa'}
         />
@@ -144,6 +146,7 @@ export function ETFContent() {
           value={(() => {
             const ibit = fundsWithLiveAum.find(f => f.ticker === 'IBIT');
             const total = fundsWithLiveAum.reduce((s, f) => s + f.aum_b, 0);
+            if (!ibit || total === 0) return '—';
             return `${(ibit.aum_b / total * 100).toFixed(1)}%`;
           })()}
           sub="BlackRock (maior)"
@@ -261,12 +264,12 @@ export function ETFContent() {
                       <div style={{ width: 60, height: 5, borderRadius: 3, background: '#1a2535', overflow: 'hidden' }}>
                         <div style={{
                           height: '100%', borderRadius: 3,
-                          width: `${(fund.aum_b / d.total_aum_b * 100).toFixed(1)}%`,
+                          width: `${(fund.aum_b / (d.total_aum_b || 1) * 100).toFixed(1)}%`,
                           background: fund.color,
                         }} />
                       </div>
                       <span style={{ fontSize: 11, fontFamily: 'JetBrains Mono, monospace', color: '#94a3b8', minWidth: 38, textAlign: 'right' }}>
-                        {(fund.aum_b / d.total_aum_b * 100).toFixed(1)}%
+                        {(fund.aum_b / (d.total_aum_b || 1) * 100).toFixed(1)}%
                       </span>
                     </div>
                   </td>

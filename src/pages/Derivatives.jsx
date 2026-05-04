@@ -136,7 +136,9 @@ export function DerivativesOverview() {
 
   // ── Long/Short Ratio — live via Binance globalLongShortAccountRatio ──────────
   const { data: lsData } = useLongShortRatio();
-  const liveLsRatio = lsData ? parseFloat((lsData.longAccount / lsData.shortAccount).toFixed(4)) : null;
+  const liveLsRatio = (lsData && lsData.shortAccount > 0)
+    ? parseFloat((lsData.longAccount / lsData.shortAccount).toFixed(4))
+    : null;
 
   // ── OI / Market Cap Ratio — computed from live OI + CoinGecko dominance ─────
   const { data: dominance } = useDominance();
@@ -583,7 +585,7 @@ function MultiVenuePanel() {
               </div>
               <div style={{ marginBottom: 8 }}>
                 <div style={{ fontSize: 9, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>Funding Rate</div>
-                <div style={{ fontSize: 15, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', color: v.funding > 0 ? '#ef4444' : v.funding < 0 ? '#10b981' : '#94a3b8' }}>
+                <div style={{ fontSize: 15, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', color: v.funding == null ? '#94a3b8' : v.funding > 0 ? '#ef4444' : v.funding < 0 ? '#10b981' : '#94a3b8' }}>
                   {v.funding !== null ? `${(v.funding * 100).toFixed(4)}%` : <span style={{ color: '#334155' }}>—</span>}
                 </div>
               </div>

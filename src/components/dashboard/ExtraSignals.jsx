@@ -3,6 +3,7 @@
 import { HelpIcon } from '../ui/Tooltip';
 import MiniTimeChart from './MiniTimeChart';
 import CorrelationChart from './CorrelationChart';
+import { DataTrustBadge } from '../ui/DataTrustBadge';
 import {
   btcDominance, btcDominanceHistory,
   liquidations24h,
@@ -221,11 +222,16 @@ function CreditSpreadCard() {
 // ── MAIN EXPORT ───────────────────────────────────────────────────────────────
 export default function ExtraSignals() {
   return (
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-      gap: 12,
-    }}>
+    <div>
+      <div style={{ marginBottom: 8, padding: '5px 10px', background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: '#92400e' }}>
+        <DataTrustBadge mode="mock" confidence="D" source="Demo" reason="Todos os sinais abaixo são dados simulados" />
+        <span>BTC Dominância · Liquidações · Stablecoins · Yield Curve · Correlação</span>
+      </div>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+        gap: 12,
+      }}>
       <BtcDominanceCard />
       <LiquidationsCard />
       <StablecoinCard />
@@ -233,6 +239,7 @@ export default function ExtraSignals() {
       {/* Correlation chart ocupa 2 colunas no desktop */}
       <CorrelationChart />
       <CreditSpreadCard />
+    </div>
     </div>
   );
 }

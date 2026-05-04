@@ -14,6 +14,9 @@ const QUERY_KEY_TO_SOURCE = {
   multi:     'multi_venue',
   risk:      'risk_score',
   supabase:  'supabase',
+  altcoins:  'coingecko',
+  bcb:       'bcb',
+  venue:     'multi_venue',
 };
 
 export const queryClientInstance = new QueryClient({
