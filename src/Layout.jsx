@@ -22,6 +22,7 @@ import {
 import { btcFutures } from '@/components/data/mockData';
 import DebugPanel from '@/components/ui/DebugPanel';
 import { DATA_MODE } from '@/lib/env';
+import { useBtcTicker } from '@/hooks/useBtcData';
 
 // ─── NAVEGAÇÃO ─────────────────────────────────────────────────────────────────
 const NAV_GROUPS = [
@@ -87,9 +88,6 @@ const BOTTOM_TABS = [
   { label: 'Mais',      icon: MoreHorizontal,   page: null }, // opens drawer
 ];
 
-// ─── BTC TICKER (mock data até DATA_MODE=live) ────────────────────────────────
-const btcPrice = btcFutures.mark_price;
-const btcDelta = btcFutures.oi_delta_pct;
 
 // ─── LIVE CLOCK ───────────────────────────────────────────────────────────────
 function LiveClock() {
@@ -274,6 +272,10 @@ export default function Layout({ children, currentPageName }) {
 
   const closeDrawer = useCallback(() => setDrawerOpen(false), []);
 
+  const { data: ticker } = useBtcTicker();
+  const btcPrice    = ticker?.mark_price    ?? btcFutures.mark_price;
+  const btcDelta    = ticker?.oi_delta_pct  ?? btcFutures.oi_delta_pct;
+  const btcIsLive   = ticker != null;
   const deltaPositive = btcDelta >= 0;
 
   return (
@@ -488,14 +490,14 @@ export default function Layout({ children, currentPageName }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
             <div
               className="live-dot"
-              style={{ width: 6, height: 6, borderRadius: '50%', background: '#f59e0b', color: '#f59e0b' }}
+              style={{ width: 6, height: 6, borderRadius: '50%', background: btcIsLive ? '#10b981' : '#f59e0b' }}
             />
             <span style={{
-              fontSize: 9, color: '#92400e',
+              fontSize: 9, color: btcIsLive ? '#059669' : '#92400e',
               fontFamily: 'JetBrains Mono, monospace', fontWeight: 700,
               letterSpacing: '0.08em',
             }}>
-              MOCK
+              {btcIsLive ? 'LIVE' : 'MOCK'}
             </span>
           </div>
         </header>
