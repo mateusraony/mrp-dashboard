@@ -7,6 +7,9 @@ import { globalRisk, fearGreed, btcFutures } from '../components/data/mockData';
 import { marketRegime } from '../components/data/mockDataRegime';
 import { ModeBadge } from '../components/ui/DataBadge';
 import { sendNotificationEmail } from '@/lib/notificationClient';
+import { useBtcTicker, useFearGreed } from '@/hooks/useBtcData';
+import { useRiskScore } from '@/hooks/useRiskScore';
+import { useMarketRegime } from '@/hooks/useMarketRegime';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const PRIORITY_STYLE = {
@@ -240,6 +243,16 @@ export function BotsContent() {
   const [showAddBot, setShowAddBot] = useState(false);
   const [toastMsg, setToastMsg] = useState(null);
 
+  const { data: ticker }     = useBtcTicker();
+  const { data: fng }        = useFearGreed(1);
+  const { data: riskScore }  = useRiskScore();
+  const { data: regimeData } = useMarketRegime();
+
+  const liveRegime  = regimeData?.label  ?? globalRisk.regime;
+  const liveScore   = riskScore?.score   ?? globalRisk.score;
+  const liveFunding = ticker?.last_funding_rate ?? btcFutures.funding_rate;
+  const liveFng     = fng?.value         ?? fearGreed.value;
+
   const showToast = (msg, color = '#10b981') => {
     setToastMsg({ msg, color });
     setTimeout(() => setToastMsg(null), 3500);
@@ -255,7 +268,7 @@ export function BotsContent() {
       await sendNotificationEmail({
         to: 'test@cryptowatch.io',
         subject: `[TESTE] CryptoWatch — ${bot.name}`,
-        body: `Teste de conexão para o canal: ${bot.name}\nTipo: ${bot.type}\n\nRegime: ${globalRisk.regime} | Score: ${globalRisk.score}/100\nFunding: ${(btcFutures.funding_rate * 100).toFixed(4)}% | F&G: ${fearGreed.value}\n\n— CryptoWatch Bot`,
+        body: `Teste de conexão para o canal: ${bot.name}\nTipo: ${bot.type}\n\nRegime: ${liveRegime} | Score: ${liveScore}/100\nFunding: ${(liveFunding * 100).toFixed(4)}% | F&G: ${liveFng}\n\n— CryptoWatch Bot`,
       });
       showToast(`✅ Teste enviado para ${bot.name}!`, '#10b981');
     } catch (e) {
@@ -267,10 +280,10 @@ export function BotsContent() {
     showToast(`Disparando: ${rule.name}...`, '#f59e0b');
     try {
       const msg = rule.message_template
-        .replace('{{regime}}', marketRegime.regime)
-        .replace('{{score}}', globalRisk.score)
-        .replace('{{rate}}', (btcFutures.funding_rate * 100).toFixed(4))
-        .replace('{{ann}}', (btcFutures.funding_rate * 3 * 365 * 100).toFixed(1))
+        .replace('{{regime}}', liveRegime)
+        .replace('{{score}}', String(liveScore))
+        .replace('{{rate}}', (liveFunding * 100).toFixed(4))
+        .replace('{{ann}}', (liveFunding * 3 * 365 * 100).toFixed(1))
         .replace('{{signal}}', 'bullish');
       await sendNotificationEmail({
         to: 'alerts@cryptowatch.io',
@@ -308,7 +321,7 @@ export function BotsContent() {
             <h1 style={{ fontSize: 20, fontWeight: 900, color: '#f1f5f9', margin: 0, letterSpacing: '-0.03em' }}>
               🤖 Automações & Bots
             </h1>
-            <ModeBadge mode="mock" />
+            <ModeBadge mode={ticker ? 'live' : 'mock'} />
           </div>
           <p style={{ fontSize: 11, color: '#475569', margin: 0 }}>Telegram · Discord · Webhooks · Regras baseadas em AI</p>
         </div>
