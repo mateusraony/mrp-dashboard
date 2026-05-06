@@ -20,6 +20,8 @@ import { ModeBadge } from '../components/ui/DataBadge';
 import { sendNotificationEmail } from '@/lib/notificationClient';
 import { useBtcTicker, useFearGreed } from '@/hooks/useBtcData';
 import { useRiskScore } from '@/hooks/useRiskScore';
+import { useMarketRegime } from '@/hooks/useMarketRegime';
+import { useOnChainCycle } from '@/hooks/useCoinMetrics';
 import { IS_LIVE } from '@/lib/env';
 import { computeRuleBasedAnalysis } from '@/utils/ruleBasedAnalysis';
 
@@ -210,9 +212,15 @@ function GlobalOverview({ period, liveTicker, liveFng, liveRisk }) {
 }
 
 // ─── REGIME SECTION ───────────────────────────────────────────────────────────
-function RegimeSection({ period }) {
-  const r = marketRegime;
-  const regColor = r.regime === 'Risk-On' ? '#10b981' : r.regime === 'Risk-Off' ? '#ef4444' : '#f59e0b';
+function RegimeSection({ period, liveRegime }) {
+  const r = {
+    regime:     liveRegime?.label?.toUpperCase().replace('-', '-') ?? marketRegime.regime,
+    score:      liveRegime?.score ?? marketRegime.score,
+    confidence: marketRegime.confidence,  // sem equivalente live
+    suggestion: marketRegime.suggestion,  // sem equivalente live
+    components: marketRegime.components,
+  };
+  const regColor = (r.regime === 'RISK-ON' || r.regime === 'Risk-On') ? '#10b981' : (r.regime === 'RISK-OFF' || r.regime === 'Risk-Off') ? '#ef4444' : '#f59e0b';
 
   const radarData = r.components.map(c => ({ subject: c.label.split(' ')[0], value: Math.round(c.score), fullMark: 100 }));
 
@@ -514,10 +522,23 @@ function DerivativesSection({ period, liveTicker }) {
 }
 
 // ─── ON-CHAIN SECTION ─────────────────────────────────────────────────────────
-function OnChainSection({ period }) {
-  const nupl = btcNUPL;
-  const sopr = btcSOPR;
-  const mvrv = btcRealizedMetrics;
+function OnChainSection({ period, liveOnChain }) {
+  const nupl = {
+    value:      liveOnChain?.nupl            ?? btcNUPL.value,
+    zone:       liveOnChain?.nupl_zone       ?? btcNUPL.zone,
+    zone_color: liveOnChain?.nupl_zone_color ?? btcNUPL.zone_color,
+    history:    btcNUPL.history,   // mantém histórico mock (formato diferente)
+    delta_7d:   btcNUPL.delta_7d,  // sem equivalente live
+    delta_30d:  btcNUPL.delta_30d, // sem equivalente live
+  };
+  const sopr = btcSOPR; // sem API gratuita — permanece mock
+  const mvrv = {
+    mvrv_ratio:      liveOnChain?.mvrv_current    ?? btcRealizedMetrics.mvrv_ratio,
+    mvrv_zone:       liveOnChain?.mvrv_zone        ?? btcRealizedMetrics.mvrv_zone,
+    mvrv_zone_color: liveOnChain?.mvrv_zone_color  ?? btcRealizedMetrics.mvrv_zone_color,
+    mvrv_zscore:     liveOnChain?.mvrv_zscore      ?? btcRealizedMetrics.mvrv_zscore,
+    realized_price:  liveOnChain?.realized_price   ?? btcRealizedMetrics.realized_price,
+  };
   const netflow = btcExchangeNetflow;
   const whale = btcWhaleActivity;
 
@@ -693,7 +714,7 @@ const ALL_MODULES = [
 ];
 
 // ─── EMAIL SCHEDULER ──────────────────────────────────────────────────────────
-function EmailScheduler({ onClose, liveTicker, liveFng, liveRisk }) {
+function EmailScheduler({ onClose, liveTicker, liveFng, liveRisk, liveRegime, liveOnChain }) {
   const [email, setEmail] = useState('');
   const [time, setTime] = useState('08:00');
   const [freq, setFreq] = useState('daily');
@@ -710,6 +731,14 @@ function EmailScheduler({ onClose, liveTicker, liveFng, liveRisk }) {
   const fngLabel = liveFng?.label ?? fearGreed.classification;
   const riskScore = liveRisk?.score ?? globalRisk.score;
   const riskRegime = liveRisk?.regime ?? globalRisk.regime;
+  // regime live-with-fallback para o email
+  const emailRegimeScore = liveRegime?.score ?? marketRegime.score;
+  const emailRegimeLabel = liveRegime?.label?.toUpperCase().replace('-', '-') ?? marketRegime.regime;
+  // on-chain live-with-fallback para o email
+  const emailNuplValue = liveOnChain?.nupl ?? btcNUPL.value;
+  const emailNuplZone  = liveOnChain?.nupl_zone ?? btcNUPL.zone;
+  const emailMvrvRatio = liveOnChain?.mvrv_current ?? btcRealizedMetrics.mvrv_ratio;
+  const emailMvrvZone  = liveOnChain?.mvrv_zone ?? btcRealizedMetrics.mvrv_zone;
 
   const handleSend = async () => {
     if (!email) return;
@@ -730,8 +759,8 @@ BTC: $${fmt(btcPrice, 0)} | 1D: ${sign(f.ret_1d * 100)}${fmt(f.ret_1d * 100, 2)}
 
 ══════════════════════════════════════════
 🎯 REGIME DE MERCADO
-Score: ${marketRegime.score}/100 · Confiança: ${marketRegime.confidence}%
-Regime: ${marketRegime.regime}
+Score: ${emailRegimeScore}/100 · Confiança: ${marketRegime.confidence}%
+Regime: ${emailRegimeLabel}
 Estratégia: ${marketRegime.suggestion?.title || '—'}
 
 ══════════════════════════════════════════
@@ -750,9 +779,9 @@ Longs em risco (−10%): $${(liquidationClusters.total_longs_at_risk_10pct / 1e9
 
 ══════════════════════════════════════════
 ⛓ ON-CHAIN
-NUPL: ${btcNUPL.value.toFixed(3)} (${btcNUPL.zone})
+NUPL: ${emailNuplValue.toFixed(3)} (${emailNuplZone})
 SOPR: ${btcSOPR.value.toFixed(3)}
-MVRV: ${btcRealizedMetrics.mvrv_ratio.toFixed(2)} (${btcRealizedMetrics.mvrv_zone})
+MVRV: ${emailMvrvRatio.toFixed(2)} (${emailMvrvZone})
 Exchange Netflow 24h: ${btcExchangeNetflow.netflow_24h > 0 ? '+' : ''}${btcExchangeNetflow.netflow_24h.toLocaleString()} BTC
 
 ══════════════════════════════════════════
@@ -927,6 +956,8 @@ export default function ExecutiveReport() {
   const { data: liveTicker } = useBtcTicker();
   const { data: liveFng } = useFearGreed(1);
   const { data: liveRisk } = useRiskScore();
+  const { data: liveRegime } = useMarketRegime();
+  const { data: liveOnChain } = useOnChainCycle();
 
   const liveAnalysis = useMemo(() => {
     if (!IS_LIVE || (!liveTicker && !liveFng)) return null;
@@ -981,7 +1012,7 @@ export default function ExecutiveReport() {
       {showEmail && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 14, width: '100%', maxWidth: 440, boxShadow: '0 20px 60px rgba(0,0,0,0.6)' }}>
-            <EmailScheduler onClose={() => setShowEmail(false)} liveTicker={liveTicker} liveFng={liveFng} liveRisk={liveRisk} />
+            <EmailScheduler onClose={() => setShowEmail(false)} liveTicker={liveTicker} liveFng={liveFng} liveRisk={liveRisk} liveRegime={liveRegime} liveOnChain={liveOnChain} />
           </div>
         </div>
       )}
@@ -1001,10 +1032,10 @@ export default function ExecutiveReport() {
       {/* Sections */}
       <div id="exec-report-content" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <GlobalOverview period={period} liveTicker={liveTicker} liveFng={liveFng} liveRisk={liveRisk} />
-        <RegimeSection period={period} />
+        <RegimeSection period={period} liveRegime={liveRegime} />
         <StablecoinSection period={period} />
         <DerivativesSection period={period} liveTicker={liveTicker} />
-        <OnChainSection period={period} />
+        <OnChainSection period={period} liveOnChain={liveOnChain} />
         <ETFMacroSection period={period} />
         <PeriodSummaryTable />
       </div>
