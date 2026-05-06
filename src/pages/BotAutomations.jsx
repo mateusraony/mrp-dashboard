@@ -4,7 +4,6 @@ import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { automationRules, botConnections, recentBotMessages } from '../components/data/mockDataActionDashboard';
 import { globalRisk, fearGreed, btcFutures } from '../components/data/mockData';
-import { marketRegime } from '../components/data/mockDataRegime';
 import { ModeBadge } from '../components/ui/DataBadge';
 import { sendNotificationEmail } from '@/lib/notificationClient';
 import { useBtcTicker, useFearGreed } from '@/hooks/useBtcData';
