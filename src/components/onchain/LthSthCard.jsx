@@ -19,7 +19,8 @@ export default function LthSthCard() {
   // Percentuais e supply: live quando CoinMetrics retorna dados (HODL wave 1yr+ proxy)
   // Outros campos (realized_price, profit, delta_30d) requerem Glassnode (pago) — mantém mock
   const TOTAL_SUPPLY = 19_850_000;
-  const lthPct    = extended?.hodl_wave_1yr_pct ?? d.lth_pct;
+  // hodl_wave_1yr_pct é fração (0–1) → converter para percentual (0–100)
+  const lthPct    = extended ? extended.hodl_wave_1yr_pct * 100 : d.lth_pct;
   const sthPct    = extended ? (100 - lthPct) : d.sth_pct;
   const lthSupply = extended ? Math.round(TOTAL_SUPPLY * lthPct / 100) : d.lth_supply;
   const sthSupply = extended ? TOTAL_SUPPLY - lthSupply : d.sth_supply;
@@ -63,7 +64,7 @@ export default function LthSthCard() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
         <div style={{ fontSize: 10, color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', display: 'flex', alignItems: 'center', gap: 6 }}>
           LTH / STH Supply
-          <ModeBadge mode={isLive ? 'estimated' : 'mock'} />
+          <ModeBadge mode={isLive ? 'live' : 'mock'} />
           <HelpIcon
             title="LTH vs STH Supply"
             content="LTH (Long-Term Holders) = moedas que não se moveram por >155 dias — holders convictos. STH (Short-Term Holders) = moedas movidas recentemente — especuladores. Quando LTH aumenta = acumulação de longo prazo (bullish). STH em prejuízo = capitulação potencial."

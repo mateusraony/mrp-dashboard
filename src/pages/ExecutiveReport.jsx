@@ -218,7 +218,7 @@ function RegimeSection({ period, liveRegime }) {
     score:      liveRegime?.score ?? marketRegime.score,
     confidence: marketRegime.confidence,  // sem equivalente live
     suggestion: marketRegime.suggestion,  // sem equivalente live
-    components: marketRegime.components,
+    components: liveRegime?.components ?? marketRegime.components,
   };
   const regColor = (r.regime === 'RISK-ON' || r.regime === 'Risk-On') ? '#10b981' : (r.regime === 'RISK-OFF' || r.regime === 'Risk-Off') ? '#ef4444' : '#f59e0b';
 
@@ -854,7 +854,7 @@ CryptoWatch Intelligence Suite
 }
 
 // ─── PDF EXPORT ───────────────────────────────────────────────────────────────
-function exportPDF({ liveRegime, liveOnChain } = {}) {
+function exportPDF({ liveRegime = null, liveOnChain = null } = {}) {
   const f = btcFutures;
   // live-with-fallback para variáveis usadas no template HTML
   const pdfRegimeScore = liveRegime?.score ?? marketRegime.score;
