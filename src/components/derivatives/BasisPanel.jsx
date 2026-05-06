@@ -2,6 +2,9 @@
 // Spot-Futures basis annualized, carry trade signal, CME premium
 import { futuresBasis, fundingByExchange } from '../../components/data/mockDataExtended';
 import { ModeBadge, GradeBadge } from '../ui/DataBadge';
+import { useBtcTicker } from '@/hooks/useBtcData';
+import { useBybitTicker, useOkxTicker } from '@/hooks/useMultiVenue';
+import { IS_LIVE } from '@/lib/env';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, Cell,
@@ -13,6 +16,23 @@ export default function BasisPanel() {
   const d = futuresBasis;
   const us10y = 4.512; // reference from macro board
 
+  // Dados live de funding rate por exchange
+  const { data: ticker } = useBtcTicker();
+  const { data: bybit }  = useBybitTicker();
+  const { data: okx }    = useOkxTicker();
+
+  // Binance/Bybit/OKX: live quando disponível; Deribit/Bitget/Gate.io: mock
+  const fundingChart = [
+    { exchange: 'Binance', rate: ticker?.last_funding_rate ?? fundingByExchange[0].rate, color: '#f59e0b' },
+    { exchange: 'Bybit',   rate: bybit?.funding_rate       ?? fundingByExchange[1].rate, color: '#10b981' },
+    { exchange: 'OKX',     rate: okx?.funding_rate         ?? fundingByExchange[2].rate, color: '#3b82f6' },
+    ...fundingByExchange.slice(3), // Deribit, Bitget, Gate.io — sem hook gratuito
+  ];
+  const isLive = IS_LIVE && (ticker != null || bybit != null || okx != null);
+
+  // Spot: usar mark_price live quando disponível
+  const spotPrice = ticker?.mark_price ?? d.spot;
+
   return (
     <div style={{
       background: 'linear-gradient(135deg, #131e2e 0%, #111827 100%)',
@@ -23,11 +43,11 @@ export default function BasisPanel() {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: '#e2e8f0' }}>Futures Basis & Carry</div>
-            <ModeBadge mode="mock" />
+            <ModeBadge mode={isLive ? 'live' : 'mock'} />
             <GradeBadge grade={d.quality} />
           </div>
           <div style={{ fontSize: 11, color: '#475569' }}>
-            Prêmio dos futuros datados vs spot · Spot: <span style={{ fontFamily: 'JetBrains Mono, monospace', color: '#60a5fa' }}>${d.spot.toLocaleString()}</span>
+            Prêmio dos futuros datados vs spot · Spot: <span style={{ fontFamily: 'JetBrains Mono, monospace', color: '#60a5fa' }}>${spotPrice.toLocaleString()}</span>
           </div>
         </div>
         {d.carry_trade_attractive && (
@@ -97,7 +117,7 @@ export default function BasisPanel() {
         </div>
         <ResponsiveContainer width="100%" height={120}>
           <BarChart
-            data={fundingByExchange}
+            data={fundingChart}
             margin={{ top: 0, right: 0, left: -24, bottom: 0 }}
           >
             <CartesianGrid strokeDasharray="3 3" stroke="#1e2d45" vertical={false} />
@@ -109,7 +129,7 @@ export default function BasisPanel() {
             />
             <ReferenceLine y={0.0005} stroke="#f59e0b" strokeDasharray="3 3" label={{ value: 'Ref', fill: '#f59e0b', fontSize: 8, position: 'right' }} />
             <Bar dataKey="rate" radius={[3, 3, 0, 0]}>
-              {fundingByExchange.map((entry, index) => (
+              {fundingChart.map((entry, index) => (
                 <Cell key={index} fill={entry.color} fillOpacity={0.8} />
               ))}
             </Bar>

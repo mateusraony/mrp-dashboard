@@ -1,15 +1,15 @@
 # CHECKPOINT.md — MRP Dashboard
 > Memória técnica viva do projeto. Atualizar ao final de cada bloco importante.
-> Última atualização: 2026-05-03 (Auditoria Técnica completa · Fase 1 Segurança concluída — PRs #58 e #59)
+> Última atualização: 2026-05-05 (Live wiring contínuo — PRs #65–#68 · BTC header live · BotAutomations live · BasisPanel/LthSthCard/ExecutiveReport live)
 
 ---
 
-## 🗂 ESTADO GERAL (verificado em 2026-05-03)
+## 🗂 ESTADO GERAL (verificado em 2026-05-05)
 
 | Aspecto | Status | Evidência Real |
 |---------|--------|---------------|
 | Build (`npm run build`) | ✅ PASSA | 0 erros |
-| Testes (`npm test`) | ✅ 79/79 | 4 suites |
+| Testes (`npm test`) | ✅ 117/117 | 7 suites |
 | Deploy (Render) | ✅ ONLINE | https://mrp-dashboard.onrender.com |
 | FRED API Key | ✅ CONFIGURADA | VITE_FRED_API_KEY em .env.local |
 | Supabase URL + ANON_KEY | ✅ CONFIGURADO | .env.local presente |
@@ -37,6 +37,10 @@
 | **Supabase config.toml** | ✅ MERGEADO (PR #51) | site_url prod + redirect wildcard + sem openai_api_key inválido — Preview CI desbloqueado |
 | **Data Reliability Audit** | ✅ MERGEADO (PR #51) | ETFFlows/StablecoinFlow: ModeBadge→DataTrustBadge paid_required; BotAutomations: mantido mock (dado genuinamente mock) |
 | **Lint limpo** | ✅ | ModeBadge unused imports removidos de ETFFlows.jsx e StablecoinFlow.jsx |
+| **Auditoria + Bug fixes** | ✅ MERGEADO (PR #65) | 7 bugs críticos (div/0, null guards, Zod parse, health monitor map) + DataTrustBadge mock em 4 páginas |
+| **BTC header live** | ✅ MERGEADO (PR #66) | Layout.jsx usa useBtcTicker(); dot LIVE/MOCK dinâmico; refetch 5s em produção |
+| **BotAutomations live** | ✅ MERGEADO (PR #67) | Regime/score/funding/F&G reais em testBot e testFireRule; import morto removido |
+| **Medium live wiring** | ✅ PR #68 | BasisPanel (funding Binance/Bybit/OKX live); LthSthCard (HODL wave CoinMetrics); ExecutiveReport (NUPL/MVRV/Regime live + PDF exportado com dados reais) |
 
 ---
 

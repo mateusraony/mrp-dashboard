@@ -1,8 +1,11 @@
 // ─── LTH / STH SUPPLY CARD ────────────────────────────────────────────────────
 // Long-Term Holders vs Short-Term Holders supply distribution
+// LTH/STH split: live via CoinMetrics HODL wave (1yr+ proxy); outros campos: mock (Glassnode pago)
 import { lthSthSupply } from '../../components/data/mockDataExtended';
-import { GradeBadge } from '../ui/DataBadge';
+import { GradeBadge, ModeBadge } from '../ui/DataBadge';
 import { HelpIcon } from '../ui/Tooltip';
+import { useOnChainExtended } from '@/hooks/useCoinMetrics';
+import { IS_LIVE } from '@/lib/env';
 
 function fmtBTC(v) {
   if (v >= 1e6) return `${(v / 1e6).toFixed(2)}M`;
@@ -11,13 +14,25 @@ function fmtBTC(v) {
 
 export default function LthSthCard() {
   const d = lthSthSupply;
+  const { data: extended } = useOnChainExtended();
+
+  // Percentuais e supply: live quando CoinMetrics retorna dados (HODL wave 1yr+ proxy)
+  // Outros campos (realized_price, profit, delta_30d) requerem Glassnode (pago) — mantém mock
+  const TOTAL_SUPPLY = 19_850_000;
+  // hodl_wave_1yr_pct é fração (0–1) → converter para percentual (0–100)
+  const lthPct    = extended ? extended.hodl_wave_1yr_pct * 100 : d.lth_pct;
+  const sthPct    = extended ? (100 - lthPct) : d.sth_pct;
+  const lthSupply = extended ? Math.round(TOTAL_SUPPLY * lthPct / 100) : d.lth_supply;
+  const sthSupply = extended ? TOTAL_SUPPLY - lthSupply : d.sth_supply;
+  const quality   = extended?.quality ?? d.quality;
+  const isLive    = IS_LIVE && extended != null;
 
   const sections = [
     {
       label: 'LTH — Long-Term Holders',
       sublabel: 'Moedas paradas > 155 dias (diamantes)',
-      supply: d.lth_supply,
-      pct: d.lth_pct,
+      supply: lthSupply,
+      pct: lthPct,
       delta_30d: d.lth_delta_30d_pct,
       in_profit: d.lth_in_profit,
       in_loss: d.lth_in_loss,
@@ -28,8 +43,8 @@ export default function LthSthCard() {
     {
       label: 'STH — Short-Term Holders',
       sublabel: 'Moedas movidas < 155 dias (especuladores)',
-      supply: d.sth_supply,
-      pct: d.sth_pct,
+      supply: sthSupply,
+      pct: sthPct,
       delta_30d: d.sth_delta_30d_pct,
       in_profit: d.sth_in_profit,
       in_loss: d.sth_in_loss,
@@ -47,36 +62,37 @@ export default function LthSthCard() {
     }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-        <div style={{ fontSize: 10, color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', display: 'flex', alignItems: 'center', gap: 4 }}>
+        <div style={{ fontSize: 10, color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', display: 'flex', alignItems: 'center', gap: 6 }}>
           LTH / STH Supply
+          <ModeBadge mode={isLive ? 'live' : 'mock'} />
           <HelpIcon
             title="LTH vs STH Supply"
             content="LTH (Long-Term Holders) = moedas que não se moveram por >155 dias — holders convictos. STH (Short-Term Holders) = moedas movidas recentemente — especuladores. Quando LTH aumenta = acumulação de longo prazo (bullish). STH em prejuízo = capitulação potencial."
             width={300}
           />
         </div>
-        <GradeBadge grade={d.quality} />
+        <GradeBadge grade={quality} />
       </div>
 
       {/* Supply bar total */}
       <div style={{ marginBottom: 14 }}>
         <div style={{ fontSize: 10, color: '#334155', marginBottom: 6 }}>
-          Supply total: <span style={{ fontFamily: 'JetBrains Mono, monospace', color: '#94a3b8' }}>{fmtBTC(d.total_supply)} BTC</span>
+          Supply total: <span style={{ fontFamily: 'JetBrains Mono, monospace', color: '#94a3b8' }}>{fmtBTC(TOTAL_SUPPLY)} BTC</span>
         </div>
         <div style={{ height: 14, borderRadius: 7, overflow: 'hidden', display: 'flex' }}>
           <div style={{
-            width: `${d.lth_pct}%`, height: '100%',
+            width: `${lthPct}%`, height: '100%',
             background: 'linear-gradient(90deg, #059669, #10b981)',
             position: 'relative',
           }} />
           <div style={{
-            width: `${d.sth_pct}%`, height: '100%',
+            width: `${sthPct}%`, height: '100%',
             background: 'linear-gradient(90deg, #d97706, #f59e0b)',
           }} />
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, fontSize: 9, color: '#334155' }}>
-          <span style={{ color: '#10b981' }}>LTH {d.lth_pct.toFixed(1)}%</span>
-          <span style={{ color: '#f59e0b' }}>STH {d.sth_pct.toFixed(1)}%</span>
+          <span style={{ color: '#10b981' }}>LTH {lthPct.toFixed(1)}%</span>
+          <span style={{ color: '#f59e0b' }}>STH {sthPct.toFixed(1)}%</span>
         </div>
       </div>
 
