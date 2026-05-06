@@ -385,7 +385,7 @@ const AI_HISTORY = [
 function AITrackRecord({ predictions = [], isConfigured = false }) {
   // When Supabase is configured, show real data (or empty state if none yet).
   // Only fall back to AI_HISTORY demo data when Supabase is not set up.
-  const useDemo = !isConfigured;
+  const useDemo = !isConfigured || !IS_LIVE;
   const displayData = predictions.length > 0 ? predictions : (useDemo ? AI_HISTORY : []);
   const resolved = displayData.filter(h => h.outcome !== 'PENDING');
   const hits = resolved.filter(h => h.outcome === 'HIT').length;
