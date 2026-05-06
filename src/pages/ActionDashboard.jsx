@@ -146,7 +146,6 @@ function OpportunityCard({ op, onSelect, selected }) {
 // ─── PERFORMANCE PANEL ────────────────────────────────────────────────────────
 function PerformancePanel() {
   const st = performanceStats;
-  const regColor = globalRisk.regime === 'RISK-ON' ? '#10b981' : globalRisk.regime === 'RISK-OFF' ? '#ef4444' : '#f59e0b';
 
   return (
     <div>
