@@ -11,6 +11,7 @@ import { useMacroBoard } from '@/hooks/useFred';
 import { useMempoolState } from '@/hooks/useMempool';
 import { computeRuleBasedAnalysis } from '@/utils/ruleBasedAnalysis';
 import { useAiPredictions, usePersistPrediction } from '@/hooks/useAiPredictions';
+import { isSupabaseConfigured } from '@/services/supabase';
 
 // ─── DATA LAYER (live > mock fallback) ───────────────────────────────────────
 function useDashboardLiveData() {
@@ -381,8 +382,11 @@ const AI_HISTORY = [
   { date: '2026-02-20', signal: 'SQUEEZE RISK ELEVADO', direction: 'bearish_bias', outcome: 'HIT', outcome_desc: 'Flush de $81K → $74K em 12h, $312M liquidados', confidence: 0.78, prob: 0.69, pct_move: -8.6 },
 ];
 
-function AITrackRecord({ predictions = [] }) {
-  const displayData = predictions.length > 0 ? predictions : AI_HISTORY;
+function AITrackRecord({ predictions = [], isConfigured = false }) {
+  // When Supabase is configured, show real data (or empty state if none yet).
+  // Only fall back to AI_HISTORY demo data when Supabase is not set up.
+  const useDemo = !isConfigured;
+  const displayData = predictions.length > 0 ? predictions : (useDemo ? AI_HISTORY : []);
   const resolved = displayData.filter(h => h.outcome !== 'PENDING');
   const hits = resolved.filter(h => h.outcome === 'HIT').length;
   const acc = resolved.length > 0 ? ((hits / resolved.length) * 100).toFixed(0) : '—';
@@ -396,7 +400,10 @@ function AITrackRecord({ predictions = [] }) {
           <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>AI — Track Record</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
             <span style={{ fontSize: 10, color: '#334155' }}>Histórico de previsões vs resultado real</span>
-            <DataTrustBadge mode="mock" confidence="D" source="Demo" reason="Histórico simulado — predições de exemplo para demonstração" />
+            {useDemo
+              ? <DataTrustBadge mode="mock" confidence="D" source="Demo" reason="Histórico simulado — predições de exemplo para demonstração" />
+              : <DataTrustBadge mode={predictions.length > 0 ? 'live' : 'estimated'} confidence={predictions.length > 0 ? 'A' : 'B'} source="Supabase" reason={predictions.length > 0 ? 'Predições reais persistidas no banco de dados' : 'Banco configurado — primeiras predições sendo geradas'} />
+            }
           </div>
         </div>
         <div style={{ textAlign: 'right' }}>
@@ -404,6 +411,17 @@ function AITrackRecord({ predictions = [] }) {
           <div style={{ fontSize: 9, color: '#334155' }}>{hits}/{resolved.length} resolvidos</div>
         </div>
       </div>
+      {/* Empty state when Supabase is configured but no predictions yet */}
+      {!useDemo && displayData.length === 0 && (
+        <div style={{ padding: '28px 18px', textAlign: 'center' }}>
+          <div style={{ fontSize: 24, marginBottom: 8 }}>🤖</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 4 }}>Primeiras previsões sendo geradas...</div>
+          <div style={{ fontSize: 10, color: '#334155', lineHeight: 1.6 }}>
+            O sistema de IA começará a persistir predições automaticamente a cada hora.<br />
+            Retorne em breve para ver o histórico real.
+          </div>
+        </div>
+      )}
       {/* Rows */}
       {displayData.map((h, i) => {
         const isPending = h.outcome === 'PENDING';
@@ -592,7 +610,7 @@ export default function Dashboard() {
         <SectionTitle icon="🤖" label="AI Analysis & Previsões" sub="Análise automática baseada em todos os módulos · Com histórico de acertos" />
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px,1fr))', gap: 14 }}>
           <AIAnalysisPanel analysis={aiAnalysis} compact={true} />
-          <AITrackRecord predictions={predictions} />
+          <AITrackRecord predictions={predictions} isConfigured={isSupabaseConfigured()} />
         </div>
       </div>
 
