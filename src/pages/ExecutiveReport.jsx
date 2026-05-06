@@ -854,8 +854,15 @@ CryptoWatch Intelligence Suite
 }
 
 // ─── PDF EXPORT ───────────────────────────────────────────────────────────────
-function exportPDF() {
+function exportPDF({ liveRegime, liveOnChain } = {}) {
   const f = btcFutures;
+  // live-with-fallback para variáveis usadas no template HTML
+  const pdfRegimeScore = liveRegime?.score ?? marketRegime.score;
+  const pdfRegimeLabel = liveRegime?.label?.toUpperCase().replace('-', '-') ?? marketRegime.regime;
+  const pdfNuplValue   = liveOnChain?.nupl           ?? btcNUPL.value;
+  const pdfNuplZone    = liveOnChain?.nupl_zone       ?? btcNUPL.zone;
+  const pdfMvrvRatio   = liveOnChain?.mvrv_current    ?? btcRealizedMetrics.mvrv_ratio;
+  const pdfMvrvZone    = liveOnChain?.mvrv_zone       ?? btcRealizedMetrics.mvrv_zone;
   const printWindow = window.open('', '_blank');
   printWindow.document.write(`
     <html><head>
@@ -891,10 +898,10 @@ function exportPDF() {
 
       <h2>🎯 Regime de Mercado</h2>
       <div class="grid">
-        <div class="metric"><div class="label">Score</div><div class="value">${marketRegime.score}/100</div></div>
+        <div class="metric"><div class="label">Score</div><div class="value">${pdfRegimeScore}/100</div></div>
+        <div class="metric"><div class="label">Regime</div><div class="value">${pdfRegimeLabel}</div></div>
         <div class="metric"><div class="label">Confiança</div><div class="value">${marketRegime.confidence}%</div></div>
         <div class="metric"><div class="label">VIX</div><div class="value">${macroBoard.series.find(s => s.id === 'VIX')?.value.toFixed(1)}</div></div>
-        <div class="metric"><div class="label">S&P 500</div><div class="value">${fmt(macroBoard.series.find(s => s.id === 'SP500')?.value, 0)}</div></div>
       </div>
       <div class="ai">💡 ${marketRegime.suggestion?.rationale?.slice(0, 300) || 'Análise em processamento.'}...</div>
 
@@ -916,9 +923,9 @@ function exportPDF() {
 
       <h2>⛓ On-Chain</h2>
       <div class="grid">
-        <div class="metric"><div class="label">NUPL</div><div class="value">${btcNUPL.value.toFixed(3)}</div><div class="sub">${btcNUPL.zone}</div></div>
+        <div class="metric"><div class="label">NUPL</div><div class="value">${pdfNuplValue.toFixed(3)}</div><div class="sub">${pdfNuplZone}</div></div>
         <div class="metric"><div class="label">SOPR</div><div class="value">${btcSOPR.value.toFixed(3)}</div></div>
-        <div class="metric"><div class="label">MVRV</div><div class="value">${btcRealizedMetrics.mvrv_ratio.toFixed(2)}</div><div class="sub">${btcRealizedMetrics.mvrv_zone}</div></div>
+        <div class="metric"><div class="label">MVRV</div><div class="value">${pdfMvrvRatio.toFixed(2)}</div><div class="sub">${pdfMvrvZone}</div></div>
         <div class="metric"><div class="label">Netflow 24h</div><div class="value">${btcExchangeNetflow.netflow_24h > 0 ? '+' : ''}${(btcExchangeNetflow.netflow_24h / 1000).toFixed(1)}K BTC</div></div>
       </div>
 
@@ -1001,7 +1008,7 @@ export default function ExecutiveReport() {
             padding: '9px 14px', borderRadius: 8, cursor: 'pointer', fontSize: 11, fontWeight: 700,
             background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)', color: '#60a5fa',
           }}>📧 E-mail</button>
-          <button onClick={exportPDF} style={{
+          <button onClick={() => exportPDF({ liveRegime, liveOnChain })} style={{
             padding: '9px 14px', borderRadius: 8, cursor: 'pointer', fontSize: 11, fontWeight: 700,
             background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', color: '#10b981',
           }}>📄 PDF</button>
