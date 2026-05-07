@@ -65,11 +65,16 @@ function PnlBadge({ pct }) {
   );
 }
 
-function StatCard({ label, value, color = '#60a5fa', sub }) {
+function StatCard({ label, value, color = '#60a5fa', sub, mockBadge = false }) {
   return (
     <div style={{ background: '#0d1421', border: '1px solid #1a2535', borderRadius: 9, padding: '12px 14px' }}>
       <div style={{ fontSize: 8, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>{label}</div>
-      <div style={{ fontSize: 20, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color }}>{value}</div>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+        <div style={{ fontSize: 20, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color }}>{value}</div>
+        {mockBadge && !IS_LIVE && (
+          <span style={{ fontSize: 8, fontWeight: 800, padding: '1px 6px', borderRadius: 3, background: 'rgba(139,92,246,0.12)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.3)', letterSpacing: '0.06em', flexShrink: 0 }}>DEMO</span>
+        )}
+      </div>
       {sub && <div style={{ fontSize: 8, color: '#475569', marginTop: 2 }}>{sub}</div>}
     </div>
   );
@@ -151,7 +156,7 @@ function PerformancePanel() {
     <div>
       {/* Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 14 }}>
-        <StatCard label="Win Rate" value={`${st.win_rate.toFixed(0)}%`} color="#10b981" sub={`${performanceHistory.filter(h=>h.result==='WIN').length} de ${st.total_trades} trades`} />
+        <StatCard label="Win Rate" value={`${st.win_rate.toFixed(0)}%`} color="#10b981" sub={`${performanceHistory.filter(h=>h.result==='WIN').length} de ${st.total_trades} trades`} mockBadge />
         <StatCard label="PnL Médio" value={`${st.avg_pnl_pct > 0 ? '+' : ''}${st.avg_pnl_pct.toFixed(2)}%`} color={st.avg_pnl_pct > 0 ? '#10b981' : '#ef4444'} sub="Por trade" />
         <StatCard label="PnL Acumulado" value={`+${st.cumulative_pnl_pct.toFixed(1)}%`} color="#60a5fa" sub="Todas as operações" />
         <StatCard label="Max Drawdown" value={`${st.max_drawdown.toFixed(2)}%`} color="#ef4444" sub={`Sharpe: ${st.sharpe_ratio}`} />
@@ -385,7 +390,22 @@ export function ActionsContent() {
 
       {tab === 'Performance' && (
         <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '18px 20px' }}>
-          <div style={{ fontSize: 13, fontWeight: 800, color: '#e2e8f0', marginBottom: 14 }}>📈 Performance do Sistema AI</div>
+          <div style={{ fontSize: 13, fontWeight: 800, color: '#e2e8f0', marginBottom: 10 }}>📈 Performance do Sistema AI</div>
+          {/* Banner: dados simulados */}
+          {!IS_LIVE && (
+            <div style={{
+              marginBottom: 16, padding: '10px 14px', borderRadius: 8,
+              background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.3)',
+              borderLeft: '4px solid #8b5cf6',
+              display: 'flex', gap: 10, alignItems: 'center',
+            }}>
+              <span style={{ fontSize: 14, flexShrink: 0 }}>🧪</span>
+              <span style={{ fontSize: 11, color: '#a78bfa', fontWeight: 700 }}>Dados de demonstração</span>
+              <span style={{ fontSize: 11, color: '#6d28d9' }}>
+                — este histórico é simulado e não representa performance real do sistema.
+              </span>
+            </div>
+          )}
           <PerformancePanel />
         </div>
       )}

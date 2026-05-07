@@ -9,6 +9,7 @@ import { sendNotificationEmail } from '@/lib/notificationClient';
 import { useBtcTicker, useFearGreed } from '@/hooks/useBtcData';
 import { useRiskScore } from '@/hooks/useRiskScore';
 import { useMarketRegime } from '@/hooks/useMarketRegime';
+import { IS_LIVE } from '@/lib/env';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const PRIORITY_STYLE = {
@@ -37,10 +38,16 @@ function ChannelChip({ channel }) {
 function BotCard({ bot, onTest }) {
   const s = CHANNEL_STYLE[bot.type] || CHANNEL_STYLE.webhook;
   const connected = bot.status === 'connected';
+  // Quando IS_LIVE=false, bots "connected" no mock são exibidos como Demo (não realmente conectados)
+  const isDemo = !IS_LIVE && connected;
+  const dotColor   = isDemo ? '#f59e0b' : connected ? '#10b981' : '#475569';
+  const dotGlow    = isDemo ? '0 0 6px #f59e0b' : connected ? '0 0 6px #10b981' : 'none';
+  const statusLabel = isDemo ? 'Demo' : connected ? 'Conectado' : 'Desconectado';
+  const borderColor = isDemo ? 'rgba(245,158,11,0.2)' : connected ? 'rgba(16,185,129,0.2)' : '#1e2d45';
   const minsAgo = bot.last_ping ? Math.round((Date.now() - bot.last_ping) / 60000) : null;
 
   return (
-    <div style={{ background: '#111827', border: `1px solid ${connected ? 'rgba(16,185,129,0.2)' : '#1e2d45'}`, borderRadius: 10, padding: '14px 16px' }}>
+    <div style={{ background: '#111827', border: `1px solid ${borderColor}`, borderRadius: 10, padding: '14px 16px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
         <div style={{ width: 36, height: 36, borderRadius: 8, background: `${s.color}15`, border: `1px solid ${s.color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>{s.icon}</div>
         <div style={{ flex: 1 }}>
@@ -48,8 +55,8 @@ function BotCard({ bot, onTest }) {
           <div style={{ fontSize: 9, color: '#475569' }}>{s.label}</div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-          <div style={{ width: 7, height: 7, borderRadius: '50%', background: connected ? '#10b981' : '#475569', boxShadow: connected ? '0 0 6px #10b981' : 'none' }} />
-          <span style={{ fontSize: 9, color: connected ? '#10b981' : '#475569', fontWeight: 700 }}>{connected ? 'Conectado' : 'Desconectado'}</span>
+          <div style={{ width: 7, height: 7, borderRadius: '50%', background: dotColor, boxShadow: dotGlow }} />
+          <span style={{ fontSize: 9, color: dotColor, fontWeight: 700 }}>{statusLabel}</span>
         </div>
       </div>
 
@@ -312,6 +319,24 @@ export function BotsContent() {
       )}
 
       {showAddBot && <AddBotModal onClose={() => setShowAddBot(false)} onAdd={(bot) => setBots(b => [...b, { id: `bot${Date.now()}`, ...bot, status: 'disconnected', messages_sent: 0, last_ping: null }])} />}
+
+      {/* Banner de aviso: nenhum bot real configurado */}
+      {!IS_LIVE && (
+        <div style={{
+          marginBottom: 16, padding: '12px 16px', borderRadius: 9,
+          background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.35)',
+          borderLeft: '4px solid #f59e0b',
+          display: 'flex', gap: 10, alignItems: 'flex-start',
+        }}>
+          <span style={{ fontSize: 16, flexShrink: 0 }}>⚠️</span>
+          <div>
+            <span style={{ fontSize: 12, color: '#f59e0b', fontWeight: 800 }}>Nenhum bot real configurado</span>
+            <span style={{ fontSize: 11, color: '#92400e', marginLeft: 8 }}>
+              — os canais abaixo são demonstração. Para receber alertas reais, configure um bot no Supabase.
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 18, flexWrap: 'wrap', gap: 12 }}>

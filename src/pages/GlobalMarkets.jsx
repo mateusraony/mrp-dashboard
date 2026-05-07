@@ -211,6 +211,15 @@ function GlobalNewsPanel() {
           ))}
         </div>
       </div>
+      {/* Disclaimer — visível apenas em modo mock */}
+      {!IS_LIVE && (
+        <div style={{ padding: '8px 16px', background: 'rgba(245,158,11,0.08)', borderBottom: '1px solid rgba(245,158,11,0.2)', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 13 }}>⚠️</span>
+          <span style={{ fontSize: 11, color: '#f59e0b', fontWeight: 600 }}>
+            Conteúdo de demonstração — estas manchetes não são notícias reais
+          </span>
+        </div>
+      )}
       <div>
         {newsData?.items.map((n, i) => {
           const imp = IMPACT_STYLE[n.impact] || IMPACT_STYLE.baixo;
@@ -225,9 +234,15 @@ function GlobalNewsPanel() {
                   <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 4, background: '#0d1421', color: '#64748b', border: '1px solid #1a2535', fontFamily: 'JetBrains Mono, monospace' }}>{n.tag}</span>
                 </div>
               </div>
-              <a href={n.url} target="_blank" rel="noopener noreferrer" style={{ flexShrink: 0, fontSize: 10, color: '#3b82f6', textDecoration: 'none', padding: '3px 8px', borderRadius: 5, background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', fontWeight: 600, whiteSpace: 'nowrap', marginTop: 2 }}>
-                Ver ↗
-              </a>
+              {IS_LIVE ? (
+                <a href={n.url} target="_blank" rel="noopener noreferrer" style={{ flexShrink: 0, fontSize: 10, color: '#3b82f6', textDecoration: 'none', padding: '3px 8px', borderRadius: 5, background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', fontWeight: 600, whiteSpace: 'nowrap', marginTop: 2 }}>
+                  Ver ↗
+                </a>
+              ) : (
+                <span style={{ flexShrink: 0, fontSize: 10, color: '#334155', padding: '3px 8px', borderRadius: 5, background: 'rgba(51,65,85,0.15)', border: '1px solid rgba(51,65,85,0.3)', fontWeight: 600, whiteSpace: 'nowrap', marginTop: 2, cursor: 'default' }}>
+                  Demo
+                </span>
+              )}
             </div>
           );
         })}
