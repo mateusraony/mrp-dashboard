@@ -95,3 +95,24 @@ enabled = false
 port = 54327
 vector_port = 54328
 backend = "postgres"
+
+[functions.ai-analysis]
+enabled = true
+
+[functions.fred-proxy]
+enabled = true
+
+[functions.health-check]
+enabled = true
+
+[functions.macro-actual-fetcher]
+enabled = true
+
+[functions.macro-alert-worker]
+enabled = true
+
+[functions.send-telegram-digest]
+enabled = true
+
+[functions.telegram-ping]
+enabled = true
