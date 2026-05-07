@@ -85,7 +85,7 @@ export function AIModuleCard({ module, title, icon }) {
           border: '1px solid rgba(59,130,246,0.2)',
           fontFamily: 'JetBrains Mono, monospace', fontWeight: 600,
         }}>⏱ {module.timeframe}</span>
-        <ModeBadge mode="mock" />
+        <ModeBadge />
       </div>
 
       {/* Trigger */}

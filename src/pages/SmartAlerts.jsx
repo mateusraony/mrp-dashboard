@@ -38,7 +38,7 @@ function AlertCycleDetail({ alert }) {
         <div style={{ fontSize: 11, color: '#4a5568', flexShrink: 0 }}>{formatDistanceToNow(alert.created_at, { addSuffix: true })}</div>
       </div>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
-        <ModeBadge mode="mock" />
+        <ModeBadge mode={IS_LIVE ? 'live' : 'mock'} />
         <GradeBadge grade={alert.grade} />
         <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 4, background: c.bg, color: c.color, border: `1px solid ${c.border}`, fontFamily: 'JetBrains Mono, monospace', fontWeight: 600 }}>{alert.type}</span>
         <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 4, background: '#0D1421', color: '#4a5568', border: '1px solid #1e2d45', fontFamily: 'JetBrains Mono, monospace' }}>{alert.asset}</span>
