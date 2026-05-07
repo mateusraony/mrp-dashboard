@@ -22,7 +22,7 @@ import {
 import { btcFutures } from '@/components/data/mockData';
 import DebugPanel from '@/components/ui/DebugPanel';
 import { DATA_MODE } from '@/lib/env';
-import { useBtcTicker } from '@/hooks/useBtcData';
+import { useBtcTicker, useBtcPriceWs } from '@/hooks/useBtcData';
 
 // ─── NAVEGAÇÃO ─────────────────────────────────────────────────────────────────
 const NAV_GROUPS = [
@@ -273,9 +273,11 @@ export default function Layout({ children, currentPageName }) {
   const closeDrawer = useCallback(() => setDrawerOpen(false), []);
 
   const { data: ticker } = useBtcTicker();
-  const btcPrice    = ticker?.mark_price    ?? btcFutures.mark_price;
+  const { price: wsPrice, connected: wsConnected } = useBtcPriceWs();
+  // WebSocket é fonte primária; REST ticker é fallback; mock data é último recurso
+  const btcPrice    = wsPrice ?? ticker?.mark_price    ?? btcFutures.mark_price;
   const btcDelta    = ticker?.oi_delta_pct  ?? btcFutures.oi_delta_pct;
-  const btcIsLive   = ticker != null;
+  const btcIsLive   = wsConnected || ticker != null;
   const deltaPositive = btcDelta >= 0;
 
   return (
@@ -490,14 +492,14 @@ export default function Layout({ children, currentPageName }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
             <div
               className="live-dot"
-              style={{ width: 6, height: 6, borderRadius: '50%', background: btcIsLive ? '#10b981' : '#f59e0b' }}
+              style={{ width: 6, height: 6, borderRadius: '50%', background: wsConnected ? '#10b981' : btcIsLive ? '#3b82f6' : '#f59e0b' }}
             />
             <span style={{
-              fontSize: 9, color: btcIsLive ? '#059669' : '#92400e',
+              fontSize: 9, color: wsConnected ? '#059669' : btcIsLive ? '#2563eb' : '#92400e',
               fontFamily: 'JetBrains Mono, monospace', fontWeight: 700,
               letterSpacing: '0.08em',
             }}>
-              {btcIsLive ? 'LIVE' : 'MOCK'}
+              {wsConnected ? 'WS' : btcIsLive ? 'REST' : 'MOCK'}
             </span>
           </div>
         </header>
