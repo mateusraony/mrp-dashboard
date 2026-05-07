@@ -1,6 +1,6 @@
 # CHECKPOINT.md — MRP Dashboard
 > Memória técnica viva do projeto. Atualizar ao final de cada bloco importante.
-> Última atualização: 2026-05-07 (AI Etapa 3 — alertas estatísticos Z-score · PR #81)
+> Última atualização: 2026-05-07 (fixes PR #82+#83 — MTF visível + SPA routing + mock isolation)
 
 ---
 
@@ -56,6 +56,7 @@
 | **AI Etapa 1 — pesos calibrados** | ✅ PR #79 | `aiCalibration.ts` + `useAiCalibration` hook; `projectWeights()` iterativo garante 10%/40% pós-norm; Dashboard passa pesos ao engine; 163/163 ✅ |
 | **AI Etapa 2 — confluência MTF** | ✅ PR #80 | `mtfAnalysis.ts` frameFromKlines+computeConfluence; `useMtfAnalysis` hook; widget em Zona D Dashboard; 19 testes; 179/179 ✅ |
 | **AI Etapa 3 — Z-score alerts** | ✅ PR #81 | `zScore.ts` mean/stddev/computeZScore/buildZScoreAlerts; `useZScoreAlerts` hook; widget em Zona D; 32 testes; 211/211 ✅ · P2 fix: volume usa candle fechado |
+| **Fix MTF + SPA routing** | ✅ PR #82+#83 | Widget MTF sempre visível (AGUARDANDO em mock); `render.yaml` SPA routing Render; `useKlines` enabled param — zero fetch em mock mode |
 
 ---
 
