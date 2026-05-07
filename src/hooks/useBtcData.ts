@@ -63,13 +63,15 @@ export function useOiByExchange() {
  * useKlines — candles de preço
  * @param interval intervalo dos candles ('1h', '15m', '4h', '1d')
  * @param limit número de candles
+ * @param enabled quando false, o query não monta nem faz fetch (default: true)
  */
-export function useKlines(interval = '1h', limit = 48) {
+export function useKlines(interval = '1h', limit = 48, enabled = true) {
   return useQuery({
     queryKey: ['btc', 'klines', interval, limit],
     queryFn:  () => fetchKlines('BTCUSDT', interval, limit),
     staleTime: 55_000,
     refetchInterval: KLINES_INTERVAL,
+    enabled,
     select: (data) => data.map(k => ({
       time:   k[0],
       open:   k[1],
