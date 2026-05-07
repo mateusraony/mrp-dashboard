@@ -1,6 +1,6 @@
 # CHECKPOINT.md — MRP Dashboard
 > Memória técnica viva do projeto. Atualizar ao final de cada bloco importante.
-> Última atualização: 2026-05-07 (AI Etapa 1 — pesos auto-calibrados por histórico · PR #79)
+> Última atualização: 2026-05-07 (AI Etapa 2 — confluência multi-timeframe 1H/4H/1D · PR #80)
 
 ---
 
@@ -9,7 +9,7 @@
 | Aspecto | Status | Evidência Real |
 |---------|--------|---------------|
 | Build (`npm run build`) | ✅ PASSA | 0 erros |
-| Testes (`npm test`) | ✅ 117/117 | 7 suites |
+| Testes (`npm test`) | ✅ 179/179 | 12 suites |
 | Deploy (Render) | ✅ ONLINE | https://mrp-dashboard.onrender.com |
 | FRED API Key | ✅ CONFIGURADA | VITE_FRED_API_KEY em .env.local |
 | Supabase URL + ANON_KEY | ✅ CONFIGURADO | .env.local presente |
@@ -54,6 +54,7 @@
 | **Sprint C — Binance WebSocket** | ✅ PR #76+#77 | `binanceWs.ts` singleton WS backoff 1s→30s; `useBtcPriceWs()` hook; Layout.jsx indicador WS/REST/MOCK; `subscribeStatus` fix stale price (P2 Codex); 150/150 ✅ |
 | **Sprint D — telegram.ts** | ✅ PR #78 | `src/services/telegram.ts` com `pingTelegram()`; fetch inline removido de Settings.jsx; build ✅ 150/150 ✅ |
 | **AI Etapa 1 — pesos calibrados** | ✅ PR #79 | `aiCalibration.ts` + `useAiCalibration` hook; `projectWeights()` iterativo garante 10%/40% pós-norm; Dashboard passa pesos ao engine; 163/163 ✅ |
+| **AI Etapa 2 — confluência MTF** | ✅ PR #80 | `mtfAnalysis.ts` frameFromKlines+computeConfluence; `useMtfAnalysis` hook; widget em Zona D Dashboard; 19 testes; 179/179 ✅ |
 
 ---
 
