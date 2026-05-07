@@ -21,7 +21,7 @@ import { sendNotificationEmail } from '@/lib/notificationClient';
 import { useBtcTicker, useFearGreed } from '@/hooks/useBtcData';
 import { useRiskScore } from '@/hooks/useRiskScore';
 import { useMarketRegime } from '@/hooks/useMarketRegime';
-import { useOnChainCycle } from '@/hooks/useCoinMetrics';
+import { useOnChainCycle, useOnChainExtended } from '@/hooks/useCoinMetrics';
 import { IS_LIVE } from '@/lib/env';
 import { computeRuleBasedAnalysis } from '@/utils/ruleBasedAnalysis';
 
@@ -212,7 +212,7 @@ function GlobalOverview({ period, liveTicker, liveFng, liveRisk }) {
 }
 
 // ─── REGIME SECTION ───────────────────────────────────────────────────────────
-function RegimeSection({ period, liveRegime }) {
+function RegimeSection({ period, liveRegime, regimeLoading }) {
   const r = {
     regime:     liveRegime?.label?.toUpperCase().replace('-', '-') ?? marketRegime.regime,
     score:      liveRegime?.score ?? marketRegime.score,
@@ -221,6 +221,13 @@ function RegimeSection({ period, liveRegime }) {
     components: liveRegime?.components ?? marketRegime.components,
   };
   const regColor = (r.regime === 'RISK-ON' || r.regime === 'Risk-On') ? '#10b981' : (r.regime === 'RISK-OFF' || r.regime === 'Risk-Off') ? '#ef4444' : '#f59e0b';
+  // Em modo live, enquanto o regime ainda está carregando, não exibir score stale
+  const scoreDisplay = (IS_LIVE && regimeLoading)
+    ? <span style={{ fontSize: 13, color: '#475569', fontFamily: 'JetBrains Mono, monospace' }}>Carregando regime...</span>
+    : <><span style={{ fontSize: 22, fontWeight: 900, color: regColor, fontFamily: 'JetBrains Mono, monospace' }}>{r.score}/100</span>
+        <span style={{ fontSize: 14, fontWeight: 800, padding: '3px 12px', borderRadius: 6, background: `${regColor}18`, color: regColor, border: `1px solid ${regColor}30` }}>{r.regime}</span>
+        <span style={{ fontSize: 10, color: '#475569' }}>Conf: {r.confidence}%</span>
+      </>;
 
   const radarData = r.components.map(c => ({ subject: c.label.split(' ')[0], value: Math.round(c.score), fullMark: 100 }));
 
@@ -248,9 +255,7 @@ function RegimeSection({ period, liveRegime }) {
         </ResponsiveContainer>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-            <span style={{ fontSize: 22, fontWeight: 900, color: regColor, fontFamily: 'JetBrains Mono, monospace' }}>{r.score}/100</span>
-            <span style={{ fontSize: 14, fontWeight: 800, padding: '3px 12px', borderRadius: 6, background: `${regColor}18`, color: regColor, border: `1px solid ${regColor}30` }}>{r.regime}</span>
-            <span style={{ fontSize: 10, color: '#475569' }}>Conf: {r.confidence}%</span>
+            {scoreDisplay}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 10 }}>
             {r.components.slice(0, 6).map((c, i) => (
@@ -300,6 +305,14 @@ function RegimeSection({ period, liveRegime }) {
 function StablecoinSection({ period }) {
   const s = stablecoinSupply;
   const snap = stablecoinSnapshot;
+
+  // LTH/STH: dados live via CoinMetrics (mesmo cálculo do LthSthCard.jsx)
+  const { data: extended } = useOnChainExtended();
+  const TOTAL_SUPPLY = 19_850_000;
+  const lthPct    = extended ? extended.hodl_wave_1yr_pct * 100 : lthSthSupply.lth_pct;
+  const sthPct    = extended ? (100 - lthPct) : lthSthSupply.sth_pct;
+  const lthSupply = extended ? Math.round(TOTAL_SUPPLY * lthPct / 100) : lthSthSupply.lth_supply;
+  const sthSupply = extended ? TOTAL_SUPPLY - lthSupply : lthSthSupply.sth_supply;
 
   const days = period === 'Diário' ? 7 : period === 'Semanal' ? 14 : 30;
   const chartData = dailyMintBurn.slice(-days).map((h, i) => ({
@@ -374,9 +387,9 @@ function StablecoinSection({ period }) {
       <Divider />
       <div style={{ fontSize: 9, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>LTH vs STH Supply</div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
-        <Metric label="LTH Supply" value={`${lthSthSupply.lth_pct}%`} color="#10b981" sub={`${(lthSthSupply.lth_supply / 1e6).toFixed(2)}M BTC`} size={14} />
+        <Metric label="LTH Supply" value={`${lthPct.toFixed(1)}%`} color="#10b981" sub={`${(lthSupply / 1e6).toFixed(2)}M BTC`} size={14} />
         <Metric label="LTH em Lucro" value={`${lthSthSupply.lth_profit_pct}%`} color="#10b981" sub="Long-Term Holders" size={14} />
-        <Metric label="STH Supply" value={`${lthSthSupply.sth_pct}%`} color="#f59e0b" sub={`${(lthSthSupply.sth_supply / 1e6).toFixed(2)}M BTC`} size={14} />
+        <Metric label="STH Supply" value={`${sthPct.toFixed(1)}%`} color="#f59e0b" sub={`${(sthSupply / 1e6).toFixed(2)}M BTC`} size={14} />
         <Metric label="STH em Lucro" value={`${lthSthSupply.sth_profit_pct}%`} color={lthSthSupply.sth_profit_pct > 60 ? '#f59e0b' : '#ef4444'} sub="Short-Term Holders" size={14} />
       </div>
     </SectionCard>
@@ -944,7 +957,7 @@ export default function ExecutiveReport() {
   const { data: liveTicker } = useBtcTicker();
   const { data: liveFng } = useFearGreed(1);
   const { data: liveRisk } = useRiskScore();
-  const { data: liveRegime } = useMarketRegime();
+  const { data: liveRegime, isLoading: regimeLoading } = useMarketRegime();
   const { data: liveOnChain } = useOnChainCycle();
 
   const liveAnalysis = useMemo(() => {
@@ -1020,7 +1033,7 @@ export default function ExecutiveReport() {
       {/* Sections */}
       <div id="exec-report-content" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <GlobalOverview period={period} liveTicker={liveTicker} liveFng={liveFng} liveRisk={liveRisk} />
-        <RegimeSection period={period} liveRegime={liveRegime} />
+        <RegimeSection period={period} liveRegime={liveRegime} regimeLoading={regimeLoading} />
         <StablecoinSection period={period} />
         <DerivativesSection period={period} liveTicker={liveTicker} />
         <OnChainSection period={period} liveOnChain={liveOnChain} />

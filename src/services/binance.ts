@@ -17,6 +17,7 @@ import {
   btcSpotFlow,
   oiByExchange,
 } from '@/components/data/mockData';
+import { futuresBasis as mockFuturesBasis } from '@/components/data/mockDataExtended';
 
 // ─── Schemas ──────────────────────────────────────────────────────────────────
 
@@ -368,4 +369,111 @@ export async function fetchLiquidations(symbol = 'BTCUSDT', limit = 50): Promise
     usd_value: item.o.q * (item.o.ap ?? item.o.p),
     timestamp: item.o.T,
   }));
+}
+
+// ─── Futures Basis (Contango / Backwardation) ─────────────────────────────────
+
+/** Uma entrada de basis para um vencimento de futuro datado vs perp */
+export interface FuturesBasisEntry {
+  symbol:           string;   // ex: 'BTCUSDT_250627'
+  expiry_label:     string;   // ex: 'Jun-27-2025'
+  mark_price:       number;
+  days_to_exp:      number;
+  basis_annualized: number;   // % anualizado = (mark/perp - 1) * 100 * (365 / days_to_exp)
+}
+
+/**
+ * Schema para um item da resposta de /fapi/v1/premiumIndex (sem symbol específico).
+ * Retorna array quando symbol não é passado.
+ */
+const PremiumIndexArrayItemSchema = z.object({
+  symbol:    z.string(),
+  markPrice: z.coerce.number(),
+});
+
+/**
+ * Converte o sufixo de data do símbolo (ex: '250627') em um Date.
+ * Formato Binance: YYMMDD → YY20-MM-DD
+ */
+function parseExpiryFromSymbol(suffix: string): Date | null {
+  // sufixo: 6 dígitos YYMMDD
+  if (!/^\d{6}$/.test(suffix)) return null;
+  const yy = parseInt(suffix.slice(0, 2), 10);
+  const mm = parseInt(suffix.slice(2, 4), 10) - 1; // 0-indexed
+  const dd = parseInt(suffix.slice(4, 6), 10);
+  return new Date(2000 + yy, mm, dd);
+}
+
+/**
+ * Formata data de expiração como 'Mon-DD-YYYY' (ex: 'Jun-27-2025').
+ */
+function formatExpiryLabel(d: Date): string {
+  return d.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }).replace(/,/, '');
+}
+
+function mockFuturesBasisData(): FuturesBasisEntry[] {
+  return mockFuturesBasis.futures.map(f => ({
+    symbol:           `BTCUSDT_MOCK`,
+    expiry_label:     f.expiry,
+    mark_price:       f.price,
+    days_to_exp:      f.days_to_exp,
+    basis_annualized: f.basis_annualized,
+  }));
+}
+
+/**
+ * fetchFuturesBasis — busca o basis anualizado de futuros trimestrais BTC vs perp.
+ *
+ * Endpoint público: GET /fapi/v1/premiumIndex (sem symbol → retorna todos)
+ * Sem autenticação necessária.
+ *
+ * - DATA_MODE=mock → retorna mockFuturesBasis.futures diretamente
+ * - DATA_MODE=live → chama API real e calcula basis vs perp
+ */
+export async function fetchFuturesBasis(): Promise<FuturesBasisEntry[]> {
+  if (DATA_MODE === 'mock') return mockFuturesBasisData();
+
+  const url = `${FUTURES_BASE}/fapi/v1/premiumIndex`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Binance premiumIndex error ${res.status}`);
+
+  const raw = await res.json();
+  const items = z.array(PremiumIndexArrayItemSchema).parse(raw);
+
+  // Encontrar o perp BTCUSDT (sem underscore = perp)
+  const perp = items.find(i => i.symbol === 'BTCUSDT');
+  if (!perp || perp.markPrice <= 0) throw new Error('BTCUSDT perp not found in premiumIndex');
+
+  const now = Date.now();
+
+  // Filtrar contratos trimestrais BTC: padrão BTCUSDT_YYMMDD
+  const quarterlyPattern = /^BTCUSDT_(\d{6})$/;
+  const results: FuturesBasisEntry[] = [];
+
+  for (const item of items) {
+    const match = item.symbol.match(quarterlyPattern);
+    if (!match) continue;
+
+    const expiry = parseExpiryFromSymbol(match[1]);
+    if (!expiry) continue;
+
+    const daysToExp = Math.max(1, Math.round((expiry.getTime() - now) / 86_400_000));
+    // Ignorar contratos já expirados
+    if (daysToExp <= 0) continue;
+
+    const basisPct = (item.markPrice / perp.markPrice - 1) * 100;
+    const basisAnnualized = basisPct * (365 / daysToExp);
+
+    results.push({
+      symbol:           item.symbol,
+      expiry_label:     formatExpiryLabel(expiry),
+      mark_price:       item.markPrice,
+      days_to_exp:      daysToExp,
+      basis_annualized: parseFloat(basisAnnualized.toFixed(4)),
+    });
+  }
+
+  // Ordenar por dias para expiração (mais próximo primeiro)
+  results.sort((a, b) => a.days_to_exp - b.days_to_exp);
+  return results;
 }

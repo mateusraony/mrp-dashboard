@@ -141,10 +141,9 @@ export function DerivativesOverview() {
     : null;
 
   // ── OI / Market Cap Ratio — computed from live OI + CoinGecko dominance ─────
+  const { data: oiData }    = useOiByExchange();
   const { data: dominance } = useDominance();
-  const totalOiUsd = IS_LIVE && liveOi.length > 0
-    ? liveOi.reduce((s, e) => s + (e.oi_usd ?? e.oi_b * 1e9), 0)
-    : null;
+  const totalOiUsd = oiData ? oiData.reduce((s, e) => s + (e.oi_usd ?? 0), 0) : null;
   const btcMcapUsd = dominance ? dominance.total_mcap_usd * dominance.btc_dominance / 100 : null;
   const liveRatioPct = (totalOiUsd && btcMcapUsd) ? (totalOiUsd / btcMcapUsd) * 100 : null;
   const displayRatioPct = liveRatioPct ?? oiRatio.ratio_pct;

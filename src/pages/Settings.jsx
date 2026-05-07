@@ -89,6 +89,98 @@ function Section({ title, children }) {
   );
 }
 
+// ─── MODULE TOGGLES (localStorage persistence) ────────────────────────────────
+
+const MODULE_DEFS = [
+  { key: 'ENABLE_OPTIONS',     defaultVal: true,  description: 'Deribit options data (IV, skew, smile)' },
+  { key: 'ENABLE_SPOT_FLOW',   defaultVal: true,  description: 'Binance Spot CVD and taker flow' },
+  { key: 'ENABLE_ONCHAIN',     defaultVal: true,  description: 'mempool.space on-chain data' },
+  { key: 'ENABLE_NEWS',        defaultVal: true,  description: 'GDELT news feed' },
+  { key: 'ENABLE_FEAR_GREED',  defaultVal: true,  description: 'Alternative.me Fear & Greed Index' },
+  { key: 'ENABLE_COINMETRICS', defaultVal: false, description: 'CoinMetrics community (optional, may be slow)' },
+];
+
+/** Reads a module toggle from localStorage, falling back to the build-time default. */
+function readModuleFlag(key, defaultVal) {
+  const stored = localStorage.getItem('module_' + key);
+  if (stored === null) return defaultVal;
+  return stored === 'true';
+}
+
+function ModuleToggles() {
+  // Initialise state from localStorage (or defaults)
+  const [values, setValues] = useState(() =>
+    Object.fromEntries(MODULE_DEFS.map(({ key, defaultVal }) => [key, readModuleFlag(key, defaultVal)]))
+  );
+  const [dirty, setDirty] = useState(false);
+
+  const handleChange = (key, next) => {
+    localStorage.setItem('module_' + key, String(next));
+    setValues(prev => ({ ...prev, [key]: next }));
+    setDirty(true);
+  };
+
+  return (
+    <div>
+      {/* Dirty-state amber banner */}
+      {dirty && (
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          gap: 12, marginBottom: 14, padding: '10px 14px', borderRadius: 8,
+          background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)',
+        }}>
+          <span style={{ fontSize: 12, color: '#f59e0b', fontWeight: 600 }}>
+            Recarregue a página para aplicar as mudanças
+          </span>
+          <button
+            onClick={() => window.location.reload()}
+            style={{
+              background: 'rgba(245,158,11,0.15)', color: '#f59e0b',
+              border: '1px solid rgba(245,158,11,0.4)',
+              borderRadius: 6, padding: '5px 12px', fontSize: 11,
+              cursor: 'pointer', fontWeight: 700, flexShrink: 0,
+            }}
+          >
+            Recarregar agora
+          </button>
+        </div>
+      )}
+
+      {MODULE_DEFS.map(({ key, description }) => (
+        <div key={key} style={{
+          display: 'flex', alignItems: 'flex-start', gap: 16, padding: '12px 0',
+          borderBottom: '1px solid rgba(30,45,69,0.5)',
+        }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0' }}>{key}</span>
+              <span style={{ fontSize: 10, color: '#4a6580', fontFamily: 'JetBrains Mono, monospace' }}>
+                (Requer recarga)
+              </span>
+            </div>
+            <div style={{ fontSize: 11, color: '#4a5568' }}>{description}</div>
+          </div>
+          <div
+            onClick={() => handleChange(key, !values[key])}
+            style={{
+              width: 36, height: 20, borderRadius: 10, cursor: 'pointer', flexShrink: 0,
+              background: values[key] ? '#3b82f6' : '#1e2d45',
+              position: 'relative', transition: 'background 0.2s',
+            }}
+          >
+            <div style={{
+              position: 'absolute', top: 2,
+              left: values[key] ? 18 : 2,
+              width: 16, height: 16, borderRadius: '50%',
+              background: '#fff', transition: 'left 0.2s',
+            }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ─── DATA MODE TOGGLE ─────────────────────────────────────────────────────────
 function DataModeToggle() {
   const isLive = DATA_MODE === 'live';
@@ -559,16 +651,7 @@ export default function Settings() {
 
       {/* Modules */}
       <Section title="🔧 Module Toggles">
-        {[
-          ['ENABLE_OPTIONS', true, 'Deribit options data (IV, skew, smile)'],
-          ['ENABLE_SPOT_FLOW', true, 'Binance Spot CVD and taker flow'],
-          ['ENABLE_ONCHAIN', true, 'mempool.space on-chain data'],
-          ['ENABLE_NEWS', true, 'GDELT news feed'],
-          ['ENABLE_FEAR_GREED', true, 'Alternative.me Fear & Greed Index'],
-          ['ENABLE_COINMETRICS', false, 'CoinMetrics community (optional, may be slow)'],
-        ].map(([k, v, d]) => (
-          <SettingRow key={String(k)} label={String(k)} value={v} type="toggle" description={String(d)} />
-        ))}
+        <ModuleToggles />
       </Section>
 
       {/* Reports & Telegram — real persistence */}

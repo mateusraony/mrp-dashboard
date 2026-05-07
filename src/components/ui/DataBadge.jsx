@@ -1,6 +1,7 @@
 // DataBadge — v2 — shows 🧪 MOCK / 🛰️ LIVE + Grade A/B/C
 import { DATA_MODE } from '@/lib/env';
 
+/** @param {{ mode?: 'mock' | 'live' | 'estimated' }} props */
 export function ModeBadge({ mode = DATA_MODE }) {
   if (mode === 'live') {
     return (
@@ -12,6 +13,19 @@ export function ModeBadge({ mode = DATA_MODE }) {
         fontWeight: 600, whiteSpace: 'nowrap',
       }}>
         🛰️ LIVE
+      </span>
+    );
+  }
+  if (mode === 'estimated') {
+    return (
+      <span style={{
+        fontSize: 10, fontFamily: 'JetBrains Mono, monospace',
+        background: 'rgba(96,165,250,0.1)', color: '#60a5fa',
+        border: '1px solid rgba(96,165,250,0.25)',
+        borderRadius: 5, padding: '2px 8px', letterSpacing: '0.06em',
+        fontWeight: 600, whiteSpace: 'nowrap',
+      }}>
+        〜 ESTIMADO
       </span>
     );
   }

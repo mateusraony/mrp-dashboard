@@ -850,6 +850,32 @@ export default function OnChain() {
         </p>
       </div>
 
+      {/* Banner de resumo de qualidade de dados — orientação rápida para novos usuários */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
+        background: '#0d1421', border: '1px solid #1e2d45', borderRadius: 8,
+        padding: '8px 14px', marginBottom: 20, fontSize: 10, lineHeight: 1.5,
+      }}>
+        <span style={{ fontWeight: 700, color: '#94a3b8', marginRight: 4 }}>Qualidade dos dados:</span>
+        {IS_LIVE ? (
+          <>
+            <span style={{ color: '#10b981', background: 'rgba(16,185,129,0.10)', border: '1px solid rgba(16,185,129,0.22)', borderRadius: 4, padding: '1px 7px', fontWeight: 700 }}>
+              AO VIVO — Mempool, Hash Rate (Mempool.space)
+            </span>
+            <span style={{ color: '#10b981', background: 'rgba(16,185,129,0.10)', border: '1px solid rgba(16,185,129,0.22)', borderRadius: 4, padding: '1px 7px', fontWeight: 700 }}>
+              AO VIVO — MVRV, Realized Price, CDD, HODL Waves (CoinMetrics Community · grátis)
+            </span>
+            <span style={{ color: '#f59e0b', background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.22)', borderRadius: 4, padding: '1px 7px', fontWeight: 700 }}>
+              ESTIMADO — NUPL, SOPR, Netflow, Whales (requerem Glassnode ~$29/mês)
+            </span>
+          </>
+        ) : (
+          <span style={{ color: '#f59e0b', background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.22)', borderRadius: 4, padding: '1px 7px', fontWeight: 700 }}>
+            DEMO — todos os dados são simulados (DATA_MODE=mock)
+          </span>
+        )}
+      </div>
+
       {/* Sentimento do mercado on-chain */}
       <div style={{ marginBottom: 8 }}>
         <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
