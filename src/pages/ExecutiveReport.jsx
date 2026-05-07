@@ -716,8 +716,6 @@ const ALL_MODULES = [
 // ─── EMAIL SCHEDULER ──────────────────────────────────────────────────────────
 function EmailScheduler({ onClose, liveTicker, liveFng, liveRisk, liveRegime, liveOnChain }) {
   const [email, setEmail] = useState('');
-  const [time, setTime] = useState('08:00');
-  const [freq, setFreq] = useState('daily');
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
 
@@ -792,7 +790,7 @@ Net 7D: +$${etfFlows.net_flow_7d_m.toFixed(0)}M
 ${etfFlows.consec_inflow_days} dias consecutivos de entrada
 
 ══════════════════════════════════════════
-Acesse: https://app.cryptowatch.io · Dados: 🧪 MOCK
+Acesse: https://app.cryptowatch.io · Dados: ${IS_LIVE ? '🛰️ LIVE' : '🧪 DEMO'}
 CryptoWatch Intelligence Suite
       `.trim(),
     });
@@ -811,30 +809,13 @@ CryptoWatch Intelligence Suite
 
   return (
     <div style={{ padding: '20px 24px' }}>
-      <div style={{ fontSize: 15, fontWeight: 800, color: '#e2e8f0', marginBottom: 4 }}>📧 Enviar / Agendar Relatório</div>
-      <div style={{ fontSize: 10, color: '#475569', marginBottom: 18 }}>Envie agora ou configure envio automático</div>
+      <div style={{ fontSize: 15, fontWeight: 800, color: '#e2e8f0', marginBottom: 4 }}>📧 Enviar Relatório</div>
+      <div style={{ fontSize: 10, color: '#475569', marginBottom: 18 }}>Envie o relatório executivo por e-mail agora</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div>
           <label style={{ fontSize: 9, color: '#475569', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.07em' }}>E-mail de destino</label>
           <input value={email} onChange={e => setEmail(e.target.value)} placeholder="seu@email.com"
             style={{ background: '#0d1421', border: '1px solid #1a2535', borderRadius: 6, color: '#e2e8f0', fontSize: 12, padding: '8px 12px', width: '100%', outline: 'none', boxSizing: 'border-box' }} />
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          <div>
-            <label style={{ fontSize: 9, color: '#475569', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.07em' }}>Horário</label>
-            <input type="time" value={time} onChange={e => setTime(e.target.value)}
-              style={{ background: '#0d1421', border: '1px solid #1a2535', borderRadius: 6, color: '#e2e8f0', fontSize: 12, padding: '8px 12px', width: '100%', outline: 'none', boxSizing: 'border-box' }} />
-          </div>
-          <div>
-            <label style={{ fontSize: 9, color: '#475569', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.07em' }}>Frequência</label>
-            <select value={freq} onChange={e => setFreq(e.target.value)}
-              style={{ background: '#0d1421', border: '1px solid #1a2535', borderRadius: 6, color: '#e2e8f0', fontSize: 12, padding: '8px 12px', width: '100%', outline: 'none', boxSizing: 'border-box' }}>
-              <option value="now">Enviar agora</option>
-              <option value="daily">Diário</option>
-              <option value="weekly">Semanal</option>
-              <option value="monthly">Mensal</option>
-            </select>
-          </div>
         </div>
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
           <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: 7, background: 'transparent', border: '1px solid #1a2535', color: '#475569', cursor: 'pointer', fontSize: 11 }}>Cancelar</button>
@@ -843,10 +824,10 @@ CryptoWatch Intelligence Suite
             background: email && !sending ? 'rgba(59,130,246,0.15)' : '#0d1421',
             border: `1px solid ${email && !sending ? 'rgba(59,130,246,0.4)' : '#1a2535'}`,
             color: email && !sending ? '#60a5fa' : '#334155', cursor: email && !sending ? 'pointer' : 'default', fontSize: 11, fontWeight: 700,
-          }}>{sending ? 'Enviando...' : freq === 'now' ? '📧 Enviar Agora' : '📅 Agendar'}</button>
+          }}>{sending ? 'Enviando...' : '📧 Enviar Agora'}</button>
         </div>
-        <div style={{ fontSize: 9, color: '#1e3048', padding: '7px 9px', background: 'rgba(245,158,11,0.04)', border: '1px solid rgba(245,158,11,0.12)', borderRadius: 6 }}>
-          💡 Agendamento automático requer Backend (Builder+). Envio imediato disponível agora.
+        <div style={{ fontSize: 9, color: '#475569', padding: '7px 9px', background: 'rgba(30,48,72,0.4)', border: '1px solid #162032', borderRadius: 6 }}>
+          Agendamento automático disponível em versão futura.
         </div>
       </div>
     </div>
@@ -947,7 +928,7 @@ function exportPDF({ liveRegime = null, liveOnChain = null } = {}) {
       </table>
 
       <div class="footer">
-        Gerado por CryptoWatch Intelligence Suite · Dados: 🧪 MOCK · ${new Date().toISOString()} · Não é aconselhamento financeiro.
+        Gerado por CryptoWatch Intelligence Suite · Dados: ${IS_LIVE ? '🛰️ LIVE' : '🧪 DEMO'} · ${new Date().toISOString()} · Não é aconselhamento financeiro.
       </div>
     </body></html>
   `);

@@ -8,6 +8,7 @@ import { ModeBadge, GradeBadge } from '../components/ui/DataBadge';
 import AIInsightPanel from '../components/ai/AIInsightPanel';
 import { useOptionsData } from '@/hooks/useDeribit';
 import { useBtcTicker } from '@/hooks/useBtcData';
+import { useMacroBoard } from '@/hooks/useFred';
 import { DATA_MODE, IS_LIVE } from '@/lib/env';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -15,7 +16,6 @@ import {
 } from 'recharts';
 
 const SPOT = 84298.70;
-const US10Y = 4.512;
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 function fmtM(v) {
@@ -335,6 +335,15 @@ function CarryCalculator() {
   const f = futures[selectedExp];
   const term = termStructure.expirations;
 
+  // Fix A — US10Y live via FRED
+  const { data: macroData } = useMacroBoard();
+  const us10yEntry = macroData?.series?.find(s => s.id === 'US10Y');
+  const US10Y = us10yEntry?.value ?? 4.512;
+
+  // Fix B — SPOT live via BTC ticker
+  const { data: ticker } = useBtcTicker();
+  const SPOT_LIVE = ticker?.mark_price ?? SPOT;
+
   // Carry calc
   const carryReturn   = capital * (f.basis_annualized / 100) * (f.days_to_exp / 365);
   const riskFreeReturn = capital * (US10Y / 100) * (f.days_to_exp / 365);
@@ -354,7 +363,7 @@ function CarryCalculator() {
     <div>
       <SectionTitle
         title="Carry Calculator — Custo de Basis por Vencimento"
-        sub={`Basis anualizado vs US10Y (${US10Y}%) · Spot: $${SPOT.toLocaleString()}`}
+        sub={`Basis anualizado vs US10Y (${US10Y}%) · Spot: $${SPOT_LIVE.toLocaleString()}`}
         badge={futuresBasis.quality}
         mode={IS_LIVE ? 'live' : 'mock'}
       />
