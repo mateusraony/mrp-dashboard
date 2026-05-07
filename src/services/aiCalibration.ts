@@ -66,6 +66,47 @@ function isModuleCorrect(dir: Direction, priceWentUp: boolean): boolean | null {
   return null;
 }
 
+// ─── Projeção com limites ─────────────────────────────────────────────────────
+
+/**
+ * projectWeights — normaliza scores para soma 1.0 respeitando [FLOOR, CEIL].
+ *
+ * Algoritmo iterativo: normalize → detecta violações → clamp violadores →
+ * redistribui o excesso/déficit proporcionalmente entre os módulos livres.
+ * Converge em ≤ 3 iterações para qualquer distribuição de 4 módulos.
+ */
+function projectWeights(scores: Record<ModuleName, number>): ModuleWeights {
+  const w: Record<ModuleName, number> = { ...scores } as Record<ModuleName, number>;
+
+  for (let iter = 0; iter < 20; iter++) {
+    // Normaliza para soma 1.0
+    const total = MODULES.reduce((s, m) => s + w[m], 0) || 1;
+    for (const m of MODULES) w[m] /= total;
+
+    const tooLow  = MODULES.filter(m => w[m] < WEIGHT_FLOOR);
+    const tooHigh = MODULES.filter(m => w[m] > WEIGHT_CEIL);
+    if (tooLow.length === 0 && tooHigh.length === 0) break;
+
+    // Fixa os violadores nos seus limites
+    for (const m of tooLow)  w[m] = WEIGHT_FLOOR;
+    for (const m of tooHigh) w[m] = WEIGHT_CEIL;
+
+    // Redistribui o peso restante entre os módulos "livres"
+    const fixedSum = [...tooLow, ...tooHigh].reduce((s, m) => s + w[m], 0);
+    const free     = MODULES.filter(m => !tooLow.includes(m) && !tooHigh.includes(m));
+    if (free.length > 0) {
+      const freeSum  = free.reduce((s, m) => s + w[m], 0) || 1;
+      const remaining = 1.0 - fixedSum;
+      for (const m of free) w[m] = (w[m] / freeSum) * remaining;
+    }
+  }
+
+  return MODULES.reduce((acc, m) => {
+    acc[m] = parseFloat(w[m].toFixed(4));
+    return acc;
+  }, {} as ModuleWeights);
+}
+
 // ─── Calibração ───────────────────────────────────────────────────────────────
 
 /**
@@ -109,17 +150,12 @@ export function computeCalibrationWeights(predictions: AiPrediction[]): Calibrat
     accuracy[mod].accuracy = total > 0 ? correct / total : 0.5;
   }
 
-  // Aplica piso/teto e normaliza para soma = 1.0
-  const clamped = {} as Record<ModuleName, number>;
-  for (const mod of MODULES) {
-    clamped[mod] = clamp(accuracy[mod].accuracy, WEIGHT_FLOOR, WEIGHT_CEIL);
-  }
-  const total = MODULES.reduce((sum, mod) => sum + clamped[mod], 0);
-
-  const weights = MODULES.reduce((acc, mod) => {
-    acc[mod] = parseFloat((clamped[mod] / total).toFixed(4));
+  // Projeta acurácias em pesos com limites garantidos pós-normalização
+  const scores = MODULES.reduce((acc, mod) => {
+    acc[mod] = accuracy[mod].accuracy;
     return acc;
-  }, {} as ModuleWeights);
+  }, {} as Record<ModuleName, number>);
 
+  const weights = projectWeights(scores);
   return { weights, accuracy, sampleCount: evaluated.length, isCalibrated: true };
 }

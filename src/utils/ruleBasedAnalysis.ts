@@ -306,11 +306,11 @@ function aggregateOverall(
   const rationale = `Análise rule-based${weightNote}. ${bearishScore > bullishScore ? `Score bearish: ${(bearishScore * 100).toFixed(0)}% — sinais: ${bearSignals.join(', ')}.` : `Score bullish: ${(bullishScore * 100).toFixed(0)}% — sinais: ${bullSignals.join(', ')}.`} Score ponderado: ${pairs.reduce((a, [mod, w]) => a + mod.score * w, 0) | 0}/100. Prob. de continuação: ${(avgProb * 100).toFixed(0)}%.`;
 
   const bull_case = bullSignals.length > 0
-    ? `${bullSignals.join(' + ')}. ${bullCount >= 2 ? 'Múltiplos módulos convergindo para sinal comprador.' : 'Sinal isolated — confirmar com volume e CVD.'}`
+    ? `${bullSignals.join(' + ')}. ${bullishScore >= 0.45 ? 'Múltiplos módulos convergindo para sinal comprador.' : 'Sinal isolated — confirmar com volume e CVD.'}`
     : 'Sem sinais bullish ativos no momento. Aguardar reversão de funding ou CVD positivo.';
 
   const bear_case = bearSignals.length > 0
-    ? `${bearSignals.join(' + ')}. ${bearCount >= 2 ? 'Convergência bearish sugere reduzir alavancagem.' : 'Sinal isolated — monitorar próximos ciclos de funding.'}`
+    ? `${bearSignals.join(' + ')}. ${bearishScore >= 0.45 ? 'Convergência bearish sugere reduzir alavancagem.' : 'Sinal isolated — monitorar próximos ciclos de funding.'}`
     : 'Sem sinais bearish ativos no momento. Estrutura equilibrada.';
 
   const triggerModule = pairs.reduce((a, b) => a[0].probability > b[0].probability ? a : b)[0];

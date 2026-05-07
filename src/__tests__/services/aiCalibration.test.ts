@@ -98,8 +98,8 @@ describe('computeCalibrationWeights — calibração ativa', () => {
     expect(weights.derivatives).toBeGreaterThan(weights.macro);
   });
 
-  it('respeita piso de 10% — módulo com 0% de acerto recebe pelo menos 0.10 de peso normalizado', () => {
-    // macro sempre erra
+  it('respeita piso de 10% após normalização — módulo com 0% de acerto recebe exatamente 0.10', () => {
+    // macro sempre erra; os outros 3 sempre acertam
     const predictions = repeat(MIN_CALIBRATION_SAMPLES, {
       outcome: 'HIT',
       outcome_ret_pct: 2.0,
@@ -107,12 +107,30 @@ describe('computeCalibrationWeights — calibração ativa', () => {
         derivatives: { direction: 'bullish' },  // sempre certo
         spot:        { direction: 'bullish' },  // sempre certo
         options:     { direction: 'bullish' },  // sempre certo
-        macro:       { direction: 'bearish' },  // sempre errado
+        macro:       { direction: 'bearish' },  // sempre errado → 0% → piso
       },
     });
     const { weights } = computeCalibrationWeights(predictions);
-    // Com piso de 10%, nenhum módulo pode ter peso normalizado muito baixo
-    expect(weights.macro).toBeGreaterThan(0.05);
+    // projectWeights garante FLOOR após normalização
+    expect(weights.macro).toBeGreaterThanOrEqual(0.099);  // 0.10 com tolerância de float
+  });
+
+  it('respeita teto de 40% após normalização — módulo perfeito isolado recebe exatamente 0.40', () => {
+    // só derivatives é direcional (outros neutros) → 100% acurácia → teto
+    const predictions = repeat(MIN_CALIBRATION_SAMPLES, {
+      outcome: 'HIT',
+      outcome_ret_pct: 2.0,
+      modules_snapshot: {
+        derivatives: { direction: 'bullish' },  // sempre certo
+        spot:        { direction: 'neutral' },
+        options:     { direction: 'neutral' },
+        macro:       { direction: 'neutral' },
+      },
+    });
+    const { weights } = computeCalibrationWeights(predictions);
+    // sem amostras nos outros módulos (accuracy=0.5), derivatives teria 1.0 sem limite
+    // projectWeights deve garantir que não ultrapasse 0.40
+    expect(weights.derivatives).toBeLessThanOrEqual(0.401);
   });
 
   it('respeita teto de 40% — módulo perfeito não domina sozinho', () => {
