@@ -1,6 +1,6 @@
 # CHECKPOINT.md — MRP Dashboard
 > Memória técnica viva do projeto. Atualizar ao final de cada bloco importante.
-> Última atualização: 2026-05-07 (Mock audit completo — PR #69: AI Track Record real · PR #70: 5 badges corrigidos · mockData.jsx conflito removido)
+> Última atualização: 2026-05-07 (Mock audit completo — PR #69/#70 badges corrigidos · PR #71: Prioridade 1 — 5 correções de confiança do usuário)
 
 ---
 
@@ -43,6 +43,7 @@
 | **Medium live wiring** | ✅ PR #68 | BasisPanel (funding Binance/Bybit/OKX live); LthSthCard (HODL wave CoinMetrics); ExecutiveReport (NUPL/MVRV/Regime live + PDF exportado com dados reais) |
 | **AI Track Record real** | ✅ PR #69 | Dashboard.jsx: AITrackRecord detecta isSupabaseConfigured(); empty state quando tabela vazia; DataTrustBadge mock→live; IS_LIVE gate corrige Codex P2 |
 | **Mock audit — badges hardcoded** | ✅ PR #70 | DerivativesAdvanced (3 badges); SmartAlerts (1 badge); AIAnalysisPanel (1 badge): todos condicionais IS_LIVE agora; mockData.jsx export DATA_MODE='mock' órfão removido; Altcoins badge condition refinada |
+| **Prioridade 1 — Confiança do usuário** | ✅ PR #71 | Macro.jsx: data "2026-03-06" → "Dados de demonstração" em mock mode; GlobalMarkets: banner amber + links "Ver ↗" desativados em demo; MacroCalendar: eventos gerados relativos à data atual (nunca mais "ENCERRADO"); BotAutomations: banner ⚠️ + status "Demo" (âmbar) em vez de "Conectado" (verde); ActionDashboard Performance: banner 🧪 + badge DEMO no win rate |
 
 ---
 

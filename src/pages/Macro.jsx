@@ -560,7 +560,7 @@ export default function Macro() {
         </h1>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
           <p style={{ fontSize: 12, color: '#4a5568', margin: 0 }}>
-            FRED Daily Data · Updated {new Date(m.updated_at).toLocaleDateString('pt-BR')} ·
+            FRED Daily Data · {IS_LIVE ? `Updated ${new Date(m.updated_at).toLocaleDateString('pt-BR')}` : 'Dados de demonstração'} ·
           </p>
           <ModeBadge />
           <div style={{

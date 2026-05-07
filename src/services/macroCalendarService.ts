@@ -682,6 +682,14 @@ export async function fetchMacroCalendarEvents(): Promise<MacroCalendarEvent[]> 
     }),
   );
 
+  // Se todos os fetches FRED falharam (Edge Function não deployada ou sem rede),
+  // retorna mock com datas relativas a hoje para evitar exibir só eventos encerrados.
+  const fredSucceeded = results.some(r => r.status === 'fulfilled');
+  if (!fredSucceeded) {
+    logWarn('Todos os fetches FRED falharam — MacroCalendar usa mock com datas relativas', null, 'macroCalendar');
+    return buildMockEvents();
+  }
+
   for (const result of results) {
     if (result.status === 'rejected') {
       logError('FRED event fetch failed', result.reason, 'macroCalendar');
@@ -751,6 +759,14 @@ export async function fetchMacroCalendarEvents(): Promise<MacroCalendarEvent[]> 
   }
 
   events.sort((a, b) => a.datetime_utc.localeCompare(b.datetime_utc));
+
+  // Segurança: se todos os eventos construídos estiverem no passado (nenhum 'scheduled'),
+  // retorna mock para garantir que o usuário veja pelo menos eventos futuros.
+  const hasUpcoming = events.some(e => e.status === 'scheduled');
+  if (!hasUpcoming) {
+    logWarn('Nenhum evento futuro encontrado via FRED/FOMC — usando mock com datas relativas', null, 'macroCalendar');
+    return buildMockEvents();
+  }
 
   logInfo('MacroCalendar fetched', { count: events.length, source: 'FRED' }, 'macroCalendar');
 
