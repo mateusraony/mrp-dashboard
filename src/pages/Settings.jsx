@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react';
 import { THRESHOLDS, sourceHealth } from '../components/data/mockData';
 import { logError, logInfo } from '@/lib/debugLog';
 import { ModeBadge, GradeBadge } from '../components/ui/DataBadge';
-import { DATA_MODE, setDataMode, env } from '@/lib/env';
+import { DATA_MODE, setDataMode } from '@/lib/env';
 import { isSupabaseConfigured } from '@/services/supabase';
 import { useUserSettings, useUpdateSettings } from '@/hooks/useSupabase';
+import { pingTelegram } from '@/services/telegram';
 
 function SettingRow({ label, value, description, type = 'text', options = undefined }) {
   const [v, setV] = useState(value);
@@ -361,11 +362,6 @@ function TelegramSection() {
     setTestMsg('');
 
     try {
-      const supabaseUrl = env.VITE_SUPABASE_URL;
-      const anonKey     = env.VITE_SUPABASE_ANON_KEY;
-
-      if (!supabaseUrl || !anonKey) throw new Error('Supabase não configurado.');
-
       // Salva antes de testar para que a Edge Function leia o token atualizado
       await updateSettings.mutateAsync({
         telegram_enabled:   true,
@@ -374,25 +370,14 @@ function TelegramSection() {
         telegram_schedule:  schedule,
       });
 
-      // telegram-ping: lê token/chat_id do banco servidor-lado (service_role).
-      // Não enviamos token no body — a Edge Function não o aceita por segurança.
-      const res = await fetch(`${supabaseUrl}/functions/v1/telegram-ping`, {
-        method:  'POST',
-        headers: {
-          'Authorization': `Bearer ${anonKey}`,
-          'Content-Type':  'application/json',
-        },
-        body: JSON.stringify({}),
-      });
+      const result = await pingTelegram();
 
-      const body = await res.json().catch(() => ({}));
-
-      if (res.ok && body.ok) {
+      if (result.ok) {
         setTestStatus('sent');
-        setTestMsg(`Mensagem enviada! (latência: ${body.latency_ms ?? '?'}ms)`);
+        setTestMsg(`Mensagem enviada! (latência: ${result.latency_ms ?? '?'}ms)`);
       } else {
         setTestStatus('error');
-        setTestMsg(body.hint ?? body.error ?? body.reason ?? `HTTP ${res.status}`);
+        setTestMsg(result.hint ?? result.error ?? result.reason ?? 'Erro desconhecido.');
       }
     } catch (/** @type {any} */ err) {
       setTestStatus('error');
