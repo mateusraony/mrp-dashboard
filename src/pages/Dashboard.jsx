@@ -12,6 +12,7 @@ import { useMempoolState } from '@/hooks/useMempool';
 import { computeRuleBasedAnalysis } from '@/utils/ruleBasedAnalysis';
 import { useAiPredictions, usePersistPrediction } from '@/hooks/useAiPredictions';
 import { useAiCalibration } from '@/hooks/useAiCalibration';
+import { useMtfAnalysis } from '@/hooks/useMtfAnalysis';
 import { isSupabaseConfigured } from '@/services/supabase';
 
 // ─── DATA LAYER (live > mock fallback) ───────────────────────────────────────
@@ -487,6 +488,9 @@ export default function Dashboard() {
   // Pesos calibrados por histórico de previsões (fallback: equiponderado)
   const { data: calibration } = useAiCalibration();
 
+  // Confluência multi-timeframe (1H / 4H / 1D)
+  const mtf = useMtfAnalysis();
+
   // Rule-based AI analysis — all four modules, live data when available
   const liveAnalysis = IS_LIVE && (liveTicker != null || liveFng != null)
     ? computeRuleBasedAnalysis({
@@ -621,6 +625,48 @@ export default function Dashboard() {
       {/* ── ZONA D: AI Analysis + Track Record (2 cols) ── */}
       <div style={{ marginBottom: 20 }}>
         <SectionTitle icon="🤖" label="AI Analysis & Previsões" sub="Análise automática baseada em todos os módulos · Com histórico de acertos" />
+
+        {/* Confluência Multi-Timeframe */}
+        {mtf && (
+          <div style={{ marginBottom: 14, background: '#0d1421', border: '1px solid #162032', borderRadius: 12, padding: '14px 18px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', letterSpacing: 0.3 }}>Confluência Multi-Timeframe</span>
+              <span style={{
+                fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 5,
+                background: mtf.confluence === 'FORTE' ? 'rgba(16,185,129,0.15)' : mtf.confluence === 'MODERADA' ? 'rgba(245,158,11,0.15)' : 'rgba(100,116,139,0.15)',
+                color:      mtf.confluence === 'FORTE' ? '#10b981'              : mtf.confluence === 'MODERADA' ? '#f59e0b'              : '#94a3b8',
+                border: `1px solid ${mtf.confluence === 'FORTE' ? 'rgba(16,185,129,0.3)' : mtf.confluence === 'MODERADA' ? 'rgba(245,158,11,0.3)' : 'rgba(100,116,139,0.3)'}`,
+              }}>
+                {mtf.confluence}
+              </span>
+              <span style={{
+                fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 5,
+                background: mtf.confluenceDir === 'bullish' ? 'rgba(16,185,129,0.12)' : mtf.confluenceDir === 'bearish' ? 'rgba(239,68,68,0.12)' : 'rgba(100,116,139,0.12)',
+                color:      mtf.confluenceDir === 'bullish' ? '#10b981'               : mtf.confluenceDir === 'bearish' ? '#ef4444'               : '#94a3b8',
+              }}>
+                {mtf.confluenceDir.toUpperCase()}
+              </span>
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              {mtf.frames.map(f => (
+                <div key={f.label} style={{
+                  flex: 1, background: '#111827', borderRadius: 8, padding: '10px 12px',
+                  border: `1px solid ${f.direction === 'bullish' ? 'rgba(16,185,129,0.25)' : f.direction === 'bearish' ? 'rgba(239,68,68,0.25)' : '#1e2d45'}`,
+                }}>
+                  <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600, marginBottom: 4 }}>{f.label}</div>
+                  <div style={{
+                    fontSize: 13, fontWeight: 700,
+                    color: f.direction === 'bullish' ? '#10b981' : f.direction === 'bearish' ? '#ef4444' : '#94a3b8',
+                  }}>{f.signal}</div>
+                  <div style={{ fontSize: 11, color: '#4a6580', fontFamily: 'JetBrains Mono, monospace', marginTop: 2 }}>
+                    {f.ret !== 0 ? `${f.ret >= 0 ? '+' : ''}${(f.ret * 100).toFixed(2)}%` : '—'}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px,1fr))', gap: 14 }}>
           <AIAnalysisPanel analysis={aiAnalysis} compact={true} />
           <AITrackRecord predictions={predictions} isConfigured={isSupabaseConfigured()} />
