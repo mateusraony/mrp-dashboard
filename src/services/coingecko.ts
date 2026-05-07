@@ -98,6 +98,15 @@ function mockAltcoins(): AltcoinMarketData[] {
  * fetchDominance — BTC/ETH dominance + total market cap
  * Cache recomendado: 5 minutos (staleTime no hook)
  */
+/** Valida shape de DominanceData lido do cache (previne cache poisoning). */
+function validateDominance(v: unknown): DominanceData | null {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
+  const d = v as Record<string, unknown>;
+  if (typeof d.btc_dominance !== 'number') return null;
+  if (typeof d.total_mcap_usd !== 'number') return null;
+  return d as unknown as DominanceData;
+}
+
 export async function fetchDominance(): Promise<DominanceData> {
   if (DATA_MODE === 'mock') return mockDominance();
 
@@ -117,7 +126,7 @@ export async function fetchDominance(): Promise<DominanceData> {
       stablecoin_supply_b: ((pct['usdt'] ?? 0) + (pct['usdc'] ?? 0)) / 100 * (parsed.data.total_market_cap['usd'] ?? 0) / 1e9,
       updated_at:          parsed.data.updated_at,
     };
-  });
+  }, validateDominance);
 }
 
 /**
@@ -154,5 +163,5 @@ export async function fetchTopAltcoins(limit = 20): Promise<AltcoinMarketData[]>
       price_change_percentage_90d: c.price_change_percentage_90d_in_currency,
       price_change_percentage_24h: c.price_change_percentage_24h,
     }));
-  });
+  }, (v) => Array.isArray(v) && v.length > 0 && typeof (v[0] as Record<string, unknown>)?.current_price === 'number' ? v as AltcoinMarketData[] : null);
 }
