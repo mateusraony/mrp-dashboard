@@ -16,6 +16,7 @@ export default defineConfig({
         'src/services/**',
         'src/utils/**',
         'src/hooks/**',
+        'src/lib/apiClient.ts',
       ],
       exclude: [
         'src/components/data/**',

@@ -16,6 +16,11 @@ const EnvSchema = z.object({
 
   // ── FRED API (macro: yields, VIX, S&P) — gratuita ────────────────────────
   VITE_FRED_API_KEY: z.string().min(1).optional(),
+
+  // ── CryptoCompare (fallback para CoinGecko em caso de 429) ───────────────
+  // Gratuito sem chave: 100 req/min. Com chave free tier: 50k req/mês.
+  // Cadastro: https://min-api.cryptocompare.com
+  VITE_CRYPTOCOMPARE_KEY: z.string().min(1).optional(),
 });
 
 // Valida no carregamento do módulo (falha silencioso em dev, hard fail em prod)
