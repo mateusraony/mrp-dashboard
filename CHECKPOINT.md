@@ -1,6 +1,6 @@
 # CHECKPOINT.md — MRP Dashboard
 > Memória técnica viva do projeto. Atualizar ao final de cada bloco importante.
-> Última atualização: 2026-05-07 (PR #84 — servidor Node.js SPA fallback · URLs diretas resolvidas)
+> Última atualização: 2026-05-07 (PR #85 — 404.html SPA fallback · Static Site · URLs diretas resolvidas)
 
 ---
 
@@ -57,7 +57,8 @@
 | **AI Etapa 2 — confluência MTF** | ✅ PR #80 | `mtfAnalysis.ts` frameFromKlines+computeConfluence; `useMtfAnalysis` hook; widget em Zona D Dashboard; 19 testes; 179/179 ✅ |
 | **AI Etapa 3 — Z-score alerts** | ✅ PR #81 | `zScore.ts` mean/stddev/computeZScore/buildZScoreAlerts; `useZScoreAlerts` hook; widget em Zona D; 32 testes; 211/211 ✅ · P2 fix: volume usa candle fechado |
 | **Fix MTF + mock isolation** | ✅ PR #82+#83 | Widget MTF sempre visível (AGUARDANDO em mock); `useKlines(enabled)` — zero fetch em mock mode |
-| **Fix SPA routing definitivo** | ✅ PR #84 | `server.js` Node.js built-in com fallback index.html; `npm start`/`npm run preview` → node server.js; `render.yaml` env:node |
+| **Fix SPA routing — Web Service** | ✅ PR #84 | `server.js` Node.js built-in com fallback index.html (útil se migrar para Web Service) |
+| **Fix SPA routing — Static Site** | ✅ PR #85 | `public/404.html` sessionStorage redirect + `main.jsx` replaceState; `render.yaml` revertido para env:static |
 
 ---
 
