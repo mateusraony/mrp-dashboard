@@ -16,6 +16,7 @@ const WS_URL = 'wss://stream.binance.com:9443/ws/btcusdt@miniTicker';
 const BACKOFF_MS = [1_000, 2_000, 4_000, 8_000, 30_000];
 
 export type PriceCallback = (price: number) => void;
+export type StatusCallback = (connected: boolean) => void;
 
 // ─── Estado singleton ──────────────────────────────────────────────────────────
 
@@ -23,6 +24,7 @@ let ws: WebSocket | null = null;
 let reconnectAttempt = 0;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 const subscribers = new Set<PriceCallback>();
+const statusSubscribers = new Set<StatusCallback>();
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -34,6 +36,10 @@ function broadcast(price: number): void {
   subscribers.forEach(cb => cb(price));
 }
 
+function broadcastStatus(connected: boolean): void {
+  statusSubscribers.forEach(cb => cb(connected));
+}
+
 function connect(): void {
   if (ws) return;
 
@@ -41,6 +47,7 @@ function connect(): void {
 
   ws.onopen = () => {
     reconnectAttempt = 0;
+    broadcastStatus(true);
   };
 
   ws.onmessage = (event: MessageEvent) => {
@@ -57,6 +64,7 @@ function connect(): void {
 
   ws.onclose = () => {
     ws = null;
+    broadcastStatus(false);
     if (subscribers.size > 0) scheduleReconnect();
   };
 
@@ -82,6 +90,7 @@ function disconnect(): void {
   ws?.close();
   ws = null;
   reconnectAttempt = 0;
+  broadcastStatus(false);
 }
 
 // ─── API pública ───────────────────────────────────────────────────────────────
@@ -104,6 +113,16 @@ export function subscribeBtcPrice(cb: PriceCallback): () => void {
   };
 }
 
+/**
+ * subscribeStatus — notifica quando o WebSocket conecta (true) ou desconecta (false).
+ * Permite que o hook limpe o preço stale ao perder a conexão.
+ */
+export function subscribeStatus(cb: StatusCallback): () => void {
+  if (!IS_LIVE) return () => {};
+  statusSubscribers.add(cb);
+  return () => { statusSubscribers.delete(cb); };
+}
+
 /** Expõe estado da conexão para testes e indicadores de UI */
 export function isWsConnected(): boolean {
   return ws !== null && ws.readyState === WebSocket.OPEN;
@@ -113,4 +132,5 @@ export function isWsConnected(): boolean {
 export function _resetSingleton(): void {
   disconnect();
   subscribers.clear();
+  statusSubscribers.clear();
 }

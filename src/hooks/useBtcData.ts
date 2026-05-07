@@ -15,7 +15,7 @@ import { IS_LIVE } from '@/lib/env';
 import { fetchBtcTicker, fetchOiByExchange, fetchKlines, fetchLiquidations, fetchLongShortRatio, fetchFuturesBasis, type BtcTickerData } from '@/services/binance';
 import { fetchDominance, fetchTopAltcoins } from '@/services/coingecko';
 import { fetchFearGreed } from '@/services/alternative';
-import { subscribeBtcPrice, isWsConnected } from '@/services/binanceWs';
+import { subscribeBtcPrice, subscribeStatus } from '@/services/binanceWs';
 
 // ─── Intervalos de refetch ────────────────────────────────────────────────────
 const PRICE_INTERVAL   = IS_LIVE ? 5_000   : false;  // 5s quando live
@@ -165,13 +165,16 @@ export function useBtcPriceWs() {
   useEffect(() => {
     if (!IS_LIVE) return;
 
-    const unsub = subscribeBtcPrice((p) => {
-      setPrice(p);
-      setConnected(isWsConnected());
+    const unsubPrice  = subscribeBtcPrice(setPrice);
+    const unsubStatus = subscribeStatus((isConnected) => {
+      setConnected(isConnected);
+      // Limpa o preço stale ao desconectar para que o fallback REST seja usado
+      if (!isConnected) setPrice(null);
     });
 
     return () => {
-      unsub();
+      unsubPrice();
+      unsubStatus();
       setConnected(false);
     };
   }, []);

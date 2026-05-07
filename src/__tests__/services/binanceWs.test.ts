@@ -16,6 +16,7 @@ vi.mock('@/lib/env', () => ({
 
 import {
   subscribeBtcPrice,
+  subscribeStatus,
   isWsConnected,
   _resetSingleton,
 } from '@/services/binanceWs';
@@ -187,5 +188,48 @@ describe('isWsConnected', () => {
 
     MockWebSocket.lastInstance!.close();
     expect(isWsConnected()).toBe(false);
+  });
+});
+
+describe('subscribeStatus — notificações de conexão/desconexão', () => {
+  it('notifica true quando WebSocket abre', async () => {
+    const statuses: boolean[] = [];
+    subscribeStatus(s => statuses.push(s));
+    subscribeBtcPrice(() => {});
+    await vi.runAllTimersAsync(); // onopen
+
+    expect(statuses).toEqual([true]);
+  });
+
+  it('notifica false quando WebSocket fecha', async () => {
+    const statuses: boolean[] = [];
+    subscribeStatus(s => statuses.push(s));
+    subscribeBtcPrice(() => {});
+    await vi.runAllTimersAsync();
+
+    MockWebSocket.lastInstance!.close();
+    expect(statuses).toContain(false);
+  });
+
+  it('não notifica após unsubscribe', async () => {
+    const statuses: boolean[] = [];
+    const unsub = subscribeStatus(s => statuses.push(s));
+    subscribeBtcPrice(() => {});
+    await vi.runAllTimersAsync();
+
+    unsub();
+    MockWebSocket.lastInstance!.close();
+    // Somente o evento true (onopen) chegou antes do unsub
+    expect(statuses).toEqual([true]);
+  });
+
+  it('notifica false quando último subscriber cancela (disconnect)', async () => {
+    const statuses: boolean[] = [];
+    subscribeStatus(s => statuses.push(s));
+    const unsub = subscribeBtcPrice(() => {});
+    await vi.runAllTimersAsync();
+
+    unsub(); // fecha WS via disconnect()
+    expect(statuses).toContain(false);
   });
 });
