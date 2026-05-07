@@ -559,6 +559,15 @@ export default function Dashboard() {
           Prob. Evento: <span style={{ fontFamily: 'JetBrains Mono, monospace', color: '#f1f5f9', fontWeight: 700 }}>{globalRisk.prob}%</span>
         </div>
         <div style={{ flex: 1 }} />
+        {/* Resumo rápido de qualidade de dados — visível no topo para novos usuários */}
+        {IS_LIVE
+          ? <span style={{ fontSize: 10, color: '#10b981', background: 'rgba(16,185,129,0.10)', border: '1px solid rgba(16,185,129,0.22)', borderRadius: 5, padding: '2px 8px', fontWeight: 700, letterSpacing: '0.02em' }}>
+              {sourceHealth.filter(s => s.grade === 'A').length} fontes ao vivo · {sourceHealth.filter(s => s.grade === 'B').length} estimadas · {sourceHealth.filter(s => ['C','D'].includes(s.grade)).length} mock
+            </span>
+          : <span style={{ fontSize: 10, color: '#f59e0b', background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.22)', borderRadius: 5, padding: '2px 8px', fontWeight: 700, letterSpacing: '0.02em' }}>
+              DEMO — todos os dados são simulados
+            </span>
+        }
         <div style={{ fontSize: 10, color: '#334155' }}>
           Updated {lastUpdate.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' })} BRT
         </div>

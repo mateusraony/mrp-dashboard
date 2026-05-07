@@ -29,6 +29,8 @@
 | pg_cron jobs | ✅ ATIVO | 3 jobs ativos: macro-actual-fetcher (*/15min), macro-alert-worker (*/5min), send-telegram-digest (11h UTC) |
 | pg_cron duplicata | ⚠️ PENDENTE | Job antigo `telegram-digest` duplica o `send-telegram-digest` — remover com SELECT cron.unschedule('telegram-digest') |
 | Auth real | ❌ AUSENTE | Stub anônimo — aguarda decisão futura |
+| **Mock que requer API paga** | ⚠️ AGUARDA | SOPR/Netflow/Baleias: Glassnode ~$29/mês · Sentimento Social (Twitter/Reddit): LunarCrush ~$19/mês · LiquidationHeatmap real: requer auth Binance · IV Delta 1D/1W/1M: sem API gratuita |
+| **Module toggles enforcement** | ⚠️ PARCIAL | Settings escreve em localStorage + feedback visual ✅ — mas as páginas ainda não lêem os flags para desativar módulos (próximo passo se necessário) |
 | **Rule-based AI Analysis** | ✅ MERGEADO (PR #49) | `ruleBasedAnalysis.ts` + wiring em Dashboard/Derivatives/SpotFlow/Options/Macro/DerivativesAdvanced/SmartAlerts/ExecutiveReport |
 | **Sprint 7.1 — Portfolio Live** | ✅ MERGEADO (PR #50) | mark_price live via useBtcTicker; VaR/Sharpe/Drawdown/Beta calculados com preço real |
 | **Sprint 7.2 — PredictivePanel Live** | ✅ MERGEADO (PR #50) | ATR(14) via useKlines(1d,30); cenários price = spot ± ATR*mult; direction via ruleBasedAnalysis |
@@ -45,6 +47,7 @@
 | **Mock audit — badges hardcoded** | ✅ PR #70 | DerivativesAdvanced (3 badges); SmartAlerts (1 badge); AIAnalysisPanel (1 badge): todos condicionais IS_LIVE agora; mockData.jsx export DATA_MODE='mock' órfão removido; Altcoins badge condition refinada |
 | **Prioridade 1 — Confiança do usuário** | ✅ PR #71 | Macro.jsx: data "2026-03-06" → "Dados de demonstração" em mock mode; GlobalMarkets: banner amber + links "Ver ↗" desativados em demo; MacroCalendar: eventos gerados relativos à data atual (nunca mais "ENCERRADO"); BotAutomations: banner ⚠️ + status "Demo" (âmbar) em vez de "Conectado" (verde); ActionDashboard Performance: banner 🧪 + badge DEMO no win rate |
 | **Prioridade 2 — Confiabilidade de dados** | ✅ PR #72 | DerivativesAdvanced: US10Y ao vivo via FRED + SPOT ao vivo via ticker no Carry Calculator; SmartAlerts: sugestões de IA dinâmicas via computeRuleBasedAnalysis (fallback para fixas); ExecutiveReport: botão "Agendar" removido, PDF/email footer IS_LIVE condicional |
+| **Prioridade 3 — Cosmético/UX** | ✅ PR #73 | Settings: toggles de módulo escrevem em localStorage + banner "Recarregue para aplicar" + botão reload; MarketRegime: histórico 90d usa seed diário (estável no dia, muda no dia seguinte) + badge "ESTIMADO"; Dashboard/DataBadge: modo "estimated" adicionado ao ModeBadge (badge azul〜ESTIMADO) |
 
 ---
 

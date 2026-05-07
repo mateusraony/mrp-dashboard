@@ -15,6 +15,19 @@ export function ModeBadge({ mode = DATA_MODE }) {
       </span>
     );
   }
+  if (mode === 'estimated') {
+    return (
+      <span style={{
+        fontSize: 10, fontFamily: 'JetBrains Mono, monospace',
+        background: 'rgba(96,165,250,0.1)', color: '#60a5fa',
+        border: '1px solid rgba(96,165,250,0.25)',
+        borderRadius: 5, padding: '2px 8px', letterSpacing: '0.06em',
+        fontWeight: 600, whiteSpace: 'nowrap',
+      }}>
+        〜 ESTIMADO
+      </span>
+    );
+  }
   return (
     <span style={{
       fontSize: 10, fontFamily: 'JetBrains Mono, monospace',

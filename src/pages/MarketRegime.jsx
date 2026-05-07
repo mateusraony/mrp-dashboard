@@ -47,12 +47,15 @@ const TRANSITION_TRIGGERS = [
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-function seedR(n) { return (Math.sin(n * 6271 + 3141) % 1 + 1) / 2; }
+// Semente muda uma vez por dia — histórico estável na mesma sessão/dia
+const DAY_SEED = Math.floor(Date.now() / 86_400_000);
+
+function seedR(n, daySeed) { return (Math.sin(n * 6271 + daySeed * 13 + 3141) % 1 + 1) / 2; }
 
 function buildHistory(baseScore) {
   return Array.from({ length: 90 }, (_, i) => {
     const base  = baseScore - 8 + i * 0.08;
-    const noise = (seedR(i) - 0.5) * 22;
+    const noise = (seedR(i, DAY_SEED) - 0.5) * 22;
     const s     = Math.min(95, Math.max(15, base + noise));
     const regime = s >= 62 ? 'Risk-On' : s <= 38 ? 'Risk-Off' : 'Neutral';
     const date   = new Date(Date.now() - (89 - i) * 86_400_000);
@@ -315,7 +318,11 @@ export default function MarketRegime() {
       {tab === 1 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '16px 18px' }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>Score de Regime — Últimos 90 Dias</div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0' }}>Score de Regime — Últimos 90 Dias</span>
+              <span style={{ fontSize: 9, color: '#94a3b8' }}>Últimos 90 dias (estimado)</span>
+              <ModeBadge mode="estimated" />
+            </div>
             <div style={{ fontSize: 9, color: '#334155', marginBottom: 12 }}>
               Score composto ponderado · &gt;62 = Risk-On · 38–62 = Neutral · &lt;38 = Risk-Off
             </div>
