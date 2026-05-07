@@ -1,6 +1,6 @@
 # CHECKPOINT.md — MRP Dashboard
 > Memória técnica viva do projeto. Atualizar ao final de cada bloco importante.
-> Última atualização: 2026-05-07 (Sprint C — Binance WebSocket para preço BTC em tempo real · PR #76)
+> Última atualização: 2026-05-07 (Sprint D — telegram.ts centralizado · PR #78)
 
 ---
 
@@ -51,7 +51,8 @@
 | **Máxima cobertura live** | ✅ PR #73 | Derivatives: OI/Market Cap ao vivo (Binance OI ÷ CoinGecko mcap); binance.ts: fetchFuturesBasis() via /fapi/v1/premiumIndex (basis real perp vs quarterly); useFuturesBasis() hook; DerivativesAdvanced CarryCalculator usa basis real; ExecutiveReport LTH/STH via CoinMetrics useOnChainExtended; MarketRegime/ExecutiveReport: "Carregando..." em vez de mock durante loading |
 | **Sprint A — Market Cache** | ✅ PR #74 | `market_cache` tabela Supabase; `marketCache.ts` withCache wrapper (TTL, timeout 2s, fire-and-forget); CoinGecko fetchDominance + fetchTopAltcoins com cache 5min — protege 30 req/min |
 | **Sprint B — apiClient + CryptoCompare** | ✅ PR #75 | `apiClient.ts` RateLimitError + retry 5xx backoff [2s,4s,8s]; `providers/cryptoCompare.ts` fallback automático em 429; 13 testes; cobertura 11.52% ✅ |
-| **Sprint C — Binance WebSocket** | ✅ PR #76 | `binanceWs.ts` singleton WS backoff 1s→30s; `useBtcPriceWs()` hook; Layout.jsx indicador WS/REST/MOCK; 13 testes; 146/146 ✅ |
+| **Sprint C — Binance WebSocket** | ✅ PR #76+#77 | `binanceWs.ts` singleton WS backoff 1s→30s; `useBtcPriceWs()` hook; Layout.jsx indicador WS/REST/MOCK; `subscribeStatus` fix stale price (P2 Codex); 150/150 ✅ |
+| **Sprint D — telegram.ts** | ✅ PR #78 | `src/services/telegram.ts` com `pingTelegram()`; fetch inline removido de Settings.jsx; build ✅ 150/150 ✅ |
 
 ---
 
