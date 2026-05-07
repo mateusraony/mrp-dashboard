@@ -13,6 +13,7 @@ import { computeRuleBasedAnalysis } from '@/utils/ruleBasedAnalysis';
 import { useAiPredictions, usePersistPrediction } from '@/hooks/useAiPredictions';
 import { useAiCalibration } from '@/hooks/useAiCalibration';
 import { useMtfAnalysis } from '@/hooks/useMtfAnalysis';
+import { useZScoreAlerts } from '@/hooks/useZScoreAlerts';
 import { isSupabaseConfigured } from '@/services/supabase';
 
 // ─── DATA LAYER (live > mock fallback) ───────────────────────────────────────
@@ -491,6 +492,9 @@ export default function Dashboard() {
   // Confluência multi-timeframe (1H / 4H / 1D)
   const mtf = useMtfAnalysis();
 
+  // Alertas estatísticos Z-score (retorno e volume 1D)
+  const zAlerts = useZScoreAlerts();
+
   // Rule-based AI analysis — all four modules, live data when available
   const liveAnalysis = IS_LIVE && (liveTicker != null || liveFng != null)
     ? computeRuleBasedAnalysis({
@@ -660,6 +664,46 @@ export default function Dashboard() {
                   }}>{f.signal}</div>
                   <div style={{ fontSize: 11, color: '#4a6580', fontFamily: 'JetBrains Mono, monospace', marginTop: 2 }}>
                     {f.ret !== 0 ? `${f.ret >= 0 ? '+' : ''}${(f.ret * 100).toFixed(2)}%` : '—'}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Alertas Estatísticos Z-Score */}
+        {zAlerts.length > 0 && (
+          <div style={{ marginBottom: 14, background: '#0d1421', border: '1px solid #162032', borderRadius: 12, padding: '14px 18px' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', letterSpacing: 0.3, marginBottom: 10 }}>
+              Alertas Estatísticos — Z-Score
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+              {zAlerts.map(a => (
+                <div key={a.metric} style={{
+                  flex: '1 1 200px', background: '#111827', borderRadius: 8, padding: '10px 14px',
+                  border: `1px solid ${a.direction === 'bullish' ? 'rgba(16,185,129,0.25)' : a.direction === 'bearish' ? 'rgba(239,68,68,0.25)' : '#1e2d45'}`,
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                    <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>{a.label}</span>
+                    <span style={{
+                      fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 4,
+                      background: a.level === 'extreme' ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.15)',
+                      color:      a.level === 'extreme' ? '#ef4444'              : '#f59e0b',
+                      border: `1px solid ${a.level === 'extreme' ? 'rgba(239,68,68,0.3)' : 'rgba(245,158,11,0.3)'}`,
+                    }}>
+                      {a.level === 'extreme' ? 'EXTREMO' : 'ELEVADO'}
+                    </span>
+                  </div>
+                  <div style={{
+                    fontSize: 20, fontWeight: 800, fontFamily: 'JetBrains Mono, monospace',
+                    color: a.direction === 'bullish' ? '#10b981' : a.direction === 'bearish' ? '#ef4444' : '#94a3b8',
+                  }}>
+                    {a.z >= 0 ? '+' : ''}{a.z.toFixed(2)}σ
+                  </div>
+                  <div style={{ fontSize: 11, color: '#4a6580', marginTop: 2, fontFamily: 'JetBrains Mono, monospace' }}>
+                    {a.metric === 'return'
+                      ? `${a.value >= 0 ? '+' : ''}${(a.value * 100).toFixed(2)}% · média ${(a.histMean * 100).toFixed(2)}%`
+                      : `$${(a.value / 1e9).toFixed(1)}B · média $${(a.histMean / 1e9).toFixed(1)}B`}
                   </div>
                 </div>
               ))}
