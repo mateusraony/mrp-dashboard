@@ -362,7 +362,7 @@ Organizar resiliência de API com cache no Supabase para nunca estourar limites 
 - Segurança com VITE_ vars — já em `src/lib/env.ts`
 - Fallback mock/live — já em todos os serviços
 
-### Sprint B — apiClient retry/429 + CryptoCompare fallback — PR #75
+### Sprint B — apiClient retry/429 + CryptoCompare fallback — PR #75 ✅ MERGEADO
 | Item | Arquivo | Status |
 |------|---------|--------|
 | `apiFetch` com retry 5xx + `RateLimitError` em 429 | `src/lib/apiClient.ts` | ✅ |
