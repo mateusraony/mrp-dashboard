@@ -1,6 +1,7 @@
 // DataBadge — v2 — shows 🧪 MOCK / 🛰️ LIVE + Grade A/B/C
 import { DATA_MODE } from '@/lib/env';
 
+/** @param {{ mode?: 'mock' | 'live' | 'estimated' }} props */
 export function ModeBadge({ mode = DATA_MODE }) {
   if (mode === 'live') {
     return (
