@@ -385,9 +385,16 @@ Organizar resiliência de API com cache no Supabase para nunca estourar limites 
 ### Verificação completa (teste como usuário — 2026-05-07)
 - ✅ Migration aplicada via MCP — tabela criada no Supabase WorkSpace MRP
 - ✅ INSERT + upsert por `cache_key` testados — freshness check `age_sec=8 → FRESH`
-- ✅ `npm run build` — 0 erros (15.22s)
-- ✅ `npm test` — 117/117 testes passando
-- ✅ PR #74 criado e mergeado
+- ✅ `npm run build` — 0 erros (8.42s)
+- ✅ `npm test:coverage` — 122/122 testes · lines 10.04% · functions 10.23%
+- ✅ PR #74 mergeado (incluindo correções P1/P2 do Codex Review)
+
+### Bugs corrigidos durante CI do Sprint A (commit b56ef6b)
+| # | Severidade | Bug | Fix |
+|---|------------|-----|-----|
+| P2 | Crítico | `setCached` sem `?on_conflict=cache_key` — PostgREST conflitava no PK (uuid novo), silenciava todos os writes após o 1º insert | URL: `/rest/v1/market_cache?on_conflict=cache_key` |
+| P1 | Alto | Cache hits devolvidos sem validação — anon key exposta permite escrever dados envenenados em market_cache | `withCache` aceita `validate?` opcional; `coingecko.ts` passa `validateDominance` e `validateAltcoins` |
+| CI | Alto | `marketCache.ts` sem testes derrubou coverage de lines para 9.86% (threshold 10%) | 5 testes em `marketCache.test.ts` → lines 10.04% ✅ |
 
 ---
 
