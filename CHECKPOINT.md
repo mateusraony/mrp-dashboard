@@ -362,6 +362,17 @@ Organizar resiliência de API com cache no Supabase para nunca estourar limites 
 - Segurança com VITE_ vars — já em `src/lib/env.ts`
 - Fallback mock/live — já em todos os serviços
 
+### Sprint B — apiClient retry/429 + CryptoCompare fallback — PR #75
+| Item | Arquivo | Status |
+|------|---------|--------|
+| `apiFetch` com retry 5xx + `RateLimitError` em 429 | `src/lib/apiClient.ts` | ✅ |
+| Fallback CryptoCompare para altcoins em 429 | `src/services/providers/cryptoCompare.ts` | ✅ |
+| `VITE_CRYPTOCOMPARE_KEY` opcional | `src/lib/env.ts` | ✅ |
+| `coingecko.ts` usa `apiFetch` + fallback automático | `src/services/coingecko.ts` | ✅ |
+| 13 testes cobrindo todos os cenários de retry/429 | `src/__tests__/lib/apiClient.test.ts` | ✅ |
+| `src/lib/apiClient.ts` adicionado ao include de coverage | `vitest.config.ts` | ✅ |
+| build ✅ · lint ✅ · tsc ✅ · tests 134/134 ✅ · lines 11.52% · functions 11.13% | — | ✅ |
+
 ### O que foi adicionado no Sprint A — PR #74 ✅ MERGEADO
 | Item | Arquivo | Status |
 |------|---------|--------|
