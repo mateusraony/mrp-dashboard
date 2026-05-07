@@ -10,10 +10,12 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
+import { useState, useEffect } from 'react';
 import { IS_LIVE } from '@/lib/env';
 import { fetchBtcTicker, fetchOiByExchange, fetchKlines, fetchLiquidations, fetchLongShortRatio, fetchFuturesBasis, type BtcTickerData } from '@/services/binance';
 import { fetchDominance, fetchTopAltcoins } from '@/services/coingecko';
 import { fetchFearGreed } from '@/services/alternative';
+import { subscribeBtcPrice, isWsConnected } from '@/services/binanceWs';
 
 // ─── Intervalos de refetch ────────────────────────────────────────────────────
 const PRICE_INTERVAL   = IS_LIVE ? 5_000   : false;  // 5s quando live
@@ -149,6 +151,32 @@ export function useFearGreed(limit = 30) {
     staleTime: 3_500_000,
     refetchInterval: FNG_INTERVAL,
   });
+}
+
+/**
+ * useBtcPriceWs — preço BTC em tempo real via Binance WebSocket.
+ * Retorna o último preço recebido e status da conexão.
+ * Em modo mock retorna { price: null, connected: false }.
+ */
+export function useBtcPriceWs() {
+  const [price, setPrice] = useState<number | null>(null);
+  const [connected, setConnected] = useState(false);
+
+  useEffect(() => {
+    if (!IS_LIVE) return;
+
+    const unsub = subscribeBtcPrice((p) => {
+      setPrice(p);
+      setConnected(isWsConnected());
+    });
+
+    return () => {
+      unsub();
+      setConnected(false);
+    };
+  }, []);
+
+  return { price, connected };
 }
 
 /**
