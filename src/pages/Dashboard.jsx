@@ -630,9 +630,8 @@ export default function Dashboard() {
       <div style={{ marginBottom: 20 }}>
         <SectionTitle icon="🤖" label="AI Analysis & Previsões" sub="Análise automática baseada em todos os módulos · Com histórico de acertos" />
 
-        {/* Confluência Multi-Timeframe */}
-        {mtf && (
-          <div style={{ marginBottom: 14, background: '#0d1421', border: '1px solid #162032', borderRadius: 12, padding: '14px 18px' }}>
+        {/* Confluência Multi-Timeframe — sempre visível (AGUARDANDO enquanto klines carregam) */}
+        <div style={{ marginBottom: 14, background: '#0d1421', border: '1px solid #162032', borderRadius: 12, padding: '14px 18px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
               <span style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', letterSpacing: 0.3 }}>Confluência Multi-Timeframe</span>
               <span style={{
@@ -669,7 +668,6 @@ export default function Dashboard() {
               ))}
             </div>
           </div>
-        )}
 
         {/* Alertas Estatísticos Z-Score */}
         {zAlerts.length > 0 && (
