@@ -14,6 +14,7 @@ import { useAiPredictions, usePersistPrediction } from '@/hooks/useAiPredictions
 import { useAiCalibration } from '@/hooks/useAiCalibration';
 import { useMtfAnalysis } from '@/hooks/useMtfAnalysis';
 import { useZScoreAlerts } from '@/hooks/useZScoreAlerts';
+import { useAiInsight } from '@/hooks/useAiInsight';
 import { isSupabaseConfigured } from '@/services/supabase';
 
 // ─── DATA LAYER (live > mock fallback) ───────────────────────────────────────
@@ -495,6 +496,21 @@ export default function Dashboard() {
   // Alertas estatísticos Z-score (retorno e volume 1D)
   const zAlerts = useZScoreAlerts();
 
+  // Análise em linguagem natural via Claude Haiku (AI Etapa 4) — 15min cache
+  const aiInsightPayload = (IS_LIVE && liveTicker)
+    ? {
+        riskScore:      activeScore,
+        riskRegime:     activeRegime,
+        fearGreedValue: _fngLive?.value ?? fearGreed.value,
+        fearGreedLabel: _fngLive?.label ?? fearGreed.label,
+        fundingRate:    liveTicker.last_funding_rate,
+        mtfConfluence:  mtf.confluence,
+        mtfDirection:   mtf.confluenceDir,
+        zAlerts:        zAlerts.slice(0, 2).map(a => ({ metric: a.metric, level: a.level, z: a.z, direction: a.direction })),
+      }
+    : null;
+  const { data: haiku, isLoading: haikuLoading } = useAiInsight(aiInsightPayload);
+
   // Rule-based AI analysis — all four modules, live data when available
   const liveAnalysis = IS_LIVE && (liveTicker != null || liveFng != null)
     ? computeRuleBasedAnalysis({
@@ -706,6 +722,32 @@ export default function Dashboard() {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Análise AI — Claude Haiku 4.5 — só mostra quando IS_LIVE + Supabase configurado */}
+        {(haiku || haikuLoading) && (
+          <div style={{ marginBottom: 14, background: '#0d1421', border: '1px solid rgba(139,92,246,0.25)', borderRadius: 12, padding: '14px 18px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>Análise Natural — Claude Haiku</span>
+              <span style={{
+                fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 4,
+                background: 'rgba(139,92,246,0.15)', color: '#a78bfa',
+                border: '1px solid rgba(139,92,246,0.3)', letterSpacing: '0.06em',
+              }}>AI · 15min cache</span>
+            </div>
+            {haikuLoading
+              ? <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                  {[0, 1, 2].map(i => (
+                    <div key={i} style={{
+                      width: 6, height: 6, borderRadius: '50%', background: '#a78bfa',
+                      animation: `pulse 1.2s ease-in-out ${i * 0.2}s infinite`,
+                    }} />
+                  ))}
+                  <span style={{ fontSize: 11, color: '#475569', marginLeft: 6 }}>Gerando análise…</span>
+                </div>
+              : <p style={{ fontSize: 13, color: '#cbd5e1', lineHeight: 1.65, margin: 0 }}>{haiku}</p>
+            }
           </div>
         )}
 
