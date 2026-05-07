@@ -1,6 +1,6 @@
 # CHECKPOINT.md — MRP Dashboard
 > Memória técnica viva do projeto. Atualizar ao final de cada bloco importante.
-> Última atualização: 2026-05-07 (Sprint D — telegram.ts centralizado · PR #78)
+> Última atualização: 2026-05-07 (AI Etapa 1 — pesos auto-calibrados por histórico · PR #79)
 
 ---
 
@@ -53,6 +53,7 @@
 | **Sprint B — apiClient + CryptoCompare** | ✅ PR #75 | `apiClient.ts` RateLimitError + retry 5xx backoff [2s,4s,8s]; `providers/cryptoCompare.ts` fallback automático em 429; 13 testes; cobertura 11.52% ✅ |
 | **Sprint C — Binance WebSocket** | ✅ PR #76+#77 | `binanceWs.ts` singleton WS backoff 1s→30s; `useBtcPriceWs()` hook; Layout.jsx indicador WS/REST/MOCK; `subscribeStatus` fix stale price (P2 Codex); 150/150 ✅ |
 | **Sprint D — telegram.ts** | ✅ PR #78 | `src/services/telegram.ts` com `pingTelegram()`; fetch inline removido de Settings.jsx; build ✅ 150/150 ✅ |
+| **AI Etapa 1 — pesos calibrados** | ✅ PR #79 | `aiCalibration.ts` + `useAiCalibration` hook; `projectWeights()` iterativo garante 10%/40% pós-norm; Dashboard passa pesos ao engine; 163/163 ✅ |
 
 ---
 
