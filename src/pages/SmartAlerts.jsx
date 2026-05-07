@@ -1,7 +1,7 @@
 // ─── SMART ALERTS — CENTRAL DE NOTIFICAÇÕES AI ───────────────────────────────
 // Alertas automáticos do sistema + AI com sugestões
 // Usuário configura prioridade e tipo de alerta — sem gestão de portfólio
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { defaultAlertRules as defaultAlertRulesMock, alertHistory, riskDashboard, ALERT_TYPES } from '../components/data/mockDataAlerts';
 import { recentAlerts, globalRisk } from '../components/data/mockData';
 import { useAlertRules, useUpsertAlertRule, useDeleteAlertRule } from '@/hooks/useSupabase';
@@ -15,6 +15,7 @@ import { useRiskScore } from '@/hooks/useRiskScore';
 import { useMultiVenueSnapshot } from '@/hooks/useMultiVenue';
 import { IS_LIVE } from '@/lib/env';
 import { logInfo, logError } from '@/lib/debugLog';
+import { computeRuleBasedAnalysis } from '@/utils/ruleBasedAnalysis';
 
 // ─── Componentes do Ciclo de Alertas ─────────────────────────────────────────
 const cycleTypeConfig = {
@@ -451,6 +452,81 @@ export default function SmartAlerts() {
     ? (ticker.last_funding_rate * 100 + (multiVenue.bybit.funding_rate ?? 0) * 100 + (multiVenue.okx.funding_rate ?? 0) * 100) / 3
     : null;
 
+  // ── Análise AI baseada em regras a partir de dados live ──────────────────────
+  // Mapeia módulos de ruleBasedAnalysis para o formato esperado por AISuggestionCard
+  const liveSuggestions = useMemo(() => {
+    if (!IS_LIVE || (!ticker && !fngData && !riskScore)) return null;
+
+    const analysis = computeRuleBasedAnalysis({
+      derivatives: ticker ? {
+        fundingRate:  ticker.last_funding_rate,
+        oiDeltaPct:   ticker.oi_delta_pct ?? 0,
+        openInterest: ticker.open_interest,
+      } : undefined,
+      spot: ticker ? {
+        ret1d:        (ticker.price_change_pct ?? 0) / 100,
+        cvd1d:        0,
+        volume1dUsdt: ticker.volume_24h_usdt ?? 0,
+        price:        ticker.mark_price,
+      } : undefined,
+      macro: fngData ? {
+        fngValue:   fngData.value,
+        fngLabel:   fngData.label,
+        riskScore:  riskScore?.score ?? 50,
+        riskRegime: riskScore?.regime ?? 'MODERADO',
+      } : undefined,
+    });
+
+    // Mapa de módulo → metadados estáticos da UI
+    const MODULE_META = {
+      derivatives: {
+        id: 'live001', category: 'derivatives',
+        data_sources: ['binance_futures', 'coinglass'],
+      },
+      spot: {
+        id: 'live002', category: 'derivatives',
+        data_sources: ['binance_spot'],
+      },
+      options: {
+        id: 'live003', category: 'sentiment',
+        data_sources: ['deribit'],
+      },
+      macro: {
+        id: 'live004', category: 'sentiment',
+        data_sources: ['alternative', 'binance'],
+      },
+    };
+
+    // Converte score 0–100 → prioridade UI
+    const scoreToPriority = (score) => {
+      if (score >= 70) return 'CRITICAL';
+      if (score >= 58) return 'HIGH';
+      if (score >= 45) return 'MEDIUM';
+      return 'LOW';
+    };
+
+    const now = new Date();
+    return Object.entries(analysis.modules).map(([key, mod], idx) => {
+      const meta = MODULE_META[key];
+      return {
+        id:          meta.id,
+        category:    meta.category,
+        priority:    scoreToPriority(mod.score),
+        title:       mod.signal,
+        reasoning:   mod.analysis,
+        suggestion:  `Gatilho: ${mod.trigger}. Timeframe esperado: ${mod.timeframe}.`,
+        probability: mod.probability,
+        confidence:  mod.confidence,
+        trigger:     mod.trigger,
+        data_sources: meta.data_sources,
+        created_at:  new Date(now.getTime() - idx * 60000), // offset fictício p/ formatar tempo
+      };
+    });
+  }, [ticker, fngData, riskScore]);
+
+  // Sugestões ativas: usa live quando disponível, cai para mock estático
+  const activeSuggestions = liveSuggestions ?? AI_SUGGESTIONS;
+
   // Estado local inicializado com dados do Supabase (ou mock como fallback)
   const [rules, setRules] = useState(defaultAlertRulesMock);
   const _seededRef = useRef(false);
@@ -499,11 +575,11 @@ export default function SmartAlerts() {
   const rd = riskDashboard;
 
   const filteredSuggestions = categoryFilter === 'all'
-    ? AI_SUGGESTIONS
-    : AI_SUGGESTIONS.filter(s => s.category === categoryFilter);
+    ? activeSuggestions
+    : activeSuggestions.filter(s => s.category === categoryFilter);
 
   const TABS = [
-    { id: 'ai',        label: '🤖 AI & Sugestões',  badge: AI_SUGGESTIONS.filter(s => s.priority === 'HIGH' || s.priority === 'CRITICAL').length },
+    { id: 'ai',        label: '🤖 AI & Sugestões',  badge: activeSuggestions.filter(s => s.priority === 'HIGH' || s.priority === 'CRITICAL').length },
     { id: 'active',    label: '🔔 Ativos',           badge: activeAlerts.length },
     { id: 'config',    label: '⚙️ Configurar',       badge: rules.filter(r => r.enabled).length },
     { id: 'history',   label: '📋 Histórico',        badge: null },
