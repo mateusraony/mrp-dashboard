@@ -7,6 +7,23 @@
 
 export type Direction = 'bullish' | 'bearish' | 'bullish_bias' | 'bearish_bias' | 'neutral';
 
+// ── Pesos por módulo ──────────────────────────────────────────────────────────
+
+export interface ModuleWeights {
+  derivatives: number;
+  spot:        number;
+  options:     number;
+  macro:       number;
+}
+
+/** Pesos padrão equiponderados — usados enquanto não há histórico suficiente */
+export const DEFAULT_WEIGHTS: ModuleWeights = {
+  derivatives: 0.25,
+  spot:        0.25,
+  options:     0.25,
+  macro:       0.25,
+};
+
 export interface ModuleAnalysis {
   score:      number;
   signal:     string;
@@ -251,37 +268,52 @@ function aggregateOverall(
   s: ModuleAnalysis,
   o: ModuleAnalysis,
   m: ModuleAnalysis,
+  weights: ModuleWeights = DEFAULT_WEIGHTS,
 ): RuleBasedAnalysis['overall'] {
-  const modules = [d, s, o, m];
-  const avgProb = modules.reduce((a, mod) => a + mod.probability, 0) / modules.length;
-  const avgConf = modules.reduce((a, mod) => a + mod.confidence, 0) / modules.length;
+  const pairs: [ModuleAnalysis, number][] = [
+    [d, weights.derivatives],
+    [s, weights.spot],
+    [o, weights.options],
+    [m, weights.macro],
+  ];
 
-  const bearCount = modules.filter(mod => mod.direction === 'bearish' || mod.direction === 'bearish_bias').length;
-  const bullCount = modules.filter(mod => mod.direction === 'bullish' || mod.direction === 'bullish_bias').length;
+  // Pesos somados por direção — substitui contagem simples
+  const bearishScore = pairs
+    .filter(([mod]) => mod.direction === 'bearish' || mod.direction === 'bearish_bias')
+    .reduce((sum, [, w]) => sum + w, 0);
+  const bullishScore = pairs
+    .filter(([mod]) => mod.direction === 'bullish' || mod.direction === 'bullish_bias')
+    .reduce((sum, [, w]) => sum + w, 0);
+
+  // Médias ponderadas de probabilidade e confiança
+  const avgProb = pairs.reduce((sum, [mod, w]) => sum + mod.probability * w, 0);
+  const avgConf = pairs.reduce((sum, [mod, w]) => sum + mod.confidence * w, 0);
 
   let direction: Direction;
   let recommendation: string;
-  if (bearCount >= 3) { direction = 'bearish'; recommendation = 'REDUZIR EXPOSIÇÃO · BEAR SINAL'; }
-  else if (bearCount === 2 && bullCount === 0) { direction = 'bearish_bias'; recommendation = 'CAUTELA · REDUZIR LONGS'; }
-  else if (bullCount >= 3) { direction = 'bullish'; recommendation = 'AUMENTAR EXPOSIÇÃO · BULL SINAL'; }
-  else if (bullCount === 2 && bearCount === 0) { direction = 'bullish_bias'; recommendation = 'VIÉS COMPRADOR · MONITORAR'; }
-  else { direction = 'neutral'; recommendation = 'NEUTRO · AGUARDAR DEFINIÇÃO'; }
+  // Thresholds calibrados para equivaler ao comportamento com pesos iguais (0.25 cada)
+  if      (bearishScore >= 0.65)                              { direction = 'bearish';      recommendation = 'REDUZIR EXPOSIÇÃO · BEAR SINAL'; }
+  else if (bearishScore >= 0.45 && bullishScore < 0.15)       { direction = 'bearish_bias'; recommendation = 'CAUTELA · REDUZIR LONGS'; }
+  else if (bullishScore >= 0.65)                              { direction = 'bullish';      recommendation = 'AUMENTAR EXPOSIÇÃO · BULL SINAL'; }
+  else if (bullishScore >= 0.45 && bearishScore < 0.15)       { direction = 'bullish_bias'; recommendation = 'VIÉS COMPRADOR · MONITORAR'; }
+  else                                                        { direction = 'neutral';      recommendation = 'NEUTRO · AGUARDAR DEFINIÇÃO'; }
 
-  // Dominant signals
-  const bearSignals = modules.filter(mod => mod.direction === 'bearish' || mod.direction === 'bearish_bias').map(mod => mod.signal);
-  const bullSignals = modules.filter(mod => mod.direction === 'bullish' || mod.direction === 'bullish_bias').map(mod => mod.signal);
+  const bearSignals = pairs.filter(([mod]) => mod.direction === 'bearish' || mod.direction === 'bearish_bias').map(([mod]) => mod.signal);
+  const bullSignals = pairs.filter(([mod]) => mod.direction === 'bullish' || mod.direction === 'bullish_bias').map(([mod]) => mod.signal);
 
-  const rationale = `Análise rule-based a partir de dados live. ${bearCount > bullCount ? `${bearCount} de 4 módulos com sinal bearish: ${bearSignals.join(', ')}.` : `${bullCount} de 4 módulos com sinal bullish: ${bullSignals.join(', ')}.`} Score médio ponderado: ${modules.reduce((a, mod) => a + mod.score, 0) / 4 | 0}/100. Prob. média de continuação do regime atual: ${(avgProb * 100).toFixed(0)}%.`;
+  const isCalibrated = Math.abs(weights.derivatives - 0.25) > 0.01;
+  const weightNote = isCalibrated ? ' (pesos calibrados por histórico)' : '';
+  const rationale = `Análise rule-based${weightNote}. ${bearishScore > bullishScore ? `Score bearish: ${(bearishScore * 100).toFixed(0)}% — sinais: ${bearSignals.join(', ')}.` : `Score bullish: ${(bullishScore * 100).toFixed(0)}% — sinais: ${bullSignals.join(', ')}.`} Score ponderado: ${pairs.reduce((a, [mod, w]) => a + mod.score * w, 0) | 0}/100. Prob. de continuação: ${(avgProb * 100).toFixed(0)}%.`;
 
   const bull_case = bullSignals.length > 0
-    ? `${bullSignals.join(' + ')}. ${bullCount >= 2 ? 'Múltiplos módulos convergindo para sinal comprador.' : 'Sinal isolated — confirmar com volume e CVD.'}`
+    ? `${bullSignals.join(' + ')}. ${bullishScore >= 0.45 ? 'Múltiplos módulos convergindo para sinal comprador.' : 'Sinal isolated — confirmar com volume e CVD.'}`
     : 'Sem sinais bullish ativos no momento. Aguardar reversão de funding ou CVD positivo.';
 
   const bear_case = bearSignals.length > 0
-    ? `${bearSignals.join(' + ')}. ${bearCount >= 2 ? 'Convergência bearish sugere reduzir alavancagem.' : 'Sinal isolated — monitorar próximos ciclos de funding.'}`
+    ? `${bearSignals.join(' + ')}. ${bearishScore >= 0.45 ? 'Convergência bearish sugere reduzir alavancagem.' : 'Sinal isolated — monitorar próximos ciclos de funding.'}`
     : 'Sem sinais bearish ativos no momento. Estrutura equilibrada.';
 
-  const triggerModule = modules.reduce((a, b) => a.probability > b.probability ? a : b);
+  const triggerModule = pairs.reduce((a, b) => a[0].probability > b[0].probability ? a : b)[0];
 
   return {
     recommendation,
@@ -307,9 +339,10 @@ export interface RuleBasedInputs {
 
 /**
  * computeRuleBasedAnalysis — generates full AI analysis from live data inputs.
+ * @param weights  Pesos por módulo (calibrados ou DEFAULT_WEIGHTS). Opcional.
  * Any null input module falls back to neutral/mock values.
  */
-export function computeRuleBasedAnalysis(inputs: RuleBasedInputs): RuleBasedAnalysis {
+export function computeRuleBasedAnalysis(inputs: RuleBasedInputs, weights?: ModuleWeights): RuleBasedAnalysis {
   const deriv = inputs.derivatives
     ? analyzeDerivatives(inputs.derivatives)
     : { score: 50, signal: 'AGUARDANDO DADOS', direction: 'neutral' as Direction, confidence: 0.3, probability: 0.45, timeframe: '—', trigger: '—', analysis: 'Dados live não disponíveis.' };
@@ -329,7 +362,7 @@ export function computeRuleBasedAnalysis(inputs: RuleBasedInputs): RuleBasedAnal
   return {
     generated_at: new Date(),
     model: 'rule-based-v1',
-    overall: aggregateOverall(deriv, spot, opts, macro),
+    overall: aggregateOverall(deriv, spot, opts, macro, weights),
     modules: { derivatives: deriv, spot, options: opts, macro },
   };
 }

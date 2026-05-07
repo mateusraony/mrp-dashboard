@@ -11,6 +11,7 @@ import { useMacroBoard } from '@/hooks/useFred';
 import { useMempoolState } from '@/hooks/useMempool';
 import { computeRuleBasedAnalysis } from '@/utils/ruleBasedAnalysis';
 import { useAiPredictions, usePersistPrediction } from '@/hooks/useAiPredictions';
+import { useAiCalibration } from '@/hooks/useAiCalibration';
 import { isSupabaseConfigured } from '@/services/supabase';
 
 // ─── DATA LAYER (live > mock fallback) ───────────────────────────────────────
@@ -483,6 +484,9 @@ function AITrackRecord({ predictions = [], isConfigured = false }) {
 export default function Dashboard() {
   const { ticker: liveTicker, fng: liveFng, riskScore: liveRiskScore, btcFutures: _btcLive, fearGreed: _fngLive, errors: liveErrors } = useDashboardLiveData();
 
+  // Pesos calibrados por histórico de previsões (fallback: equiponderado)
+  const { data: calibration } = useAiCalibration();
+
   // Rule-based AI analysis — all four modules, live data when available
   const liveAnalysis = IS_LIVE && (liveTicker != null || liveFng != null)
     ? computeRuleBasedAnalysis({
@@ -503,7 +507,7 @@ export default function Dashboard() {
           riskScore:  liveRiskScore?.score ?? 50,
           riskRegime: liveRiskScore?.regime ?? 'MODERADO',
         } : undefined,
-      })
+      }, calibration?.weights)
     : null;
   const aiAnalysis = liveAnalysis ?? aiAnalysisMockData;
 
