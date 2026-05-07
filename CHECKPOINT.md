@@ -1,6 +1,6 @@
 # CHECKPOINT.md — MRP Dashboard
 > Memória técnica viva do projeto. Atualizar ao final de cada bloco importante.
-> Última atualização: 2026-05-07 (Mock audit completo — PR #69/#70 badges corrigidos · PR #71: Prioridade 1 — 5 correções de confiança do usuário)
+> Última atualização: 2026-05-07 (Sprint C — Binance WebSocket para preço BTC em tempo real · PR #76)
 
 ---
 
@@ -50,6 +50,8 @@
 | **Prioridade 3 — Cosmético/UX** | ✅ PR #73 | Settings: toggles de módulo escrevem em localStorage + banner "Recarregue para aplicar" + botão reload; MarketRegime: histórico 90d usa seed diário (estável no dia, muda no dia seguinte) + badge "ESTIMADO"; Dashboard/DataBadge: modo "estimated" adicionado ao ModeBadge (badge azul〜ESTIMADO) |
 | **Máxima cobertura live** | ✅ PR #73 | Derivatives: OI/Market Cap ao vivo (Binance OI ÷ CoinGecko mcap); binance.ts: fetchFuturesBasis() via /fapi/v1/premiumIndex (basis real perp vs quarterly); useFuturesBasis() hook; DerivativesAdvanced CarryCalculator usa basis real; ExecutiveReport LTH/STH via CoinMetrics useOnChainExtended; MarketRegime/ExecutiveReport: "Carregando..." em vez de mock durante loading |
 | **Sprint A — Market Cache** | ✅ PR #74 | `market_cache` tabela Supabase; `marketCache.ts` withCache wrapper (TTL, timeout 2s, fire-and-forget); CoinGecko fetchDominance + fetchTopAltcoins com cache 5min — protege 30 req/min |
+| **Sprint B — apiClient + CryptoCompare** | ✅ PR #75 | `apiClient.ts` RateLimitError + retry 5xx backoff [2s,4s,8s]; `providers/cryptoCompare.ts` fallback automático em 429; 13 testes; cobertura 11.52% ✅ |
+| **Sprint C — Binance WebSocket** | ✅ PR #76 | `binanceWs.ts` singleton WS backoff 1s→30s; `useBtcPriceWs()` hook; Layout.jsx indicador WS/REST/MOCK; 13 testes; 146/146 ✅ |
 
 ---
 

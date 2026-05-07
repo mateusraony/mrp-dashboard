@@ -4,7 +4,7 @@
 > Stack: React, Tailwind, Lucide, Vite, Node.js (ESM), TypeScript, Zod.
 > Repositório: https://github.com/mateusraony/mrp-dashboard
 > Deploy: https://mrp-dashboard.onrender.com
-> Última atualização: 2026-04-16
+> Última atualização: 2026-05-07
 
 ---
 
@@ -43,7 +43,7 @@ src/
     options/      → 3 componentes
     ai/           → 1 componente AI
   hooks/
-    useBtcData.ts       ← 7 hooks (ticker, klines, liquidações, etc.)
+    useBtcData.ts       ← 8 hooks (ticker, klines, liquidações, etc.) + useBtcPriceWs (Sprint C)
     useCoinMetrics.ts   ← useOnChainCycle + useOnChainExtended (NOVO Sprint 6.1)
     useDeribit.ts       ← options IV, term structure
     useFred.ts          ← macro yields + useGlobalLiquidity (NOVO Sprint 6.2)
@@ -56,18 +56,27 @@ src/
     coinmetrics.ts (CDD/Dormancy/HODL proxy — NOVO Sprint 6.1),
     deribit.ts, fred.ts (Global Liquidity — NOVO Sprint 6.2),
     mempool.ts, okx.ts, supabase.ts
+    marketCache.ts      ← withCache<T> TTL 5min Supabase edge cache (Sprint A)
+    binanceWs.ts        ← singleton WebSocket BTC price, backoff reconnect (Sprint C)
+    providers/
+      cryptoCompare.ts  ← fallback CoinGecko 429 via CryptoCompare (Sprint B)
   utils/
     index.ts, riskCalculations.ts, sessionAnalytics.ts
   lib/
     env.ts, errorBoundary.tsx, AuthContext.jsx (stub anônimo)
     query-client.js, app-params.js, notificationClient.js
+    apiClient.ts        ← apiFetch + RateLimitError + retry 5xx backoff (Sprint B)
   __tests__/
     utils/sessionAnalytics.test.ts   ← 15 testes
     services/coinmetrics.test.ts      ← 10 testes
+    services/marketCache.test.ts      ← 5 testes (Sprint A)
+    lib/apiClient.test.ts             ← 13 testes (Sprint B)
+    services/binanceWs.test.ts        ← 13 testes (Sprint C)
 scripts/
   validate_var.py, validate_risk_score.py, validate_gex.py,
   validate_macro_surprise.py, validate_mvrv_zscore.py
 supabase/migrations/20260412000000_create_core_tables.sql
+supabase/migrations/20260507000000_market_cache.sql   ← Sprint A
 vitest.config.ts
 .env.local (criado com credenciais reais — ignorado pelo git)
 ```
@@ -247,6 +256,17 @@ AUTOMAÇÕES
 16. ✅ **SPA routing Render** — `public/_redirects` — sem 404 em refresh de rota.
 17. ✅ **Migration conflict Supabase** — 5 stubs + schema consolidado + pré-registro prod/preview — PR check ✅.
 18. ✅ **Settings persistência** — FK constraint removida, upsert anônimo funciona com sentinel UUID.
+
+### Implementados (Sprints A–C — Resiliência de API):
+19. ✅ **Sprint A — Supabase edge cache** — `market_cache` tabela + `withCache<T>` TTL 5min, timeout 2s, validate anti-poisoning; CoinGecko protegido contra 30 req/min (PR #74).
+20. ✅ **Sprint B — apiClient + CryptoCompare** — `apiFetch` retry 5xx backoff [2s,4s,8s]; `RateLimitError` 429 imediato; `cryptoCompare.ts` fallback automático; 13 testes (PR #75).
+21. ✅ **Sprint C — Binance WebSocket** — `binanceWs.ts` singleton WS backoff 1s→30s; `useBtcPriceWs()` hook; indicador WS/REST/MOCK no header; 13 testes (PR #76).
+
+#### Padrões de resiliência (Sprints A–C):
+- `withCache(key, ttlSec, source, fetcher, validate?)` — read-through com TTL, IS_LIVE guard, fire-and-forget write
+- `apiFetch(url, options?)` — 429→RateLimitError sem retry; 5xx/TypeError→retry backoff
+- `subscribeBtcPrice(cb)` → `() => void` — singleton WS, backoff, unsubscribe fecha WS quando sem subscribers
+- Variáveis de ambiente: `VITE_CRYPTOCOMPARE_KEY` (opcional, 100 req/min free sem chave)
 
 ### Pendentes:
 - [ ] **Telegram Digest** — Edge Function pronta. Falta: deploy via CLI + pg_cron no Supabase Dashboard.
