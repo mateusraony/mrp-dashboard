@@ -11,6 +11,7 @@ import { z } from 'zod';
 import { DATA_MODE } from '@/lib/env';
 import { btcDominance, stablecoinSupply } from '@/components/data/mockData';
 import { ethDominance, topAltcoins } from '@/components/data/mockDataAltcoins';
+import { withCache } from './marketCache';
 
 const BASE = 'https://api.coingecko.com/api/v3';
 
@@ -100,21 +101,23 @@ function mockAltcoins(): AltcoinMarketData[] {
 export async function fetchDominance(): Promise<DominanceData> {
   if (DATA_MODE === 'mock') return mockDominance();
 
-  const res = await fetch(`${BASE}/global`);
-  if (!res.ok) throw new Error(`CoinGecko /global error ${res.status}`);
+  return withCache('coingecko:dominance', 300, 'coingecko', async () => {
+    const res = await fetch(`${BASE}/global`);
+    if (!res.ok) throw new Error(`CoinGecko /global error ${res.status}`);
 
-  const raw = await res.json();
-  const parsed = GlobalDataSchema.parse(raw);
-  const pct = parsed.data.market_cap_percentage;
+    const raw = await res.json();
+    const parsed = GlobalDataSchema.parse(raw);
+    const pct = parsed.data.market_cap_percentage;
 
-  return {
-    btc_dominance:       pct['btc'] ?? 0,
-    eth_dominance:       pct['eth'] ?? 0,
-    others_dominance:    100 - (pct['btc'] ?? 0) - (pct['eth'] ?? 0),
-    total_mcap_usd:      parsed.data.total_market_cap['usd'] ?? 0,
-    stablecoin_supply_b: ((pct['usdt'] ?? 0) + (pct['usdc'] ?? 0)) / 100 * (parsed.data.total_market_cap['usd'] ?? 0) / 1e9,
-    updated_at:          parsed.data.updated_at,
-  };
+    return {
+      btc_dominance:       pct['btc'] ?? 0,
+      eth_dominance:       pct['eth'] ?? 0,
+      others_dominance:    100 - (pct['btc'] ?? 0) - (pct['eth'] ?? 0),
+      total_mcap_usd:      parsed.data.total_market_cap['usd'] ?? 0,
+      stablecoin_supply_b: ((pct['usdt'] ?? 0) + (pct['usdc'] ?? 0)) / 100 * (parsed.data.total_market_cap['usd'] ?? 0) / 1e9,
+      updated_at:          parsed.data.updated_at,
+    };
+  });
 }
 
 /**
@@ -125,29 +128,31 @@ export async function fetchDominance(): Promise<DominanceData> {
 export async function fetchTopAltcoins(limit = 20): Promise<AltcoinMarketData[]> {
   if (DATA_MODE === 'mock') return mockAltcoins();
 
-  const params = new URLSearchParams({
-    vs_currency:              'usd',
-    order:                    'market_cap_desc',
-    per_page:                 String(limit),
-    page:                     '1',
-    price_change_percentage:  '7d,30d,90d',
+  return withCache(`coingecko:altcoins:${limit}`, 300, 'coingecko', async () => {
+    const params = new URLSearchParams({
+      vs_currency:             'usd',
+      order:                   'market_cap_desc',
+      per_page:                String(limit),
+      page:                    '1',
+      price_change_percentage: '7d,30d,90d',
+    });
+
+    const res = await fetch(`${BASE}/coins/markets?${params}`);
+    if (!res.ok) throw new Error(`CoinGecko /coins/markets error ${res.status}`);
+
+    const raw = await res.json();
+    const parsed = AltcoinsSchema.parse(raw);
+
+    return parsed.map(c => ({
+      id:            c.id,
+      symbol:        c.symbol.toUpperCase(),
+      name:          c.name,
+      current_price: c.current_price,
+      market_cap:    c.market_cap,
+      price_change_percentage_7d:  c.price_change_percentage_7d_in_currency,
+      price_change_percentage_30d: c.price_change_percentage_30d_in_currency,
+      price_change_percentage_90d: c.price_change_percentage_90d_in_currency,
+      price_change_percentage_24h: c.price_change_percentage_24h,
+    }));
   });
-
-  const res = await fetch(`${BASE}/coins/markets?${params}`);
-  if (!res.ok) throw new Error(`CoinGecko /coins/markets error ${res.status}`);
-
-  const raw = await res.json();
-  const parsed = AltcoinsSchema.parse(raw);
-
-  return parsed.map(c => ({
-    id:            c.id,
-    symbol:        c.symbol.toUpperCase(),
-    name:          c.name,
-    current_price: c.current_price,
-    market_cap:    c.market_cap,
-    price_change_percentage_7d:  c.price_change_percentage_7d_in_currency,
-    price_change_percentage_30d: c.price_change_percentage_30d_in_currency,
-    price_change_percentage_90d: c.price_change_percentage_90d_in_currency,
-    price_change_percentage_24h: c.price_change_percentage_24h,
-  }));
 }
