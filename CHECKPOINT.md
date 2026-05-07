@@ -1,10 +1,10 @@
 # CHECKPOINT.md — MRP Dashboard
 > Memória técnica viva do projeto. Atualizar ao final de cada bloco importante.
-> Última atualização: 2026-05-05 (Live wiring contínuo — PRs #65–#68 · BTC header live · BotAutomations live · BasisPanel/LthSthCard/ExecutiveReport live)
+> Última atualização: 2026-05-07 (Mock audit completo — PR #69: AI Track Record real · PR #70: 5 badges corrigidos · mockData.jsx conflito removido)
 
 ---
 
-## 🗂 ESTADO GERAL (verificado em 2026-05-05)
+## 🗂 ESTADO GERAL (verificado em 2026-05-07)
 
 | Aspecto | Status | Evidência Real |
 |---------|--------|---------------|
@@ -41,6 +41,8 @@
 | **BTC header live** | ✅ MERGEADO (PR #66) | Layout.jsx usa useBtcTicker(); dot LIVE/MOCK dinâmico; refetch 5s em produção |
 | **BotAutomations live** | ✅ MERGEADO (PR #67) | Regime/score/funding/F&G reais em testBot e testFireRule; import morto removido |
 | **Medium live wiring** | ✅ PR #68 | BasisPanel (funding Binance/Bybit/OKX live); LthSthCard (HODL wave CoinMetrics); ExecutiveReport (NUPL/MVRV/Regime live + PDF exportado com dados reais) |
+| **AI Track Record real** | ✅ PR #69 | Dashboard.jsx: AITrackRecord detecta isSupabaseConfigured(); empty state quando tabela vazia; DataTrustBadge mock→live; IS_LIVE gate corrige Codex P2 |
+| **Mock audit — badges hardcoded** | ✅ PR #70 | DerivativesAdvanced (3 badges); SmartAlerts (1 badge); AIAnalysisPanel (1 badge): todos condicionais IS_LIVE agora; mockData.jsx export DATA_MODE='mock' órfão removido; Altcoins badge condition refinada |
 
 ---
 

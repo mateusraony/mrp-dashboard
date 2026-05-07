@@ -1,8 +1,7 @@
 // ─── MOCK DATA MODULE ───────────────────────────────────────────────────────
 // All values tagged with source for easy swap to live API calls
 // Badge: 🧪 MOCK | Grades: A/B/C
-
-export const DATA_MODE = 'mock'; // 'mock' | 'live'
+// DATA_MODE is imported from @/lib/env — não exportar aqui para evitar shadowing.
 
 // ─── HELPERS ───────────────────────────────────────────────────────────────
 export function sigmoid(x) {

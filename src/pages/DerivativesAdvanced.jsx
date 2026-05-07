@@ -66,7 +66,7 @@ function LiqHeatmapFull() {
         title="Liquidation Cluster Heatmap"
         sub={`Spot atual: $${SPOT_LIVE.toLocaleString()} · Barras VERMELHAS = longs que serão liquidados se preço CAIR · VERDES = shorts se preço SUBIR`}
         badge={d.quality}
-        mode="mock"
+        mode={IS_LIVE ? 'live' : 'mock'}
       />
 
       {/* KPIs */}
@@ -356,7 +356,7 @@ function CarryCalculator() {
         title="Carry Calculator — Custo de Basis por Vencimento"
         sub={`Basis anualizado vs US10Y (${US10Y}%) · Spot: $${SPOT.toLocaleString()}`}
         badge={futuresBasis.quality}
-        mode="mock"
+        mode={IS_LIVE ? 'live' : 'mock'}
       />
 
       {/* Basis chart */}
@@ -516,7 +516,7 @@ function TermStructurePanel() {
         title="Term Structure — IV por Prazo"
         sub={`Estrutura: ${ts.structure_type} · 1W-1Y spread: +${(ts.front_back_spread * 100).toFixed(1)}pp`}
         badge={ts.quality}
-        mode="mock"
+        mode={IS_LIVE ? 'live' : 'mock'}
       />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {ts.expirations.map((e, i) => {
