@@ -496,21 +496,6 @@ export default function Dashboard() {
   // Alertas estatísticos Z-score (retorno e volume 1D)
   const zAlerts = useZScoreAlerts();
 
-  // Análise em linguagem natural via Claude Haiku (AI Etapa 4) — 15min cache
-  const aiInsightPayload = (IS_LIVE && liveTicker)
-    ? {
-        riskScore:      activeScore,
-        riskRegime:     activeRegime,
-        fearGreedValue: _fngLive?.value ?? fearGreed.value,
-        fearGreedLabel: _fngLive?.label ?? fearGreed.label,
-        fundingRate:    liveTicker.last_funding_rate,
-        mtfConfluence:  mtf.confluence,
-        mtfDirection:   mtf.confluenceDir,
-        zAlerts:        zAlerts.slice(0, 2).map(a => ({ metric: a.metric, level: a.level, z: a.z, direction: a.direction })),
-      }
-    : null;
-  const { data: haiku, isLoading: haikuLoading } = useAiInsight(aiInsightPayload);
-
   // Rule-based AI analysis — all four modules, live data when available
   const liveAnalysis = IS_LIVE && (liveTicker != null || liveFng != null)
     ? computeRuleBasedAnalysis({
@@ -565,6 +550,21 @@ export default function Dashboard() {
     ? (liveRiskScore.regime === 'RISCO ELEVADO' ? 'RISK-OFF' : liveRiskScore.regime === 'SAUDÁVEL' ? 'RISK-ON' : 'NEUTRAL')
     : globalRisk.regime;
   const regimeColor = activeRegime === 'RISK-ON' ? '#10b981' : activeRegime === 'RISK-OFF' ? '#ef4444' : '#f59e0b';
+
+  // Análise em linguagem natural via Claude Haiku (AI Etapa 4) — 15min cache
+  const aiInsightPayload = (IS_LIVE && liveTicker)
+    ? {
+        riskScore:      activeScore,
+        riskRegime:     activeRegime,
+        fearGreedValue: _fngLive?.value ?? fearGreed.value,
+        fearGreedLabel: _fngLive?.label ?? fearGreed.label,
+        fundingRate:    liveTicker.last_funding_rate,
+        mtfConfluence:  mtf.confluence,
+        mtfDirection:   mtf.confluenceDir,
+        zAlerts:        zAlerts.slice(0, 2).map(a => ({ metric: a.metric, level: a.level, z: a.z, direction: a.direction })),
+      }
+    : null;
+  const { data: haiku, isLoading: haikuLoading } = useAiInsight(aiInsightPayload);
 
   return (
     <div style={{ maxWidth: 1440, margin: '0 auto' }}>
