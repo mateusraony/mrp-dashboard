@@ -165,29 +165,30 @@ describe('buildZScoreAlerts — dados insuficientes', () => {
     expect(buildZScoreAlerts([])).toEqual([]);
   });
 
-  it('retorna [] para menos de 4 candles', () => {
-    const candles = neutralHistory(3) as any[];
+  it('retorna [] para menos de 5 candles', () => {
+    const candles = neutralHistory(4) as any[];
     expect(buildZScoreAlerts(candles)).toEqual([]);
   });
 });
 
 describe('buildZScoreAlerts — sem anomalia', () => {
   it('retorna [] quando candle atual tem retorno na média do histórico (z ≈ 0)', () => {
-    // histórico com alternância ±0.01% → mean≈0
-    // candle atual com open=close → return=0 (no centro da distribuição)
+    // 30 histórico (alternância ±0.01%) + 1 fechado neutro + 1 em formação neutro
+    // closed e forming com open=close → retorno 0, volume exatamente na média
     const hist    = neutralHistory(30) as any[];
-    const current = candle(100_000, 100_000, 10);  // retorno 0, volume na média
-    const alerts  = buildZScoreAlerts([...hist, current] as any[]);
+    const closed  = candle(100_000, 100_000, 10);  // último candle fechado: neutro
+    const forming = candle(100_000, 100_000, 10);  // em formação: neutro
+    const alerts  = buildZScoreAlerts([...hist, closed, forming] as any[]);
     expect(alerts).toEqual([]);
   });
 });
 
 describe('buildZScoreAlerts — anomalia detectada', () => {
-  it('gera alerta de retorno quando vela atual é extrema', () => {
-    // 30 velas neutras + 1 com retorno +10% (extremo)
-    const hist    = neutralHistory(30, 100_000, 10) as any[];
-    const extreme = candle(100_000, 110_000, 10);   // +10%
-    const alerts  = buildZScoreAlerts([...hist, extreme] as any[]);
+  it('gera alerta de retorno quando vela em formação é extrema', () => {
+    // 30 neutros + 1 fechado neutro + 1 em formação com +10%
+    const hist    = neutralHistory(31, 100_000, 10) as any[];
+    const forming = candle(100_000, 110_000, 10);   // +10% (em formação)
+    const alerts  = buildZScoreAlerts([...hist, forming] as any[]);
 
     const ret = alerts.find(a => a.metric === 'return');
     expect(ret).toBeDefined();
@@ -196,10 +197,10 @@ describe('buildZScoreAlerts — anomalia detectada', () => {
     expect(ret!.z).toBeGreaterThan(2);
   });
 
-  it('gera alerta bearish para queda extrema', () => {
-    const hist    = neutralHistory(30, 100_000, 10) as any[];
-    const extreme = candle(100_000, 88_000, 10);   // -12%
-    const alerts  = buildZScoreAlerts([...hist, extreme] as any[]);
+  it('gera alerta bearish para queda extrema na vela em formação', () => {
+    const hist    = neutralHistory(31, 100_000, 10) as any[];
+    const forming = candle(100_000, 88_000, 10);   // -12%
+    const alerts  = buildZScoreAlerts([...hist, forming] as any[]);
 
     const ret = alerts.find(a => a.metric === 'return');
     expect(ret).toBeDefined();
@@ -207,35 +208,49 @@ describe('buildZScoreAlerts — anomalia detectada', () => {
     expect(ret!.z).toBeLessThan(-2);
   });
 
-  it('alerta de volume bullish quando spike + retorno positivo', () => {
-    const hist    = neutralHistory(30, 100_000, 10) as any[];
-    // volume 100x maior + retorno positivo
-    const spike   = candle(100_000, 101_000, 1_000);
-    const alerts  = buildZScoreAlerts([...hist, spike] as any[]);
+  it('alerta de volume usa candle fechado (penúltimo) — spike + retorno positivo', () => {
+    // 29 neutros + 1 fechado com spike de volume e retorno positivo + 1 em formação neutro
+    const hist    = neutralHistory(29, 100_000, 10) as any[];
+    const closed  = candle(100_000, 101_000, 1_000);  // spike de volume, retorno > 0
+    const forming = candle(100_000, 100_000, 10);      // em formação neutro
+    const alerts  = buildZScoreAlerts([...hist, closed, forming] as any[]);
 
     const vol = alerts.find(a => a.metric === 'volume');
     expect(vol).toBeDefined();
     expect(vol!.level).not.toBe('normal');
-    expect(vol!.direction).toBe('bullish');   // retorno > 0 → bullish
+    expect(vol!.direction).toBe('bullish');   // retorno do closed > 0 → bullish
   });
 
-  it('alerta de volume bearish quando spike + retorno negativo', () => {
-    const hist  = neutralHistory(30, 100_000, 10) as any[];
-    const spike = candle(100_000, 99_000, 1_000);   // retorno negativo + spike de volume
-    const alerts = buildZScoreAlerts([...hist, spike] as any[]);
+  it('alerta de volume bearish quando candle fechado tem spike + retorno negativo', () => {
+    const hist    = neutralHistory(29, 100_000, 10) as any[];
+    const closed  = candle(100_000, 99_000, 1_000);   // spike, retorno negativo
+    const forming = candle(100_000, 100_000, 10);
+    const alerts  = buildZScoreAlerts([...hist, closed, forming] as any[]);
 
     const vol = alerts.find(a => a.metric === 'volume');
     expect(vol).toBeDefined();
     expect(vol!.direction).toBe('bearish');
   });
 
-  it('preserva value e histMean no alerta', () => {
-    const hist    = neutralHistory(30, 100_000, 10) as any[];
-    const extreme = candle(100_000, 110_000, 10);
-    const alerts  = buildZScoreAlerts([...hist, extreme] as any[]);
+  it('preserva value e histMean no alerta de retorno', () => {
+    const hist    = neutralHistory(31, 100_000, 10) as any[];
+    const forming = candle(100_000, 110_000, 10);
+    const alerts  = buildZScoreAlerts([...hist, forming] as any[]);
     const ret     = alerts.find(a => a.metric === 'return')!;
 
     expect(ret.value).toBeCloseTo(0.1, 4);      // +10% = 0.1
-    expect(ret.histMean).toBeCloseTo(0, 5);      // histórico neutro → média ≈ 0
+    expect(ret.histMean).toBeCloseTo(0, 4);      // histórico neutro → média ≈ 0
+  });
+
+  it('volume parcial intraday NÃO gera alerta falso — forming com volume baixo é ignorado', () => {
+    // simula candle do dia com apenas 5% do volume típico (parcial intraday)
+    const hist    = neutralHistory(29, 100_000, 10) as any[];
+    const closed  = candle(100_000, 100_000, 10);  // fechado neutro (sem spike)
+    const forming = candle(100_000, 100_001, 1);   // forming com volume muito baixo
+    const alerts  = buildZScoreAlerts([...hist, closed, forming] as any[]);
+
+    // volume compara closed (neutro) com hist → sem alerta
+    const vol = alerts.find(a => a.metric === 'volume');
+    expect(vol).toBeUndefined();
   });
 });

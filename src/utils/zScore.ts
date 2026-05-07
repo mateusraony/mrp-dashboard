@@ -76,24 +76,28 @@ export function interpretZScore(z: number, positiveIsBullish = true): ZScoreInte
 
 /**
  * Constrói alertas Z-score a partir de um array de candles 1D.
- * Espera pelo menos 4 candles (3 histórico + 1 atual).
+ * Espera pelo menos 5 candles (3 histórico vol + 1 fechado + 1 em formação).
  * Retorna apenas alertas com level !== 'normal'.
+ *
+ * Retorno usa o candle mais recente (em formação) — momentum atual válido.
+ * Volume usa o penúltimo candle (último fechado) — evita falso-positivo de
+ * volume parcial comparado com dias completos.
  */
 export function buildZScoreAlerts(candles: Array<{ open: number; close: number; volume: number }>): ZScoreAlert[] {
-  if (candles.length < 4) return [];
+  if (candles.length < 5) return [];
 
-  const history = candles.slice(0, -1);  // todos exceto o último (em formação)
-  const current = candles[candles.length - 1];
+  const forming = candles[candles.length - 1];      // candle atual (em formação)
+  const closed  = candles[candles.length - 2];      // último candle fechado
 
-  // Retorno: (close - open) / open
-  const histReturns = history.map(c => c.open > 0 ? (c.close - c.open) / c.open : 0);
-  const currReturn  = current.open > 0 ? (current.close - current.open) / current.open : 0;
-  const retZ        = computeZScore(histReturns, currReturn);
+  // Retorno: usa candle em formação (momentum atual)
+  const retHistory = candles.slice(0, -1).map(c => c.open > 0 ? (c.close - c.open) / c.open : 0);
+  const currReturn = forming.open > 0 ? (forming.close - forming.open) / forming.open : 0;
+  const retZ       = computeZScore(retHistory, currReturn);
 
-  // Volume em USD (volume * close como proxy)
-  const histVolumes = history.map(c => c.volume * c.close);
-  const currVolume  = current.volume * current.close;
-  const volZ        = computeZScore(histVolumes, currVolume);
+  // Volume: usa último candle FECHADO para evitar comparar dia parcial com dias completos
+  const volHistory = candles.slice(0, -2).map(c => c.volume * c.close);
+  const currVolume = closed.volume * closed.close;
+  const volZ       = computeZScore(volHistory, currVolume);
 
   const alerts: ZScoreAlert[] = [];
 
@@ -106,14 +110,14 @@ export function buildZScoreAlerts(candles: Array<{ open: number; close: number; 
       level:     retInterp.level,
       direction: retInterp.direction,
       value:     currReturn,
-      histMean:  mean(histReturns),
+      histMean:  mean(retHistory),
     });
   }
 
-  // Volume: z positivo = volume alto (amplifica direção do retorno)
+  // Volume: z positivo = volume alto (amplifica direção do candle fechado)
   const volDirection: ZScoreDirection =
     Math.abs(volZ) >= ELEVATED_Z
-      ? (currReturn >= 0 ? 'bullish' : 'bearish')
+      ? (closed.close >= closed.open ? 'bullish' : 'bearish')
       : 'neutral';
   const volInterp = interpretZScore(volZ, false);
   if (volInterp.level !== 'normal') {
@@ -124,7 +128,7 @@ export function buildZScoreAlerts(candles: Array<{ open: number; close: number; 
       level:     volInterp.level,
       direction: volDirection,
       value:     currVolume,
-      histMean:  mean(histVolumes),
+      histMean:  mean(volHistory),
     });
   }
 

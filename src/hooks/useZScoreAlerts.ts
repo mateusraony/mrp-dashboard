@@ -15,10 +15,11 @@ import { buildZScoreAlerts, type ZScoreAlert } from '@/utils/zScore';
 export type { ZScoreAlert } from '@/utils/zScore';
 
 export function useZScoreAlerts(): ZScoreAlert[] {
-  const { data: candles } = useKlines('1d', 31);
+  // 32 candles: 30 histórico volume + 1 candle fechado + 1 em formação
+  const { data: candles } = useKlines('1d', 32);
 
   return useMemo(() => {
-    if (!IS_LIVE || !candles || candles.length < 4) return [];
+    if (!IS_LIVE || !candles || candles.length < 5) return [];
     return buildZScoreAlerts(candles);
   }, [candles]);
 }
