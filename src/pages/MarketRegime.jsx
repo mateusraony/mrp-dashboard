@@ -226,8 +226,13 @@ export default function MarketRegime() {
       }}>
         <div style={{ textAlign: 'center', flexShrink: 0 }}>
           <div style={{ fontSize: 9, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700, marginBottom: 4 }}>Score Global</div>
-          <div style={{ fontSize: 72, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color, lineHeight: 1, letterSpacing: '-0.05em', textShadow: `0 0 40px ${color}40` }}>{score}</div>
-          <div style={{ fontSize: 9, color: '#334155' }}>/ 100</div>
+          {IS_LIVE && isLoading
+            ? <div style={{ fontSize: 13, color: '#475569', fontFamily: 'JetBrains Mono, monospace', padding: '16px 0' }}>Carregando...</div>
+            : <>
+                <div style={{ fontSize: 72, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color, lineHeight: 1, letterSpacing: '-0.05em', textShadow: `0 0 40px ${color}40` }}>{score}</div>
+                <div style={{ fontSize: 9, color: '#334155' }}>/ 100</div>
+              </>
+          }
         </div>
 
         <div style={{ flex: 1, minWidth: 200 }}>

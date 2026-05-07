@@ -7,7 +7,7 @@ import { btcOptionsExtended } from '../components/data/mockData';
 import { ModeBadge, GradeBadge } from '../components/ui/DataBadge';
 import AIInsightPanel from '../components/ai/AIInsightPanel';
 import { useOptionsData } from '@/hooks/useDeribit';
-import { useBtcTicker } from '@/hooks/useBtcData';
+import { useBtcTicker, useFuturesBasis } from '@/hooks/useBtcData';
 import { useMacroBoard } from '@/hooks/useFred';
 import { DATA_MODE, IS_LIVE } from '@/lib/env';
 import {
@@ -330,25 +330,38 @@ function OIByStrike() {
 // ─── CARRY CALCULATOR ─────────────────────────────────────────────────────────
 function CarryCalculator() {
   const [capital, setCapital] = useState(100000);
-  const [selectedExp, setSelectedExp] = useState(1);   // index in futuresBasis.futures
-  const futures = futuresBasis.futures;
-  const f = futures[selectedExp];
-  const term = termStructure.expirations;
+  const [selectedExp, setSelectedExp] = useState(0);   // index in futures array
 
-  // Fix A — US10Y live via FRED
+  // Live futures basis — Binance /fapi/v1/premiumIndex
+  const { data: liveBasis } = useFuturesBasis();
+  // Fallback: usar mock quando live não disponível ou em modo mock
+  const futures = (liveBasis && liveBasis.length > 0)
+    ? liveBasis.map(f => ({
+        expiry:           f.expiry_label,
+        price:            f.mark_price,
+        days_to_exp:      f.days_to_exp,
+        basis_annualized: f.basis_annualized,
+      }))
+    : futuresBasis.futures;
+
+  // Garantir que selectedExp não sai dos bounds quando dados mudam
+  const safeIdx = Math.min(selectedExp, Math.max(0, futures.length - 1));
+  const f = futures[safeIdx];
+
+  // US10Y live via FRED
   const { data: macroData } = useMacroBoard();
   const us10yEntry = macroData?.series?.find(s => s.id === 'US10Y');
   const US10Y = us10yEntry?.value ?? 4.512;
 
-  // Fix B — SPOT live via BTC ticker
+  // SPOT live via BTC ticker
   const { data: ticker } = useBtcTicker();
   const SPOT_LIVE = ticker?.mark_price ?? SPOT;
 
   // Carry calc
-  const carryReturn   = capital * (f.basis_annualized / 100) * (f.days_to_exp / 365);
+  const carryReturn    = capital * (f.basis_annualized / 100) * (f.days_to_exp / 365);
   const riskFreeReturn = capital * (US10Y / 100) * (f.days_to_exp / 365);
-  const netCarry      = carryReturn - riskFreeReturn;
-  const carrySpread   = f.basis_annualized - US10Y;
+  const netCarry       = carryReturn - riskFreeReturn;
+  const carrySpread    = f.basis_annualized - US10Y;
 
   // Chart data — all vencimentos vs US10Y
   const chartData = futures.map(fx => ({
@@ -364,8 +377,8 @@ function CarryCalculator() {
       <SectionTitle
         title="Carry Calculator — Custo de Basis por Vencimento"
         sub={`Basis anualizado vs US10Y (${US10Y}%) · Spot: $${SPOT_LIVE.toLocaleString()}`}
-        badge={futuresBasis.quality}
-        mode={IS_LIVE ? 'live' : 'mock'}
+        badge={(liveBasis && liveBasis.length > 0) ? 'A' : futuresBasis.quality}
+        mode={(liveBasis && liveBasis.length > 0) ? 'live' : (IS_LIVE ? 'live' : 'mock')}
       />
 
       {/* Basis chart */}
@@ -391,7 +404,7 @@ function CarryCalculator() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
           {futures.map((fx, i) => {
             const spread = fx.basis_annualized - US10Y;
-            const isSelected = selectedExp === i;
+            const isSelected = safeIdx === i;
             return (
               <div key={i} onClick={() => setSelectedExp(i)} style={{
                 display: 'flex', alignItems: 'center', gap: 12, padding: '9px 12px',

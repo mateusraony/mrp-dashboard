@@ -11,7 +11,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { IS_LIVE } from '@/lib/env';
-import { fetchBtcTicker, fetchOiByExchange, fetchKlines, fetchLiquidations, fetchLongShortRatio, type BtcTickerData } from '@/services/binance';
+import { fetchBtcTicker, fetchOiByExchange, fetchKlines, fetchLiquidations, fetchLongShortRatio, fetchFuturesBasis, type BtcTickerData } from '@/services/binance';
 import { fetchDominance, fetchTopAltcoins } from '@/services/coingecko';
 import { fetchFearGreed } from '@/services/alternative';
 
@@ -148,5 +148,20 @@ export function useFearGreed(limit = 30) {
     queryFn:  () => fetchFearGreed(limit),
     staleTime: 3_500_000,
     refetchInterval: FNG_INTERVAL,
+  });
+}
+
+/**
+ * useFuturesBasis — basis anualizado dos futuros trimestrais BTC vs perp.
+ *
+ * Fonte: Binance /fapi/v1/premiumIndex (público, sem auth).
+ * Atualiza a cada 60s em modo live (preço mark muda ~1x/min).
+ */
+export function useFuturesBasis() {
+  return useQuery({
+    queryKey:        ['futures', 'basis'],
+    queryFn:         fetchFuturesBasis,
+    staleTime:       60_000,
+    refetchInterval: IS_LIVE ? 60_000 : false,
   });
 }
