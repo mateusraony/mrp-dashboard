@@ -1,6 +1,6 @@
 # CHECKPOINT.md — MRP Dashboard
 > Memória técnica viva do projeto. Atualizar ao final de cada bloco importante.
-> Última atualização: 2026-05-07 (PR #85 — 404.html SPA fallback · Static Site · URLs diretas resolvidas)
+> Última atualização: 2026-05-08 (PR #86 — AI Etapa 4 · Claude Haiku · análise natural · config.toml Edge Functions)
 
 ---
 
@@ -9,7 +9,7 @@
 | Aspecto | Status | Evidência Real |
 |---------|--------|---------------|
 | Build (`npm run build`) | ✅ PASSA | 0 erros |
-| Testes (`npm test`) | ✅ 211/211 | 13 suites |
+| Testes (`npm test`) | ✅ 217/217 | 14 suites |
 | Deploy (Render) | ✅ ONLINE | https://mrp-dashboard.onrender.com |
 | FRED API Key | ✅ CONFIGURADA | VITE_FRED_API_KEY em .env.local |
 | Supabase URL + ANON_KEY | ✅ CONFIGURADO | .env.local presente |
@@ -59,6 +59,8 @@
 | **Fix MTF + mock isolation** | ✅ PR #82+#83 | Widget MTF sempre visível (AGUARDANDO em mock); `useKlines(enabled)` — zero fetch em mock mode |
 | **Fix SPA routing — Web Service** | ✅ PR #84 | `server.js` Node.js built-in com fallback index.html (útil se migrar para Web Service) |
 | **Fix SPA routing — Static Site** | ✅ PR #85 | `public/404.html` sessionStorage redirect + `main.jsx` replaceState; `render.yaml` revertido para env:static |
+| **AI Etapa 4 — Claude Haiku** | ✅ PR #86 | Edge Function `ai-analysis` (Deno + SDK Anthropic); `aiInsight.ts` cliente; `useAiInsight.ts` hook time-bucket 15min; widget "Análise Natural" em Zona D Dashboard; 6 testes novos; 217/217 ✅ |
+| **config.toml Edge Functions** | ✅ PR #86 | 7 funções declaradas em `[functions.*]` — Supabase Branching auto-deploya em preview |
 
 ---
 
@@ -337,7 +339,7 @@ refetchInterval: IS_LIVE ? 30_000 : false,
 
 ---
 
-## 🧪 COBERTURA DE TESTES (79 testes — 4 suites)
+## 🧪 COBERTURA DE TESTES (217 testes — 14 suites)
 
 | Arquivo | Testes | O que cobre |
 |---------|--------|-------------|
@@ -345,6 +347,13 @@ refetchInterval: IS_LIVE ? 30_000 : false,
 | `coinmetrics.test.ts` | 10 | Shape, ranges MVRV/NUPL, zonas, history, updated_at |
 | `dealerGreeks.test.ts` | 27 | `computeGreeks` null guards, delta ATM, put-call parity, GEX sign |
 | `macroCalendar.test.ts` | 27 | parsePrevToNumeric, dedup delivery key, DST ET→BRT, janelas de alerta |
+| `marketCache.test.ts` | 5 | withCache TTL, anti-poisoning, IS_LIVE guard |
+| `apiClient.test.ts` | 13 | apiFetch retry 5xx, RateLimitError 429, backoff |
+| `binanceWs.test.ts` | 13 | singleton WS, backoff 1s→30s, unsubscribe |
+| `aiCalibration.test.ts` | — | pesos calibrados, projectWeights normalização |
+| `mtfAnalysis.test.ts` | 19 | frameFromKlines, computeConfluence FORTE/MODERADA/FRACA |
+| `zScore.test.ts` | 32 | mean/stddev, computeZScore, buildZScoreAlerts, volume candle fechado |
+| `aiInsight.test.ts` | 6 | fetchAiInsight payload, headers, zAlerts, erros 4xx/5xx |
 
 ---
 
@@ -415,6 +424,29 @@ Organizar resiliência de API com cache no Supabase para nunca estourar limites 
 | P2 | Crítico | `setCached` sem `?on_conflict=cache_key` — PostgREST conflitava no PK (uuid novo), silenciava todos os writes após o 1º insert | URL: `/rest/v1/market_cache?on_conflict=cache_key` |
 | P1 | Alto | Cache hits devolvidos sem validação — anon key exposta permite escrever dados envenenados em market_cache | `withCache` aceita `validate?` opcional; `coingecko.ts` passa `validateDominance` e `validateAltcoins` |
 | CI | Alto | `marketCache.ts` sem testes derrubou coverage de lines para 9.86% (threshold 10%) | 5 testes em `marketCache.test.ts` → lines 10.04% ✅ |
+
+---
+
+## 🤖 AI ETAPAS — INTELIGÊNCIA ADAPTATIVA (2026-05-07/08)
+
+| Etapa | Status | PR | O que foi entregue |
+|-------|--------|----|--------------------|
+| **Etapa 1 — Pesos calibrados** | ✅ PR #79 | `aiCalibration.ts` + `useAiCalibration`; `projectWeights()` garante 10%/40% pós-norm; Dashboard passa pesos ao engine |
+| **Etapa 2 — Confluência MTF** | ✅ PR #80 | `mtfAnalysis.ts` frameFromKlines + computeConfluence; `useMtfAnalysis` (enabled=IS_LIVE); widget Zona D sempre visível (AGUARDANDO em mock); 19 testes |
+| **Etapa 3 — Z-score alerts** | ✅ PR #81 | `zScore.ts` mean/stddev/computeZScore/buildZScoreAlerts; `useZScoreAlerts`; widget condicional em Zona D; 32 testes; P2 fix: volume usa candle fechado (`candles[-2]`) |
+| **Etapa 4 — Claude Haiku NLG** | ✅ PR #86 | Edge Function `ai-analysis` (Deno + `npm:@anthropic-ai/sdk`); prompt caching ~90% redução custo; `useAiInsight` time-bucket 15min (evita chamada por tick); widget "Análise Natural — Claude Haiku" em Zona D; 6 testes; ~R$2/mês |
+
+### Ativação da Etapa 4
+- Supabase Dashboard → Settings → Edge Functions → Secrets → `ANTHROPIC_API_KEY`
+- Deploy: `supabase functions deploy ai-analysis`
+- Widget só aparece com IS_LIVE=true + Supabase configurado
+
+### Bugs corrigidos durante CI do PR #86
+| # | Bug | Fix | Commit |
+|---|-----|-----|--------|
+| P1 | `TS2448`: `aiInsightPayload` usava `activeScore`/`activeRegime` antes de declarados (temporal dead zone) | Movido bloco para após as declarações | `2a21e57` |
+| P2 | Query key com dados live (riskScore, fundingRate) mudava a cada tick de 30s, bypassando staleTime | Substituído por `timeBucket = floor(Date.now() / 15min)` | `2637630` |
+| CI | Edge Functions não listadas em `config.toml` → Supabase Preview warning ⚠️ | 7 entradas `[functions.*]` adicionadas | `66958c4` |
 
 ---
 
