@@ -577,25 +577,28 @@ export async function fetchGdeltSentimentHistory(days = 7): Promise<GdeltDaySent
  */
 export async function upsertGdeltArticles(
   articles: Array<{
-    url: string;
-    title?: string;
-    source?: string;
-    published_at?: string;
-    sentiment?: number;
-    query?: string;
+    url:             string;
+    title?:          string;
+    domain?:         string;
+    published_at?:   string;
+    sentiment?:      number;
+    sentiment_label?: string;
+    query?:          string;
   }>
 ): Promise<void> {
   if (!isSupabaseConfigured() || articles.length === 0) return;
 
   const sb = getClient();
+  // Colunas reais da tabela: url, title, domain, published_at, sentiment,
+  // sentiment_label, query, created_at (auto). Sem source/fetched_at.
   const payload = articles.map(a => ({
-    url:          a.url,
-    title:        a.title ?? null,
-    source:       a.source ?? null,
-    published_at: a.published_at ?? null,
-    sentiment:    a.sentiment ?? 0,
-    query:        a.query ?? 'bitcoin',
-    fetched_at:   new Date().toISOString(),
+    url:             a.url,
+    title:           a.title ?? '',
+    domain:          a.domain ?? null,
+    published_at:    a.published_at ?? null,
+    sentiment:       a.sentiment ?? 0,
+    sentiment_label: a.sentiment_label ?? 'Neutro',
+    query:           a.query ?? 'bitcoin',
   }));
 
   try {

@@ -28,12 +28,13 @@ export function useGdeltNews(query?: string) {
       if (IS_LIVE && articles.length > 0) {
         upsertGdeltArticles(
           articles.map(a => ({
-            url:          a.url,
-            title:        a.title,
-            source:       a.domain,
-            published_at: a.published_at,
-            sentiment:    a.sentiment,
-            query:        resolvedQuery,
+            url:             a.url,
+            title:           a.title,
+            domain:          a.domain,
+            published_at:    a.published_at,
+            sentiment:       a.sentiment,
+            sentiment_label: a.sentiment_label,
+            query:           resolvedQuery,
           }))
         ).catch(() => {});
       }
