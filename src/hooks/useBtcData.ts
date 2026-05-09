@@ -31,8 +31,9 @@ const FNG_INTERVAL     = IS_LIVE ? 3_600_000: false; // 1h quando live
  * useBtcTicker — preço mark, funding rate, OI, variação 24h
  * Atualiza a cada 5s em modo live.
  */
-export function useBtcTicker() {
+export function useBtcTicker(enabled = true) {
   return useQuery({
+    enabled,
     queryKey: ['btc', 'ticker'],
     queryFn:  fetchBtcTicker,
     staleTime: 4_000,

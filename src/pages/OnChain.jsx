@@ -15,11 +15,12 @@ import { DisabledModuleBanner } from '@/components/ui/DisabledModuleBanner';
 
 // ─── DATA LAYER (live > mock fallback) ───────────────────────────────────────
 function useOnChainLiveData() {
-  const { data: cycle }    = useOnChainCycle();     // MVRV Z-Score, NUPL, Realized Price
-  const { data: mempool }  = useMempoolState();     // fees + mempool state live
-  const { data: hashrate } = useHashrate();         // hashrate live
-  const { data: extended } = useOnChainExtended();  // CDD, HODL Waves, Dormancy
-  useOnChainAdvanced();                             // NUPL/SOPR/Netflow — mantém cache (mock quality B)
+  const onchainEnabled = readModuleFlag('ENABLE_ONCHAIN');
+  const { data: cycle }    = useOnChainCycle(onchainEnabled);
+  const { data: mempool }  = useMempoolState();
+  const { data: hashrate } = useHashrate();
+  const { data: extended } = useOnChainExtended(onchainEnabled);
+  useOnChainAdvanced();
   return { cycle, mempool, hashrate, extended };
 }
 import MiniTimeChart from '../components/dashboard/MiniTimeChart';

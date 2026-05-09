@@ -24,13 +24,13 @@ const ONCHAIN_CYCLE_INTERVAL = IS_LIVE ? 3_600_000 : false;
  * Em modo mock: retorna valores simulados baseados no mock data existente.
  * Atualiza a cada 1h em modo live.
  */
-export function useOnChainCycle() {
+export function useOnChainCycle(pageEnabled = true) {
   return useQuery({
     queryKey:        ['onchain', 'cycle'],
     queryFn:         fetchOnChainCycle,
     staleTime:       3_500_000,
     refetchInterval: ONCHAIN_CYCLE_INTERVAL,
-    enabled:         readModuleFlag('ENABLE_COINMETRICS'),
+    enabled:         pageEnabled && readModuleFlag('ENABLE_COINMETRICS'),
   });
 }
 
@@ -42,12 +42,12 @@ export function useOnChainCycle() {
  * Em modo mock: retorna valores simulados razoáveis (quality B).
  * Atualiza a cada 1h em modo live.
  */
-export function useOnChainExtended() {
+export function useOnChainExtended(pageEnabled = true) {
   return useQuery({
     queryKey:        ['onchain', 'extended'],
     queryFn:         fetchOnChainExtended,
     staleTime:       3_500_000,
     refetchInterval: IS_LIVE ? 3_600_000 : false,
-    enabled:         readModuleFlag('ENABLE_COINMETRICS'),
+    enabled:         pageEnabled && readModuleFlag('ENABLE_COINMETRICS'),
   });
 }

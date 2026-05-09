@@ -18,7 +18,7 @@ export function DisabledModuleBanner({ moduleName }) {
       </div>
       <div style={{ fontSize: 11, color: '#374151' }}>
         Ative em{' '}
-        <a href="/Configuracoes" style={{ color: '#3b82f6', textDecoration: 'none' }}>
+        <a href="/Settings" style={{ color: '#3b82f6', textDecoration: 'none' }}>
           Configurações → Módulos
         </a>
       </div>
