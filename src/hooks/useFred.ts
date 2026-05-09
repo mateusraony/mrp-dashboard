@@ -2,7 +2,7 @@
  * useFred.ts — TanStack Query hooks para dados macro (FRED API)
  *
  * FRED atualiza dados uma vez por dia (não intraday).
- * Requer VITE_FRED_API_KEY — sem key: retorna mock sem erro de rede.
+ * Requer Supabase configurado (FRED_API_KEY em Supabase Secrets) — sem isso: retorna mock.
  */
 
 import { useQuery } from '@tanstack/react-query';

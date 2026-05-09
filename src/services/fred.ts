@@ -1,8 +1,8 @@
 /**
  * fred.ts — FRED (Federal Reserve Economic Data) API
  *
- * Endpoint: https://api.stlouisfed.org/fred/series/observations
- * Autenticação: VITE_FRED_API_KEY (gratuito, requer cadastro em fred.stlouisfed.org)
+ * Endpoint: via Edge Function fred-proxy (server-side)
+ * Autenticação: FRED_API_KEY (Supabase Secret — sem prefixo VITE_)
  *
  * Séries usadas:
  *   SP500        — S&P 500 Index (diário)
@@ -15,14 +15,13 @@
  *   FEDFUNDS     — Fed Funds Rate
  *
  * Regra de mock: idem binance.ts — mock NÃO substitui live com falha.
- * Sem VITE_FRED_API_KEY → retorna mock com aviso de configuração.
+ * Sem Supabase configurado → retorna mock com aviso de configuração.
  */
 
 import { z } from 'zod';
 import { DATA_MODE, env } from '@/lib/env';
+import { isSupabaseConfigured } from '@/services/supabase';
 import { macroBoard } from '@/components/data/mockData';
-
-const BASE = 'https://api.stlouisfed.org/fred';
 
 // ─── Schemas ──────────────────────────────────────────────────────────────────
 
@@ -146,43 +145,59 @@ function mockYieldCurve(): YieldCurveData {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /**
- * Garante que VITE_FRED_API_KEY está configurada.
- * Se não estiver, lança erro descritivo.
+ * Chama a Edge Function fred-proxy para buscar dados FRED server-side.
+ * A FRED_API_KEY fica em Supabase Secrets — nunca exposta no bundle JS.
  */
-function requireApiKey(): string {
-  const key = env.VITE_FRED_API_KEY;
-  if (!key) {
+async function callFredProxy(
+  type: 'observations' | 'release_dates',
+  params: Record<string, string>,
+): Promise<unknown> {
+  const baseUrl = env.VITE_SUPABASE_URL?.replace(/\/$/, '');
+  const key     = env.VITE_SUPABASE_ANON_KEY;
+
+  if (!baseUrl || !key) {
     throw new Error(
-      'FRED API key não configurada. Defina VITE_FRED_API_KEY em .env.local. ' +
-      'Obtenha sua key gratuita em https://fred.stlouisfed.org/docs/api/api_key.html',
+      'Supabase não configurado — VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY ' +
+      'necessários para acessar dados FRED via proxy seguro.',
     );
   }
-  return key;
+
+  const res = await fetch(`${baseUrl}/functions/v1/fred-proxy`, {
+    method:  'POST',
+    headers: {
+      'Content-Type':  'application/json',
+      'Authorization': `Bearer ${key}`,
+    },
+    body:   JSON.stringify({ type, params }),
+    signal: AbortSignal.timeout(15_000),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({} as Record<string, unknown>));
+    throw new Error(
+      `fred-proxy error ${res.status}: ${(err.error as string | undefined) ?? res.statusText}`,
+    );
+  }
+
+  return res.json();
 }
 
 /**
- * Busca observações de uma série FRED com histórico de N dias.
+ * Busca observações de uma série FRED com histórico de N dias via fred-proxy.
  */
 export async function fetchSeries(
   seriesId: string,
-  apiKey: string,
   days = 35,
 ): Promise<Array<{ date: string; value: number }>> {
   const startDate = new Date(Date.now() - days * 86_400_000)
     .toISOString().slice(0, 10);
 
-  const params = new URLSearchParams({
-    series_id:  seriesId,
-    api_key:    apiKey,
-    file_type:  'json',
-    sort_order: 'asc',
+  const raw = await callFredProxy('observations', {
+    series_id:         seriesId,
+    sort_order:        'asc',
     observation_start: startDate,
   });
 
-  const res = await fetch(`${BASE}/series/observations?${params}`);
-  if (!res.ok) throw new Error(`FRED API error ${res.status}: series_id=${seriesId}`);
-
-  const raw = await res.json();
   const parsed = ObservationsResponseSchema.parse(raw);
 
   // Filtra observações com valor numérico válido (FRED usa '.' para N/A)
@@ -224,17 +239,15 @@ function extractDeltas(history: Array<{ date: string; value: number }>, format: 
 /**
  * fetchMacroBoard — S&P 500, DXY, Gold, VIX, US10Y, US2Y com histórico 30d
  *
- * Requer VITE_FRED_API_KEY. Cache recomendado: 1 hora.
+ * Requer Supabase configurado (FRED_API_KEY em Supabase Secrets). Cache recomendado: 1 hora.
  * FRED atualiza dados macro diariamente (sem intraday).
  */
 export async function fetchMacroBoard(): Promise<MacroBoardData> {
   if (DATA_MODE === 'mock') return mockMacroBoard();
 
-  const apiKey = requireApiKey();
-
-  // Busca todas as séries em paralelo
+  // Busca todas as séries em paralelo via fred-proxy
   const results = await Promise.all(
-    MACRO_SERIES.map(s => fetchSeries(s.series_id, apiKey, 35)),
+    MACRO_SERIES.map(s => fetchSeries(s.series_id, 35)),
   );
 
   const series: MacroSeriesEntry[] = MACRO_SERIES.map((cfg, i) => {
@@ -344,13 +357,11 @@ function mockGlobalLiquidity(): GlobalLiquidityData {
 /**
  * fetchGlobalLiquidity — Fed Balance Sheet, RRP, TGA, Real Yield, Term Premium, DXY
  *
- * Busca 6 séries em paralelo via FRED.
+ * Busca 6 séries em paralelo via fred-proxy.
  * Cache recomendado: 1 hora (dados semanais/diários, não intraday).
  */
 export async function fetchGlobalLiquidity(): Promise<GlobalLiquidityData> {
   if (DATA_MODE === 'mock') return mockGlobalLiquidity();
-
-  const apiKey = requireApiKey();
 
   // Buscar histórico de 35 dias (séries semanais: ~5 pontos; diárias: ~25 pontos)
   const [
@@ -361,12 +372,12 @@ export async function fetchGlobalLiquidity(): Promise<GlobalLiquidityData> {
     term10,    // 10Y Term Premium ACM (daily, %)
     dtwex,     // Broad Dollar Index (daily)
   ] = await Promise.all([
-    fetchSeries('WALCL',       apiKey, 35),
-    fetchSeries('RRPONTSYD',   apiKey, 35),
-    fetchSeries('WTREGEN',     apiKey, 35),
-    fetchSeries('DFII10',      apiKey, 35),
-    fetchSeries('THREEFYTP10', apiKey, 35),
-    fetchSeries('DTWEXBGS',    apiKey, 35),
+    fetchSeries('WALCL',       35),
+    fetchSeries('RRPONTSYD',   35),
+    fetchSeries('WTREGEN',     35),
+    fetchSeries('DFII10',      35),
+    fetchSeries('THREEFYTP10', 35),
+    fetchSeries('DTWEXBGS',    35),
   ]);
 
   // Valores mais recentes disponíveis
@@ -447,12 +458,10 @@ export async function fetchGlobalLiquidity(): Promise<GlobalLiquidityData> {
 export async function fetchYieldCurve(): Promise<YieldCurveData> {
   if (DATA_MODE === 'mock') return mockYieldCurve();
 
-  const apiKey = requireApiKey();
-
   const [hist10y, hist2y, histFF] = await Promise.all([
-    fetchSeries('DGS10',    apiKey, 35),
-    fetchSeries('DGS2',     apiKey, 35),
-    fetchSeries('FEDFUNDS', apiKey, 35),
+    fetchSeries('DGS10',    35),
+    fetchSeries('DGS2',     35),
+    fetchSeries('FEDFUNDS', 35),
   ]);
 
   const last10y  = hist10y[hist10y.length - 1]?.value ?? 0;
