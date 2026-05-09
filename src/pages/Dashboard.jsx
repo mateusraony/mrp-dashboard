@@ -3,7 +3,7 @@ import {
   btcFutures, btcSpotFlow, macroBoard, onChain,
   fearGreed, recentAlerts, globalRisk, sourceHealth, fmtNum, fmtPct, aiAnalysis as aiAnalysisMockData,
 } from '../components/data/mockData';
-import { DATA_MODE, IS_LIVE, env } from '@/lib/env';
+import { DATA_MODE, IS_LIVE } from '@/lib/env';
 import { DataTrustBadge } from '../components/ui/DataTrustBadge';
 import { useBtcTicker, useFearGreed as useFearGreedHook } from '@/hooks/useBtcData';
 import { useRiskScore } from '@/hooks/useRiskScore';
@@ -623,11 +623,11 @@ export default function Dashboard() {
           action={
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <DataTrustBadge
-                mode={IS_LIVE ? (env.VITE_FRED_API_KEY ? 'live' : 'error') : 'mock'}
-                confidence={IS_LIVE && env.VITE_FRED_API_KEY ? 'A' : 'D'}
+                mode={IS_LIVE ? (isSupabaseConfigured() ? 'live' : 'error') : 'mock'}
+                confidence={IS_LIVE && isSupabaseConfigured() ? 'A' : 'D'}
                 source="FRED API"
                 sourceUrl="https://api.stlouisfed.org/fred"
-                reason={!env.VITE_FRED_API_KEY && IS_LIVE ? 'VITE_FRED_API_KEY não configurada — dados indisponíveis' : !IS_LIVE ? 'DATA_MODE=mock' : undefined}
+                reason={!isSupabaseConfigured() && IS_LIVE ? 'Supabase não configurado — dados FRED indisponíveis' : !IS_LIVE ? 'DATA_MODE=mock' : undefined}
               />
               <Link to={createPageUrl('Macro')} style={{ fontSize: 11, color: '#475569', textDecoration: 'none', border: '1px solid #1e2d45', padding: '3px 9px', borderRadius: 5 }}>Ver Detalhes →</Link>
             </div>

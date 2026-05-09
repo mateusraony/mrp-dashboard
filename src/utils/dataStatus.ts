@@ -2,7 +2,8 @@
  * dataStatus.ts — Utilitários de confiabilidade e registro de fontes de dados
  */
 import type { DataMode, DataConfidence, DataPoint } from '@/types/dataStatus';
-import { DATA_MODE, env } from '@/lib/env';
+import { DATA_MODE } from '@/lib/env';
+import { isSupabaseConfigured } from '@/services/supabase';
 
 // ─── normalizeDataStatus ───────────────────────────────────────────────────────
 
@@ -184,7 +185,7 @@ export const SOURCE_REGISTRY: Record<string, SourceRegistryEntry> = {
     free: true,
     authRequired: true,
     updateFrequency: 'Diário',
-    limitation: 'Requer VITE_FRED_API_KEY (gratuita em stlouisfed.org)',
+    limitation: 'Requer FRED_API_KEY em Supabase Secrets (gratuita em stlouisfed.org)',
     staticMode: 'live',
     staticConfidence: 'A',
   },
@@ -233,7 +234,7 @@ export const SOURCE_REGISTRY: Record<string, SourceRegistryEntry> = {
 /**
  * getRuntimeMode — retorna o modo real de um serviço no build atual.
  *
- * Leva em conta DATA_MODE global e presença de VITE_FRED_API_KEY.
+ * Leva em conta DATA_MODE global e configuração do Supabase (para FRED via proxy).
  * Como DATA_MODE é lido no bootstrap do módulo, é preciso de page reload
  * para que mudanças de localStorage surtam efeito — comportamento intencional.
  */
@@ -242,8 +243,8 @@ export function getRuntimeMode(serviceKey: string): DataMode {
   if (!reg) return 'error';
   // Em modo mock global, tudo vira mock (exceto paid_required — mantemos para transparência)
   if (DATA_MODE === 'mock' && reg.staticMode !== 'paid_required') return 'mock';
-  // FRED requer key — sem ela é erro em live mode
-  if (serviceKey === 'fred' && !env.VITE_FRED_API_KEY && DATA_MODE === 'live') return 'error';
+  // FRED requer Supabase configurado (proxy server-side) — sem ele é erro em live mode
+  if (serviceKey === 'fred' && !isSupabaseConfigured() && DATA_MODE === 'live') return 'error';
   return reg.staticMode;
 }
 

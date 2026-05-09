@@ -1,7 +1,7 @@
 /**
  * fred.test.ts — smoke tests para serviços FRED (mock mode)
  *
- * DATA_MODE=mock → sem chamadas de rede. Sem VITE_FRED_API_KEY necessária.
+ * DATA_MODE=mock → sem chamadas de rede. FRED_API_KEY fica em Supabase Secrets (server-side).
  * Valida shape, tipos e invariantes do mock.
  */
 

@@ -14,13 +14,15 @@ const EnvSchema = z.object({
   VITE_SUPABASE_URL:      z.string().url().optional(),
   VITE_SUPABASE_ANON_KEY: z.string().min(1).optional(),
 
-  // ── FRED API (macro: yields, VIX, S&P) — gratuita ────────────────────────
-  VITE_FRED_API_KEY: z.string().min(1).optional(),
-
   // ── CryptoCompare (fallback para CoinGecko em caso de 429) ───────────────
   // Gratuito sem chave: 100 req/min. Com chave free tier: 50k req/mês.
   // Cadastro: https://min-api.cryptocompare.com
   VITE_CRYPTOCOMPARE_KEY: z.string().min(1).optional(),
+
+  // ── FRED API (macro: yields, VIX, S&P) ───────────────────────────────────
+  // Configurar como Supabase Secret: FRED_API_KEY (sem prefixo VITE_)
+  // A Edge Function fred-proxy adiciona a key server-side.
+  // Obtenha gratuitamente em https://fred.stlouisfed.org/docs/api/api_key.html
 });
 
 // Valida no carregamento do módulo (falha silencioso em dev, hard fail em prod)

@@ -595,8 +595,8 @@ function buildMockEvents(): MacroCalendarEvent[] {
 /**
  * fetchMacroCalendarEvents
  *
- * Em mock mode ou sem VITE_FRED_API_KEY → retorna eventos mock com datas calculadas.
- * Em live mode com chave → busca FRED release dates + últimas observações.
+ * Em mock mode ou sem Supabase configurado → retorna eventos mock com datas calculadas.
+ * Em live mode com Supabase configurado → busca FRED release dates + últimas observações via fred-proxy.
  *
  * Eventos FOMC sempre vêm de datas estáticas 2026 (hardcoded, mais confiável que FRED).
  */

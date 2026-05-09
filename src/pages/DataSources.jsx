@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { DataTrustBadge } from '../components/ui/DataTrustBadge';
 import { SOURCE_REGISTRY, getRuntimeMode, getSourceSummary } from '@/utils/dataStatus';
-import { DATA_MODE, env } from '@/lib/env';
+import { DATA_MODE } from '@/lib/env';
+import { isSupabaseConfigured } from '@/services/supabase';
 
 // ─── Legenda de grades ────────────────────────────────────────────────────────
 const CONFIDENCE_LABELS = {
@@ -97,8 +98,8 @@ function SourceRow({ serviceKey, entry }) {
           source={entry.name}
           sourceUrl={entry.url || undefined}
           reason={
-            runtimeMode === 'error' && serviceKey === 'fred' && !env.VITE_FRED_API_KEY
-              ? 'VITE_FRED_API_KEY não configurada'
+            runtimeMode === 'error' && serviceKey === 'fred' && !isSupabaseConfigured()
+              ? 'FRED_API_KEY não configurada em Supabase Secrets'
               : runtimeMode === 'mock'
               ? 'DATA_MODE=mock'
               : entry.limitation

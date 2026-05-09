@@ -2,7 +2,7 @@
  * globalMarkets.ts — Mercados Globais: FX, commodities, bancos centrais, correlações BTC
  *
  * Fontes:
- *   FRED API — FX rates, Gold, Silver, Oil, taxas bancos centrais (requer VITE_FRED_API_KEY)
+ *   FRED API — FX rates, Gold, Silver, Oil, taxas bancos centrais (via fred-proxy Edge Function)
  *   BCB OpenData — USDBRL, SELIC (sem auth)
  *
  * Funções puras (sem rede):
@@ -12,17 +12,9 @@
  * Regra de mock: mock NÃO substitui live com falha.
  */
 
-import { DATA_MODE, env } from '@/lib/env';
+import { DATA_MODE } from '@/lib/env';
 import { fetchSeries } from '@/services/fred';
 import { fetchBcbData } from '@/services/bcb';
-
-// ─── Helper interno ───────────────────────────────────────────────────────────
-
-function requireFredKey(): string {
-  const key = env.VITE_FRED_API_KEY;
-  if (!key) throw new Error('VITE_FRED_API_KEY não configurada');
-  return key;
-}
 
 function calcDeltas(history: Array<{ date: string; value: number }>) {
   const n     = history.length;
@@ -202,8 +194,6 @@ function mockGlobalMarkets(): GlobalMarketsData {
 export async function fetchFxRates(): Promise<FxRateData[]> {
   if (DATA_MODE === 'mock') return mockGlobalMarkets().fxRates;
 
-  const key = requireFredKey();
-
   const fredPairs = [
     { pair: 'EUR/USD', series: 'DEXUSEU' },
     { pair: 'USD/JPY', series: 'DEXJPUS' },
@@ -212,7 +202,7 @@ export async function fetchFxRates(): Promise<FxRateData[]> {
   ];
 
   const [fredResults, bcbData] = await Promise.all([
-    Promise.allSettled(fredPairs.map(p => fetchSeries(p.series, key, 35))),
+    Promise.allSettled(fredPairs.map(p => fetchSeries(p.series, 35))),
     fetchBcbData(),
   ]);
 
@@ -240,8 +230,6 @@ export async function fetchFxRates(): Promise<FxRateData[]> {
 export async function fetchCommodities(): Promise<CommodityData[]> {
   if (DATA_MODE === 'mock') return mockGlobalMarkets().commodities;
 
-  const key = requireFredKey();
-
   const configs = [
     { name: 'Gold',          symbol: 'XAU', unit: '$/oz',  series: 'GOLDAMGBD228NLBM' },
     { name: 'Silver',        symbol: 'XAG', unit: '$/oz',  series: 'SLVPRUSD'         },
@@ -249,7 +237,7 @@ export async function fetchCommodities(): Promise<CommodityData[]> {
   ];
 
   const results = await Promise.allSettled(
-    configs.map(c => fetchSeries(c.series, key, 35)),
+    configs.map(c => fetchSeries(c.series, 35)),
   );
 
   return configs.map((c, i) => {
@@ -266,8 +254,6 @@ export async function fetchCommodities(): Promise<CommodityData[]> {
 export async function fetchCentralBankRates(): Promise<CentralBankRateData[]> {
   if (DATA_MODE === 'mock') return mockGlobalMarkets().centralBankRates;
 
-  const key = requireFredKey();
-
   const fredConfigs = [
     { bank: 'Federal Reserve', country: 'EUA',      series: 'FEDFUNDS'         },
     { bank: 'BCE',             country: 'Eurozona', series: 'ECBDFR'           },
@@ -275,7 +261,7 @@ export async function fetchCentralBankRates(): Promise<CentralBankRateData[]> {
   ];
 
   const [fredResults, bcbData] = await Promise.all([
-    Promise.allSettled(fredConfigs.map(c => fetchSeries(c.series, key, 70))),
+    Promise.allSettled(fredConfigs.map(c => fetchSeries(c.series, 70))),
     fetchBcbData(),
   ]);
 

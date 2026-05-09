@@ -7,7 +7,8 @@ import {
 import { useGlobalMarkets } from '../hooks/useGlobalMarkets';
 import { useBcbData } from '../hooks/useBcb';
 import { useBtcTicker } from '../hooks/useBtcData';
-import { IS_LIVE, env } from '../lib/env';
+import { IS_LIVE } from '../lib/env';
+import { isSupabaseConfigured } from '../services/supabase';
 import { ModeBadge } from '../components/ui/DataBadge';
 import { DataTrustBadge } from '../components/ui/DataTrustBadge';
 import GoldenRule from '../components/ui/GoldenRule';
@@ -292,11 +293,11 @@ export default function GlobalMarkets() {
             <h1 style={{ fontSize: 20, fontWeight: 900, color: '#f1f5f9', margin: 0, letterSpacing: '-0.03em' }}>🌍 Mercados Globais</h1>
             <ModeBadge mode={IS_LIVE ? 'live' : 'mock'} />
             <DataTrustBadge
-              mode={IS_LIVE ? (env.VITE_FRED_API_KEY ? 'live' : 'error') : 'mock'}
-              confidence={IS_LIVE && env.VITE_FRED_API_KEY ? 'A' : 'D'}
+              mode={IS_LIVE ? (isSupabaseConfigured() ? 'live' : 'error') : 'mock'}
+              confidence={IS_LIVE && isSupabaseConfigured() ? 'A' : 'D'}
               source="FRED API"
               sourceUrl="https://api.stlouisfed.org/fred"
-              reason={!env.VITE_FRED_API_KEY && IS_LIVE ? 'VITE_FRED_API_KEY não configurada — dados macro indisponíveis' : !IS_LIVE ? 'DATA_MODE=mock' : undefined}
+              reason={!isSupabaseConfigured() && IS_LIVE ? 'Supabase não configurado — dados FRED indisponíveis' : !IS_LIVE ? 'DATA_MODE=mock' : undefined}
             />
           </div>
           <p style={{ fontSize: 11, color: '#475569', margin: 0 }}>EUR · BRL · GBP · JPY · Ouro · Petróleo · Bancos Centrais · Correlações com BTC</p>
