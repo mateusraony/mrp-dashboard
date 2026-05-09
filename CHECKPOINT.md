@@ -1,6 +1,6 @@
 # CHECKPOINT.md — MRP Dashboard
 > Memória técnica viva do projeto. Atualizar ao final de cada bloco importante.
-> Última atualização: 2026-05-09 (P4 — FRED API key movida para server-side via fred-proxy Edge Function)
+> Última atualização: 2026-05-09 (P5 — module toggles enforcement, PR #90)
 
 ---
 
@@ -30,7 +30,7 @@
 | pg_cron duplicata | ⚠️ PENDENTE | Job antigo `telegram-digest` duplica o `send-telegram-digest` — remover com SELECT cron.unschedule('telegram-digest') |
 | Auth real | ❌ AUSENTE | Stub anônimo — aguarda decisão futura |
 | **Mock que requer API paga** | ⚠️ AGUARDA | SOPR/Netflow/Baleias: Glassnode ~$29/mês · Sentimento Social (Twitter/Reddit): LunarCrush ~$19/mês · LiquidationHeatmap real: requer auth Binance · IV Delta 1D/1W/1M: sem API gratuita |
-| **Module toggles enforcement** | ⚠️ PARCIAL | Settings escreve em localStorage + feedback visual ✅ — mas as páginas ainda não lêem os flags para desativar módulos (próximo passo se necessário) |
+| **Module toggles enforcement** | ✅ PR #90 | Settings escreve em localStorage; hooks têm `enabled: readModuleFlag(...)`; páginas mostram `DisabledModuleBanner` — zero fetch de rede quando módulo off |
 | **Rule-based AI Analysis** | ✅ MERGEADO (PR #49) | `ruleBasedAnalysis.ts` + wiring em Dashboard/Derivatives/SpotFlow/Options/Macro/DerivativesAdvanced/SmartAlerts/ExecutiveReport |
 | **Sprint 7.1 — Portfolio Live** | ✅ MERGEADO (PR #50) | mark_price live via useBtcTicker; VaR/Sharpe/Drawdown/Beta calculados com preço real |
 | **Sprint 7.2 — PredictivePanel Live** | ✅ MERGEADO (PR #50) | ATR(14) via useKlines(1d,30); cenários price = spot ± ATR*mult; direction via ruleBasedAnalysis |
@@ -67,6 +67,7 @@
 | **npm audit fix** | ✅ PR #88 | dompurify + postcss corrigidos — 0 vulnerabilidades |
 | **GDELT upsert** | ✅ PR #88 | `upsertGdeltArticles()` em supabase.ts; `useGdelt.ts` persiste artigos novos (fire-and-forget); colunas corretas: `domain`, `sentiment_label` (fix Codex P2) |
 | **P4 — FRED key server-side** | ✅ commit `11a718f` | `VITE_FRED_API_KEY` removido de todos os arquivos cliente; `fred.ts` usa `callFredProxy()` via Edge Function `fred-proxy`; `env.ts` sem a variável; badges usam `isSupabaseConfigured()` (Dashboard, GlobalMarkets, DataSources); build ✅ · 217 testes ✅ · `grep VITE_FRED_API_KEY dist/` = 0 |
+| **P5 — Module toggles enforcement** | ✅ PR #90 | `moduleFlags.ts` + `DisabledModuleBanner.jsx`; `enabled: readModuleFlag(...)` em 6 hooks (useDeribit, useMempool, useCoinMetrics, useGdelt, useBtcData#useFearGreed); early-return banner em Options/SpotFlow/OnChain/NewsIntelligence; Codex P2 fixes: link `/Settings`, `useBtcTicker(enabled)`, `useOnChainCycle/Extended(pageEnabled)` |
 
 ---
 
