@@ -1,6 +1,6 @@
 # CHECKPOINT.md — MRP Dashboard
 > Memória técnica viva do projeto. Atualizar ao final de cada bloco importante.
-> Última atualização: 2026-05-08 (PR #86 — AI Etapa 4 · Claude Haiku · análise natural · config.toml Edge Functions)
+> Última atualização: 2026-05-09 (PR #88 — StaleIndicator · npm fix · GDELT upsert · auditoria completa)
 
 ---
 
@@ -61,6 +61,11 @@
 | **Fix SPA routing — Static Site** | ✅ PR #85 | `public/404.html` sessionStorage redirect + `main.jsx` replaceState; `render.yaml` revertido para env:static |
 | **AI Etapa 4 — Claude Haiku** | ✅ PR #86 | Edge Function `ai-analysis` (Deno + SDK Anthropic); `aiInsight.ts` cliente; `useAiInsight.ts` hook time-bucket 15min; widget "Análise Natural" em Zona D Dashboard; 6 testes novos; 217/217 ✅ |
 | **config.toml Edge Functions** | ✅ PR #86 | 7 funções declaradas em `[functions.*]` — Supabase Branching auto-deploya em preview |
+| **StaleIndicator** | ✅ PR #88 | `StaleIndicator.jsx` — `?` âmbar com tooltip "Última atualização: HH:MM:SS" quando dado live indisponível |
+| **Portfolio live + stale** | ✅ PR #88 | `StaleIndicator` em P&L, VaR 95%/99%, preço spot — sem labels DEMO; dados live sempre |
+| **Strategies live + stale** | ✅ PR #88 | `StaleIndicator` em `bull_bear`/`basis`; nota discreta em dados históricos sem IS_LIVE guard |
+| **npm audit fix** | ✅ PR #88 | dompurify + postcss corrigidos — 0 vulnerabilidades |
+| **GDELT upsert** | ✅ PR #88 | `upsertGdeltArticles()` em supabase.ts; `useGdelt.ts` persiste artigos novos (fire-and-forget); colunas corretas: `domain`, `sentiment_label` (fix Codex P2) |
 
 ---
 
@@ -306,12 +311,13 @@ refetchInterval: IS_LIVE ? 30_000 : false,
 | **FRED API key exposta via VITE_** | Alta | Pendente (Fase 5) | Mover chamadas FRED para Edge Function fred-proxy |
 | **Auth stub anônimo** (`AuthContext.jsx`) | Alta | Pendente (decisão) | Supabase Auth (email/OAuth) — aguarda decisão de negócio |
 | **Dados mock sem aviso visual** | Alta | Pendente (Fase 2) | Banner DEMO global + remoção de dados fabricados |
-| **AI recommendation hardcoded** | Alta | Pendente (Fase 2) | String fixa `"CAUTION — REDUCE LONGS"` em mockData.jsx |
-| **Artigos de notícias fabricados** | Alta | Pendente (Fase 2) | mockDataNews.jsx com 10 artigos inventados |
+| ~~AI recommendation hardcoded~~ | ~~Alta~~ | ✅ RESOLVIDO (Fase 2) | mockData.jsx já tem string vazia |
+| ~~Artigos de notícias fabricados~~ | ~~Alta~~ | ✅ RESOLVIDO (Fase 2) | mockDataNews.jsx array vazio |
 | pg_cron duplicata | Baixa | Pendente | `SELECT cron.unschedule('telegram-digest');` no SQL Editor |
 | SOPR/Netflow/Whale via Glassnode | Média | Pendente (Fase 3) | Requer plano pago ~$29/mês ou marcar PAID-ONLY |
-| 2 vulnerabilidades npm (dompurify, postcss) | Média | Pendente (Fase 5) | `npm audit fix` |
-| Base44 favicon residual (`index.html`) | Baixa | Pendente | 1 linha — remover quando conveniente |
+| ~~2 vulnerabilidades npm (dompurify, postcss)~~ | ~~Média~~ | ✅ RESOLVIDO (PR #88) | `npm audit fix` — 0 vulnerabilidades |
+| ~~Base44 favicon residual (`index.html`)~~ | ~~Baixa~~ | ✅ RESOLVIDO | Favicon SVG customizado — sem referência Base44 |
+| ~~Stripe instalado sem uso~~ | ~~Baixa~~ | ✅ RESOLVIDO | Removido do package.json |
 | Rate limiting CoinGecko | Baixa | Pendente | Debounce/queue ≤30 req/min no free tier |
 | ~~Migration conflict~~ | ~~Alta~~ | ✅ RESOLVIDO | 5 stubs + full_schema + pré-registro no preview DB |
 
@@ -359,13 +365,16 @@ refetchInterval: IS_LIVE ? 30_000 : false,
 
 ## 🗺 O QUE FALTA / EM ANDAMENTO
 
-| Item | Descrição | Bloqueio |
-|------|-----------|---------|
-| **Telegram Digest (Sprint 6.6)** | ✅ CONCLUÍDO | Edge Functions deployed + pg_cron ativo. Pendente: remover job duplicado `telegram-digest` |
-| **GDELT→Supabase wiring** | `useGdelt.ts` busca artigos mas não faz upsert em `gdelt_articles` ainda | Tabela criada (Sprint 7) — falta wiring no hook |
-| **MacroCalendar bronze pipeline** | `macro_event_schedule` não é populado automaticamente ainda | `macroCalendarService.ts` gera eventos em memória; persistência é Sprint 8 |
-| **Auth real** | Login com email/Google via Supabase Auth | Decisão de negócio — quando quiser ativar |
-| **APIs pagas** | SOPR, Netflow, Whale via Glassnode/CryptoQuant | Custo ~$29/mês — confirmar se vale |
+| Item | Descrição | Status |
+|------|-----------|--------|
+| **Telegram Digest** | Edge Functions + pg_cron ativos | ✅ CONCLUÍDO — remover job duplicado `telegram-digest` no SQL Editor |
+| **GDELT→Supabase wiring** | upsert de artigos novos | ✅ RESOLVIDO (PR #88) — `upsertGdeltArticles` fire-and-forget em `useGdelt.ts` |
+| **MacroCalendar bronze pipeline** | `persistMacroSchedule()` + macro-actual-fetcher | ✅ IMPLEMENTADO — funcional |
+| **FRED API key no bundle** | `VITE_FRED_API_KEY` visível no bundle JS | ⚠️ Aguarda decisão — mover para Edge Function `fred-proxy` |
+| **Module toggles enforcement** | Settings escreve flags mas páginas não lêem | ⚠️ Aguarda decisão |
+| **pg_cron duplicata** | Job `telegram-digest` duplica `send-telegram-digest` | ⚠️ Usuário executa: `SELECT cron.unschedule('telegram-digest');` |
+| **Auth real** | Login com email/Google via Supabase Auth | Aguarda decisão de negócio |
+| **APIs pagas** | SOPR, Netflow, Whale via Glassnode/CryptoQuant | ~$29/mês — confirmar se vale |
 
 ---
 
