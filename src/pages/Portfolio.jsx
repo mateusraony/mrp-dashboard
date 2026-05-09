@@ -1,5 +1,5 @@
 // ─── PORTFOLIO MANAGER PAGE ───────────────────────────────────────────────────
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import {
   defaultPositions as defaultPositionsMock,
   computePortfolioGreeks, computePositionPnL,
@@ -10,6 +10,7 @@ import { useBtcTicker, useKlines } from '@/hooks/useBtcData';
 import { computeLiveRiskMetrics } from '@/utils/riskCalculations';
 import { IS_LIVE } from '@/lib/env';
 import { ModeBadge } from '../components/ui/DataBadge';
+import { StaleIndicator } from '../components/ui/StaleIndicator';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   ReferenceLine, Cell, CartesianGrid,
@@ -176,6 +177,12 @@ export default function Portfolio() {
   const { data: ticker }   = useBtcTicker();
   const { data: klines1d } = useKlines('1d', 30);
 
+  // Rastreia quando o ticker foi recebido pela última vez (para StaleIndicator)
+  const tickerUpdatedAt = useRef(null);
+  useEffect(() => {
+    if (ticker?.mark_price) tickerUpdatedAt.current = Date.now();
+  }, [ticker?.mark_price]);
+
   // Carrega posições do Supabase (ou mock se não configurado)
   const { data: savedPositions } = usePortfolioPositions();
   const { mutate: persistPosition } = useUpsertPosition();
@@ -275,21 +282,18 @@ export default function Portfolio() {
           <ModeBadge mode={IS_LIVE ? 'live' : 'mock'} />
           <span style={{ fontSize: 10, color: totalPnL >= 0 ? '#10b981' : '#ef4444', background: totalPnL >= 0 ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)', border: `1px solid ${totalPnL >= 0 ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)'}`, borderRadius: 4, padding: '2px 8px', fontWeight: 700, fontFamily: 'JetBrains Mono, monospace' }}>
             P&L {totalPnL >= 0 ? '+' : ''}{fmtUSD(totalPnL)}
+            {!ticker?.mark_price && <StaleIndicator lastUpdatedAt={tickerUpdatedAt.current} size={9} />}
           </span>
         </div>
         <p style={{ fontSize: 11, color: '#475569' }}>
-          Simulação de portfólio com Greeks ponderados · BTC Spot + Futuros + Opções · Spot: <span style={{ fontFamily: 'JetBrains Mono, monospace', color: '#f59e0b' }}>${liveSpotPrice.toLocaleString()}</span>
+          Portfólio com Greeks ponderados · BTC Spot + Futuros + Opções · Spot:{' '}
+          <span style={{ fontFamily: 'JetBrains Mono, monospace', color: '#f59e0b' }}>
+            ${liveSpotPrice.toLocaleString()}
+          </span>
+          {!ticker?.mark_price && (
+            <StaleIndicator lastUpdatedAt={tickerUpdatedAt.current} />
+          )}
         </p>
-        {(!savedPositions || savedPositions.length === 0) && (
-          <div style={{
-            marginTop: 10, padding: '8px 14px',
-            background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.2)',
-            borderLeft: '3px solid rgba(245,158,11,0.5)', borderRadius: 7,
-            fontSize: 10, color: '#92400e',
-          }}>
-            🧪 <strong>Portfólio Demo</strong> — Posições simuladas. Adicione posições reais usando o botão abaixo ou conecte uma carteira.
-          </div>
-        )}
       </div>
 
       {/* Greeks Cards */}
@@ -348,6 +352,7 @@ export default function Portfolio() {
             <div style={{ fontSize: 9, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, marginBottom: 6 }}>VaR 95% (1 dia)</div>
             <div style={{ fontSize: 20, fontWeight: 800, fontFamily: 'JetBrains Mono, monospace', color: '#ef4444', lineHeight: 1 }}>
               -{fmtUSD(riskMetrics.var95)}
+              {btcPriceHistory.length === 0 && <StaleIndicator lastUpdatedAt={null} size={11} />}
             </div>
             <div style={{ fontSize: 9, color: '#334155', marginTop: 5 }}>Perda máx. 95% confiança · 1 dia</div>
           </div>
@@ -356,6 +361,7 @@ export default function Portfolio() {
             <div style={{ fontSize: 9, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, marginBottom: 6 }}>VaR 99% (1 dia)</div>
             <div style={{ fontSize: 20, fontWeight: 800, fontFamily: 'JetBrains Mono, monospace', color: '#ef4444', lineHeight: 1 }}>
               -{fmtUSD(riskMetrics.var99)}
+              {btcPriceHistory.length === 0 && <StaleIndicator lastUpdatedAt={null} size={11} />}
             </div>
             <div style={{ fontSize: 9, color: '#334155', marginTop: 5 }}>Cauda de risco extremo · normal</div>
           </div>

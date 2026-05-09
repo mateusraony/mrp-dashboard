@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react';
 import { strategies, marketConditionsSummary } from '../components/data/mockDataStrategies';
 import { ModeBadge } from '../components/ui/DataBadge';
+import { StaleIndicator } from '../components/ui/StaleIndicator';
 import { useBtcTicker, useFearGreed } from '@/hooks/useBtcData';
 import { useOptionsData } from '@/hooks/useDeribit';
 import { IS_LIVE } from '@/lib/env';
@@ -280,6 +281,11 @@ export function StrategiesContent() {
   const { data: fng } = useFearGreed(1);
   const { data: optionsData } = useOptionsData();
 
+  // Flags para saber se dados live estão disponíveis (afeta StaleIndicator)
+  const hasLiveTicker    = IS_LIVE && !!ticker;
+  const hasLiveOptions   = IS_LIVE && !!optionsData;
+  const hasLiveSentiment = IS_LIVE && !!fng;
+
   // Live market conditions merged over mock fallback
   const mc = useMemo(() => ({
     ...marketConditionsSummary,
@@ -314,11 +320,11 @@ export function StrategiesContent() {
         </p>
         <div style={{
           marginTop: 8, padding: '7px 14px',
-          background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.2)',
-          borderLeft: '3px solid rgba(245,158,11,0.5)', borderRadius: 7,
-          fontSize: 10, color: '#92400e',
+          background: 'rgba(245,158,11,0.04)', border: '1px solid rgba(245,158,11,0.15)',
+          borderLeft: '2px solid rgba(245,158,11,0.35)', borderRadius: 7,
+          fontSize: 10, color: '#64748b',
         }}>
-          🧪 <strong>Estratégias Simuladas</strong> — Setups, condições e probabilidades são dados de exemplo. Não representa análise real de mercado.
+          Dados históricos de demonstração — em breve conectados ao banco de dados real
         </div>
       </div>
 
@@ -331,20 +337,29 @@ export function StrategiesContent() {
         <div style={{ fontSize: 10, color: '#475569', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', gridColumn: '1 / -1', marginBottom: 8 }}>
           ⚡ Condições de Mercado Atuais
         </div>
-        {Object.entries(mc.conditions).map(([key, cond]) => (
-          <div key={key} style={{ background: '#0d1421', borderRadius: 8, padding: '10px 12px', border: `1px solid ${cond.color}18` }}>
-            <div style={{ fontSize: 9, color: '#334155', marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{cond.label}</div>
-            <div style={{ fontSize: 16, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: cond.color }}>
-              {typeof cond.value === 'number' ? (cond.value < 1 ? (cond.value > 0 ? '+' : '') + cond.value.toFixed(4) + '%' : cond.value.toFixed(2)) : cond.value}
+        {Object.entries(mc.conditions).map(([key, cond]) => {
+          // Indica se esta célula tem dado live disponível
+          const isStale =
+            (key === 'ivr'       && !hasLiveOptions)  ||
+            (key === 'funding'   && !hasLiveTicker)   ||
+            (key === 'bull_bear' && !hasLiveSentiment) ||
+            (key === 'basis'     && !hasLiveTicker);
+          return (
+            <div key={key} style={{ background: '#0d1421', borderRadius: 8, padding: '10px 12px', border: `1px solid ${cond.color}18` }}>
+              <div style={{ fontSize: 9, color: '#334155', marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{cond.label}</div>
+              <div style={{ fontSize: 16, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: cond.color }}>
+                {typeof cond.value === 'number' ? (cond.value < 1 ? (cond.value > 0 ? '+' : '') + cond.value.toFixed(4) + '%' : cond.value.toFixed(2)) : cond.value}
+                {isStale && <StaleIndicator lastUpdatedAt={null} size={10} />}
+              </div>
+              <div style={{
+                marginTop: 4, fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em',
+                color: cond.color,
+              }}>
+                {cond.status.replace('_', ' ')}
+              </div>
             </div>
-            <div style={{
-              marginTop: 4, fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em',
-              color: cond.color,
-            }}>
-              {cond.status.replace('_', ' ')}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Filters */}
@@ -396,7 +411,7 @@ export function StrategiesContent() {
         background: 'rgba(239,68,68,0.04)', border: '1px solid rgba(239,68,68,0.12)',
         borderRadius: 8, fontSize: 10, color: '#475569', lineHeight: 1.6,
       }}>
-        ⚠️ <strong style={{ color: '#64748b' }}>Aviso:</strong> Estratégias geradas por modelo quantitativo com dados mock. Probabilidades históricas são baseadas em backtests que não garantem performance futura. Não constitui recomendação de investimento. Consulte um profissional qualificado.
+        ⚠️ <strong style={{ color: '#64748b' }}>Aviso:</strong> Estratégias geradas por modelo quantitativo. Probabilidades históricas são baseadas em backtests que não garantem performance futura. Não constitui recomendação de investimento. Consulte um profissional qualificado.
       </div>
     </div>
   );

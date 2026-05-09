@@ -8,7 +8,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { IS_LIVE } from '@/lib/env';
 import { fetchGdeltNews } from '@/services/gdelt';
-import { fetchGdeltSentimentHistory, type GdeltDaySentiment } from '@/services/supabase';
+import { fetchGdeltSentimentHistory, upsertGdeltArticles, type GdeltDaySentiment } from '@/services/supabase';
 
 const DEFAULT_QUERY = 'bitcoin crypto';
 
@@ -19,9 +19,27 @@ const DEFAULT_QUERY = 'bitcoin crypto';
  * Em modo live → refetch a cada 10 minutos.
  */
 export function useGdeltNews(query?: string) {
+  const resolvedQuery = query ?? DEFAULT_QUERY;
   return useQuery({
-    queryKey:       ['gdelt', 'news', query ?? DEFAULT_QUERY],
-    queryFn:        () => fetchGdeltNews(query),
+    queryKey:       ['gdelt', 'news', resolvedQuery],
+    queryFn:        async () => {
+      const articles = await fetchGdeltNews(resolvedQuery);
+      // Persiste no Supabase para histórico — fire-and-forget, não bloqueia UI
+      if (IS_LIVE && articles.length > 0) {
+        upsertGdeltArticles(
+          articles.map(a => ({
+            url:             a.url,
+            title:           a.title,
+            domain:          a.domain,
+            published_at:    a.published_at,
+            sentiment:       a.sentiment,
+            sentiment_label: a.sentiment_label,
+            query:           resolvedQuery,
+          }))
+        ).catch(() => {});
+      }
+      return articles;
+    },
     staleTime:      5 * 60_000,                         // 5 min
     refetchInterval: IS_LIVE ? 10 * 60_000 : false,    // 10 min em live
     retry:          1,

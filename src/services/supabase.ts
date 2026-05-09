@@ -569,3 +569,43 @@ export async function fetchGdeltSentimentHistory(days = 7): Promise<GdeltDaySent
     return [];
   }
 }
+
+/**
+ * upsertGdeltArticles — persiste artigos GDELT no Supabase para histórico.
+ * Usa upsert por url (UNIQUE) para evitar duplicatas.
+ * Fire-and-forget: não bloqueia o hook; falhas são silenciosas.
+ */
+export async function upsertGdeltArticles(
+  articles: Array<{
+    url:             string;
+    title?:          string;
+    domain?:         string;
+    published_at?:   string;
+    sentiment?:      number;
+    sentiment_label?: string;
+    query?:          string;
+  }>
+): Promise<void> {
+  if (!isSupabaseConfigured() || articles.length === 0) return;
+
+  const sb = getClient();
+  // Colunas reais da tabela: url, title, domain, published_at, sentiment,
+  // sentiment_label, query, created_at (auto). Sem source/fetched_at.
+  const payload = articles.map(a => ({
+    url:             a.url,
+    title:           a.title ?? '',
+    domain:          a.domain ?? null,
+    published_at:    a.published_at ?? null,
+    sentiment:       a.sentiment ?? 0,
+    sentiment_label: a.sentiment_label ?? 'Neutro',
+    query:           a.query ?? 'bitcoin',
+  }));
+
+  try {
+    await sb
+      .from('gdelt_articles')
+      .upsert(payload, { onConflict: 'url', ignoreDuplicates: true });
+  } catch {
+    // fire-and-forget — falha silenciosa para não bloquear UI
+  }
+}
