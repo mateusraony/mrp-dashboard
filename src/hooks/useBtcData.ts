@@ -16,6 +16,7 @@ import { fetchBtcTicker, fetchOiByExchange, fetchKlines, fetchLiquidations, fetc
 import { fetchDominance, fetchTopAltcoins } from '@/services/coingecko';
 import { fetchFearGreed } from '@/services/alternative';
 import { subscribeBtcPrice, subscribeStatus } from '@/services/binanceWs';
+import { readModuleFlag } from '@/lib/moduleFlags';
 
 // ─── Intervalos de refetch ────────────────────────────────────────────────────
 const PRICE_INTERVAL   = IS_LIVE ? 5_000   : false;  // 5s quando live
@@ -152,6 +153,7 @@ export function useFearGreed(limit = 30) {
     queryFn:  () => fetchFearGreed(limit),
     staleTime: 3_500_000,
     refetchInterval: FNG_INTERVAL,
+    enabled:  readModuleFlag('ENABLE_FEAR_GREED'),
   });
 }
 

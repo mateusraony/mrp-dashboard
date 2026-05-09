@@ -1,5 +1,7 @@
 import { btcOptions as btcOptionsMock, btcOptionsExtended, aiAnalysis as aiAnalysisMock } from '../components/data/mockData';
 import { useOptionsData } from '@/hooks/useDeribit';
+import { readModuleFlag } from '@/lib/moduleFlags';
+import { DisabledModuleBanner } from '@/components/ui/DisabledModuleBanner';
 import { computeGex, computeMaxPain } from '@/utils/riskCalculations';
 import { computeRuleBasedAnalysis } from '@/utils/ruleBasedAnalysis';
 import { IS_LIVE } from '@/lib/env';
@@ -125,6 +127,10 @@ export default function Options() {
   const nearestStrike = o.strikes.reduce((prev, curr) =>
     Math.abs(curr.strike - atmStrike) < Math.abs(prev.strike - atmStrike) ? curr : prev
   );
+
+  if (!readModuleFlag('ENABLE_OPTIONS')) {
+    return <DisabledModuleBanner moduleName="ENABLE_OPTIONS" />;
+  }
 
   return (
     <div style={{ maxWidth: 1400, margin: '0 auto' }}>

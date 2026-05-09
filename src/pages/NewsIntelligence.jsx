@@ -6,6 +6,8 @@ import { ModeBadge } from '../components/ui/DataBadge';
 import { RefreshButton } from '../components/ui/RefreshButton';
 import { IS_LIVE } from '@/lib/env';
 import { useGdeltNews, useGdeltHistory } from '@/hooks/useGdelt';
+import { readModuleFlag } from '@/lib/moduleFlags';
+import { DisabledModuleBanner } from '@/components/ui/DisabledModuleBanner';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
@@ -314,6 +316,10 @@ export default function NewsIntelligence() {
     ? parseFloat(((instBullishCount - instBearishCount) / instArticles.length).toFixed(2))
     : 0;
   const sentColor = avgSentiment24h > 0.1 ? '#10b981' : avgSentiment24h < -0.1 ? '#ef4444' : '#f59e0b';
+
+  if (!readModuleFlag('ENABLE_NEWS')) {
+    return <DisabledModuleBanner moduleName="ENABLE_NEWS" />;
+  }
 
   return (
     <div style={{ maxWidth: 1400, margin: '0 auto' }} data-source="gdelt,alternative_me" data-page="news-intelligence">

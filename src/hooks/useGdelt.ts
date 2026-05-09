@@ -9,6 +9,7 @@ import { useQuery } from '@tanstack/react-query';
 import { IS_LIVE } from '@/lib/env';
 import { fetchGdeltNews } from '@/services/gdelt';
 import { fetchGdeltSentimentHistory, upsertGdeltArticles, type GdeltDaySentiment } from '@/services/supabase';
+import { readModuleFlag } from '@/lib/moduleFlags';
 
 const DEFAULT_QUERY = 'bitcoin crypto';
 
@@ -43,6 +44,7 @@ export function useGdeltNews(query?: string) {
     staleTime:      5 * 60_000,                         // 5 min
     refetchInterval: IS_LIVE ? 10 * 60_000 : false,    // 10 min em live
     retry:          1,
+    enabled:        readModuleFlag('ENABLE_NEWS'),
   });
 }
 
@@ -57,5 +59,6 @@ export function useGdeltHistory(days = 7) {
     staleTime:       5 * 60_000,
     refetchInterval: IS_LIVE ? 10 * 60_000 : false,
     retry:           0,
+    enabled:         readModuleFlag('ENABLE_NEWS'),
   });
 }

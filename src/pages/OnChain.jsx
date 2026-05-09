@@ -10,6 +10,8 @@ import { useOnChainCycle, useOnChainExtended } from '@/hooks/useCoinMetrics';
 import { IS_LIVE } from '@/lib/env';
 import { DataQualityBadge } from '../components/ui/DataQualityBadge';
 import { DataTrustBadge } from '../components/ui/DataTrustBadge';
+import { readModuleFlag } from '@/lib/moduleFlags';
+import { DisabledModuleBanner } from '@/components/ui/DisabledModuleBanner';
 
 // ─── DATA LAYER (live > mock fallback) ───────────────────────────────────────
 function useOnChainLiveData() {
@@ -831,6 +833,11 @@ export default function OnChain() {
   // Determina se algum dado live está disponível (para ajustar o badge)
   const hasLiveData = !!(cycle || mempool || hashrate || extended);
   const modeLabel   = (IS_LIVE && hasLiveData) ? 'live' : 'mock';
+
+  if (!readModuleFlag('ENABLE_ONCHAIN')) {
+    return <DisabledModuleBanner moduleName="ENABLE_ONCHAIN" />;
+  }
+
   return (
     <div style={{ maxWidth: 1400, margin: '0 auto' }}>
       {/* Header */}
