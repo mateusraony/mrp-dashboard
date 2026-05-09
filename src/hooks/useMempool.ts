@@ -13,6 +13,7 @@ import {
   fetchMiningPools,
   fetchOnChainAdvanced,
 } from '@/services/mempool';
+import { readModuleFlag } from '@/lib/moduleFlags';
 
 // Intervalos de refetch
 const MEMPOOL_INTERVAL  = IS_LIVE ? 30_000     : false;  // 30s — dado em tempo real
@@ -30,6 +31,7 @@ export function useMempoolState() {
     queryFn:  fetchMempoolState,
     staleTime: 25_000,
     refetchInterval: MEMPOOL_INTERVAL,
+    enabled:  readModuleFlag('ENABLE_ONCHAIN'),
   });
 }
 
@@ -43,6 +45,7 @@ export function useHashrate() {
     queryFn:  fetchHashrate,
     staleTime: 290_000,
     refetchInterval: HASHRATE_INTERVAL,
+    enabled:  readModuleFlag('ENABLE_ONCHAIN'),
   });
 }
 
@@ -56,6 +59,7 @@ export function useMiningPools() {
     queryFn:  fetchMiningPools,
     staleTime: 3_500_000,
     refetchInterval: POOLS_INTERVAL,
+    enabled:  readModuleFlag('ENABLE_ONCHAIN'),
   });
 }
 
@@ -71,5 +75,6 @@ export function useOnChainAdvanced() {
     queryFn:  fetchOnChainAdvanced,
     staleTime: 3_500_000,
     refetchInterval: ONCHAIN_INTERVAL,
+    enabled:  readModuleFlag('ENABLE_ONCHAIN'),
   });
 }

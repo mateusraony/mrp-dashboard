@@ -11,6 +11,8 @@ import {
 } from 'recharts';
 import { format } from 'date-fns';
 import { useKlines, useBtcTicker } from '@/hooks/useBtcData';
+import { readModuleFlag } from '@/lib/moduleFlags';
+import { DisabledModuleBanner } from '@/components/ui/DisabledModuleBanner';
 import { computeSessionStats } from '@/utils/sessionAnalytics';
 
 // Derives spot metrics from 1h klines.
@@ -53,8 +55,9 @@ function computeSpotMetrics(klines, btcPrice) {
 
 export default function SpotFlow() {
   // ── Sprint 5.4: live session analytics from Binance klines ──────────────────
-  const { data: klines }  = useKlines('1h', 168);  // 168h = 7 days — needed for accurate 1W aggregates
-  const { data: ticker }  = useBtcTicker();
+  const spotEnabled       = readModuleFlag('ENABLE_SPOT_FLOW');
+  const { data: klines }  = useKlines('1h', 168, spotEnabled);
+  const { data: ticker }  = useBtcTicker(spotEnabled);
   const btcPrice          = ticker?.mark_price ?? btcSpotFlow.price;
 
   // Live spot metrics derived from klines; fallback to mock for uncovered fields
@@ -87,6 +90,10 @@ export default function SpotFlow() {
   }));
 
   const retColor = (v) => v > 0 ? '#10b981' : v < 0 ? '#ef4444' : '#4a5568';
+
+  if (!spotEnabled) {
+    return <DisabledModuleBanner moduleName="ENABLE_SPOT_FLOW" />;
+  }
 
   return (
     <div style={{ maxWidth: 1400, margin: '0 auto' }}>

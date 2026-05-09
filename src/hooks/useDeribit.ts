@@ -7,6 +7,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { IS_LIVE } from '@/lib/env';
 import { fetchOptionsData, fetchDvolHistory } from '@/services/deribit';
+import { readModuleFlag } from '@/lib/moduleFlags';
 
 // Intervalos de refetch
 const OPTIONS_INTERVAL = IS_LIVE ? 60_000  : false;  // 1min quando live
@@ -22,6 +23,7 @@ export function useOptionsData() {
     queryFn:  fetchOptionsData,
     staleTime: 55_000,
     refetchInterval: OPTIONS_INTERVAL,
+    enabled:  readModuleFlag('ENABLE_OPTIONS'),
   });
 }
 
@@ -35,5 +37,6 @@ export function useDvolHistory(days = 30) {
     queryFn:  () => fetchDvolHistory(days),
     staleTime: 3_500_000,
     refetchInterval: DVOL_INTERVAL,
+    enabled:  readModuleFlag('ENABLE_OPTIONS'),
   });
 }

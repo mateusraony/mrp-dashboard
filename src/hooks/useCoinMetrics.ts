@@ -12,6 +12,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { IS_LIVE } from '@/lib/env';
 import { fetchOnChainCycle, fetchOnChainExtended } from '@/services/coinmetrics';
+import { readModuleFlag } from '@/lib/moduleFlags';
 
 // Dados on-chain mudam apenas 1x/dia — poll a cada 1h é suficiente
 const ONCHAIN_CYCLE_INTERVAL = IS_LIVE ? 3_600_000 : false;
@@ -23,12 +24,13 @@ const ONCHAIN_CYCLE_INTERVAL = IS_LIVE ? 3_600_000 : false;
  * Em modo mock: retorna valores simulados baseados no mock data existente.
  * Atualiza a cada 1h em modo live.
  */
-export function useOnChainCycle() {
+export function useOnChainCycle(pageEnabled = true) {
   return useQuery({
     queryKey:        ['onchain', 'cycle'],
     queryFn:         fetchOnChainCycle,
     staleTime:       3_500_000,
     refetchInterval: ONCHAIN_CYCLE_INTERVAL,
+    enabled:         pageEnabled && readModuleFlag('ENABLE_COINMETRICS'),
   });
 }
 
@@ -40,11 +42,12 @@ export function useOnChainCycle() {
  * Em modo mock: retorna valores simulados razoáveis (quality B).
  * Atualiza a cada 1h em modo live.
  */
-export function useOnChainExtended() {
+export function useOnChainExtended(pageEnabled = true) {
   return useQuery({
     queryKey:        ['onchain', 'extended'],
     queryFn:         fetchOnChainExtended,
     staleTime:       3_500_000,
     refetchInterval: IS_LIVE ? 3_600_000 : false,
+    enabled:         pageEnabled && readModuleFlag('ENABLE_COINMETRICS'),
   });
 }
