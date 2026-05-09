@@ -1,6 +1,6 @@
 # CHECKPOINT.md — MRP Dashboard
 > Memória técnica viva do projeto. Atualizar ao final de cada bloco importante.
-> Última atualização: 2026-05-09 (PR #88 — StaleIndicator · npm fix · GDELT upsert · auditoria completa)
+> Última atualização: 2026-05-09 (P4 — FRED API key movida para server-side via fred-proxy Edge Function)
 
 ---
 
@@ -66,6 +66,7 @@
 | **Strategies live + stale** | ✅ PR #88 | `StaleIndicator` em `bull_bear`/`basis`; nota discreta em dados históricos sem IS_LIVE guard |
 | **npm audit fix** | ✅ PR #88 | dompurify + postcss corrigidos — 0 vulnerabilidades |
 | **GDELT upsert** | ✅ PR #88 | `upsertGdeltArticles()` em supabase.ts; `useGdelt.ts` persiste artigos novos (fire-and-forget); colunas corretas: `domain`, `sentiment_label` (fix Codex P2) |
+| **P4 — FRED key server-side** | ✅ commit `11a718f` | `VITE_FRED_API_KEY` removido de todos os arquivos cliente; `fred.ts` usa `callFredProxy()` via Edge Function `fred-proxy`; `env.ts` sem a variável; badges usam `isSupabaseConfigured()` (Dashboard, GlobalMarkets, DataSources); build ✅ · 217 testes ✅ · `grep VITE_FRED_API_KEY dist/` = 0 |
 
 ---
 
@@ -133,7 +134,7 @@ Achados principais:
 
 | Risco | Severidade | Fase que resolve |
 |-------|------------|-----------------|
-| FRED API key exposta via `VITE_` no bundle | Alto | Fase 5 |
+| ~~FRED API key exposta via `VITE_` no bundle~~ | ~~Alto~~ | ✅ RESOLVIDO — P4 (commit `11a718f`) |
 | Auth stub sem isolamento real | Alto | Fase 5 / decisão de negócio |
 | Dados mock sem aviso visual claro | Crítico (UX) | **Fase 2** |
 | AI recommendation hardcoded | Crítico (UX) | **Fase 2** |
@@ -195,7 +196,7 @@ Achados principais:
 
 | API | Service | Key necessária | Status |
 |-----|---------|---------------|--------|
-| **FRED API** | `fred.ts` | `VITE_FRED_API_KEY` | ✅ Configurada — WALCL, RRP, TGA, Real Yield, Term Premium, DXY |
+| **FRED API** | `fred.ts` → `fred-proxy` Edge Fn | `FRED_API_KEY` (Supabase Secret — sem prefixo VITE_) | ✅ Server-side via fred-proxy — chave nunca exposta no bundle JS |
 | **Supabase** | `supabase.ts` | `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` | ✅ Configurado — 5 tabelas ativas com RLS |
 
 ### ❌ AUSENTE — Requer plano pago (não implementado)
