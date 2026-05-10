@@ -61,9 +61,9 @@ async function fetchSeries(codigo: number): Promise<number | null> {
 
 function mockBcbData(): BcbData {
   return {
-    selic:      10.75,
-    ipca:       0.38,
-    usdbrl:     5.72,
+    selic:      14.50,
+    ipca:       0.88,
+    usdbrl:     4.90,
     updated_at: Date.now(),
     quality:    'B',
     source:     'mock',
