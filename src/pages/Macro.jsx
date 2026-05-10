@@ -6,6 +6,7 @@ import { useRiskScore } from '@/hooks/useRiskScore';
 import { computeRuleBasedAnalysis } from '@/utils/ruleBasedAnalysis';
 import { IS_LIVE } from '@/lib/env';
 import { DataQualityBadge } from '../components/ui/DataQualityBadge';
+import { useMemo } from 'react';
 import { Area, AreaChart } from 'recharts';
 
 // ─── DATA LAYER (live > mock fallback) ───────────────────────────────────────
@@ -32,10 +33,11 @@ import {
 } from 'recharts';
 
 // Converts live series history [{date, value}] to MiniTimeChart format {1d, 1w, 1m}
+// 1d = 2 pontos (ontem + hoje), 1w = 5 dias úteis, 1m = todos os pontos (~30d)
 function historyToWindows(history) {
   if (!history || history.length === 0) return null;
   const pts = history.map(h => ({ t: h.date, v: h.value }));
-  return { '1d': pts.slice(-5), '1w': pts.slice(-7), '1m': pts };
+  return { '1d': pts.slice(-2), '1w': pts.slice(-5), '1m': pts };
 }
 
 function SeriesCard({ s }) {
@@ -508,7 +510,7 @@ function BrMacroPanel({ bcb, isLoading, isError }) {
             )}
 
             {/* Estado de erro/loading por campo */}
-            {(isLoading || isError || m.value === null) && !isLoading && (
+            {!isLoading && (isError || m.value === null) && (
               <div style={{
                 marginTop: 8,
                 fontSize: 9, color: '#ef4444',
@@ -540,19 +542,26 @@ export default function Macro() {
       })
     : null;
   const aiAnalysis = liveAnalysis ?? aiAnalysisMock;
-  const us10y = m.series.find(s => s.id === 'US10Y');
-  const us2y  = m.series.find(s => s.id === 'US2Y');
-  const yieldSpread = (us10y?.value ?? 0) - (us2y?.value ?? 0);
-  const yieldSpreadBp = (yieldSpread * 100).toFixed(1);
-  const isInverted = yieldSpread < 0;
+  const { yieldSpread, yieldSpreadBp, isInverted } = useMemo(() => {
+    const us10y = m.series.find(s => s.id === 'US10Y');
+    const us2y  = m.series.find(s => s.id === 'US2Y');
+    const spread = (us10y?.value && us2y?.value)
+      ? us10y.value - us2y.value
+      : null;
+    return {
+      yieldSpread:   spread,
+      yieldSpreadBp: spread !== null ? (spread * 100).toFixed(1) : null,
+      isInverted:    spread !== null && spread < 0,
+    };
+  }, [m.series]);
 
-  const deltaChartData = m.series.map(s => ({
+  const deltaChartData = useMemo(() => m.series.map(s => ({
     name: s.id,
-    d1:  s.format === 'yield' ? parseFloat(s.delta_1d_bp.toFixed(1))   : parseFloat((s.delta_1d * 100).toFixed(2)),
-    d1w: s.format === 'yield' ? parseFloat(s.delta_7d_bp.toFixed(1))   : parseFloat((s.delta_7d * 100).toFixed(2)),
-    d1m: s.format === 'yield' ? parseFloat(s.delta_30d_bp !== undefined ? s.delta_30d_bp.toFixed(1) : '0') : parseFloat((s.delta_30d !== undefined ? s.delta_30d * 100 : 0).toFixed(2)),
+    d1:  s.format === 'yield' ? parseFloat((s.delta_1d_bp ?? 0).toFixed(1))  : parseFloat((s.delta_1d * 100).toFixed(2)),
+    d1w: s.format === 'yield' ? parseFloat((s.delta_7d_bp ?? 0).toFixed(1))  : parseFloat((s.delta_7d * 100).toFixed(2)),
+    d1m: s.format === 'yield' ? parseFloat((s.delta_30d_bp ?? 0).toFixed(1)) : parseFloat(((s.delta_30d ?? 0) * 100).toFixed(2)),
     label: s.format === 'yield' ? 'bp' : '%',
-  }));
+  })), [m.series]);
 
   return (
     <div style={{ maxWidth: 1400, margin: '0 auto' }}>
@@ -588,10 +597,14 @@ export default function Macro() {
         <span style={{ fontSize: 18 }}>{isInverted ? '🔴' : '🟢'}</span>
         <div>
           <div style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0' }}>
-            Yield Curve (10Y−2Y): {yieldSpread >= 0 ? '+' : ''}{yieldSpreadBp}bp
+            {yieldSpreadBp !== null
+              ? `Yield Curve (10Y−2Y): ${yieldSpread >= 0 ? '+' : ''}${yieldSpreadBp}bp`
+              : 'Yield Curve: dados insuficientes'}
           </div>
           <div style={{ fontSize: 11, color: '#8899a6', marginTop: 2 }}>
-            {isInverted
+            {yieldSpreadBp === null
+              ? 'US10Y ou US2Y indisponível no momento'
+              : isInverted
               ? 'Inverted yield curve — historically associated with recession risk'
               : `Positive spread — ${parseFloat(yieldSpreadBp) < 50 ? 'Flattening' : 'Normal'} curve`}
           </div>
