@@ -5,12 +5,15 @@
  *   S&P 500  → ticker %5EGSPC
  *   VIX      → ticker %5EVIX
  *
- * Não requer chave de API. Dados EOD (fim de dia).
- * Em caso de falha retorna [] — fetchMacroBoard trata com Promise.allSettled.
+ * Arquitetura de acesso:
+ *   - Em produção (Supabase configurado): rota via fred-proxy Edge Function
+ *     com type='yahoo_chart' para evitar bloqueio de CORS do browser.
+ *   - Em dev local sem Supabase: chamada direta (pode funcionar, ou falha
+ *     graciosamente retornando []).
  */
 
 import { z } from 'zod';
-import { apiFetch } from '@/lib/apiClient';
+import { env } from '@/lib/env';
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
 
@@ -33,11 +36,40 @@ const YahooChartSchema = z.object({
   }),
 });
 
-// Yahoo Finance requer User-Agent para evitar bloqueio
-const YAHOO_HEADERS: HeadersInit = {
-  'User-Agent': 'Mozilla/5.0 (compatible; mrp-dashboard/1.0)',
-  'Accept':     'application/json',
-};
+// ─── Proxy / fetch ────────────────────────────────────────────────────────────
+
+/**
+ * Busca dados Yahoo Finance via Supabase Edge Function (server-side, sem CORS).
+ * Fallback: chamada direta quando Supabase não configurado (dev local).
+ */
+async function fetchYahooRaw(ticker: string, days: number): Promise<unknown> {
+  const baseUrl = env.VITE_SUPABASE_URL?.replace(/\/$/, '');
+  const key     = env.VITE_SUPABASE_ANON_KEY;
+
+  if (baseUrl && key) {
+    // Produção: proxy server-side via fred-proxy (evita CORS)
+    const res = await fetch(`${baseUrl}/functions/v1/fred-proxy`, {
+      method:  'POST',
+      headers: {
+        'Content-Type':  'application/json',
+        'Authorization': `Bearer ${key}`,
+      },
+      body:   JSON.stringify({ type: 'yahoo_chart', params: { ticker, days: String(days) } }),
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!res.ok) throw new Error(`fred-proxy yahoo_chart ${res.status}: ${ticker}`);
+    return res.json();
+  }
+
+  // Dev local sem Supabase: tenta chamada direta
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=${days}d`;
+  const res = await fetch(url, {
+    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; mrp-dashboard/1.0)' },
+    signal:  AbortSignal.timeout(15_000),
+  });
+  if (!res.ok) throw new Error(`Yahoo direct HTTP ${res.status}: ${ticker}`);
+  return res.json();
+}
 
 // ─── Fetcher base ─────────────────────────────────────────────────────────────
 
@@ -51,11 +83,8 @@ export async function fetchYahooSeries(
   ticker: string,
   days = 40,
 ): Promise<Array<{ date: string; value: number }>> {
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=${days}d`;
-
   try {
-    const res  = await apiFetch(url, { headers: YAHOO_HEADERS });
-    const raw  = await res.json();
+    const raw  = await fetchYahooRaw(ticker, days);
     const data = YahooChartSchema.parse(raw);
 
     const result = data.chart.result[0];

@@ -1,10 +1,16 @@
 /**
- * fred-proxy — Edge Function que faz proxy das chamadas ao FRED API.
- * Resolve o CORS: o browser chama esta função, que chama o FRED no servidor.
+ * fred-proxy — Edge Function que faz proxy das chamadas ao FRED API e Yahoo Finance.
+ * Resolve o CORS: o browser chama esta função, que chama as APIs no servidor.
  * FRED_API_KEY fica como secret do Supabase (não exposta no bundle frontend).
+ *
+ * Types suportados:
+ *   observations   — FRED series/observations (requer FRED_API_KEY)
+ *   release_dates  — FRED release/dates (requer FRED_API_KEY)
+ *   yahoo_chart    — Yahoo Finance v8/finance/chart (sem API key, evita CORS)
  */
 
 const FRED_BASE = 'https://api.stlouisfed.org/fred';
+const YAHOO_BASE = 'https://query1.finance.yahoo.com/v8/finance/chart';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin':  '*',
@@ -18,6 +24,34 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    const body = await req.json() as { type: string; params: Record<string, string> };
+    const { type, params } = body;
+
+    // ── Yahoo Finance — sem necessidade de API key ───────────────────────────
+    if (type === 'yahoo_chart') {
+      const { ticker, days = '35' } = params;
+      if (!ticker) {
+        return new Response(
+          JSON.stringify({ error: 'param ticker obrigatório para yahoo_chart' }),
+          { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } },
+        );
+      }
+      const url = `${YAHOO_BASE}/${ticker}?interval=1d&range=${days}d`;
+      const yahooRes = await fetch(url, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; mrp-dashboard/1.0)' },
+        signal: AbortSignal.timeout(15_000),
+      });
+      const data = await yahooRes.json();
+      if (!yahooRes.ok) {
+        console.error(`[fred-proxy] Yahoo ${yahooRes.status} | ticker=${ticker}`);
+      }
+      return new Response(JSON.stringify(data), {
+        status:  yahooRes.ok ? 200 : yahooRes.status,
+        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // ── FRED — requer API key ────────────────────────────────────────────────
     const fredApiKey = Deno.env.get('FRED_API_KEY');
     if (!fredApiKey) {
       return new Response(
@@ -25,9 +59,6 @@ Deno.serve(async (req: Request) => {
         { status: 500, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } },
       );
     }
-
-    const body = await req.json() as { type: string; params: Record<string, string> };
-    const { type, params } = body;
 
     const searchParams = new URLSearchParams({
       ...params,
