@@ -245,26 +245,32 @@ function extractDeltas(history: Array<{ date: string; value: number }>, format: 
 export async function fetchMacroBoard(): Promise<MacroBoardData> {
   if (DATA_MODE === 'mock') return mockMacroBoard();
 
-  // Busca todas as séries em paralelo via fred-proxy
-  const results = await Promise.all(
+  // Busca todas as séries em paralelo via fred-proxy (allSettled = uma falha não quebra o board)
+  const settled = await Promise.allSettled(
     MACRO_SERIES.map(s => fetchSeries(s.series_id, 35)),
   );
 
-  const series: MacroSeriesEntry[] = MACRO_SERIES.map((cfg, i) => {
-    const history = results[i];
+  const series: MacroSeriesEntry[] = [];
+  for (let i = 0; i < MACRO_SERIES.length; i++) {
+    const result = settled[i];
+    const cfg    = MACRO_SERIES[i];
+    if (result.status === 'rejected') {
+      console.warn(`[fred] ${cfg.series_id} falhou (${result.reason?.message ?? result.reason}) — série omitida do board`);
+      continue;
+    }
+    const history = result.value;
     const deltas  = extractDeltas(history, cfg.format);
-
-    return {
-      id:           cfg.id,
-      name:         cfg.name,
-      series_id:    cfg.series_id,
-      unit:         cfg.unit,
-      format:       cfg.format,
-      history:      history.slice(-30), // últimos 30d úteis
-      quality:      'A',
+    series.push({
+      id:       cfg.id,
+      name:     cfg.name,
+      series_id: cfg.series_id,
+      unit:     cfg.unit,
+      format:   cfg.format,
+      history:  history.slice(-30),
+      quality:  'A',
       ...deltas,
-    };
-  });
+    });
+  }
 
   return {
     series,
@@ -363,22 +369,27 @@ function mockGlobalLiquidity(): GlobalLiquidityData {
 export async function fetchGlobalLiquidity(): Promise<GlobalLiquidityData> {
   if (DATA_MODE === 'mock') return mockGlobalLiquidity();
 
-  // Buscar histórico de 35 dias (séries semanais: ~5 pontos; diárias: ~25 pontos)
-  const [
-    walcl,     // Fed Balance Sheet (weekly, bilhões)
-    rrp,       // Reverse Repo (daily, bilhões)
-    wtregen,   // Treasury General Account (weekly, bilhões)
-    dfii10,    // 10Y Real Yield TIPS (daily, %)
-    term10,    // 10Y Term Premium ACM (daily, %)
-    dtwex,     // Broad Dollar Index (daily)
-  ] = await Promise.all([
-    fetchSeries('WALCL',       35),
-    fetchSeries('RRPONTSYD',   35),
-    fetchSeries('WTREGEN',     35),
-    fetchSeries('DFII10',      35),
-    fetchSeries('THREEFYTP10', 35),
-    fetchSeries('DTWEXBGS',    35),
-  ]);
+  // Buscar histórico de 35 dias (allSettled = uma falha não quebra o widget inteiro)
+  const LIQUIDITY_SERIES = ['WALCL', 'RRPONTSYD', 'WTREGEN', 'DFII10', 'THREEFYTP10', 'DTWEXBGS'] as const;
+  const liqSettled = await Promise.allSettled(
+    LIQUIDITY_SERIES.map(id => fetchSeries(id, 35)),
+  );
+
+  const liqGet = (idx: number): Array<{ date: string; value: number }> => {
+    const r = liqSettled[idx];
+    if (r.status === 'rejected') {
+      console.warn(`[fred] ${LIQUIDITY_SERIES[idx]} falhou (${r.reason?.message ?? r.reason}) — usando []`);
+      return [];
+    }
+    return r.value;
+  };
+
+  const walcl   = liqGet(0); // Fed Balance Sheet (weekly, bilhões)
+  const rrp     = liqGet(1); // Reverse Repo (daily, bilhões)
+  const wtregen = liqGet(2); // Treasury General Account (weekly, bilhões)
+  const dfii10  = liqGet(3); // 10Y Real Yield TIPS (daily, %)
+  const term10  = liqGet(4); // 10Y Term Premium ACM (daily, %)
+  const dtwex   = liqGet(5); // Broad Dollar Index (daily)
 
   // Valores mais recentes disponíveis
   const fed_b  = (walcl[walcl.length - 1]?.value   ?? 7_100_000) / 1_000; // FRED: milhões → bilhões
