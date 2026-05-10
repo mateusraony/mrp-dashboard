@@ -47,7 +47,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const fredRes  = await fetch(endpoint);
+    const fredRes  = await fetch(endpoint, { signal: AbortSignal.timeout(15_000) });
     const data     = await fredRes.json();
 
     return new Response(JSON.stringify(data), {
