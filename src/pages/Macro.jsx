@@ -540,7 +540,9 @@ export default function Macro() {
       })
     : null;
   const aiAnalysis = liveAnalysis ?? aiAnalysisMock;
-  const yieldSpread = m.series.find(s => s.id === 'US10Y').value - m.series.find(s => s.id === 'US2Y').value;
+  const us10y = m.series.find(s => s.id === 'US10Y');
+  const us2y  = m.series.find(s => s.id === 'US2Y');
+  const yieldSpread = (us10y?.value ?? 0) - (us2y?.value ?? 0);
   const yieldSpreadBp = (yieldSpread * 100).toFixed(1);
   const isInverted = yieldSpread < 0;
 
