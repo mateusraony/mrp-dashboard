@@ -50,6 +50,11 @@ Deno.serve(async (req: Request) => {
     const fredRes  = await fetch(endpoint, { signal: AbortSignal.timeout(15_000) });
     const data     = await fredRes.json();
 
+    if (!fredRes.ok) {
+      const preview = JSON.stringify(data).slice(0, 400);
+      console.error(`[fred-proxy] FRED ${fredRes.status} | type=${type} | params=${JSON.stringify(params)} | body=${preview}`);
+    }
+
     return new Response(JSON.stringify(data), {
       status:  fredRes.ok ? 200 : fredRes.status,
       headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
