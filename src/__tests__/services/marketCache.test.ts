@@ -1,12 +1,15 @@
 /**
- * marketCache.test.ts — testes para withCache
+ * marketCache.test.ts — testes para withCache e withSWR
  *
- * Ambiente de teste: VITE_DATA_MODE=mock, sem VITE_SUPABASE_URL.
- * Isso significa IS_LIVE=false e isConfigured()=false → withCache
- * chama o fetcher diretamente sem tocar no Supabase.
+ * Ambiente padrão: VITE_DATA_MODE=mock, sem VITE_SUPABASE_URL.
+ * Isso significa IS_LIVE=false e isConfigured()=false → withCache/withSWR
+ * chamam o fetcher diretamente sem tocar no Supabase.
+ *
+ * Testes withSWR mocam IS_LIVE=true + fetch global para simular respostas
+ * do Supabase sem rede real.
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { withCache, isConfigured } from '@/services/marketCache';
 
 describe('isConfigured', () => {
