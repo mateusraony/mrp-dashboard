@@ -12,7 +12,7 @@
  *   DGS10        — US 10-Year Treasury Yield (diário)
  *   DGS2         — US 2-Year Treasury Yield (diário)
  *   T10Y2Y       — Yield Curve Spread 10Y-2Y
- *   FEDFUNDS     — Fed Funds Rate
+ *   DFF          — Daily Effective Fed Funds Rate
  *
  * Regra de mock: idem binance.ts — mock NÃO substitui live com falha.
  * Sem Supabase configurado → retorna mock com aviso de configuração.
@@ -22,6 +22,7 @@ import { z } from 'zod';
 import { DATA_MODE, env } from '@/lib/env';
 import { isSupabaseConfigured } from '@/services/supabase';
 import { macroBoard } from '@/components/data/mockData';
+import { fetchSP500, fetchVIX } from '@/services/yahooFinance';
 
 // ─── Schemas ──────────────────────────────────────────────────────────────────
 
@@ -82,13 +83,12 @@ interface SeriesConfig {
 }
 
 const MACRO_SERIES: SeriesConfig[] = [
-  { id: 'SP500',  name: 'S&P 500',           series_id: 'SP500',               unit: 'pts',  format: 'number' },
   { id: 'DXY',    name: 'USD Broad Index',    series_id: 'DTWEXBGS',            unit: '',     format: 'number' },
   { id: 'GOLD',   name: 'Gold (LBMA AM)',     series_id: 'GOLDAMGBD228NLBM',    unit: '$/oz', format: 'number' },
-  { id: 'VIX',    name: 'VIX',                series_id: 'VIXCLS',              unit: '',     format: 'number' },
   { id: 'US10Y',  name: 'US 10Y Yield',       series_id: 'DGS10',               unit: '%',    format: 'yield'  },
   { id: 'US2Y',   name: 'US 2Y Yield',        series_id: 'DGS2',                unit: '%',    format: 'yield'  },
 ];
+// SP500 e VIX são buscados via Yahoo Finance (sem restrição de licença S&P/CBOE)
 
 // ─── Mock transformer ─────────────────────────────────────────────────────────
 
@@ -129,7 +129,7 @@ function mockYieldCurve(): YieldCurveData {
 
   return {
     spread_10y2y: us10y.value - us2y.value,
-    fed_funds:    5.25,
+    fed_funds:    3.65,
     history_10y: Array.from({ length: 30 }, (_, i) => ({
       date:  new Date(Date.now() - (29 - i) * 86_400_000).toISOString().slice(0, 10),
       value: us10y.value + (Math.random() - 0.5) * 0.2,
@@ -255,7 +255,26 @@ export async function fetchMacroBoard(): Promise<MacroBoardData> {
     const result = settled[i];
     const cfg    = MACRO_SERIES[i];
     if (result.status === 'rejected') {
-      console.warn(`[fred] ${cfg.series_id} falhou (${result.reason?.message ?? result.reason}) — série omitida do board`);
+      console.warn(`[fred] ${cfg.series_id} falhou (${result.reason?.message ?? result.reason}) — placeholder quality C`);
+      series.push({
+        id:           cfg.id,
+        name:         cfg.name,
+        series_id:    cfg.series_id,
+        unit:         cfg.unit,
+        format:       cfg.format,
+        value:        0,
+        prev:         0,
+        prev_7d:      0,
+        prev_30d:     0,
+        delta_1d:     0,
+        delta_7d:     0,
+        delta_30d:    0,
+        delta_1d_bp:  cfg.format === 'yield' ? 0 : undefined,
+        delta_7d_bp:  cfg.format === 'yield' ? 0 : undefined,
+        delta_30d_bp: cfg.format === 'yield' ? 0 : undefined,
+        history:      [],
+        quality:      'C',
+      });
       continue;
     }
     const history = result.value;
@@ -270,6 +289,38 @@ export async function fetchMacroBoard(): Promise<MacroBoardData> {
       quality:  'A',
       ...deltas,
     });
+  }
+
+  // SP500 e VIX via Yahoo Finance (sem restrição de licença S&P/CBOE)
+  const [sp500Result, vixResult] = await Promise.allSettled([
+    fetchSP500(35),
+    fetchVIX(35),
+  ]);
+
+  if (sp500Result.status === 'fulfilled' && sp500Result.value.length > 0) {
+    const history = sp500Result.value;
+    const deltas  = extractDeltas(history, 'number');
+    series.push({
+      id: 'SP500', name: 'S&P 500', series_id: 'SP500',
+      unit: 'pts', format: 'number',
+      history: history.slice(-30), quality: 'A',
+      ...deltas,
+    });
+  } else {
+    console.warn('[fred] SP500 via Yahoo Finance falhou — série omitida');
+  }
+
+  if (vixResult.status === 'fulfilled' && vixResult.value.length > 0) {
+    const history = vixResult.value;
+    const deltas  = extractDeltas(history, 'number');
+    series.push({
+      id: 'VIX', name: 'VIX', series_id: 'VIXCLS',
+      unit: '', format: 'number',
+      history: history.slice(-30), quality: 'A',
+      ...deltas,
+    });
+  } else {
+    console.warn('[fred] VIX via Yahoo Finance falhou — série omitida');
   }
 
   return {
@@ -322,7 +373,7 @@ function calcTrend<T extends string>(
 
 function mockGlobalLiquidity(): GlobalLiquidityData {
   const fed_b = 7_100;
-  const rrp_b = 300;
+  const rrp_b = 1;   // RRP praticamente zerado em 2026 (~0.6B)
   const tga_b = 600;
   const net    = fed_b - rrp_b - tga_b; // 6_200
 
@@ -393,13 +444,14 @@ export async function fetchGlobalLiquidity(): Promise<GlobalLiquidityData> {
 
   // Valores mais recentes disponíveis
   const fed_b  = (walcl[walcl.length - 1]?.value   ?? 7_100_000) / 1_000; // FRED: milhões → bilhões
-  const rrp_b  = rrp[rrp.length - 1]?.value         ?? 300;
+  const rrp_b  = rrp[rrp.length - 1]?.value         ?? 1;  // RRP ~zerado em 2026
   const tga_b  = (wtregen[wtregen.length - 1]?.value ?? 600_000) / 1_000;
 
-  // Valor 4 semanas atrás (séries semanais: ~4 pontos atrás)
-  const fed4w  = (walcl[Math.max(0, walcl.length - 5)]?.value   ?? fed_b * 1_000) / 1_000;
-  const rrp4w  = rrp[Math.max(0, rrp.length - 28)]?.value        ?? rrp_b;
-  const tga4w  = (wtregen[Math.max(0, wtregen.length - 5)]?.value ?? tga_b * 1_000) / 1_000;
+  // Valor 4 semanas atrás por data-alvo (índice fixo falha com séries de frequência variada)
+  const fourWeeksAgo = new Date(Date.now() - 28 * 86_400_000).toISOString().slice(0, 10);
+  const fed4w  = ([...walcl].reverse().find(r => r.date <= fourWeeksAgo)?.value   ?? fed_b * 1_000) / 1_000;
+  const rrp4w  = ([...rrp].reverse().find(r => r.date <= fourWeeksAgo)?.value     ?? rrp_b);
+  const tga4w  = ([...wtregen].reverse().find(r => r.date <= fourWeeksAgo)?.value ?? tga_b * 1_000) / 1_000;
 
   const fed_balance_chg_4w = fed_b - fed4w;
 
@@ -470,9 +522,9 @@ export async function fetchYieldCurve(): Promise<YieldCurveData> {
   if (DATA_MODE === 'mock') return mockYieldCurve();
 
   const [hist10y, hist2y, histFF] = await Promise.all([
-    fetchSeries('DGS10',    35),
-    fetchSeries('DGS2',     35),
-    fetchSeries('FEDFUNDS', 35),
+    fetchSeries('DGS10', 35),
+    fetchSeries('DGS2',  35),
+    fetchSeries('DFF',   35),  // Daily Effective Fed Funds Rate (FEDFUNDS é mensal)
   ]);
 
   const last10y  = hist10y[hist10y.length - 1]?.value ?? 0;

@@ -46,6 +46,6 @@ export function useGlobalLiquidity() {
     queryKey: ['macro', 'global-liquidity'],
     queryFn:  fetchGlobalLiquidity,
     staleTime: 3_500_000,
-    refetchInterval: IS_LIVE ? 3_600_000 : false,
+    refetchInterval: IS_LIVE ? 6 * 3_600_000 : false,  // 6h — dados semanais
   });
 }
