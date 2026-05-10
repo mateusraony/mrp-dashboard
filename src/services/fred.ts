@@ -24,11 +24,11 @@ import { isSupabaseConfigured } from '@/services/supabase';
 import { macroBoard } from '@/components/data/mockData';
 import { fetchSP500, fetchVIX } from '@/services/yahooFinance';
 
-// ─── Schemas ──────────────────────────────────────────────────────────────────
+// ─── Schemas ────────────────────────────────────────────────────────────────
 
 const ObservationSchema = z.object({
   date:  z.string(),
-  value: z.string(), // FRED retorna valores como string (pode ser '.' para N/A)
+  value: z.string(),
 });
 
 const ObservationsResponseSchema = z.object({
@@ -37,22 +37,22 @@ const ObservationsResponseSchema = z.object({
   frequency_short: z.string().optional(),
 });
 
-// ─── Shapes exportadas ────────────────────────────────────────────────────────
+// ─── Shapes exportadas ─────────────────────────────────────────────────────────────
 
 export interface MacroSeriesEntry {
   id:           string;
   name:         string;
   series_id:    string;
   value:        number;
-  prev:         number;        // dia anterior
+  prev:         number;
   prev_7d:      number;
   prev_30d:     number;
   unit:         string;
   format:       'number' | 'yield' | 'percent';
-  delta_1d:     number;        // variação relativa
+  delta_1d:     number;
   delta_7d:     number;
   delta_30d:    number;
-  delta_1d_bp?: number;        // variação em basis points (só para yields)
+  delta_1d_bp?: number;
   delta_7d_bp?: number;
   delta_30d_bp?: number;
   history:      Array<{ date: string; value: number }>;
@@ -65,14 +65,14 @@ export interface MacroBoardData {
 }
 
 export interface YieldCurveData {
-  spread_10y2y: number;   // diferença em % (negativo = invertida)
+  spread_10y2y: number;
   fed_funds:    number;
   history_10y:  Array<{ date: string; value: number }>;
   history_2y:   Array<{ date: string; value: number }>;
   updated_at:   number;
 }
 
-// ─── Config das séries ────────────────────────────────────────────────────────
+// ─── Config das séries ───────────────────────────────────────────────────────────────
 
 interface SeriesConfig {
   id:        string;
@@ -88,9 +88,8 @@ const MACRO_SERIES: SeriesConfig[] = [
   { id: 'US10Y',  name: 'US 10Y Yield',       series_id: 'DGS10',               unit: '%',    format: 'yield'  },
   { id: 'US2Y',   name: 'US 2Y Yield',        series_id: 'DGS2',                unit: '%',    format: 'yield'  },
 ];
-// SP500 e VIX são buscados via Yahoo Finance (sem restrição de licença S&P/CBOE)
 
-// ─── Mock transformer ─────────────────────────────────────────────────────────
+// ─── Mock transformer ───────────────────────────────────────────────────────────────
 
 function mockMacroBoard(): MacroBoardData {
   const series: MacroSeriesEntry[] = macroBoard.series.map(s => ({
@@ -109,7 +108,6 @@ function mockMacroBoard(): MacroBoardData {
     delta_1d_bp:  'delta_1d_bp' in s ? s.delta_1d_bp : undefined,
     delta_7d_bp:  'delta_7d_bp' in s ? s.delta_7d_bp : undefined,
     delta_30d_bp: 'delta_30d_bp' in s ? s.delta_30d_bp : undefined,
-    // Histórico simulado (30d)
     history: Array.from({ length: 30 }, (_, i) => ({
       date:  new Date(Date.now() - (29 - i) * 86_400_000).toISOString().slice(0, 10),
       value: s.value * (1 + (Math.random() - 0.5) * 0.04 * ((30 - i) / 30)),
@@ -142,12 +140,8 @@ function mockYieldCurve(): YieldCurveData {
   };
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Helpers ───────────────────────────────────────────────────────────────────
 
-/**
- * Chama a Edge Function fred-proxy para buscar dados FRED server-side.
- * A FRED_API_KEY fica em Supabase Secrets — nunca exposta no bundle JS.
- */
 async function callFredProxy(
   type: 'observations' | 'release_dates',
   params: Record<string, string>,
@@ -182,9 +176,6 @@ async function callFredProxy(
   return res.json();
 }
 
-/**
- * Busca observações de uma série FRED com histórico de N dias via fred-proxy.
- */
 export async function fetchSeries(
   seriesId: string,
   days = 35,
@@ -200,20 +191,16 @@ export async function fetchSeries(
 
   const parsed = ObservationsResponseSchema.parse(raw);
 
-  // Filtra observações com valor numérico válido (FRED usa '.' para N/A)
   return parsed.observations
     .filter(o => o.value !== '.' && !isNaN(parseFloat(o.value)))
     .map(o => ({ date: o.date, value: parseFloat(o.value) }));
 }
 
-/**
- * Extrai as variações temporais de um array de observações ordenado por data.
- */
 function extractDeltas(history: Array<{ date: string; value: number }>, format: string) {
   const last    = history[history.length - 1]?.value ?? 0;
-  const prev    = history[history.length - 2]?.value ?? last;  // ~1d antes (útil)
-  const prev7d  = history[Math.max(0, history.length - 6)]?.value ?? last; // ~5 úteis
-  const prev30d = history[0]?.value ?? last; // início do período
+  const prev    = history[history.length - 2]?.value ?? last;
+  const prev7d  = history[Math.max(0, history.length - 6)]?.value ?? last;
+  const prev30d = history[0]?.value ?? last;
 
   const delta_1d   = prev   ? (last - prev)   / prev   : 0;
   const delta_7d   = prev7d ? (last - prev7d) / prev7d : 0;
@@ -236,16 +223,9 @@ function extractDeltas(history: Array<{ date: string; value: number }>, format: 
 
 // ─── Fetchers ─────────────────────────────────────────────────────────────────
 
-/**
- * fetchMacroBoard — S&P 500, DXY, Gold, VIX, US10Y, US2Y com histórico 30d
- *
- * Requer Supabase configurado (FRED_API_KEY em Supabase Secrets). Cache recomendado: 1 hora.
- * FRED atualiza dados macro diariamente (sem intraday).
- */
 export async function fetchMacroBoard(): Promise<MacroBoardData> {
   if (DATA_MODE === 'mock') return mockMacroBoard();
 
-  // Busca todas as séries em paralelo via fred-proxy (allSettled = uma falha não quebra o board)
   const settled = await Promise.allSettled(
     MACRO_SERIES.map(s => fetchSeries(s.series_id, 35)),
   );
@@ -291,7 +271,6 @@ export async function fetchMacroBoard(): Promise<MacroBoardData> {
     });
   }
 
-  // SP500 e VIX via Yahoo Finance (sem restrição de licença S&P/CBOE)
   const [sp500Result, vixResult] = await Promise.allSettled([
     fetchSP500(35),
     fetchVIX(35),
@@ -329,19 +308,19 @@ export async function fetchMacroBoard(): Promise<MacroBoardData> {
   };
 }
 
-// ─── Global Liquidity ─────────────────────────────────────────────────────────
+// ─── Global Liquidity ────────────────────────────────────────────────────────────
 
 export interface GlobalLiquidityData {
-  fed_balance_b: number;       // Fed BS em bilhões USD
-  fed_balance_chg_4w: number;  // variação 4 semanas (bilhões)
-  rrp_b: number;               // Reverse Repo (bilhões)
+  fed_balance_b: number;
+  fed_balance_chg_4w: number;
+  rrp_b: number;
   rrp_trend: 'draining' | 'adding' | 'stable';
-  tga_b: number;               // Treasury General Account (bilhões)
+  tga_b: number;
   tga_trend: 'spending' | 'building' | 'stable';
-  real_yield_10y: number;      // DFII10
-  term_premium_10y: number;    // ACM term premium (THREEFYTP10)
-  dollar_index: number;        // DTWEXBGS
-  net_liquidity: number;       // Fed BS - RRP - TGA (proxy liquidez líquida)
+  real_yield_10y: number;
+  term_premium_10y: number;
+  dollar_index: number;
+  net_liquidity: number;
   net_liquidity_signal: string;
   history: Array<{
     date: string;
@@ -355,10 +334,6 @@ export interface GlobalLiquidityData {
   updated_at: number;
 }
 
-/**
- * Calcula tendência de uma série comparando último vs 4 semanas atrás.
- * Threshold de 2% para considerar movimento significativo.
- */
 function calcTrend<T extends string>(
   current: number,
   prev4w: number,
@@ -372,14 +347,14 @@ function calcTrend<T extends string>(
 }
 
 function mockGlobalLiquidity(): GlobalLiquidityData {
-  const fed_b = 7_100;
-  const rrp_b = 1;   // RRP praticamente zerado em 2026 (~0.6B)
-  const tga_b = 600;
-  const net    = fed_b - rrp_b - tga_b; // 6_200
+  const fed_b = 6_700;
+  const rrp_b = 1;
+  const tga_b = 860;
+  const net    = fed_b - rrp_b - tga_b;
 
   const now = Date.now();
   const history = Array.from({ length: 30 }, (_, i) => {
-    const d = new Date(now - (29 - i) * 7 * 86_400_000); // dados semanais
+    const d = new Date(now - (29 - i) * 7 * 86_400_000);
     const _fed = fed_b * (0.97 + (i / 30) * 0.03 + (Math.random() - 0.5) * 0.005);
     const _rrp = rrp_b * (1.4 - (i / 30) * 0.4 + (Math.random() - 0.5) * 0.02);
     const _tga = tga_b * (0.9 + (Math.random() - 0.5) * 0.1);
@@ -400,8 +375,8 @@ function mockGlobalLiquidity(): GlobalLiquidityData {
     tga_b,
     tga_trend:           'building',
     real_yield_10y:      1.95,
-    term_premium_10y:    0.42,
-    dollar_index:        104.8,
+    term_premium_10y:    0.62,
+    dollar_index:        118.5,
     net_liquidity:       net,
     net_liquidity_signal: 'Liquidez líquida estável — RRP drenando gradualmente (bullish marginal)',
     history,
@@ -411,16 +386,9 @@ function mockGlobalLiquidity(): GlobalLiquidityData {
   };
 }
 
-/**
- * fetchGlobalLiquidity — Fed Balance Sheet, RRP, TGA, Real Yield, Term Premium, DXY
- *
- * Busca 6 séries em paralelo via fred-proxy.
- * Cache recomendado: 1 hora (dados semanais/diários, não intraday).
- */
 export async function fetchGlobalLiquidity(): Promise<GlobalLiquidityData> {
   if (DATA_MODE === 'mock') return mockGlobalLiquidity();
 
-  // Buscar histórico de 35 dias (allSettled = uma falha não quebra o widget inteiro)
   const LIQUIDITY_SERIES = ['WALCL', 'RRPONTSYD', 'WTREGEN', 'DFII10', 'THREEFYTP10', 'DTWEXBGS'] as const;
   const liqSettled = await Promise.allSettled(
     LIQUIDITY_SERIES.map(id => fetchSeries(id, 35)),
@@ -435,19 +403,17 @@ export async function fetchGlobalLiquidity(): Promise<GlobalLiquidityData> {
     return r.value;
   };
 
-  const walcl   = liqGet(0); // Fed Balance Sheet (weekly, bilhões)
-  const rrp     = liqGet(1); // Reverse Repo (daily, bilhões)
-  const wtregen = liqGet(2); // Treasury General Account (weekly, bilhões)
-  const dfii10  = liqGet(3); // 10Y Real Yield TIPS (daily, %)
-  const term10  = liqGet(4); // 10Y Term Premium ACM (daily, %)
-  const dtwex   = liqGet(5); // Broad Dollar Index (daily)
+  const walcl   = liqGet(0);
+  const rrp     = liqGet(1);
+  const wtregen = liqGet(2);
+  const dfii10  = liqGet(3);
+  const term10  = liqGet(4);
+  const dtwex   = liqGet(5);
 
-  // Valores mais recentes disponíveis
-  const fed_b  = (walcl[walcl.length - 1]?.value   ?? 7_100_000) / 1_000; // FRED: milhões → bilhões
-  const rrp_b  = rrp[rrp.length - 1]?.value         ?? 1;  // RRP ~zerado em 2026
-  const tga_b  = (wtregen[wtregen.length - 1]?.value ?? 600_000) / 1_000;
+  const fed_b  = (walcl[walcl.length - 1]?.value   ?? 6_700_000) / 1_000;
+  const rrp_b  = rrp[rrp.length - 1]?.value         ?? 1;
+  const tga_b  = (wtregen[wtregen.length - 1]?.value ?? 860_000) / 1_000;
 
-  // Valor 4 semanas atrás por data-alvo (índice fixo falha com séries de frequência variada)
   const fourWeeksAgo = new Date(Date.now() - 28 * 86_400_000).toISOString().slice(0, 10);
   const fed4w  = ([...walcl].reverse().find(r => r.date <= fourWeeksAgo)?.value   ?? fed_b * 1_000) / 1_000;
   const rrp4w  = ([...rrp].reverse().find(r => r.date <= fourWeeksAgo)?.value     ?? rrp_b);
@@ -464,7 +430,6 @@ export async function fetchGlobalLiquidity(): Promise<GlobalLiquidityData> {
 
   const net_liquidity = fed_b - rrp_b - tga_b;
 
-  // Sinal interpretativo simples
   const chg4wPct = fed_b > 0 ? (fed_balance_chg_4w / fed_b) * 100 : 0;
   let net_liquidity_signal: string;
   if (net_liquidity > 6_500 && rrp_trend === 'draining') {
@@ -477,12 +442,9 @@ export async function fetchGlobalLiquidity(): Promise<GlobalLiquidityData> {
     net_liquidity_signal = 'Liquidez líquida estável — sem sinal direcional forte';
   }
 
-  // Construir histórico alinhando WALCL (weekly) com RRP e TGA
-  // Usamos as datas do WALCL como âncora
   const histLen = Math.min(walcl.length, 30);
   const history = walcl.slice(-histLen).map(w => {
     const w_fed   = w.value / 1_000;
-    // Busca o ponto mais próximo nas séries diárias/semanais
     const w_rrp   = rrp.find(r => r.date >= w.date)?.value ?? rrp_b;
     const w_tga   = (wtregen.find(t => t.date >= w.date)?.value ?? tga_b * 1_000) / 1_000;
     return {
@@ -513,18 +475,13 @@ export async function fetchGlobalLiquidity(): Promise<GlobalLiquidityData> {
   };
 }
 
-/**
- * fetchYieldCurve — Curva de juros US: 10Y, 2Y, spread, Fed Funds
- *
- * Cache recomendado: 1 hora.
- */
 export async function fetchYieldCurve(): Promise<YieldCurveData> {
   if (DATA_MODE === 'mock') return mockYieldCurve();
 
   const [hist10y, hist2y, histFF] = await Promise.all([
     fetchSeries('DGS10', 35),
     fetchSeries('DGS2',  35),
-    fetchSeries('DFF',   35),  // Daily Effective Fed Funds Rate (FEDFUNDS é mensal)
+    fetchSeries('DFF',   35),
   ]);
 
   const last10y  = hist10y[hist10y.length - 1]?.value ?? 0;
