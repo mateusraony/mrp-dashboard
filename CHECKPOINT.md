@@ -1,6 +1,6 @@
 # CHECKPOINT.md — MRP Dashboard
 > Memória técnica viva do projeto. Atualizar ao final de cada bloco importante.
-> Última atualização: 2026-05-09 (P5 — module toggles enforcement, PR #90)
+> Última atualização: 2026-05-10 (P6 — produção DB fixes + fred-proxy timeout, PR #91)
 
 ---
 
@@ -27,7 +27,7 @@
 | Migration hardening | ✅ APLICADA | 3 tabelas criadas pelo usuário no SQL Editor |
 | Edge Functions | ✅ DEPLOYED | telegram-ping, macro-alert-worker, macro-actual-fetcher, send-telegram-digest |
 | pg_cron jobs | ✅ ATIVO | 3 jobs ativos: macro-actual-fetcher (*/15min), macro-alert-worker (*/5min), send-telegram-digest (11h UTC) |
-| pg_cron duplicata | ⚠️ PENDENTE | Job antigo `telegram-digest` duplica o `send-telegram-digest` — remover com SELECT cron.unschedule('telegram-digest') |
+| pg_cron duplicata | ✅ RESOLVIDO | Job duplicado `telegram-daily-digest` removido pelo usuário via SQL Editor |
 | Auth real | ❌ AUSENTE | Stub anônimo — aguarda decisão futura |
 | **Mock que requer API paga** | ⚠️ AGUARDA | SOPR/Netflow/Baleias: Glassnode ~$29/mês · Sentimento Social (Twitter/Reddit): LunarCrush ~$19/mês · LiquidationHeatmap real: requer auth Binance · IV Delta 1D/1W/1M: sem API gratuita |
 | **Module toggles enforcement** | ✅ PR #90 | Settings escreve em localStorage; hooks têm `enabled: readModuleFlag(...)`; páginas mostram `DisabledModuleBanner` — zero fetch de rede quando módulo off |
@@ -68,6 +68,7 @@
 | **GDELT upsert** | ✅ PR #88 | `upsertGdeltArticles()` em supabase.ts; `useGdelt.ts` persiste artigos novos (fire-and-forget); colunas corretas: `domain`, `sentiment_label` (fix Codex P2) |
 | **P4 — FRED key server-side** | ✅ commit `11a718f` | `VITE_FRED_API_KEY` removido de todos os arquivos cliente; `fred.ts` usa `callFredProxy()` via Edge Function `fred-proxy`; `env.ts` sem a variável; badges usam `isSupabaseConfigured()` (Dashboard, GlobalMarkets, DataSources); build ✅ · 217 testes ✅ · `grep VITE_FRED_API_KEY dist/` = 0 |
 | **P5 — Module toggles enforcement** | ✅ PR #90 | `moduleFlags.ts` + `DisabledModuleBanner.jsx`; `enabled: readModuleFlag(...)` em 6 hooks (useDeribit, useMempool, useCoinMetrics, useGdelt, useBtcData#useFearGreed); early-return banner em Options/SpotFlow/OnChain/NewsIntelligence; Codex P2 fixes: link `/Settings`, `useBtcTicker(enabled)`, `useOnChainCycle/Extended(pageEnabled)` |
+| **P6 — Produção DB + fred-proxy** | ✅ PR #91 | 4 erros de log corrigidos: `system_logs` criada; `macro_event_catalog` criada + seed 8 eventos; 5 colunas adicionadas a `macro_event_schedule` (`actual_source`, `actual_updated_at`, `is_revised`, `retry_count`, `last_error`); `v_macro_actual_pending` + `v_job_health` recriadas com JOIN correto; tabelas `macro_alert_preferences`, `telegram_delivery_log`, `system_job_log` criadas; `fred-proxy` v9 com `AbortSignal.timeout(15_000)` |
 
 ---
 
