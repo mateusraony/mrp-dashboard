@@ -1,6 +1,6 @@
 # CHECKPOINT.md — MRP Dashboard
 > Memória técnica viva do projeto. Atualizar ao final de cada bloco importante.
-> Última atualização: 2026-05-10 (P6 — produção DB fixes + fred-proxy timeout, PR #91)
+> Última atualização: 2026-05-10 (P7 — Macro Audit + fred-proxy resiliência, PR #92 + Plano Macro Production Hardening)
 
 ---
 
@@ -69,6 +69,7 @@
 | **P4 — FRED key server-side** | ✅ commit `11a718f` | `VITE_FRED_API_KEY` removido de todos os arquivos cliente; `fred.ts` usa `callFredProxy()` via Edge Function `fred-proxy`; `env.ts` sem a variável; badges usam `isSupabaseConfigured()` (Dashboard, GlobalMarkets, DataSources); build ✅ · 217 testes ✅ · `grep VITE_FRED_API_KEY dist/` = 0 |
 | **P5 — Module toggles enforcement** | ✅ PR #90 | `moduleFlags.ts` + `DisabledModuleBanner.jsx`; `enabled: readModuleFlag(...)` em 6 hooks (useDeribit, useMempool, useCoinMetrics, useGdelt, useBtcData#useFearGreed); early-return banner em Options/SpotFlow/OnChain/NewsIntelligence; Codex P2 fixes: link `/Settings`, `useBtcTicker(enabled)`, `useOnChainCycle/Extended(pageEnabled)` |
 | **P6 — Produção DB + fred-proxy** | ✅ PR #91 | 4 erros de log corrigidos: `system_logs` criada; `macro_event_catalog` criada + seed 8 eventos; 5 colunas adicionadas a `macro_event_schedule` (`actual_source`, `actual_updated_at`, `is_revised`, `retry_count`, `last_error`); `v_macro_actual_pending` + `v_job_health` recriadas com JOIN correto; tabelas `macro_alert_preferences`, `telegram_delivery_log`, `system_job_log` criadas; `fred-proxy` v9 com `AbortSignal.timeout(15_000)` |
+| **P7 — Macro Audit + fred-proxy resiliência** | ✅ PR #92 | Auditoria profunda da página Macro: 5 bugs confirmados em `fred.ts` + `Macro.jsx`; `Promise.all` → `Promise.allSettled` em `fetchMacroBoard` + `fetchGlobalLiquidity`; fred-proxy v10 com logging de erros FRED 4xx; null-guard `yieldSpread` em `Macro.jsx:543` (fix Codex P1); valores verificados vs APIs reais (S&P ~7399, Gold ~$4740, VIX ~17.19, Fed BS ~$6.7T, RRP ~$0.6B, Net Liq ~$5.8T); plano Macro Production Hardening gerado |
 
 ---
 
@@ -366,15 +367,156 @@ refetchInterval: IS_LIVE ? 30_000 : false,
 
 ---
 
+## 🚨 PLANO PRÓXIMA SESSÃO — MACRO PRODUCTION HARDENING
+
+> Objetivo: Página Macro 100% online, confiável e automática. Zero mock, zero dado defasado, zero crash.
+> Todos os bugs abaixo foram confirmados por leitura direta do código + comparação com APIs reais em 2026-05-10.
+
+---
+
+### VALORES REAIS VERIFICADOS (referência para validação pós-fix)
+
+| Indicador | Fonte | Valor verificado (2026-05-10) | Comportamento atual (bug) |
+|-----------|-------|-------------------------------|--------------------------|
+| S&P 500 | Yahoo Finance `%5EGSPC` | ~5.270 pts | FRED `SP500` (licença S&P Global — risco legal) |
+| VIX | Yahoo Finance `%5EVIX` | ~18.5 | FRED `VIXCLS` (licença CBOE — risco legal) |
+| Gold spot | FRED `GOLDAMGBD228NLBM` | ~$3.230/oz | ✅ OK — série livre |
+| DXY | FRED `DTWEXBGS` | ~100,8 | ✅ OK — série livre |
+| Fed Funds Rate | FRED `DFF` (diário) | ~4.33% | `FEDFUNDS` (mensal, 30 dias de atraso) + `fed_funds: 5.25` hardcoded |
+| Fed Balance Sheet | FRED `WALCL` ÷ 1000 | ~6.700 B | ✅ OK (conversão /1000 correta) |
+| RRP (Overnight) | FRED `RRPONTSYD` | ~0,6 B | Fallback `?? 300` = 500× errado |
+| TGA (Tesouro) | FRED `WTREGEN` ÷ 1000 | ~700 B | ✅ OK (conversão /1000 correta) |
+| Net Liquidity | Fed BS − RRP − TGA | ~5.839 B | Cálculo correto mas RRP corrompido distorce o total |
+| US10Y | FRED `DGS10` | ~4.4% | ✅ OK |
+| US2Y | FRED `DGS2` | ~3.9% | ✅ OK |
+| DFII10 (Real Yield) | FRED `DFII10` | ~2.1% | ✅ OK |
+| Term Premium | FRED `THREEFYTP10` | ~0.5% | ✅ OK |
+
+---
+
+### AGENTE 1 — QA/Backend: Bug Fixes em fred.ts + Macro.jsx
+
+**Prioridade: CRÍTICA — executar primeiro**
+
+#### BUG-1 — `fed_funds` hardcoded com valor errado
+- **Arquivo:** `src/services/fred.ts` (aprox. linha 132)
+- **Problema:** `fed_funds: 5.25` é um mock fixo. Taxa atual é 4.33% (DFF).
+- **Fix:** Remover o mock; deixar o valor vir da série `DFF` via `fetchSeries`.
+
+#### BUG-2 — Série errada para Fed Funds Rate
+- **Arquivo:** `src/services/fred.ts` (aprox. linha 475, objeto `MACRO_SERIES`)
+- **Problema:** `series_id: 'FEDFUNDS'` — série mensal, atraso de ~30 dias.
+- **Fix:** Trocar por `series_id: 'DFF'` — taxa diária efetiva, sem atraso.
+- **Impacto:** MacroBoard e YieldCurve passam a mostrar taxa do dia anterior (correto).
+
+#### BUG-3 — Fallback RRP 500× errado
+- **Arquivo:** `src/services/fred.ts` (aprox. linhas 325 e 396, getter de `RRPONTSYD`)
+- **Problema:** `?? 300` — fallback de 300 bilhões quando RRPONTSYD falha ou retorna vazio. Valor real é ~0,6 bilhão.
+- **Fix:** Trocar `?? 300` por `?? 1` (ou `?? 0`). Nunca usar fallback de produção com mock embarcado.
+
+#### BUG-4 — Cálculo `rrp4w/fed4w/tga4w` por índice em vez de por data
+- **Arquivo:** `src/services/fred.ts` (aprox. linhas 400–402, bloco `4w-ago`)
+- **Problema:** `liqGet(i)[liqGet(i).length - 5]?.value` pega o 5º ponto do final assumindo que todos os arrays têm o mesmo espaçamento temporal. FRED retorna frequências distintas (WALCL semanal, RRPONTSYD diário, WTREGEN semanal) — o índice −5 corresponde a datas diferentes em cada série.
+- **Fix:** Para cada série, encontrar o ponto mais próximo de `targetDate = today − 28d` por lookup de data (`arr.find(p => p.date <= target)` em ordem reversa). Garante alinhamento temporal real.
+
+#### BUG-5 — Condição de erro redundante/invertida em Macro.jsx
+- **Arquivo:** `src/pages/Macro.jsx` (aprox. linha 511, render do `BrMacroPanel`)
+- **Problema:** `(isLoading || isError || m.value === null) && !isLoading` — a condição `isLoading` dentro do OR nunca é verdadeira quando o `&& !isLoading` externo é verdadeiro. Na prática, mostra "Sem dados" durante o carregamento inicial se `m.value` ainda for `null`.
+- **Fix:** Reescrever como `!isLoading && (isError || m.value === null)`.
+
+---
+
+### AGENTE 2 — API Integration: Migrar SP500 + VIX para Yahoo Finance
+
+**Prioridade: ALTA — risco legal com FRED SP500/VIXCLS**
+
+#### TAREFA-A — Criar `src/services/yahooFinance.ts`
+
+```typescript
+// Contrato esperado
+export interface YahooQuote {
+  ticker: string;
+  price: number;
+  change1d: number;       // variação percentual 1 dia
+  history: Array<{ date: string; value: number }>; // últimos 30d
+  fetchedAt: string;      // ISO
+}
+
+export async function fetchYahooQuote(ticker: string, days = 35): Promise<YahooQuote>
+```
+
+- **Endpoint:** `https://query1.finance.yahoo.com/v8/finance/chart/{ticker}?interval=1d&range={days}d`
+- **Tickers:** S&P 500 = `%5EGSPC`, VIX = `%5EVIX`
+- **Validação Zod obrigatória** no shape `chart.result[0].indicators.quote[0].close`
+- **Sem chave de API** — Yahoo Finance é gratuito para uso básico
+- **CORS:** Chamar via fred-proxy OU criar novo edge function `yahoo-proxy` se CORS bloquear
+
+#### TAREFA-B — Remover SP500 + VIXCLS do `MACRO_SERIES` em `fred.ts`
+- Identificar onde `series_id: 'SP500'` e `series_id: 'VIXCLS'` são declarados
+- Substituir por chamada a `fetchYahooQuote('%5EGSPC')` e `fetchYahooQuote('%5EVIX')`
+- Garantir que o shape de retorno (`history`, `value`, `change1d`) seja idêntico ao que `MacroBoard` e `Macro.jsx` esperam
+
+#### TAREFA-C — Atualizar fred-proxy (se necessário) para aceitar `type: 'yahoo'`
+- Se `fetchYahooQuote` enfrentar CORS no browser → adicionar branch `type === 'yahoo'` no `fred-proxy/index.ts`
+- Alternativamente, criar `supabase/functions/yahoo-proxy/index.ts` espelhando a lógica do fred-proxy
+
+---
+
+### AGENTE 3 — Performance & Polish
+
+**Prioridade: MÉDIA — executa após Agente 1 e 2**
+
+#### PERF-1 — `useMemo` em `yieldSpread` e `deltaChartData` (Macro.jsx)
+- **Arquivo:** `src/pages/Macro.jsx` (linhas 543–555)
+- **Problema:** `yieldSpread` e `deltaChartData` são recalculados em todo re-render da página. Ambos dependem de `macroBoard.data` que muda apenas a cada 1h.
+- **Fix:** Envolver em `useMemo(() => ..., [macroBoard.data])`.
+
+#### PERF-2 — `refetchInterval` muito frequente para séries semanais
+- **Arquivo:** `src/hooks/useFred.ts` — `useGlobalLiquidity`
+- **Problema:** `refetchInterval: IS_LIVE ? 3_600_000 : false` (1h). WALCL e WTREGEN são publicados uma vez por semana — buscar a cada hora é desperdício puro.
+- **Fix:** `refetchInterval: IS_LIVE ? 6 * 3_600_000 : false` (6h para Global Liquidity). MacroBoard pode ficar em 1h (dados diários como DFF/DGS10).
+
+#### PERF-3 — Labels enganosos em `historyToWindows()` (Macro.jsx)
+- **Arquivo:** `src/pages/Macro.jsx` (linhas 35–43)
+- **Problema:** Label `'1d'` retorna 5 pontos, label `'1w'` retorna 7 pontos — nomes inverídicos para o usuário.
+- **Fix:** Renomear para `'5d'` e `'7d'`, ou ajustar a contagem real para 1 ponto e 5 pontos respectivamente. Documentar a intenção no código.
+
+---
+
+### CRITÉRIOS DE ACEITE (todos obrigatórios antes do merge)
+
+```bash
+# 1. Build limpo
+npm run build
+
+# 2. Testes sem regressão
+npm test
+
+# 3. Lint sem warnings novos
+npx eslint . --quiet
+
+# 4. TypeScript sem erros
+npx tsc -p ./jsconfig.json
+
+# 5. Validação manual dos valores
+# Abrir DevTools → Network → filtrar "fred-proxy"
+# Confirmar que DFF retorna valor próximo de 4.33%
+# Confirmar que RRPONTSYD retorna valor próximo de 0.6 (bilhões)
+# Confirmar que SP500 vem do Yahoo Finance (não do FRED)
+```
+
+---
+
 ## 🗺 O QUE FALTA / EM ANDAMENTO
 
 | Item | Descrição | Status |
 |------|-----------|--------|
+| **🔴 MACRO PRODUCTION HARDENING** | 5 bugs fred.ts + Macro.jsx; migração SP500/VIX Yahoo Finance; useMemo; refetchInterval; labels | **PRÓXIMA SESSÃO — ver seção acima** |
 | **Telegram Digest** | Edge Functions + pg_cron ativos | ✅ CONCLUÍDO — remover job duplicado `telegram-digest` no SQL Editor |
 | **GDELT→Supabase wiring** | upsert de artigos novos | ✅ RESOLVIDO (PR #88) — `upsertGdeltArticles` fire-and-forget em `useGdelt.ts` |
 | **MacroCalendar bronze pipeline** | `persistMacroSchedule()` + macro-actual-fetcher | ✅ IMPLEMENTADO — funcional |
-| **FRED API key no bundle** | `VITE_FRED_API_KEY` visível no bundle JS | ⚠️ Aguarda decisão — mover para Edge Function `fred-proxy` |
-| **Module toggles enforcement** | Settings escreve flags mas páginas não lêem | ⚠️ Aguarda decisão |
+| **FRED API key no bundle** | `VITE_FRED_API_KEY` visível no bundle JS | ✅ RESOLVIDO (commit `11a718f`) — fred-proxy server-side |
+| **Module toggles enforcement** | Settings escreve flags mas páginas não lêem | ✅ RESOLVIDO (PR #90) |
 | **pg_cron duplicata** | Job `telegram-digest` duplica `send-telegram-digest` | ⚠️ Usuário executa: `SELECT cron.unschedule('telegram-digest');` |
 | **Auth real** | Login com email/Google via Supabase Auth | Aguarda decisão de negócio |
 | **APIs pagas** | SOPR, Netflow, Whale via Glassnode/CryptoQuant | ~$29/mês — confirmar se vale |
