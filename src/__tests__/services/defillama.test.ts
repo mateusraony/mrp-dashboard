@@ -126,6 +126,7 @@ describe('fetchStablecoinData', () => {
       env: { VITE_SUPABASE_URL: undefined, VITE_SUPABASE_ANON_KEY: undefined },
     }));
     const result = await fetchMock();
+    // no erro = mock retornado
     expect(result).toHaveProperty('totalSupply');
   });
 

@@ -105,6 +105,7 @@ const mockStablecoinData: StablecoinData = {
 
 // ─── Schemas Zod ──────────────────────────────────────────────────────────────
 
+// Schema de cada stablecoin na resposta da DeFiLlama
 const DefillamaCirculatingSchema = z.object({
   peggedUSD: z.number().optional(),
 }).passthrough();
@@ -115,8 +116,11 @@ const DefillamaStablecoinSchema = z.object({
   pegType:     z.string().default('peggedUSD'),
   circulating: DefillamaCirculatingSchema.optional(),
   circulatingPrevDay: DefillamaCirculatingSchema.optional(),
+  // chainCirculating: supply por chain (objeto com chaves arbitrárias)
   chainCirculating: z.record(z.object({
-    current: DefillamaCirculatingSchema.optional(),
+    // DeFiLlama usa 'current' na maioria das respostas, mas alguns assets usam 'circulating'
+    current:     DefillamaCirculatingSchema.optional(),
+    circulating: DefillamaCirculatingSchema.optional(),
   }).passthrough()).optional(),
 }).passthrough();
 
@@ -124,6 +128,7 @@ const DefillamaStablecoinsResponseSchema = z.object({
   peggedAssets: z.array(DefillamaStablecoinSchema),
 });
 
+// Schema para /stablecoinchains
 const DefillamaChainSchema = z.object({
   name:       z.string(),
   totalCirculatingUSD: z.object({
@@ -136,12 +141,14 @@ const DefillamaChainArraySchema = z.array(DefillamaChainSchema);
 // ─── Helper para registrar rate limit em system_logs ─────────────────────────
 
 async function logRateLimit(retryAfter: number | undefined): Promise<void> {
+  // Registra apenas se Supabase estiver configurado
   if (!isSupabaseConfigured()) return;
 
   const SB_URL = env.VITE_SUPABASE_URL;
   const SB_KEY = env.VITE_SUPABASE_ANON_KEY;
   if (!SB_URL || !SB_KEY) return;
 
+  // Fire-and-forget — não bloqueia o retorno
   fetch(`${SB_URL}/rest/v1/system_logs`, {
     method: 'POST',
     headers: {
@@ -156,12 +163,14 @@ async function logRateLimit(retryAfter: number | undefined): Promise<void> {
       message: 'Rate limit atingido',
       context: { timestamp: Date.now(), retryAfter },
     }),
-  }).catch(() => {});
+  }).catch(() => {}); // silencia erro de rede
 }
 
 // ─── Fetcher principal ────────────────────────────────────────────────────────
 
+/** Busca dados reais das APIs DeFiLlama e transforma para StablecoinData */
 async function fetchFromDeFiLlama(): Promise<StablecoinData> {
+  // Busca stablecoins e chains em paralelo
   const [stablecoinsRes, chainsRes] = await Promise.all([
     apiFetch('https://stablecoins.llama.fi/stablecoins?includePrices=true'),
     apiFetch('https://stablecoins.llama.fi/stablecoinchains'),
@@ -172,19 +181,22 @@ async function fetchFromDeFiLlama(): Promise<StablecoinData> {
     chainsRes.json(),
   ]);
 
+  // Valida com Zod — lança se inválido (será capturado pelo caller)
   const stablecoinsData = DefillamaStablecoinsResponseSchema.parse(stablecoinsJson);
   const chainsData      = DefillamaChainArraySchema.parse(chainsJson);
 
   const assets = stablecoinsData.peggedAssets;
 
+  // Extrai supply atual de cada stablecoin (campo peggedUSD dentro de circulating)
   const withSupply = assets.map(asset => {
     const circulating    = asset.circulating?.peggedUSD    ?? 0;
     const circulatingPrev = asset.circulatingPrevDay?.peggedUSD ?? circulating;
 
+    // Supply por chain
     const chainSupply: Record<string, number> = {};
     if (asset.chainCirculating) {
       for (const [chain, chainData] of Object.entries(asset.chainCirculating)) {
-        const val = chainData.current?.peggedUSD ?? 0;
+        const val = chainData.current?.peggedUSD ?? chainData.circulating?.peggedUSD ?? 0;
         if (val > 0) chainSupply[chain] = val;
       }
     }
@@ -204,15 +216,18 @@ async function fetchFromDeFiLlama(): Promise<StablecoinData> {
     };
   });
 
+  // Ordena por supply e pega top 5
   const sorted = [...withSupply].sort((a, b) => b.circulating - a.circulating);
   const top5   = sorted.slice(0, 5);
 
+  // Total supply
   const totalSupply   = withSupply.reduce((s, a) => s + a.circulating, 0);
   const totalPrevious = withSupply.reduce((s, a) => s + a.circulatingPrev, 0);
   const totalChange24h = totalPrevious > 0
     ? ((totalSupply - totalPrevious) / totalPrevious) * 100
     : 0;
 
+  // Supply por chain — top 5
   const chainMap = new Map<string, number>();
   for (const chain of chainsData) {
     const tvl = chain.totalCirculatingUSD?.peggedUSD ?? 0;
@@ -236,6 +251,15 @@ async function fetchFromDeFiLlama(): Promise<StablecoinData> {
 
 // ─── Função pública ───────────────────────────────────────────────────────────
 
+/**
+ * fetchStablecoinData — entry point público para o hook useStablecoinData.
+ *
+ * Fluxo:
+ *   DATA_MODE=mock     → retorna mock imediatamente
+ *   DATA_MODE=live     → withCache (TTL 3600s) → API DeFiLlama
+ *   429 rate limit     → loga em system_logs, retorna mock com quality 'C'
+ *   Zod parse error    → retorna mock com quality 'C'
+ */
 export async function fetchStablecoinData(): Promise<StablecoinData> {
   if (DATA_MODE === 'mock') {
     return { ...mockStablecoinData, updatedAt: Date.now() };
@@ -247,14 +271,22 @@ export async function fetchStablecoinData(): Promise<StablecoinData> {
       3_600,
       'defillama',
       fetchFromDeFiLlama,
+      (d): StablecoinData | null => {
+        const data = d as StablecoinData;
+        return typeof data?.totalSupply === 'number' && Array.isArray(data?.top5)
+          ? data
+          : null;
+      },
     );
   } catch (err) {
     if (err instanceof RateLimitError) {
+      // Registra rate limit em Supabase de forma assíncrona
       logRateLimit(err.retryAfterMs);
       console.warn('[DeFiLlama] Rate limit atingido — retornando mock:', err.message);
       return { ...mockStablecoinData, updatedAt: Date.now(), quality: 'C', source: 'mock' };
     }
 
+    // Zod parse error ou qualquer outro — retorna mock degradado
     console.error('[DeFiLlama] Erro ao buscar dados — retornando mock:', err);
     return { ...mockStablecoinData, updatedAt: Date.now(), quality: 'C', source: 'mock' };
   }
