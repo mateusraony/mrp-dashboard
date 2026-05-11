@@ -3,7 +3,6 @@
 // Usuário configura prioridade e tipo de alerta — sem gestão de portfólio
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { defaultAlertRules as defaultAlertRulesMock, alertHistory, riskDashboard, ALERT_TYPES } from '../components/data/mockDataAlerts';
-import { recentAlerts, globalRisk } from '../components/data/mockData';
 import { useAlertRules, useUpsertAlertRule, useDeleteAlertRule } from '@/hooks/useSupabase';
 import { AlertAuditPanel } from '../components/governance/AlertAuditPanel';
 import { ModeBadge, GradeBadge } from '../components/ui/DataBadge';
@@ -853,17 +852,17 @@ export default function SmartAlerts() {
               ))}
             </div>
           </div>
-          <div style={{ marginBottom: 20, padding: '12px 16px', background: globalRisk.regime === 'NEUTRAL' ? 'rgba(245,158,11,0.06)' : 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.15)', borderRadius: 10 }}>
+          <div style={{ marginBottom: 20, padding: '12px 16px', background: (riskScore?.regime ?? 'NEUTRAL') === 'NEUTRAL' ? 'rgba(245,158,11,0.06)' : 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.15)', borderRadius: 10 }}>
             <div style={{ fontSize: 12, color: '#60a5fa', fontWeight: 600, marginBottom: 4 }}>
-              Estado Global: {globalRisk.regime} · Score {globalRisk.score}/100 · Prob {globalRisk.prob}%
+              Estado Global: {riskScore?.regime ?? '—'} · Score {riskScore?.score ?? '—'}/100
             </div>
             <div style={{ fontSize: 11, color: '#4a5568' }}>
-              {globalRisk.score >= 65 ? 'RISK-ON threshold não atingido' : globalRisk.score <= 35 ? '🔴 RISK-OFF threshold atingido' : 'Zona neutra — monitorando'}{' '}
+              {(riskScore?.score ?? 50) >= 65 ? 'RISK-ON threshold não atingido' : (riskScore?.score ?? 50) <= 35 ? '🔴 RISK-OFF threshold atingido' : 'Zona neutra — monitorando'}{' '}
               (RISKON ≥ 65, RISKOFF ≤ 35)
             </div>
           </div>
-          <div style={{ fontSize: 11, color: '#4a5568', marginBottom: 12 }}>Ciclo atual · {recentAlerts.length} alertas · Deduplicados · Anti-spam cooldown</div>
-          {recentAlerts.map(a => <AlertCycleDetail key={a.id} alert={a} />)}
+          <div style={{ fontSize: 11, color: '#4a5568', marginBottom: 12 }}>Ciclo atual · {history.length} alertas · Deduplicados · Anti-spam cooldown</div>
+          {history.map(a => <AlertCycleDetail key={a.id} alert={a} />)}
           <div style={{ marginTop: 16, padding: '10px 14px', background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.12)', borderRadius: 8, fontSize: 11, color: '#4a5568' }}>
             <strong style={{ color: '#60a5fa' }}>Deduplicação:</strong> Cada alerta tem <span style={{ fontFamily: 'JetBrains Mono, monospace', color: '#8899a6' }}>dedupe_key</span> = (tipo + ativo + bucket). Cooldown padrão 60min previne spam.
           </div>

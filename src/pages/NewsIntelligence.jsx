@@ -1,7 +1,6 @@
 // ─── NEWS INTELLIGENCE PAGE ───────────────────────────────────────────────────
 // Notícias institucionais (GDELT live) + Feed Geral com AI Sentiment Score
 import { useState, useMemo } from 'react';
-import { optionsTakerFlow } from '../components/data/mockDataExtended';
 import { ModeBadge } from '../components/ui/DataBadge';
 import { RefreshButton } from '../components/ui/RefreshButton';
 import { IS_LIVE } from '@/lib/env';
@@ -510,7 +509,7 @@ export default function NewsIntelligence() {
               { label: 'Bearish',       value: instBearishCount,  color: '#ef4444', sub: 'artigos' },
               { label: 'Neutro',        value: instNeutralCount,  color: '#f59e0b', sub: 'artigos' },
               { label: 'Total',         value: instArticles.length, color: '#60a5fa', sub: 'GDELT inst.' },
-              { label: 'Bull-Bear Idx', value: `${optionsTakerFlow.bull_bear_index >= 0 ? '+' : ''}${optionsTakerFlow.bull_bear_index.toFixed(3)}`, color: '#a78bfa', sub: 'Opções Flow' },
+              { label: 'Bull-Bear Idx', value: `${avgSentiment24h >= 0 ? '+' : ''}${avgSentiment24h.toFixed(3)}`, color: '#a78bfa', sub: 'Sentimento News' },
             ].map((item, i) => (
               <div key={i} style={{ background: 'linear-gradient(135deg,#131e2e,#111827)', border: '1px solid #1e2d45', borderRadius: 10, padding: '12px 14px' }}>
                 <div style={{ fontSize: 9, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 4 }}>{item.label}</div>
