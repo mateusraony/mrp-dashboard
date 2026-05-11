@@ -271,9 +271,12 @@ export async function fetchStablecoinData(): Promise<StablecoinData> {
       3_600,
       'defillama',
       fetchFromDeFiLlama,
-      (d): d is StablecoinData =>
-        typeof (d as StablecoinData)?.totalSupply === 'number' &&
-        Array.isArray((d as StablecoinData)?.top5),
+      (d): StablecoinData | null => {
+        const data = d as StablecoinData;
+        return typeof data?.totalSupply === 'number' && Array.isArray(data?.top5)
+          ? data
+          : null;
+      },
     );
   } catch (err) {
     if (err instanceof RateLimitError) {
