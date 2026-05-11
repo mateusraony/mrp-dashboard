@@ -1,7 +1,6 @@
 // ─── PORTFOLIO MANAGER PAGE ───────────────────────────────────────────────────
 import { useState, useMemo, useEffect, useRef } from 'react';
 import {
-  defaultPositions as defaultPositionsMock,
   computePortfolioGreeks, computePositionPnL,
   stressTest, stressScenarios, SPOT_PRICE,
 } from '../components/data/mockDataPortfolio';
@@ -189,7 +188,7 @@ export default function Portfolio() {
   const { mutate: persistRemovePosition } = useDeletePosition();
 
   // Estado local inicializado com dados do Supabase (ou mock como fallback)
-  const [positions, setPositions] = useState(defaultPositionsMock);
+  const [positions, setPositions] = useState([]);
   useEffect(() => {
     if (savedPositions && savedPositions.length > 0) {
       // Adiciona current_price do SPOT_PRICE como fallback (será atualizado via hook live)
