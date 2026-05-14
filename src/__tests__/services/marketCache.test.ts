@@ -28,7 +28,7 @@ import {
   _pendingRefreshes,
 } from '@/services/marketCache';
 
-// ─── isConfigured ──────────────────────────────────────────────────────────────
+// ─── isConfigured ──────────────────────────────────────────────────────────────────────────────
 
 describe('isConfigured', () => {
   it('retorna true quando VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY estão definidos', () => {
@@ -36,7 +36,7 @@ describe('isConfigured', () => {
   });
 });
 
-// ─── withCache — IS_LIVE=true, fetch mockado ──────────────────────────────────
+// ─── withCache — IS_LIVE=true, fetch mockado ────────────────────────────────────────────────
 
 describe('withCache — IS_LIVE=true (com cache mockado)', () => {
   afterEach(() => {
@@ -124,7 +124,7 @@ describe('withCache — IS_LIVE=true (com cache mockado)', () => {
   });
 });
 
-// ─── withSWR — testes de comportamento SWR ────────────────────────────────────
+// ─── withSWR — testes de comportamento SWR ─────────────────────────────────────────────────
 
 describe('withSWR — cache miss chama fetcher e retorna dado', () => {
   afterEach(() => {
@@ -211,7 +211,7 @@ describe('withSWR — background refresh deduplicado', () => {
     const pending = _pendingRefreshes.get('swr:dedup');
     if (pending) await pending;
 
-    // Graças à deduplicação, fetcher chamado no máximo 1x no background
+    // Graças à dedupliccação, fetcher chamado no máximo 1x no background
     expect(fetcherCalls).toBeLessThanOrEqual(1);
   });
 });

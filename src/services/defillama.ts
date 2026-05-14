@@ -17,7 +17,7 @@ import { DATA_MODE, IS_LIVE } from '@/lib/env';
 import { isSupabaseConfigured } from '@/services/supabase';
 import { env } from '@/lib/env';
 
-// ─── Tipos exportados ─────────────────────────────────────────────────────────
+// ─── Tipos exportados ────────────────────────────────────────────────────────────────────────────────
 
 export interface StablecoinSnapshot {
   name: string;
@@ -39,7 +39,7 @@ export interface StablecoinData {
   source: 'DeFiLlama' | 'cache' | 'mock';
 }
 
-// ─── Mock data ────────────────────────────────────────────────────────────────
+// ─── Mock data ──────────────────────────────────────────────────────────────────────────────────
 
 const mockStablecoinData: StablecoinData = {
   totalSupply: 178_000_000_000,
@@ -103,7 +103,7 @@ const mockStablecoinData: StablecoinData = {
   source: 'mock',
 };
 
-// ─── Schemas Zod ──────────────────────────────────────────────────────────────
+// ─── Schemas Zod ────────────────────────────────────────────────────────────────────────────────
 
 // Schema de cada stablecoin na resposta da DeFiLlama
 const DefillamaCirculatingSchema = z.object({
@@ -138,7 +138,7 @@ const DefillamaChainSchema = z.object({
 
 const DefillamaChainArraySchema = z.array(DefillamaChainSchema);
 
-// ─── Helper para registrar rate limit em system_logs ─────────────────────────
+// ─── Helper para registrar rate limit em system_logs ─────────────────────────────────────────────
 
 async function logRateLimit(retryAfter: number | undefined): Promise<void> {
   // Registra apenas se Supabase estiver configurado
@@ -166,7 +166,7 @@ async function logRateLimit(retryAfter: number | undefined): Promise<void> {
   }).catch(() => {}); // silencia erro de rede
 }
 
-// ─── Fetcher principal ────────────────────────────────────────────────────────
+// ─── Fetcher principal ───────────────────────────────────────────────────────────────────────────────
 
 /** Busca dados reais das APIs DeFiLlama e transforma para StablecoinData */
 async function fetchFromDeFiLlama(): Promise<StablecoinData> {
@@ -249,7 +249,7 @@ async function fetchFromDeFiLlama(): Promise<StablecoinData> {
   };
 }
 
-// ─── Função pública ───────────────────────────────────────────────────────────
+// ─── Função pública ──────────────────────────────────────────────────────────────────────────────────
 
 /**
  * fetchStablecoinData — entry point público para o hook useStablecoinData.
