@@ -18,7 +18,7 @@ import { IS_LIVE } from '@/lib/env';
 
 const BASE = 'https://api.bcb.gov.br/dados/serie/bcdata.sgs';
 
-// ─── Schemas ──────────────────────────────────────────────────────────────────
+// ─── Schemas ────────────────────────────────────────────────────────────────────────────────
 
 const BcbPointSchema = z.object({
   data:  z.string(),  // "DD/MM/YYYY"
@@ -27,7 +27,7 @@ const BcbPointSchema = z.object({
 
 const BcbResponseSchema = z.array(BcbPointSchema);
 
-// ─── Shapes exportadas ────────────────────────────────────────────────────────
+// ─── Shapes exportadas ─────────────────────────────────────────────────────────────────────────────
 
 export interface BcbData {
   selic:      number | null;  // % ao ano (SELIC overnight)
@@ -38,7 +38,7 @@ export interface BcbData {
   source:     string;
 }
 
-// ─── Helpers internos ─────────────────────────────────────────────────────────
+// ─── Helpers internos ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * Busca o último valor de uma série BCB SGS.
@@ -57,20 +57,20 @@ async function fetchSeries(codigo: number): Promise<number | null> {
   return isNaN(val) ? null : val;
 }
 
-// ─── Mock ─────────────────────────────────────────────────────────────────────
+// ─── Mock ────────────────────────────────────────────────────────────────────────────────────────
 
 function mockBcbData(): BcbData {
   return {
-    selic:      10.75,
-    ipca:       0.38,
-    usdbrl:     5.72,
+    selic:      14.50,
+    ipca:       0.88,
+    usdbrl:     4.90,
     updated_at: Date.now(),
     quality:    'B',
     source:     'mock',
   };
 }
 
-// ─── Fetcher principal ────────────────────────────────────────────────────────
+// ─── Fetcher principal ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * fetchBcbData — SELIC, IPCA e USDBRL via BCB OpenData

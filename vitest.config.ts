@@ -9,6 +9,8 @@ export default defineConfig({
     env: {
       VITE_DATA_MODE: 'mock',
     },
+    // Exclui worktrees temporários dos agentes para evitar testes duplicados
+    exclude: ['.claude/**', 'node_modules/**', 'dist/**'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],

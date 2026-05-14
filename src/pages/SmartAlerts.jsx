@@ -3,7 +3,6 @@
 // Usuário configura prioridade e tipo de alerta — sem gestão de portfólio
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { defaultAlertRules as defaultAlertRulesMock, alertHistory, riskDashboard, ALERT_TYPES } from '../components/data/mockDataAlerts';
-import { recentAlerts, globalRisk } from '../components/data/mockData';
 import { useAlertRules, useUpsertAlertRule, useDeleteAlertRule } from '@/hooks/useSupabase';
 import { AlertAuditPanel } from '../components/governance/AlertAuditPanel';
 import { ModeBadge, GradeBadge } from '../components/ui/DataBadge';
@@ -74,7 +73,6 @@ function AlertCycleDetail({ alert }) {
 const SPOT_PRICE = 84298.70;
 
 // ─── CATEGORIAS DE ALERTAS ───────────────────────────────────────────────────
-// Agrupadas por tipo de dado fonte
 const CATEGORIES = [
   {
     id: 'derivatives', label: 'Derivatives', icon: '⟆', color: '#f59e0b',
@@ -106,13 +104,12 @@ const PRIORITIES = [
   { id: 'LOW',      label: 'Baixo',   color: '#64748b', desc: 'Informativo' },
 ];
 
-// ─── AI SUGGESTIONS (mock) ────────────────────────────────────────────────────
 const AI_SUGGESTIONS = [
   {
     id: 'ai001', category: 'derivatives', priority: 'HIGH',
     title: 'Long Flush iminente — Funding persistente',
-    reasoning: 'Funding rate em +0.0712% por 3 ciclos consecutivos com OI crescendo +13.7% na semana. Historicamente, quando funding mantém-se >0.06% por >24h com OI em expansão, a probabilidade de flush nas próximas 4-12h é de 62%. Padrão similar ocorreu em Nov 2022 (−12%) e Jan 2024 (−8%).',
-    suggestion: 'Considere reduzir exposição direcional ou comprar proteção via put $82K. Aguardar funding cair abaixo de 0.04% antes de reentrada.',
+    reasoning: 'Funding rate em +0.0712% por 3 ciclos consecutivos com OI crescendo +13.7% na semana.',
+    suggestion: 'Considere reduzir exposição direcional ou comprar proteção via put $82K.',
     probability: 0.62, confidence: 0.74,
     trigger: 'Funding > 0.08% OU OI Delta 1H > +0.5%',
     data_sources: ['binance_futures', 'coinglass'],
@@ -121,8 +118,8 @@ const AI_SUGGESTIONS = [
   {
     id: 'ai002', category: 'macro', priority: 'HIGH',
     title: 'CPI em 10 dias — Regime de alta IV',
-    reasoning: 'IV ATM em 62.4% com term structure em leve contango indica que o mercado está precificando risco no curto prazo. CPI de Mar/26 em 12/Abr. Nos últimos 6 CPIs acima da estimativa, BTC caiu média de -4.2% nas 48h. O put skew ativo (-3.1pp) confirma hedging institucional.',
-    suggestion: 'IV elevada = custo de proteção alto mas justificado. Se tiver posição comprada, straddle ou put spread reduz risco com custo controlado.',
+    reasoning: 'IV ATM em 62.4% com term structure em leve contango.',
+    suggestion: 'IV elevada = custo de proteção alto mas justificado.',
     probability: 0.58, confidence: 0.81,
     trigger: 'CPI publicado OU IV ATM > 70%',
     data_sources: ['fred', 'deribit'],
@@ -131,8 +128,8 @@ const AI_SUGGESTIONS = [
   {
     id: 'ai003', category: 'onchain', priority: 'MEDIUM',
     title: 'Exchange netflow negativo — Acumulação de baleias',
-    reasoning: 'Saída líquida de 4.820 BTC das exchanges em 24h + whale transactions +11.6% acima da média de 7 dias. LTH acumulando (+1.88% em 30d). Padrão de acumulação silenciosa tipicamente precede movimentos de alta de 2-4 semanas, mas pode ser distribuição disfarçada — checar CVD.',
-    suggestion: 'Sinal ambíguo mas net positivo. Não tomar ação isolada — confirmar com CVD e funding. Se CVD virar negativo com netflow negativo = distribuição = sinal de venda.',
+    reasoning: 'Saída líquida de 4.820 BTC das exchanges em 24h + whale transactions +11.6% acima da média de 7 dias.',
+    suggestion: 'Sinal ambíguo mas net positivo. Confirmar com CVD e funding.',
     probability: 0.54, confidence: 0.61,
     trigger: 'Netflow > +1.000 BTC em 24h (entrada = reversão)',
     data_sources: ['coinmetrics', 'mempool'],
@@ -141,8 +138,8 @@ const AI_SUGGESTIONS = [
   {
     id: 'ai004', category: 'sentiment', priority: 'LOW',
     title: 'Sentimento estável — Fear & Greed em 58',
-    reasoning: 'Fear & Greed em 58 (Greed) com histórico de 7d estável entre 63-74. Sem extremos de sentimento no momento. Notícias institucionais com score médio +0.27. Ambiente de complacência moderada — sem divergência alarmante entre sentimento e dados on-chain.',
-    suggestion: 'Manter monitoramento de rotina. Alerta será ativado se Fear & Greed superar 75 (Extreme Greed) ou cair abaixo de 35 (Fear).',
+    reasoning: 'Fear & Greed em 58 (Greed) com histórico de 7d estável entre 63-74.',
+    suggestion: 'Manter monitoramento de rotina.',
     probability: 0.28, confidence: 0.88,
     trigger: 'F&G > 75 OU F&G < 35 OU Sentimento notícias < -0.50',
     data_sources: ['alternative', 'gdelt'],
@@ -150,7 +147,6 @@ const AI_SUGGESTIONS = [
   },
 ];
 
-// Configurações de prioridade padrão (simulando preferências do usuário)
 const DEFAULT_PREFS = {
   LONG_FLUSH: 'CRITICAL', SHORT_SQUEEZE: 'HIGH', FUNDING_EXTREME: 'HIGH',
   LIQUIDATION_CLUSTER: 'HIGH', BASIS_DEVIATION: 'MEDIUM',
@@ -198,23 +194,14 @@ function AISuggestionCard({ item, prefs }) {
       background: expanded ? `${prio.color}05` : '#0d1421',
       border: `1px solid ${expanded ? prio.color + '30' : '#1a2535'}`,
       borderLeft: `4px solid ${prio.color}`,
-      borderRadius: 10, overflow: 'hidden',
-      transition: 'all 0.15s',
+      borderRadius: 10, overflow: 'hidden', transition: 'all 0.15s',
     }}>
-      {/* Header — clicável */}
       <div onClick={() => setExpanded(e => !e)} style={{ padding: '12px 14px', cursor: 'pointer', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-        {/* Cat icon */}
-        <div style={{
-          width: 32, height: 32, borderRadius: 8, flexShrink: 0,
-          background: `${cat.color}14`, border: `1px solid ${cat.color}25`,
-          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, marginTop: 1,
-        }}>{cat.icon}</div>
+        <div style={{ width: 32, height: 32, borderRadius: 8, flexShrink: 0, background: `${cat.color}14`, border: `1px solid ${cat.color}25`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, marginTop: 1 }}>{cat.icon}</div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
             <span style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', lineHeight: 1.3 }}>{item.title}</span>
-            <span style={{ fontSize: 9, color: prio.color, background: `${prio.color}12`, border: `1px solid ${prio.color}25`, borderRadius: 3, padding: '1px 6px', fontWeight: 800, whiteSpace: 'nowrap' }}>
-              {prio.label.toUpperCase()}
-            </span>
+            <span style={{ fontSize: 9, color: prio.color, background: `${prio.color}12`, border: `1px solid ${prio.color}25`, borderRadius: 3, padding: '1px 6px', fontWeight: 800, whiteSpace: 'nowrap' }}>{prio.label.toUpperCase()}</span>
           </div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
             <div style={{ flex: 1, minWidth: 120, maxWidth: 200 }}>
@@ -230,25 +217,16 @@ function AISuggestionCard({ item, prefs }) {
         </div>
         <span style={{ color: '#334155', fontSize: 11, flexShrink: 0, marginTop: 6 }}>{expanded ? '▲' : '▼'}</span>
       </div>
-
-      {/* Expanded detail */}
       {expanded && (
         <div style={{ padding: '0 14px 14px', borderTop: '1px solid #1a2535' }}>
-          {/* Reasoning */}
           <div style={{ marginTop: 12, marginBottom: 10 }}>
             <div style={{ fontSize: 9, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 700, marginBottom: 6 }}>🤖 Raciocínio da AI</div>
-            <div style={{ fontSize: 11, color: '#64748b', lineHeight: 1.7, background: '#070b14', padding: '10px 12px', borderRadius: 8, border: '1px solid #0f1d2e' }}>
-              {item.reasoning}
-            </div>
+            <div style={{ fontSize: 11, color: '#64748b', lineHeight: 1.7, background: '#070b14', padding: '10px 12px', borderRadius: 8, border: '1px solid #0f1d2e' }}>{item.reasoning}</div>
           </div>
-
-          {/* Suggestion */}
           <div style={{ marginBottom: 10, padding: '10px 12px', background: `${prio.color}07`, border: `1px solid ${prio.color}20`, borderRadius: 8 }}>
             <div style={{ fontSize: 9, color: prio.color, fontWeight: 700, marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.07em' }}>💡 Sugestão</div>
             <div style={{ fontSize: 11, color: '#94a3b8', lineHeight: 1.7 }}>{item.suggestion}</div>
           </div>
-
-          {/* Trigger + Sources */}
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             <div style={{ flex: 1, minWidth: 200, padding: '8px 10px', background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.15)', borderRadius: 7 }}>
               <div style={{ fontSize: 8, color: '#f59e0b', fontWeight: 700, marginBottom: 3 }}>🎯 GATILHO</div>
@@ -257,9 +235,7 @@ function AISuggestionCard({ item, prefs }) {
             <div style={{ padding: '8px 10px', background: '#0d1421', border: '1px solid #1a2535', borderRadius: 7 }}>
               <div style={{ fontSize: 8, color: '#334155', fontWeight: 700, marginBottom: 3 }}>FONTES</div>
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                {item.data_sources.map(s => (
-                  <span key={s} style={{ fontSize: 9, color: '#475569', background: '#111827', border: '1px solid #1e2d45', borderRadius: 3, padding: '1px 5px', fontFamily: 'JetBrains Mono, monospace' }}>{s}</span>
-                ))}
+                {item.data_sources.map(s => <span key={s} style={{ fontSize: 9, color: '#475569', background: '#111827', border: '1px solid #1e2d45', borderRadius: 3, padding: '1px 5px', fontFamily: 'JetBrains Mono, monospace' }}>{s}</span>)}
               </div>
             </div>
           </div>
@@ -276,31 +252,17 @@ function AlertRuleConfig({ rule, prefs, onToggle, onPriorityChange, onThresholdC
   const [tmpTh, setTmpTh] = useState(rule.threshold);
 
   return (
-    <div style={{
-      background: rule.enabled ? '#0d1421' : 'transparent',
-      border: `1px solid ${rule.enabled ? '#1a2535' : '#0f1a28'}`,
-      borderRadius: 9, padding: '11px 13px',
-      opacity: rule.enabled ? 1 : 0.5, transition: 'all 0.15s',
-    }}>
+    <div style={{ background: rule.enabled ? '#0d1421' : 'transparent', border: `1px solid ${rule.enabled ? '#1a2535' : '#0f1a28'}`, borderRadius: 9, padding: '11px 13px', opacity: rule.enabled ? 1 : 0.5, transition: 'all 0.15s' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        {/* Toggle */}
-        <button onClick={() => onToggle(rule.id)} style={{
-          width: 36, height: 20, borderRadius: 10, border: 'none', cursor: 'pointer', flexShrink: 0,
-          background: rule.enabled ? prio.color : '#1a2535', position: 'relative', transition: 'background 0.2s',
-        }}>
-          <div style={{
-            position: 'absolute', top: 2, left: rule.enabled ? 18 : 2,
-            width: 16, height: 16, borderRadius: 8, background: '#fff', transition: 'left 0.2s',
-          }} />
+        <button onClick={() => onToggle(rule.id)} style={{ width: 36, height: 20, borderRadius: 10, border: 'none', cursor: 'pointer', flexShrink: 0, background: rule.enabled ? prio.color : '#1a2535', position: 'relative', transition: 'background 0.2s' }}>
+          <div style={{ position: 'absolute', top: 2, left: rule.enabled ? 18 : 2, width: 16, height: 16, borderRadius: 8, background: '#fff', transition: 'left 0.2s' }} />
         </button>
-        {/* Info */}
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 11 }}>{type.icon}</span>
             <span style={{ fontSize: 11, fontWeight: 700, color: rule.enabled ? '#e2e8f0' : '#334155' }}>{rule.label}</span>
             {rule.triggered && <span style={{ fontSize: 8, color: type.color, background: `${type.color}15`, border: `1px solid ${type.color}30`, borderRadius: 3, padding: '1px 5px', fontWeight: 800 }}>🔔 ATIVO</span>}
           </div>
-          {/* Progress bar */}
           {rule.enabled && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
               <div style={{ flex: 1, height: 3, borderRadius: 2, background: '#1a2535', overflow: 'hidden' }}>
@@ -313,29 +275,18 @@ function AlertRuleConfig({ rule, prefs, onToggle, onPriorityChange, onThresholdC
             </div>
           )}
         </div>
-        {/* Priority selector */}
-        <select value={prefs[rule.type] || 'MEDIUM'} onChange={e => onPriorityChange(rule.type, e.target.value)} style={{
-          background: '#0d1421', border: `1px solid ${prio.color}35`, borderRadius: 5,
-          color: prio.color, fontSize: 9, fontWeight: 700, padding: '2px 6px', cursor: 'pointer', outline: 'none',
-        }}>
+        <select value={prefs[rule.type] || 'MEDIUM'} onChange={e => onPriorityChange(rule.type, e.target.value)} style={{ background: '#0d1421', border: `1px solid ${prio.color}35`, borderRadius: 5, color: prio.color, fontSize: 9, fontWeight: 700, padding: '2px 6px', cursor: 'pointer', outline: 'none' }}>
           {PRIORITIES.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
         </select>
-        {/* Threshold edit */}
         <div>
           {editing ? (
             <div style={{ display: 'flex', gap: 3 }}>
-              <input type="number" value={tmpTh} onChange={e => setTmpTh(parseFloat(e.target.value))}
-                style={{ width: 60, background: '#070b14', border: `1px solid rgba(59,130,246,0.4)`, borderRadius: 4, padding: '2px 5px', color: '#60a5fa', fontSize: 9, fontFamily: 'JetBrains Mono, monospace', outline: 'none' }} />
-              <button onClick={() => { onThresholdChange(rule.id, tmpTh); setEditing(false); }}
-                style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.3)', color: '#10b981', cursor: 'pointer' }}>✓</button>
-              <button onClick={() => setEditing(false)}
-                style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', cursor: 'pointer' }}>✕</button>
+              <input type="number" value={tmpTh} onChange={e => setTmpTh(parseFloat(e.target.value))} style={{ width: 60, background: '#070b14', border: '1px solid rgba(59,130,246,0.4)', borderRadius: 4, padding: '2px 5px', color: '#60a5fa', fontSize: 9, fontFamily: 'JetBrains Mono, monospace', outline: 'none' }} />
+              <button onClick={() => { onThresholdChange(rule.id, tmpTh); setEditing(false); }} style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.3)', color: '#10b981', cursor: 'pointer' }}>✓</button>
+              <button onClick={() => setEditing(false)} style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', cursor: 'pointer' }}>✕</button>
             </div>
           ) : (
-            <button onClick={() => setEditing(true)} style={{
-              fontSize: 9, fontFamily: 'JetBrains Mono, monospace', color: '#475569',
-              background: '#111827', border: '1px solid #1e2d45', borderRadius: 4, padding: '2px 7px', cursor: 'pointer',
-            }}>{rule.threshold}{rule.threshold_unit}</button>
+            <button onClick={() => setEditing(true)} style={{ fontSize: 9, fontFamily: 'JetBrains Mono, monospace', color: '#475569', background: '#111827', border: '1px solid #1e2d45', borderRadius: 4, padding: '2px 7px', cursor: 'pointer' }}>{rule.threshold}{rule.threshold_unit}</button>
           )}
         </div>
       </div>
@@ -343,42 +294,26 @@ function AlertRuleConfig({ rule, prefs, onToggle, onPriorityChange, onThresholdC
   );
 }
 
-// ─── Cálculo de Short Squeeze Score a partir de liquidações ──────────────────
-// Quando há mais liquidações de shorts (side=BUY) = pressão de squeeze
-// Retorna score 0–100 proporcional à dominância de short-liq no volume total
 function computeShortSqueezeScore(liquidations) {
   if (!liquidations || liquidations.length === 0) return null;
-  const totalUsd  = liquidations.reduce((s, l) => s + l.usd_value, 0);
-  const shortLiqUsd = liquidations
-    .filter(l => l.side === 'BUY') // BUY = short foi liquidado
-    .reduce((s, l) => s + l.usd_value, 0);
+  const totalUsd = liquidations.reduce((s, l) => s + l.usd_value, 0);
+  const shortLiqUsd = liquidations.filter(l => l.side === 'BUY').reduce((s, l) => s + l.usd_value, 0);
   if (totalUsd === 0) return null;
-  // Score: % de liq que são de shorts × 100, limitado a 100
   return Math.min(100, Math.round((shortLiqUsd / totalUsd) * 100));
 }
 
-// ─── Cálculo de Long Flush Score a partir de liquidações ──────────────────────
-// Quando há mais liquidações de longs (side=SELL) = risco de flush
 function computeLongFlushScore(liquidations, riskScoreValue) {
   if (!liquidations || liquidations.length === 0) return riskScoreValue ?? null;
-  const totalUsd   = liquidations.reduce((s, l) => s + l.usd_value, 0);
-  const longLiqUsd = liquidations
-    .filter(l => l.side === 'SELL') // SELL = long foi liquidado
-    .reduce((s, l) => s + l.usd_value, 0);
+  const totalUsd = liquidations.reduce((s, l) => s + l.usd_value, 0);
+  const longLiqUsd = liquidations.filter(l => l.side === 'SELL').reduce((s, l) => s + l.usd_value, 0);
   if (totalUsd === 0) return riskScoreValue ?? null;
   const liqScore = Math.min(100, Math.round((longLiqUsd / totalUsd) * 100));
-  // Combina liq ratio (60%) + risk score composto (40%) para sinal mais robusto
-  if (riskScoreValue != null) {
-    return Math.round(liqScore * 0.6 + riskScoreValue * 0.4);
-  }
+  if (riskScoreValue != null) return Math.round(liqScore * 0.6 + riskScoreValue * 0.4);
   return liqScore;
 }
 
-// ─── Nearest Liquidation Cluster a partir de dados reais ─────────────────────
-// Agrupa liquidações por faixas de preço de $500 e retorna a mais densa próxima ao spot
 function computeNearestCluster(liquidations, spotPrice, mockCluster) {
   if (!liquidations || liquidations.length === 0 || !spotPrice) return mockCluster;
-  // Agrupa em buckets de $500
   const BUCKET = 500;
   const buckets = {};
   for (const liq of liquidations) {
@@ -386,164 +321,86 @@ function computeNearestCluster(liquidations, spotPrice, mockCluster) {
     if (!buckets[key]) buckets[key] = { price: key, usd: 0 };
     buckets[key].usd += liq.usd_value;
   }
-  // Seleciona o bucket com maior volume em USD (excluindo spot ± 0.1%)
-  const candidates = Object.values(buckets)
-    .filter(b => Math.abs(b.price - spotPrice) / spotPrice > 0.001);
+  const candidates = Object.values(buckets).filter(b => Math.abs(b.price - spotPrice) / spotPrice > 0.001);
   if (candidates.length === 0) return mockCluster;
   const top = candidates.reduce((best, b) => b.usd > best.usd ? b : best, candidates[0]);
-  const distance_pct = Math.abs(top.price - spotPrice) / spotPrice * 100;
-  return { price: top.price, distance_pct, usd: top.usd };
+  return { price: top.price, distance_pct: Math.abs(top.price - spotPrice) / spotPrice * 100, usd: top.usd };
 }
 
 export default function SmartAlerts() {
-  // Carrega regras do Supabase (ou mock se não configurado)
   const { data: savedRules } = useAlertRules();
   const { mutate: saveRule } = useUpsertAlertRule();
   const { mutate: removeRule } = useDeleteAlertRule();
 
-  // ── Hooks de dados reais ──────────────────────────────────────────────────
-  const { data: ticker,       isLoading: tickerLoading,  isError: tickerError  } = useBtcTicker();
-  const { data: liquidations, isLoading: liqLoading,    isError: liqError     } = useLiquidations(100);
-  const { data: riskScore,    isLoading: riskLoading,   isError: riskError    } = useRiskScore();
+  const { data: ticker, isLoading: tickerLoading, isError: tickerError } = useBtcTicker();
+  const { data: liquidations, isLoading: liqLoading, isError: liqError } = useLiquidations(100);
+  const { data: riskScore, isLoading: riskLoading, isError: riskError } = useRiskScore();
   const { data: fngData } = useFearGreed(1);
   const multiVenue = useMultiVenueSnapshot();
 
-  // ── Logging quando dados live carregam ───────────────────────────────────
   const _loggedRef = useRef(false);
   useEffect(() => {
     if (ticker && riskScore && !_loggedRef.current) {
       _loggedRef.current = true;
-      logInfo('SmartAlerts gauges loaded', {
-        funding:       ticker.last_funding_rate,
-        riskScore:     riskScore.score,
-        riskRegime:    riskScore.regime,
-        liqCount:      liquidations?.length ?? 0,
-        bybitFunding:  multiVenue.bybit?.funding_rate ?? null,
-        okxFunding:    multiVenue.okx?.funding_rate   ?? null,
-      }, 'alerts');
+      logInfo('SmartAlerts gauges loaded', { funding: ticker.last_funding_rate, riskScore: riskScore.score, riskRegime: riskScore.regime, liqCount: liquidations?.length ?? 0, bybitFunding: multiVenue.bybit?.funding_rate ?? null, okxFunding: multiVenue.okx?.funding_rate ?? null }, 'alerts');
     }
     if (tickerError) logError('SmartAlerts ticker fetch failed', undefined, 'alerts');
-    if (liqError)    logError('SmartAlerts liquidations fetch failed', undefined, 'alerts');
-    if (riskError)   logError('SmartAlerts riskScore fetch failed', undefined, 'alerts');
+    if (liqError) logError('SmartAlerts liquidations fetch failed', undefined, 'alerts');
+    if (riskError) logError('SmartAlerts riskScore fetch failed', undefined, 'alerts');
   }, [ticker, riskScore, liquidations, tickerError, liqError, riskError, multiVenue]);
 
-  // ── Valores calculados (com fallback para mock) ──────────────────────────
-  const spotPrice       = ticker?.mark_price ?? SPOT_PRICE;
-  const fundingCurrent  = ticker != null
-    ? ticker.last_funding_rate * 100
-    : riskDashboard.funding_current;
-  const isFundingLive   = ticker != null;
+  const spotPrice = ticker?.mark_price ?? SPOT_PRICE;
+  const fundingCurrent = ticker != null ? ticker.last_funding_rate * 100 : riskDashboard.funding_current;
+  const isFundingLive = ticker != null;
 
-  const longFlushScore  = computeLongFlushScore(liquidations, riskScore?.score);
-  const longFlushLive   = longFlushScore != null;
-  const longFlushVal    = longFlushLive ? longFlushScore : riskDashboard.long_flush_score;
+  const longFlushScore = computeLongFlushScore(liquidations, riskScore?.score);
+  const longFlushLive = longFlushScore != null;
+  const longFlushVal = longFlushLive ? longFlushScore : riskDashboard.long_flush_score;
 
   const shortSqueezeScore = computeShortSqueezeScore(liquidations);
-  const shortSqueezeLive  = shortSqueezeScore != null;
-  const shortSqueezeVal   = shortSqueezeLive ? shortSqueezeScore : riskDashboard.short_squeeze_score;
+  const shortSqueezeLive = shortSqueezeScore != null;
+  const shortSqueezeVal = shortSqueezeLive ? shortSqueezeScore : riskDashboard.short_squeeze_score;
 
-  const nearestCluster = computeNearestCluster(
-    liquidations, spotPrice, riskDashboard.nearest_liq_cluster,
-  );
-  const isClusterLive  = liquidations != null && liquidations.length > 0;
+  const nearestCluster = computeNearestCluster(liquidations, spotPrice, riskDashboard.nearest_liq_cluster);
+  const isClusterLive = liquidations != null && liquidations.length > 0;
 
-  // Funding cross-venue: média das 3 exchanges quando disponível
   const fundingCrossVenue = (ticker && multiVenue.bybit && multiVenue.okx)
     ? (ticker.last_funding_rate * 100 + (multiVenue.bybit.funding_rate ?? 0) * 100 + (multiVenue.okx.funding_rate ?? 0) * 100) / 3
     : null;
 
-  // ── Análise AI baseada em regras a partir de dados live ──────────────────────
-  // Mapeia módulos de ruleBasedAnalysis para o formato esperado por AISuggestionCard
   const liveSuggestions = useMemo(() => {
     if (!IS_LIVE || (!ticker && !fngData && !riskScore)) return null;
-
     const analysis = computeRuleBasedAnalysis({
-      derivatives: ticker ? {
-        fundingRate:  ticker.last_funding_rate,
-        oiDeltaPct:   ticker.oi_delta_pct ?? 0,
-        openInterest: ticker.open_interest,
-      } : undefined,
-      spot: ticker ? {
-        ret1d:        (ticker.price_change_pct ?? 0) / 100,
-        cvd1d:        0,
-        volume1dUsdt: ticker.volume_24h_usdt ?? 0,
-        price:        ticker.mark_price,
-      } : undefined,
-      macro: fngData ? {
-        fngValue:   fngData.value,
-        fngLabel:   fngData.label,
-        riskScore:  riskScore?.score ?? 50,
-        riskRegime: riskScore?.regime ?? 'MODERADO',
-      } : undefined,
+      derivatives: ticker ? { fundingRate: ticker.last_funding_rate, oiDeltaPct: ticker.oi_delta_pct ?? 0, openInterest: ticker.open_interest } : undefined,
+      spot: ticker ? { ret1d: (ticker.price_change_pct ?? 0) / 100, cvd1d: 0, volume1dUsdt: ticker.volume_24h_usdt ?? 0, price: ticker.mark_price } : undefined,
+      macro: fngData ? { fngValue: fngData.value, fngLabel: fngData.label, riskScore: riskScore?.score ?? 50, riskRegime: riskScore?.regime ?? 'MODERADO' } : undefined,
     });
-
-    // Mapa de módulo → metadados estáticos da UI
     const MODULE_META = {
-      derivatives: {
-        id: 'live001', category: 'derivatives',
-        data_sources: ['binance_futures', 'coinglass'],
-      },
-      spot: {
-        id: 'live002', category: 'derivatives',
-        data_sources: ['binance_spot'],
-      },
-      options: {
-        id: 'live003', category: 'sentiment',
-        data_sources: ['deribit'],
-      },
-      macro: {
-        id: 'live004', category: 'sentiment',
-        data_sources: ['alternative', 'binance'],
-      },
+      derivatives: { id: 'live001', category: 'derivatives', data_sources: ['binance_futures', 'coinglass'] },
+      spot: { id: 'live002', category: 'derivatives', data_sources: ['binance_spot'] },
+      options: { id: 'live003', category: 'sentiment', data_sources: ['deribit'] },
+      macro: { id: 'live004', category: 'sentiment', data_sources: ['alternative', 'binance'] },
     };
-
-    // Converte score 0–100 → prioridade UI
-    const scoreToPriority = (score) => {
-      if (score >= 70) return 'CRITICAL';
-      if (score >= 58) return 'HIGH';
-      if (score >= 45) return 'MEDIUM';
-      return 'LOW';
-    };
-
+    const scoreToPriority = (score) => score >= 70 ? 'CRITICAL' : score >= 58 ? 'HIGH' : score >= 45 ? 'MEDIUM' : 'LOW';
     const now = new Date();
     return Object.entries(analysis.modules).map(([key, mod], idx) => {
       const meta = MODULE_META[key];
-      return {
-        id:          meta.id,
-        category:    meta.category,
-        priority:    scoreToPriority(mod.score),
-        title:       mod.signal,
-        reasoning:   mod.analysis,
-        suggestion:  `Gatilho: ${mod.trigger}. Timeframe esperado: ${mod.timeframe}.`,
-        probability: mod.probability,
-        confidence:  mod.confidence,
-        trigger:     mod.trigger,
-        data_sources: meta.data_sources,
-        created_at:  new Date(now.getTime() - idx * 60000), // offset fictício p/ formatar tempo
-      };
+      return { id: meta.id, category: meta.category, priority: scoreToPriority(mod.score), title: mod.signal, reasoning: mod.analysis, suggestion: `Gatilho: ${mod.trigger}. Timeframe esperado: ${mod.timeframe}.`, probability: mod.probability, confidence: mod.confidence, trigger: mod.trigger, data_sources: meta.data_sources, created_at: new Date(now.getTime() - idx * 60000) };
     });
   }, [ticker, fngData, riskScore]);
 
-  // Sugestões ativas: usa live quando disponível, cai para mock estático
   const activeSuggestions = liveSuggestions ?? AI_SUGGESTIONS;
 
-  // Estado local inicializado com dados do Supabase (ou mock como fallback)
   const [rules, setRules] = useState(defaultAlertRulesMock);
   const _seededRef = useRef(false);
   useEffect(() => {
-    if (savedRules === undefined) return; // ainda carregando
+    if (savedRules === undefined) return;
     if (savedRules.length > 0) {
       // @ts-ignore — campos runtime adicionados aqui
       setRules(savedRules.map(r => ({ ...r, id: r.id ?? crypto.randomUUID(), current_value: 0, triggered: false, last_triggered: r.last_triggered ? new Date(r.last_triggered) : null })));
     } else if (!_seededRef.current) {
-      // Primeira carga com DB vazio: semeia as regras padrão no Supabase
       _seededRef.current = true;
-      defaultAlertRulesMock.forEach(r => saveRule({
-        ...r,
-        last_triggered: r.last_triggered instanceof Date
-          ? r.last_triggered.toISOString()
-          : r.last_triggered ?? null,
-      }));
+      defaultAlertRulesMock.forEach(r => saveRule({ ...r, last_triggered: r.last_triggered instanceof Date ? r.last_triggered.toISOString() : r.last_triggered ?? null }));
     }
   }, [savedRules]); // eslint-disable-line react-hooks/exhaustive-deps
   const [prefs, setPrefs] = useState(DEFAULT_PREFS);
@@ -551,208 +408,93 @@ export default function SmartAlerts() {
   const [tab, setTab] = useState('ai');
   const [categoryFilter, setCategoryFilter] = useState('all');
 
-  const _toSavable = rule => ({
-    ...rule,
-    last_triggered: rule.last_triggered instanceof Date
-      ? rule.last_triggered.toISOString()
-      : rule.last_triggered,
-  });
-
-  const toggleRule = id => {
-    setRules(rs => rs.map(r => r.id === id ? { ...r, enabled: !r.enabled } : r));
-    const rule = rules.find(r => r.id === id);
-    if (rule) saveRule(_toSavable({ ...rule, enabled: !rule.enabled }));
-  };
+  const _toSavable = rule => ({ ...rule, last_triggered: rule.last_triggered instanceof Date ? rule.last_triggered.toISOString() : rule.last_triggered });
+  const toggleRule = id => { setRules(rs => rs.map(r => r.id === id ? { ...r, enabled: !r.enabled } : r)); const rule = rules.find(r => r.id === id); if (rule) saveRule(_toSavable({ ...rule, enabled: !rule.enabled })); };
   const changePriority = (type, p) => setPrefs(prev => ({ ...prev, [type]: p }));
-  const changeThreshold = (id, val) => {
-    setRules(rs => rs.map(r => r.id === id ? { ...r, threshold: val } : r));
-    const rule = rules.find(r => r.id === id);
-    if (rule) saveRule(_toSavable({ ...rule, threshold: val }));
-  };
+  const changeThreshold = (id, val) => { setRules(rs => rs.map(r => r.id === id ? { ...r, threshold: val } : r)); const rule = rules.find(r => r.id === id); if (rule) saveRule(_toSavable({ ...rule, threshold: val })); };
   const dismissAlert = id => setHistory(h => h.map(a => a.id === id ? { ...a, resolved: true } : a));
 
   const activeAlerts = history.filter(a => !a.resolved);
   const rd = riskDashboard;
-
-  const filteredSuggestions = categoryFilter === 'all'
-    ? activeSuggestions
-    : activeSuggestions.filter(s => s.category === categoryFilter);
+  const filteredSuggestions = categoryFilter === 'all' ? activeSuggestions : activeSuggestions.filter(s => s.category === categoryFilter);
 
   const TABS = [
-    { id: 'ai',        label: '🤖 AI & Sugestões',  badge: activeSuggestions.filter(s => s.priority === 'HIGH' || s.priority === 'CRITICAL').length },
-    { id: 'active',    label: '🔔 Ativos',           badge: activeAlerts.length },
-    { id: 'config',    label: '⚙️ Configurar',       badge: rules.filter(r => r.enabled).length },
-    { id: 'history',   label: '📋 Histórico',        badge: null },
-    { id: 'cycle',     label: '🔄 Ciclo',            badge: null },
-    { id: 'auditoria', label: '🔍 Auditoria',        badge: null },
+    { id: 'ai', label: '🤖 AI & Sugestões', badge: activeSuggestions.filter(s => s.priority === 'HIGH' || s.priority === 'CRITICAL').length },
+    { id: 'active', label: '🔔 Ativos', badge: activeAlerts.length },
+    { id: 'config', label: '⚙️ Configurar', badge: rules.filter(r => r.enabled).length },
+    { id: 'history', label: '📋 Histórico', badge: null },
+    { id: 'cycle', label: '🔄 Ciclo', badge: null },
+    { id: 'auditoria', label: '🔍 Auditoria', badge: null },
   ];
 
   return (
     <div style={{ maxWidth: 1400, margin: '0 auto' }}>
-      {/* Header */}
       <div style={{ marginBottom: 18 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
           <h1 style={{ fontSize: 20, fontWeight: 900, color: '#f1f5f9', margin: 0, letterSpacing: '-0.03em' }}>Central de Alertas</h1>
           <ModeBadge mode={IS_LIVE && ticker ? 'live' : 'mock'} />
-          {activeAlerts.length > 0 && (
-            <span style={{ fontSize: 10, color: '#ef4444', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 4, padding: '2px 8px', fontWeight: 800 }}>
-              🔔 {activeAlerts.length} ativo{activeAlerts.length > 1 ? 's' : ''}
-            </span>
-          )}
+          {activeAlerts.length > 0 && <span style={{ fontSize: 10, color: '#ef4444', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 4, padding: '2px 8px', fontWeight: 800 }}>🔔 {activeAlerts.length} ativo{activeAlerts.length > 1 ? 's' : ''}</span>}
         </div>
-        <p style={{ fontSize: 11, color: '#475569', margin: 0 }}>
-          Monitoramento automático de mercado · AI identifica anomalias e emite sugestões · Configure prioridade e gatilhos por tipo de sinal
-        </p>
+        <p style={{ fontSize: 11, color: '#475569', margin: 0 }}>Monitoramento automático de mercado · AI identifica anomalias e emite sugestões · Configure prioridade e gatilhos por tipo de sinal</p>
       </div>
 
-      {/* Risk gauges — sempre visíveis, conectados a dados reais */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(145px, 1fr))', gap: 8, marginBottom: 16 }}>
-
-        {/* Long Flush — derivado de liquidações (SELL side) + Risk Score composto */}
         <div>
           <RiskGauge label="Long Flush" icon="⬇️" value={longFlushVal} max={100} threshold={70} color="#ef4444" sub={`${Math.max(0, 70 - longFlushVal)}pts p/ ativar`} />
-          <div style={{ marginTop: 3, display: 'flex', justifyContent: 'flex-end' }}>
-            <DataQualityBadge
-              freshness={longFlushLive ? 100 : 0}
-              completeness={longFlushLive ? 100 : 60}
-              fallback_active={!longFlushLive}
-              source={longFlushLive ? 'Binance' : 'MOCK'}
-            />
-          </div>
+          <div style={{ marginTop: 3, display: 'flex', justifyContent: 'flex-end' }}><DataQualityBadge freshness={longFlushLive ? 100 : 0} completeness={longFlushLive ? 100 : 60} fallback_active={!longFlushLive} source={longFlushLive ? 'Binance' : 'MOCK'} /></div>
         </div>
-
-        {/* Short Squeeze — derivado de liquidações (BUY side) */}
         <div>
           <RiskGauge label="Short Squeeze" icon="⬆️" value={shortSqueezeVal} max={100} threshold={65} color="#10b981" sub={`${Math.max(0, 65 - shortSqueezeVal)}pts p/ ativar`} />
-          <div style={{ marginTop: 3, display: 'flex', justifyContent: 'flex-end' }}>
-            <DataQualityBadge
-              freshness={shortSqueezeLive ? 100 : 0}
-              completeness={shortSqueezeLive ? 100 : 60}
-              fallback_active={!shortSqueezeLive}
-              source={shortSqueezeLive ? 'Binance' : 'MOCK'}
-            />
-          </div>
+          <div style={{ marginTop: 3, display: 'flex', justifyContent: 'flex-end' }}><DataQualityBadge freshness={shortSqueezeLive ? 100 : 0} completeness={shortSqueezeLive ? 100 : 60} fallback_active={!shortSqueezeLive} source={shortSqueezeLive ? 'Binance' : 'MOCK'} /></div>
         </div>
-
-        {/* Funding Rate — useBtcTicker (Binance) + cross-venue Bybit/OKX */}
         <div>
-          <RiskGauge
-            label="Funding Rate"
-            icon="💸"
-            value={fundingCrossVenue ?? fundingCurrent}
-            max={rd.funding_threshold_hi * 1.5}
-            threshold={rd.funding_threshold_hi}
-            color="#f59e0b"
-            sub={fundingCrossVenue
-              ? `Cross-venue avg · Threshold: ${rd.funding_threshold_hi}%`
-              : `Threshold: ${rd.funding_threshold_hi}%`}
-          />
-          <div style={{ marginTop: 3, display: 'flex', justifyContent: 'flex-end' }}>
-            <DataQualityBadge
-              freshness={isFundingLive ? 100 : 0}
-              completeness={isFundingLive ? 100 : 60}
-              fallback_active={!isFundingLive}
-              source={fundingCrossVenue ? 'Cross-venue' : isFundingLive ? 'Binance' : 'MOCK'}
-            />
-          </div>
+          <RiskGauge label="Funding Rate" icon="💸" value={fundingCrossVenue ?? fundingCurrent} max={rd.funding_threshold_hi * 1.5} threshold={rd.funding_threshold_hi} color="#f59e0b" sub={fundingCrossVenue ? `Cross-venue avg · Threshold: ${rd.funding_threshold_hi}%` : `Threshold: ${rd.funding_threshold_hi}%`} />
+          <div style={{ marginTop: 3, display: 'flex', justifyContent: 'flex-end' }}><DataQualityBadge freshness={isFundingLive ? 100 : 0} completeness={isFundingLive ? 100 : 60} fallback_active={!isFundingLive} source={fundingCrossVenue ? 'Cross-venue' : isFundingLive ? 'Binance' : 'MOCK'} /></div>
         </div>
-
-        {/* Basis Dev. — sem hook real; mantém mock com badge explícito */}
         <div>
           <RiskGauge label="Basis Dev." icon="📐" value={rd.basis_deviation} max={5} threshold={3} color="#a78bfa" sub={`${rd.basis_current.toFixed(1)}% ann.`} />
-          <div style={{ marginTop: 3, display: 'flex', justifyContent: 'flex-end' }}>
-            <DataQualityBadge freshness={0} completeness={60} fallback_active={true} source="MOCK" />
-          </div>
+          <div style={{ marginTop: 3, display: 'flex', justifyContent: 'flex-end' }}><DataQualityBadge freshness={0} completeness={60} fallback_active={true} source="MOCK" /></div>
         </div>
-
-        {/* Sentimento — Fear & Greed real via Alternative.me quando disponível */}
         {(() => {
           const fngScore = fngData != null ? (fngData.value - 50) / 50 : null;
           const sentimentVal = fngScore != null ? Math.abs(fngScore) : Math.abs(rd.sentiment_24h);
-          const sentimentSub = fngScore != null
-            ? `F&G: ${fngData.value} · ${fngData.label}`
-            : `Score: ${rd.sentiment_24h > 0 ? '+' : ''}${rd.sentiment_24h.toFixed(2)}`;
+          const sentimentSub = fngScore != null ? `F&G: ${fngData.value} · ${fngData.label}` : `Score: ${rd.sentiment_24h > 0 ? '+' : ''}${rd.sentiment_24h.toFixed(2)}`;
           const isSentLive = fngScore != null && IS_LIVE;
           return (
             <div>
               <RiskGauge label="Sentimento" icon="🧠" value={sentimentVal} max={1} threshold={0.5} color="#06b6d4" sub={sentimentSub} />
-              <div style={{ marginTop: 3, display: 'flex', justifyContent: 'flex-end' }}>
-                <DataQualityBadge freshness={isSentLive ? 100 : 0} completeness={isSentLive ? 100 : 60} fallback_active={!isSentLive} source={isSentLive ? 'Alternative.me' : 'MOCK'} />
-              </div>
+              <div style={{ marginTop: 3, display: 'flex', justifyContent: 'flex-end' }}><DataQualityBadge freshness={isSentLive ? 100 : 0} completeness={isSentLive ? 100 : 60} fallback_active={!isSentLive} source={isSentLive ? 'Alternative.me' : 'MOCK'} /></div>
             </div>
           );
         })()}
-
-        {/* Cluster BTC — derivado de liquidações reais quando disponível */}
         <div>
-          <RiskGauge
-            label="Cluster BTC"
-            icon="🔥"
-            value={100 - nearestCluster.distance_pct * 10}
-            max={100}
-            threshold={80}
-            color="#f97316"
-            sub={`$${(nearestCluster.price / 1000).toFixed(0)}K · ${nearestCluster.distance_pct.toFixed(1)}% dist`}
-          />
-          <div style={{ marginTop: 3, display: 'flex', justifyContent: 'flex-end' }}>
-            <DataQualityBadge
-              freshness={isClusterLive ? 100 : 0}
-              completeness={isClusterLive ? 100 : 60}
-              fallback_active={!isClusterLive}
-              source={isClusterLive ? 'Binance' : 'MOCK'}
-            />
-          </div>
+          <RiskGauge label="Cluster BTC" icon="🔥" value={100 - nearestCluster.distance_pct * 10} max={100} threshold={80} color="#f97316" sub={`$${(nearestCluster.price / 1000).toFixed(0)}K · ${nearestCluster.distance_pct.toFixed(1)}% dist`} />
+          <div style={{ marginTop: 3, display: 'flex', justifyContent: 'flex-end' }}><DataQualityBadge freshness={isClusterLive ? 100 : 0} completeness={isClusterLive ? 100 : 60} fallback_active={!isClusterLive} source={isClusterLive ? 'Binance' : 'MOCK'} /></div>
         </div>
-
       </div>
 
-      {/* Tabs */}
       <div style={{ display: 'flex', gap: 2, borderBottom: '1px solid #0f1d2e', marginBottom: 16 }}>
         {TABS.map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)} style={{
-            padding: '8px 16px', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: tab === t.id ? 700 : 400,
-            background: 'transparent', color: tab === t.id ? '#60a5fa' : '#475569',
-            borderBottom: tab === t.id ? '2px solid #3b82f6' : '2px solid transparent',
-            display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.12s',
-          }}>
+          <button key={t.id} onClick={() => setTab(t.id)} style={{ padding: '8px 16px', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: tab === t.id ? 700 : 400, background: 'transparent', color: tab === t.id ? '#60a5fa' : '#475569', borderBottom: tab === t.id ? '2px solid #3b82f6' : '2px solid transparent', display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.12s' }}>
             {t.label}
-            {t.badge !== null && (
-              <span style={{ fontSize: 9, fontWeight: 800, padding: '1px 5px', borderRadius: 8, background: tab === t.id ? 'rgba(59,130,246,0.2)' : 'rgba(100,116,139,0.15)', color: tab === t.id ? '#60a5fa' : '#64748b' }}>
-                {t.badge}
-              </span>
-            )}
+            {t.badge !== null && <span style={{ fontSize: 9, fontWeight: 800, padding: '1px 5px', borderRadius: 8, background: tab === t.id ? 'rgba(59,130,246,0.2)' : 'rgba(100,116,139,0.15)', color: tab === t.id ? '#60a5fa' : '#64748b' }}>{t.badge}</span>}
           </button>
         ))}
       </div>
 
-      {/* ── AI & SUGESTÕES ── */}
       {tab === 'ai' && (
         <>
-          {/* Category filter */}
           <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
-            <button onClick={() => setCategoryFilter('all')} style={{
-              padding: '4px 12px', borderRadius: 20, border: `1px solid ${categoryFilter === 'all' ? 'rgba(59,130,246,0.4)' : '#1a2535'}`,
-              background: categoryFilter === 'all' ? 'rgba(59,130,246,0.12)' : 'transparent',
-              color: categoryFilter === 'all' ? '#60a5fa' : '#475569', cursor: 'pointer', fontSize: 11, fontWeight: 700,
-            }}>Todos</button>
-            {CATEGORIES.map(c => (
-              <button key={c.id} onClick={() => setCategoryFilter(c.id)} style={{
-                padding: '4px 12px', borderRadius: 20, border: `1px solid ${categoryFilter === c.id ? c.color + '40' : '#1a2535'}`,
-                background: categoryFilter === c.id ? `${c.color}12` : 'transparent',
-                color: categoryFilter === c.id ? c.color : '#475569', cursor: 'pointer', fontSize: 11, fontWeight: 700,
-              }}>{c.icon} {c.label}</button>
-            ))}
+            <button onClick={() => setCategoryFilter('all')} style={{ padding: '4px 12px', borderRadius: 20, border: `1px solid ${categoryFilter === 'all' ? 'rgba(59,130,246,0.4)' : '#1a2535'}`, background: categoryFilter === 'all' ? 'rgba(59,130,246,0.12)' : 'transparent', color: categoryFilter === 'all' ? '#60a5fa' : '#475569', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>Todos</button>
+            {CATEGORIES.map(c => <button key={c.id} onClick={() => setCategoryFilter(c.id)} style={{ padding: '4px 12px', borderRadius: 20, border: `1px solid ${categoryFilter === c.id ? c.color + '40' : '#1a2535'}`, background: categoryFilter === c.id ? `${c.color}12` : 'transparent', color: categoryFilter === c.id ? c.color : '#475569', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>{c.icon} {c.label}</button>)}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {filteredSuggestions.map(s => <AISuggestionCard key={s.id} item={s} prefs={prefs} />)}
           </div>
-          <div style={{ marginTop: 14, padding: '10px 13px', background: 'rgba(30,45,69,0.3)', border: '1px solid #1a2535', borderRadius: 9, fontSize: 10, color: '#334155', lineHeight: 1.7 }}>
-            ⚠️ <strong style={{ color: '#475569' }}>Aviso:</strong> Todas as sugestões da AI são baseadas em dados quantitativos históricos e não constituem recomendação de investimento. Probabilidades são estimativas de modelos estatísticos, não garantias.
-          </div>
+          <div style={{ marginTop: 14, padding: '10px 13px', background: 'rgba(30,45,69,0.3)', border: '1px solid #1a2535', borderRadius: 9, fontSize: 10, color: '#334155', lineHeight: 1.7 }}>⚠️ <strong style={{ color: '#475569' }}>Aviso:</strong> Todas as sugestões da AI são baseadas em dados quantitativos históricos e não constituem recomendação de investimento.</div>
         </>
       )}
 
-      {/* ── ALERTAS ATIVOS ── */}
       {tab === 'active' && (
         <div>
           {activeAlerts.length === 0 ? (
@@ -775,26 +517,19 @@ export default function SmartAlerts() {
                   </div>
                   <div style={{ fontSize: 12, color: '#e2e8f0', marginBottom: 7 }}>{a.message}</div>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    {Object.entries(a.context).map(([k, v]) => (
-                      <span key={k} style={{ fontSize: 9, color: '#475569', background: '#0d1421', border: '1px solid #1a2535', borderRadius: 3, padding: '1px 6px', fontFamily: 'JetBrains Mono, monospace' }}>
-                        {k}: {typeof v === 'number' ? v.toLocaleString() : String(v)}
-                      </span>
-                    ))}
+                    {Object.entries(a.context).map(([k, v]) => <span key={k} style={{ fontSize: 9, color: '#475569', background: '#0d1421', border: '1px solid #1a2535', borderRadius: 3, padding: '1px 6px', fontFamily: 'JetBrains Mono, monospace' }}>{k}: {typeof v === 'number' ? v.toLocaleString() : String(v)}</span>)}
                   </div>
                 </div>
-                <button onClick={() => dismissAlert(a.id)} style={{ padding: '4px 10px', borderRadius: 5, border: '1px solid #1e2d45', cursor: 'pointer', background: 'transparent', color: '#475569', fontSize: 10, flexShrink: 0, whiteSpace: 'nowrap' }}>Dispensar</button>
+                <button onClick={() => dismissAlert(a.id)} style={{ padding: '4px 10px', borderRadius: 5, border: '1px solid #1e2d45', cursor: 'pointer', background: 'transparent', color: '#475569', fontSize: 10, flexShrink: 0 }}>Dispensar</button>
               </div>
             );
           })}
         </div>
       )}
 
-      {/* ── CONFIGURAR ── */}
       {tab === 'config' && (
         <div>
-          <div style={{ fontSize: 11, color: '#475569', marginBottom: 16 }}>
-            Configure a prioridade e os gatilhos de cada alerta. <strong style={{ color: '#64748b' }}>Toggle</strong> para ativar/desativar · Clique no <strong style={{ color: '#64748b' }}>threshold</strong> para editar · Selecione a <strong style={{ color: '#64748b' }}>prioridade</strong> para ordenar na aba AI.
-          </div>
+          <div style={{ fontSize: 11, color: '#475569', marginBottom: 16 }}>Configure a prioridade e os gatilhos de cada alerta.</div>
           {CATEGORIES.map(cat => {
             const catRules = rules.filter(r => cat.types.includes(r.type));
             return (
@@ -805,9 +540,7 @@ export default function SmartAlerts() {
                   <span style={{ fontSize: 10, color: '#334155' }}>— {cat.desc}</span>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {catRules.map(r => (
-                    <AlertRuleConfig key={r.id} rule={r} prefs={prefs} onToggle={toggleRule} onPriorityChange={changePriority} onThresholdChange={changeThreshold} />
-                  ))}
+                  {catRules.map(r => <AlertRuleConfig key={r.id} rule={r} prefs={prefs} onToggle={toggleRule} onPriorityChange={changePriority} onThresholdChange={changeThreshold} />)}
                 </div>
               </div>
             );
@@ -815,12 +548,9 @@ export default function SmartAlerts() {
         </div>
       )}
 
-      {/* ── HISTÓRICO ── */}
       {tab === 'history' && (
         <div>
-          <div style={{ fontSize: 11, color: '#475569', marginBottom: 12 }}>
-            {alertHistory.length} alertas registrados · {alertHistory.filter(a => a.resolved).length} resolvidos
-          </div>
+          <div style={{ fontSize: 11, color: '#475569', marginBottom: 12 }}>{alertHistory.length} alertas registrados · {alertHistory.filter(a => a.resolved).length} resolvidos</div>
           {alertHistory.map(a => {
             const type = ALERT_TYPES[a.type];
             const sc = a.severity === 'HIGH' ? '#ef4444' : '#f59e0b';
@@ -840,37 +570,26 @@ export default function SmartAlerts() {
         </div>
       )}
 
-      {/* ── CICLO ── */}
       {tab === 'cycle' && (
         <div style={{ maxWidth: 1100 }}>
           <div style={{ marginBottom: 20, background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: 16 }}>
             <div style={{ fontSize: 11, color: '#4a5568', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.07em' }}>Tipos de Alerta</div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {Object.entries(cycleTypeConfig).map(([type, c]) => (
-                <div key={type} style={{ padding: '4px 10px', borderRadius: 6, background: c.bg, color: c.color, border: `1px solid ${c.border}`, fontSize: 11, fontFamily: 'JetBrains Mono, monospace' }}>
-                  {c.emoji} {type}
-                </div>
-              ))}
+              {Object.entries(cycleTypeConfig).map(([type, c]) => <div key={type} style={{ padding: '4px 10px', borderRadius: 6, background: c.bg, color: c.color, border: `1px solid ${c.border}`, fontSize: 11, fontFamily: 'JetBrains Mono, monospace' }}>{c.emoji} {type}</div>)}
             </div>
           </div>
-          <div style={{ marginBottom: 20, padding: '12px 16px', background: globalRisk.regime === 'NEUTRAL' ? 'rgba(245,158,11,0.06)' : 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.15)', borderRadius: 10 }}>
-            <div style={{ fontSize: 12, color: '#60a5fa', fontWeight: 600, marginBottom: 4 }}>
-              Estado Global: {globalRisk.regime} · Score {globalRisk.score}/100 · Prob {globalRisk.prob}%
-            </div>
-            <div style={{ fontSize: 11, color: '#4a5568' }}>
-              {globalRisk.score >= 65 ? 'RISK-ON threshold não atingido' : globalRisk.score <= 35 ? '🔴 RISK-OFF threshold atingido' : 'Zona neutra — monitorando'}{' '}
-              (RISKON ≥ 65, RISKOFF ≤ 35)
-            </div>
+          <div style={{ marginBottom: 20, padding: '12px 16px', background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.15)', borderRadius: 10 }}>
+            <div style={{ fontSize: 12, color: '#60a5fa', fontWeight: 600, marginBottom: 4 }}>Estado Global: {riskScore?.regime ?? '—'} · Score {riskScore?.score ?? '—'}/100</div>
+            <div style={{ fontSize: 11, color: '#4a5568' }}>{(riskScore?.score ?? 50) >= 65 ? 'RISK-ON threshold não atingido' : (riskScore?.score ?? 50) <= 35 ? '🔴 RISK-OFF threshold atingido' : 'Zona neutra — monitorando'} (RISKON ≥ 65, RISKOFF ≤ 35)</div>
           </div>
-          <div style={{ fontSize: 11, color: '#4a5568', marginBottom: 12 }}>Ciclo atual · {recentAlerts.length} alertas · Deduplicados · Anti-spam cooldown</div>
-          {recentAlerts.map(a => <AlertCycleDetail key={a.id} alert={a} />)}
+          <div style={{ fontSize: 11, color: '#4a5568', marginBottom: 12 }}>Ciclo atual · {history.length} alertas · Deduplicados · Anti-spam cooldown</div>
+          {history.map(a => <AlertCycleDetail key={a.id} alert={{ ...a, title: a.title ?? a.message ?? a.type, created_at: a.created_at ?? a.triggered_at, grade: a.grade ?? 'B', score: a.score ?? 50, prob: a.prob ?? 0.5, conf: a.conf ?? 0.5, metrics: a.metrics ?? {}, run_id: a.run_id ?? `hist-${a.id}`, cooldown_min: a.cooldown_min ?? 60, dedupe_key: a.dedupe_key ?? a.id, asset: a.asset ?? 'BTC' }} />)}
           <div style={{ marginTop: 16, padding: '10px 14px', background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.12)', borderRadius: 8, fontSize: 11, color: '#4a5568' }}>
             <strong style={{ color: '#60a5fa' }}>Deduplicação:</strong> Cada alerta tem <span style={{ fontFamily: 'JetBrains Mono, monospace', color: '#8899a6' }}>dedupe_key</span> = (tipo + ativo + bucket). Cooldown padrão 60min previne spam.
           </div>
         </div>
       )}
 
-      {/* ── AUDITORIA ── */}
       {tab === 'auditoria' && <AlertAuditPanel />}
     </div>
   );

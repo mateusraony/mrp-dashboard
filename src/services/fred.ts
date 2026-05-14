@@ -24,7 +24,7 @@ import { isSupabaseConfigured } from '@/services/supabase';
 import { macroBoard } from '@/components/data/mockData';
 import { fetchSP500, fetchVIX } from '@/services/yahooFinance';
 
-// ─── Schemas ──────────────────────────────────────────────────────────────────
+// ─── Schemas ─────────────────────────────────────────────────────────────────────────────
 
 const ObservationSchema = z.object({
   date:  z.string(),
@@ -37,7 +37,7 @@ const ObservationsResponseSchema = z.object({
   frequency_short: z.string().optional(),
 });
 
-// ─── Shapes exportadas ────────────────────────────────────────────────────────
+// ─── Shapes exportadas ──────────────────────────────────────────────────────────────────────────
 
 export interface MacroSeriesEntry {
   id:           string;
@@ -72,7 +72,7 @@ export interface YieldCurveData {
   updated_at:   number;
 }
 
-// ─── Config das séries ────────────────────────────────────────────────────────
+// ─── Config das séries ──────────────────────────────────────────────────────────────────────────
 
 interface SeriesConfig {
   id:        string;
@@ -90,7 +90,7 @@ const MACRO_SERIES: SeriesConfig[] = [
 ];
 // SP500 e VIX são buscados via Yahoo Finance (sem restrição de licença S&P/CBOE)
 
-// ─── Mock transformer ─────────────────────────────────────────────────────────
+// ─── Mock transformer ─────────────────────────────────────────────────────────────────────────────
 
 function mockMacroBoard(): MacroBoardData {
   const series: MacroSeriesEntry[] = macroBoard.series.map(s => ({
@@ -142,7 +142,7 @@ function mockYieldCurve(): YieldCurveData {
   };
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────────────────
 
 /**
  * Chama a Edge Function fred-proxy para buscar dados FRED server-side.
@@ -234,7 +234,7 @@ function extractDeltas(history: Array<{ date: string; value: number }>, format: 
   };
 }
 
-// ─── Fetchers ─────────────────────────────────────────────────────────────────
+// ─── Fetchers ───────────────────────────────────────────────────────────────────────────────
 
 /**
  * fetchMacroBoard — S&P 500, DXY, Gold, VIX, US10Y, US2Y com histórico 30d
@@ -329,7 +329,7 @@ export async function fetchMacroBoard(): Promise<MacroBoardData> {
   };
 }
 
-// ─── Global Liquidity ─────────────────────────────────────────────────────────
+// ─── Global Liquidity ───────────────────────────────────────────────────────────────────────
 
 export interface GlobalLiquidityData {
   fed_balance_b: number;       // Fed BS em bilhões USD
@@ -372,10 +372,10 @@ function calcTrend<T extends string>(
 }
 
 function mockGlobalLiquidity(): GlobalLiquidityData {
-  const fed_b = 7_100;
+  const fed_b = 6_700;
   const rrp_b = 1;   // RRP praticamente zerado em 2026 (~0.6B)
-  const tga_b = 600;
-  const net    = fed_b - rrp_b - tga_b; // 6_200
+  const tga_b = 860;
+  const net    = fed_b - rrp_b - tga_b; // 5_839
 
   const now = Date.now();
   const history = Array.from({ length: 30 }, (_, i) => {
@@ -400,8 +400,8 @@ function mockGlobalLiquidity(): GlobalLiquidityData {
     tga_b,
     tga_trend:           'building',
     real_yield_10y:      1.95,
-    term_premium_10y:    0.42,
-    dollar_index:        104.8,
+    term_premium_10y:    0.62,
+    dollar_index:        118.5,
     net_liquidity:       net,
     net_liquidity_signal: 'Liquidez líquida estável — RRP drenando gradualmente (bullish marginal)',
     history,
@@ -443,9 +443,9 @@ export async function fetchGlobalLiquidity(): Promise<GlobalLiquidityData> {
   const dtwex   = liqGet(5); // Broad Dollar Index (daily)
 
   // Valores mais recentes disponíveis
-  const fed_b  = (walcl[walcl.length - 1]?.value   ?? 7_100_000) / 1_000; // FRED: milhões → bilhões
+  const fed_b  = (walcl[walcl.length - 1]?.value   ?? 6_700_000) / 1_000; // FRED: milhões → bilhões
   const rrp_b  = rrp[rrp.length - 1]?.value         ?? 1;  // RRP ~zerado em 2026
-  const tga_b  = (wtregen[wtregen.length - 1]?.value ?? 600_000) / 1_000;
+  const tga_b  = (wtregen[wtregen.length - 1]?.value ?? 860_000) / 1_000;
 
   // Valor 4 semanas atrás por data-alvo (índice fixo falha com séries de frequência variada)
   const fourWeeksAgo = new Date(Date.now() - 28 * 86_400_000).toISOString().slice(0, 10);

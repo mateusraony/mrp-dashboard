@@ -163,66 +163,66 @@ export const btcOptions = {
 // ─── MACRO BOARD (FRED) — with 1D / 1W / 1M deltas ──────────────────────────
 export const macroBoard = {
   note: 'Dados diários FRED — não intraday',
-  updated_at: new Date('2026-03-06'),
+  updated_at: new Date('2026-05-10'),
   series: [
     {
       id: 'SP500', name: 'S&P 500', series_id: 'SP500',
-      value: 5687.40, prev: 5641.20, prev_7d: 5512.30, prev_30d: 5380.10,
+      value: 7398.93, prev: 7337.50, prev_7d: 7168.20, prev_30d: 6987.40,
       unit: 'pts', format: 'number',
-      delta_1d: (5687.40 - 5641.20) / 5641.20,
-      delta_7d: (5687.40 - 5512.30) / 5512.30,
-      delta_30d: (5687.40 - 5380.10) / 5380.10,
+      delta_1d: (7398.93 - 7337.50) / 7337.50,
+      delta_7d: (7398.93 - 7168.20) / 7168.20,
+      delta_30d: (7398.93 - 6987.40) / 6987.40,
       quality: 'A', icon: '📈',
     },
     {
       id: 'DXY', name: 'USD Broad Index', series_id: 'DTWEXBGS',
-      value: 104.82, prev: 105.21, prev_7d: 106.10, prev_30d: 108.40,
+      value: 118.5, prev: 119.20, prev_7d: 120.40, prev_30d: 122.80,
       unit: '', format: 'number',
-      delta_1d: (104.82 - 105.21) / 105.21,
-      delta_7d: (104.82 - 106.10) / 106.10,
-      delta_30d: (104.82 - 108.40) / 108.40,
+      delta_1d: (118.5 - 119.20) / 119.20,
+      delta_7d: (118.5 - 120.40) / 120.40,
+      delta_30d: (118.5 - 122.80) / 122.80,
       quality: 'A', icon: '💵',
     },
     {
       id: 'GOLD', name: 'Gold (LBMA AM)', series_id: 'GOLDAMGBD228NLBM',
-      value: 2912.50, prev: 2888.30, prev_7d: 2841.20, prev_30d: 2780.00,
+      value: 4715.0, prev: 4678.0, prev_7d: 4580.0, prev_30d: 4320.0,
       unit: '$/oz', format: 'number',
-      delta_1d: (2912.50 - 2888.30) / 2888.30,
-      delta_7d: (2912.50 - 2841.20) / 2841.20,
-      delta_30d: (2912.50 - 2780.00) / 2780.00,
+      delta_1d: (4715.0 - 4678.0) / 4678.0,
+      delta_7d: (4715.0 - 4580.0) / 4580.0,
+      delta_30d: (4715.0 - 4320.0) / 4320.0,
       quality: 'A', icon: '🥇',
     },
     {
       id: 'VIX', name: 'VIX', series_id: 'VIXCLS',
-      value: 22.14, prev: 21.80, prev_7d: 19.42, prev_30d: 15.80,
+      value: 17.19, prev: 17.42, prev_7d: 18.85, prev_30d: 21.60,
       unit: '', format: 'number',
-      delta_1d: (22.14 - 21.80) / 21.80,
-      delta_7d: (22.14 - 19.42) / 19.42,
-      delta_30d: (22.14 - 15.80) / 15.80,
+      delta_1d: (17.19 - 17.42) / 17.42,
+      delta_7d: (17.19 - 18.85) / 18.85,
+      delta_30d: (17.19 - 21.60) / 21.60,
       quality: 'A', icon: '🌡️',
     },
     {
       id: 'US10Y', name: 'US 10Y Yield', series_id: 'DGS10',
-      value: 4.512, prev: 4.487, prev_7d: 4.380, prev_30d: 4.210,
+      value: 4.37, prev: 4.40, prev_7d: 4.44, prev_30d: 4.28,
       unit: '%', format: 'yield',
-      delta_1d_bp: (4.512 - 4.487) * 100,
-      delta_7d_bp: (4.512 - 4.380) * 100,
-      delta_30d_bp: (4.512 - 4.210) * 100,
-      delta_1d: (4.512 - 4.487) / 4.487,
-      delta_7d: (4.512 - 4.380) / 4.380,
-      delta_30d: (4.512 - 4.210) / 4.210,
+      delta_1d_bp: (4.37 - 4.40) * 100,
+      delta_7d_bp: (4.37 - 4.44) * 100,
+      delta_30d_bp: (4.37 - 4.28) * 100,
+      delta_1d: (4.37 - 4.40) / 4.40,
+      delta_7d: (4.37 - 4.44) / 4.44,
+      delta_30d: (4.37 - 4.28) / 4.28,
       quality: 'A', icon: '📊',
     },
     {
       id: 'US2Y', name: 'US 2Y Yield', series_id: 'DGS2',
-      value: 4.231, prev: 4.198, prev_7d: 4.120, prev_30d: 4.050,
+      value: 3.90, prev: 3.93, prev_7d: 3.97, prev_30d: 4.02,
       unit: '%', format: 'yield',
-      delta_1d_bp: (4.231 - 4.198) * 100,
-      delta_7d_bp: (4.231 - 4.120) * 100,
-      delta_30d_bp: (4.231 - 4.050) * 100,
-      delta_1d: (4.231 - 4.198) / 4.198,
-      delta_7d: (4.231 - 4.120) / 4.120,
-      delta_30d: (4.231 - 4.050) / 4.050,
+      delta_1d_bp: (3.90 - 3.93) * 100,
+      delta_7d_bp: (3.90 - 3.97) * 100,
+      delta_30d_bp: (3.90 - 4.02) * 100,
+      delta_1d: (3.90 - 3.93) / 3.93,
+      delta_7d: (3.90 - 3.97) / 3.97,
+      delta_30d: (3.90 - 4.02) / 4.02,
       quality: 'A', icon: '📉',
     },
   ],
@@ -566,11 +566,11 @@ export const stablecoinSupply = {
 // ─── YIELD CURVE SPREAD ────────────────────────────────────────────────────────
 // Calculado a partir de macroBoard: 10Y - 2Y
 export const yieldCurveSpread = {
-  spread_bp: (4.512 - 4.231) * 100,  // 28.1bp — curva normal (positiva)
-  prev_7d_bp: (4.380 - 4.120) * 100,
-  prev_30d_bp: (4.210 - 4.050) * 100,
+  spread_bp: (4.37 - 3.90) * 100,   // 47bp — curva normal (positiva)
+  prev_7d_bp: (4.44 - 3.97) * 100,
+  prev_30d_bp: (4.28 - 4.02) * 100,
   regime: 'normal',   // 'normal' | 'flat' | 'inverted'
-  signal: 'Curva positiva (+28.1bp) — sem sinal recessivo imediato',
+  signal: 'Curva positiva (+47bp) — sem sinal recessivo imediato',
   recession_watch: false,
   quality: 'A',
 };
@@ -611,9 +611,9 @@ export const stablecoinHistory = {
 
 // ─── HISTÓRICO — Yield Curve Spread (bp) ─────────────────────────────────────
 export const yieldCurveHistory = {
-  '1d': Array.from({length: 24}, (_, i) => ({ t: i, v: parseFloat((28.1 - (23-i)*0.04 + (Math.random()-0.5)*1.5).toFixed(1)) })),
-  '1w': Array.from({length: 7},  (_, i) => ({ t: i, v: parseFloat((26.0 + i*0.30 + (Math.random()-0.5)*1.2).toFixed(1)) })),
-  '1m': Array.from({length: 30}, (_, i) => ({ t: i, v: parseFloat((16.0 + i*0.40 + (Math.random()-0.5)*1.5).toFixed(1)) })),
+  '1d': Array.from({length: 24}, (_, i) => ({ t: i, v: parseFloat((47.0 - (23-i)*0.04 + (Math.random()-0.5)*1.5).toFixed(1)) })),
+  '1w': Array.from({length: 7},  (_, i) => ({ t: i, v: parseFloat((47.0 + i*0.10 + (Math.random()-0.5)*1.2).toFixed(1)) })),
+  '1m': Array.from({length: 30}, (_, i) => ({ t: i, v: parseFloat((26.0 + i*0.70 + (Math.random()-0.5)*1.5).toFixed(1)) })),
 };
 
 // ─── HISTÓRICO — HY Credit Spread (bp) ───────────────────────────────────────
@@ -650,34 +650,34 @@ function genMacroHistory(current, prev7d, prev30d, points, window) {
 
 export const macroHistory = {
   SP500: {
-    '1d': genMacroHistory(5687.40, 5641.20, 5380.10, 24, '1d'),
-    '1w': genMacroHistory(5687.40, 5512.30, 5380.10, 7, '1w'),
-    '1m': genMacroHistory(5687.40, 5512.30, 5380.10, 30, '1m'),
+    '1d': genMacroHistory(7398.93, 7337.50, 6987.40, 24, '1d'),
+    '1w': genMacroHistory(7398.93, 7168.20, 6987.40, 7, '1w'),
+    '1m': genMacroHistory(7398.93, 7168.20, 6987.40, 30, '1m'),
   },
   DXY: {
-    '1d': genMacroHistory(104.82, 105.21, 108.40, 24, '1d'),
-    '1w': genMacroHistory(104.82, 106.10, 108.40, 7, '1w'),
-    '1m': genMacroHistory(104.82, 106.10, 108.40, 30, '1m'),
+    '1d': genMacroHistory(118.5, 119.20, 122.80, 24, '1d'),
+    '1w': genMacroHistory(118.5, 120.40, 122.80, 7, '1w'),
+    '1m': genMacroHistory(118.5, 120.40, 122.80, 30, '1m'),
   },
   GOLD: {
-    '1d': genMacroHistory(2912.50, 2888.30, 2780.00, 24, '1d'),
-    '1w': genMacroHistory(2912.50, 2841.20, 2780.00, 7, '1w'),
-    '1m': genMacroHistory(2912.50, 2841.20, 2780.00, 30, '1m'),
+    '1d': genMacroHistory(4715.0, 4678.0, 4320.0, 24, '1d'),
+    '1w': genMacroHistory(4715.0, 4580.0, 4320.0, 7, '1w'),
+    '1m': genMacroHistory(4715.0, 4580.0, 4320.0, 30, '1m'),
   },
   VIX: {
-    '1d': genMacroHistory(22.14, 21.80, 15.80, 24, '1d'),
-    '1w': genMacroHistory(22.14, 19.42, 15.80, 7, '1w'),
-    '1m': genMacroHistory(22.14, 19.42, 15.80, 30, '1m'),
+    '1d': genMacroHistory(17.19, 17.42, 21.60, 24, '1d'),
+    '1w': genMacroHistory(17.19, 18.85, 21.60, 7, '1w'),
+    '1m': genMacroHistory(17.19, 18.85, 21.60, 30, '1m'),
   },
   US10Y: {
-    '1d': genMacroHistory(4.512, 4.487, 4.210, 24, '1d'),
-    '1w': genMacroHistory(4.512, 4.380, 4.210, 7, '1w'),
-    '1m': genMacroHistory(4.512, 4.380, 4.210, 30, '1m'),
+    '1d': genMacroHistory(4.37, 4.40, 4.28, 24, '1d'),
+    '1w': genMacroHistory(4.37, 4.44, 4.28, 7, '1w'),
+    '1m': genMacroHistory(4.37, 4.44, 4.28, 30, '1m'),
   },
   US2Y: {
-    '1d': genMacroHistory(4.231, 4.198, 4.050, 24, '1d'),
-    '1w': genMacroHistory(4.231, 4.120, 4.050, 7, '1w'),
-    '1m': genMacroHistory(4.231, 4.120, 4.050, 30, '1m'),
+    '1d': genMacroHistory(3.90, 3.93, 4.02, 24, '1d'),
+    '1w': genMacroHistory(3.90, 3.97, 4.02, 7, '1w'),
+    '1m': genMacroHistory(3.90, 3.97, 4.02, 30, '1m'),
   },
 };
 
