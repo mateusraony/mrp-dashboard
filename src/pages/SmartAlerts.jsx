@@ -1,4 +1,4 @@
-// ─── SMART ALERTS — CENTRAL DE NOTIFICAÇÕES AI ───────────────────────────────────────
+// ─── SMART ALERTS — CENTRAL DE NOTIFICAÇÕES AI ───────────────────────────────
 // Alertas automáticos do sistema + AI com sugestões
 // Usuário configura prioridade e tipo de alerta — sem gestão de portfólio
 import { useState, useEffect, useRef, useMemo } from 'react';
@@ -8,7 +8,7 @@ import { AlertAuditPanel } from '../components/governance/AlertAuditPanel';
 import { ModeBadge, GradeBadge } from '../components/ui/DataBadge';
 import { DataQualityBadge } from '@/components/ui/DataQualityBadge';
 import { formatDistanceToNow } from 'date-fns';
-// ── Hooks de dados reais ────────────────────────────────────────────
+// ── Hooks de dados reais ────────────────────────────────────────────────────
 import { useBtcTicker, useLiquidations, useFearGreed } from '@/hooks/useBtcData';
 import { useRiskScore } from '@/hooks/useRiskScore';
 import { useMultiVenueSnapshot } from '@/hooks/useMultiVenue';
@@ -16,7 +16,7 @@ import { IS_LIVE } from '@/lib/env';
 import { logInfo, logError } from '@/lib/debugLog';
 import { computeRuleBasedAnalysis } from '@/utils/ruleBasedAnalysis';
 
-// ─── Componentes do Ciclo de Alertas ─────────────────────────────────────────────
+// ─── Componentes do Ciclo de Alertas ─────────────────────────────────────────
 const cycleTypeConfig = {
   RISK_ON:      { emoji: '🟢', color: '#10b981', bg: 'rgba(16,185,129,0.1)',  border: 'rgba(16,185,129,0.25)' },
   RISK_OFF:     { emoji: '🔴', color: '#ef4444', bg: 'rgba(239,68,68,0.1)',   border: 'rgba(239,68,68,0.25)' },
@@ -76,7 +76,7 @@ const SPOT_PRICE = 84298.70;
 // Agrupadas por tipo de dado fonte
 const CATEGORIES = [
   {
-    id: 'derivatives', label: 'Derivatives', icon: '⏆', color: '#f59e0b',
+    id: 'derivatives', label: 'Derivatives', icon: '⟆', color: '#f59e0b',
     desc: 'Funding Rate, OI, Long/Short Ratio, Liquidações',
     types: ['LONG_FLUSH', 'SHORT_SQUEEZE', 'FUNDING_EXTREME'],
   },
@@ -97,7 +97,7 @@ const CATEGORIES = [
   },
 ];
 
-// ─── PRIORIDADES ──────────────────────────────────────────────────────────────
+// ─── PRIORIDADES ─────────────────────────────────────────────────────────────
 const PRIORITIES = [
   { id: 'CRITICAL', label: 'Crítico', color: '#ef4444', desc: 'Ação imediata necessária' },
   { id: 'HIGH',     label: 'Alto',    color: '#f97316', desc: 'Monitorar de perto' },
@@ -105,7 +105,7 @@ const PRIORITIES = [
   { id: 'LOW',      label: 'Baixo',   color: '#64748b', desc: 'Informativo' },
 ];
 
-// ─── AI SUGGESTIONS (mock) ───────────────────────────────────────────────────────────
+// ─── AI SUGGESTIONS (mock) ────────────────────────────────────────────────────
 const AI_SUGGESTIONS = [
   {
     id: 'ai001', category: 'derivatives', priority: 'HIGH',
@@ -130,7 +130,7 @@ const AI_SUGGESTIONS = [
   {
     id: 'ai003', category: 'onchain', priority: 'MEDIUM',
     title: 'Exchange netflow negativo — Acumulação de baleias',
-    reasoning: 'Saída líquida de 4.820 BTC das exchanges em 24h + whale transactions +11.6% acima da média de 7 dias. LTH acumulando (+1.88% em 30d). Padrão de acumulação silenciosa tipicamente precede movimentos de alta de 2-4 semanas, mas pode ser distribuição disfarada — checar CVD.',
+    reasoning: 'Saída líquida de 4.820 BTC das exchanges em 24h + whale transactions +11.6% acima da média de 7 dias. LTH acumulando (+1.88% em 30d). Padrão de acumulação silenciosa tipicamente precede movimentos de alta de 2-4 semanas, mas pode ser distribuição disfarçada — checar CVD.',
     suggestion: 'Sinal ambíguo mas net positivo. Não tomar ação isolada — confirmar com CVD e funding. Se CVD virar negativo com netflow negativo = distribuição = sinal de venda.',
     probability: 0.54, confidence: 0.61,
     trigger: 'Netflow > +1.000 BTC em 24h (entrada = reversão)',
@@ -342,35 +342,42 @@ function AlertRuleConfig({ rule, prefs, onToggle, onPriorityChange, onThresholdC
   );
 }
 
-// ─── Cálculo de Short Squeeze Score a partir de liquidações ────────────────────────────────────────────
+// ─── Cálculo de Short Squeeze Score a partir de liquidações ──────────────────
+// Quando há mais liquidações de shorts (side=BUY) = pressão de squeeze
+// Retorna score 0–100 proporcional à dominância de short-liq no volume total
 function computeShortSqueezeScore(liquidations) {
   if (!liquidations || liquidations.length === 0) return null;
   const totalUsd  = liquidations.reduce((s, l) => s + l.usd_value, 0);
   const shortLiqUsd = liquidations
-    .filter(l => l.side === 'BUY')
+    .filter(l => l.side === 'BUY') // BUY = short foi liquidado
     .reduce((s, l) => s + l.usd_value, 0);
   if (totalUsd === 0) return null;
+  // Score: % de liq que são de shorts × 100, limitado a 100
   return Math.min(100, Math.round((shortLiqUsd / totalUsd) * 100));
 }
 
-// ─── Cálculo de Long Flush Score a partir de liquidações ──────────────────────────────────────────────
+// ─── Cálculo de Long Flush Score a partir de liquidações ──────────────────────
+// Quando há mais liquidações de longs (side=SELL) = risco de flush
 function computeLongFlushScore(liquidations, riskScoreValue) {
   if (!liquidations || liquidations.length === 0) return riskScoreValue ?? null;
   const totalUsd   = liquidations.reduce((s, l) => s + l.usd_value, 0);
   const longLiqUsd = liquidations
-    .filter(l => l.side === 'SELL')
+    .filter(l => l.side === 'SELL') // SELL = long foi liquidado
     .reduce((s, l) => s + l.usd_value, 0);
   if (totalUsd === 0) return riskScoreValue ?? null;
   const liqScore = Math.min(100, Math.round((longLiqUsd / totalUsd) * 100));
+  // Combina liq ratio (60%) + risk score composto (40%) para sinal mais robusto
   if (riskScoreValue != null) {
     return Math.round(liqScore * 0.6 + riskScoreValue * 0.4);
   }
   return liqScore;
 }
 
-// ─── Nearest Liquidation Cluster a partir de dados reais ────────────────────────────────────────────
+// ─── Nearest Liquidation Cluster a partir de dados reais ─────────────────────
+// Agrupa liquidações por faixas de preço de $500 e retorna a mais densa próxima ao spot
 function computeNearestCluster(liquidations, spotPrice, mockCluster) {
   if (!liquidations || liquidations.length === 0 || !spotPrice) return mockCluster;
+  // Agrupa em buckets de $500
   const BUCKET = 500;
   const buckets = {};
   for (const liq of liquidations) {
@@ -378,6 +385,7 @@ function computeNearestCluster(liquidations, spotPrice, mockCluster) {
     if (!buckets[key]) buckets[key] = { price: key, usd: 0 };
     buckets[key].usd += liq.usd_value;
   }
+  // Seleciona o bucket com maior volume em USD (excluindo spot ± 0.1%)
   const candidates = Object.values(buckets)
     .filter(b => Math.abs(b.price - spotPrice) / spotPrice > 0.001);
   if (candidates.length === 0) return mockCluster;
@@ -387,16 +395,19 @@ function computeNearestCluster(liquidations, spotPrice, mockCluster) {
 }
 
 export default function SmartAlerts() {
+  // Carrega regras do Supabase (ou mock se não configurado)
   const { data: savedRules } = useAlertRules();
   const { mutate: saveRule } = useUpsertAlertRule();
   const { mutate: removeRule } = useDeleteAlertRule();
 
+  // ── Hooks de dados reais ──────────────────────────────────────────────────
   const { data: ticker,       isLoading: tickerLoading,  isError: tickerError  } = useBtcTicker();
   const { data: liquidations, isLoading: liqLoading,    isError: liqError     } = useLiquidations(100);
   const { data: riskScore,    isLoading: riskLoading,   isError: riskError    } = useRiskScore();
   const { data: fngData } = useFearGreed(1);
   const multiVenue = useMultiVenueSnapshot();
 
+  // ── Logging quando dados live carregam ───────────────────────────────────
   const _loggedRef = useRef(false);
   useEffect(() => {
     if (ticker && riskScore && !_loggedRef.current) {
@@ -415,6 +426,7 @@ export default function SmartAlerts() {
     if (riskError)   logError('SmartAlerts riskScore fetch failed', undefined, 'alerts');
   }, [ticker, riskScore, liquidations, tickerError, liqError, riskError, multiVenue]);
 
+  // ── Valores calculados (com fallback para mock) ──────────────────────────
   const spotPrice       = ticker?.mark_price ?? SPOT_PRICE;
   const fundingCurrent  = ticker != null
     ? ticker.last_funding_rate * 100
@@ -434,10 +446,13 @@ export default function SmartAlerts() {
   );
   const isClusterLive  = liquidations != null && liquidations.length > 0;
 
+  // Funding cross-venue: média das 3 exchanges quando disponível
   const fundingCrossVenue = (ticker && multiVenue.bybit && multiVenue.okx)
     ? (ticker.last_funding_rate * 100 + (multiVenue.bybit.funding_rate ?? 0) * 100 + (multiVenue.okx.funding_rate ?? 0) * 100) / 3
     : null;
 
+  // ── Análise AI baseada em regras a partir de dados live ──────────────────────
+  // Mapeia módulos de ruleBasedAnalysis para o formato esperado por AISuggestionCard
   const liveSuggestions = useMemo(() => {
     if (!IS_LIVE || (!ticker && !fngData && !riskScore)) return null;
 
@@ -461,13 +476,27 @@ export default function SmartAlerts() {
       } : undefined,
     });
 
+    // Mapa de módulo → metadados estáticos da UI
     const MODULE_META = {
-      derivatives: { id: 'live001', category: 'derivatives', data_sources: ['binance_futures', 'coinglass'] },
-      spot:        { id: 'live002', category: 'derivatives', data_sources: ['binance_spot'] },
-      options:     { id: 'live003', category: 'sentiment',   data_sources: ['deribit'] },
-      macro:       { id: 'live004', category: 'sentiment',   data_sources: ['alternative', 'binance'] },
+      derivatives: {
+        id: 'live001', category: 'derivatives',
+        data_sources: ['binance_futures', 'coinglass'],
+      },
+      spot: {
+        id: 'live002', category: 'derivatives',
+        data_sources: ['binance_spot'],
+      },
+      options: {
+        id: 'live003', category: 'sentiment',
+        data_sources: ['deribit'],
+      },
+      macro: {
+        id: 'live004', category: 'sentiment',
+        data_sources: ['alternative', 'binance'],
+      },
     };
 
+    // Converte score 0–100 → prioridade UI
     const scoreToPriority = (score) => {
       if (score >= 70) return 'CRITICAL';
       if (score >= 58) return 'HIGH';
@@ -489,20 +518,24 @@ export default function SmartAlerts() {
         confidence:  mod.confidence,
         trigger:     mod.trigger,
         data_sources: meta.data_sources,
-        created_at:  new Date(now.getTime() - idx * 60000),
+        created_at:  new Date(now.getTime() - idx * 60000), // offset fictício p/ formatar tempo
       };
     });
   }, [ticker, fngData, riskScore]);
 
+  // Sugestões ativas: usa live quando disponível, cai para mock estático
   const activeSuggestions = liveSuggestions ?? AI_SUGGESTIONS;
 
+  // Estado local inicializado com dados do Supabase (ou mock como fallback)
   const [rules, setRules] = useState(defaultAlertRulesMock);
   const _seededRef = useRef(false);
   useEffect(() => {
-    if (savedRules === undefined) return;
+    if (savedRules === undefined) return; // ainda carregando
     if (savedRules.length > 0) {
+      // @ts-ignore — campos runtime adicionados aqui
       setRules(savedRules.map(r => ({ ...r, id: r.id ?? crypto.randomUUID(), current_value: 0, triggered: false, last_triggered: r.last_triggered ? new Date(r.last_triggered) : null })));
     } else if (!_seededRef.current) {
+      // Primeira carga com DB vazio: semeia as regras padrão no Supabase
       _seededRef.current = true;
       defaultAlertRulesMock.forEach(r => saveRule({
         ...r,
@@ -571,37 +604,73 @@ export default function SmartAlerts() {
         </p>
       </div>
 
-      {/* Risk gauges */}
+      {/* Risk gauges — sempre visíveis, conectados a dados reais */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(145px, 1fr))', gap: 8, marginBottom: 16 }}>
+
+        {/* Long Flush — derivado de liquidações (SELL side) + Risk Score composto */}
         <div>
           <RiskGauge label="Long Flush" icon="⬇️" value={longFlushVal} max={100} threshold={70} color="#ef4444" sub={`${Math.max(0, 70 - longFlushVal)}pts p/ ativar`} />
           <div style={{ marginTop: 3, display: 'flex', justifyContent: 'flex-end' }}>
-            <DataQualityBadge freshness={longFlushLive ? 100 : 0} completeness={longFlushLive ? 100 : 60} fallback_active={!longFlushLive} source={longFlushLive ? 'Binance' : 'MOCK'} />
+            <DataQualityBadge
+              freshness={longFlushLive ? 100 : 0}
+              completeness={longFlushLive ? 100 : 60}
+              fallback_active={!longFlushLive}
+              source={longFlushLive ? 'Binance' : 'MOCK'}
+            />
           </div>
         </div>
+
+        {/* Short Squeeze — derivado de liquidações (BUY side) */}
         <div>
           <RiskGauge label="Short Squeeze" icon="⬆️" value={shortSqueezeVal} max={100} threshold={65} color="#10b981" sub={`${Math.max(0, 65 - shortSqueezeVal)}pts p/ ativar`} />
           <div style={{ marginTop: 3, display: 'flex', justifyContent: 'flex-end' }}>
-            <DataQualityBadge freshness={shortSqueezeLive ? 100 : 0} completeness={shortSqueezeLive ? 100 : 60} fallback_active={!shortSqueezeLive} source={shortSqueezeLive ? 'Binance' : 'MOCK'} />
+            <DataQualityBadge
+              freshness={shortSqueezeLive ? 100 : 0}
+              completeness={shortSqueezeLive ? 100 : 60}
+              fallback_active={!shortSqueezeLive}
+              source={shortSqueezeLive ? 'Binance' : 'MOCK'}
+            />
           </div>
         </div>
+
+        {/* Funding Rate — useBtcTicker (Binance) + cross-venue Bybit/OKX */}
         <div>
-          <RiskGauge label="Funding Rate" icon="💸" value={fundingCrossVenue ?? fundingCurrent} max={rd.funding_threshold_hi * 1.5} threshold={rd.funding_threshold_hi} color="#f59e0b"
-            sub={fundingCrossVenue ? `Cross-venue avg · Threshold: ${rd.funding_threshold_hi}%` : `Threshold: ${rd.funding_threshold_hi}%`} />
+          <RiskGauge
+            label="Funding Rate"
+            icon="💸"
+            value={fundingCrossVenue ?? fundingCurrent}
+            max={rd.funding_threshold_hi * 1.5}
+            threshold={rd.funding_threshold_hi}
+            color="#f59e0b"
+            sub={fundingCrossVenue
+              ? `Cross-venue avg · Threshold: ${rd.funding_threshold_hi}%`
+              : `Threshold: ${rd.funding_threshold_hi}%`}
+          />
           <div style={{ marginTop: 3, display: 'flex', justifyContent: 'flex-end' }}>
-            <DataQualityBadge freshness={isFundingLive ? 100 : 0} completeness={isFundingLive ? 100 : 60} fallback_active={!isFundingLive} source={fundingCrossVenue ? 'Cross-venue' : isFundingLive ? 'Binance' : 'MOCK'} />
+            <DataQualityBadge
+              freshness={isFundingLive ? 100 : 0}
+              completeness={isFundingLive ? 100 : 60}
+              fallback_active={!isFundingLive}
+              source={fundingCrossVenue ? 'Cross-venue' : isFundingLive ? 'Binance' : 'MOCK'}
+            />
           </div>
         </div>
+
+        {/* Basis Dev. — sem hook real; mantém mock com badge explícito */}
         <div>
           <RiskGauge label="Basis Dev." icon="📐" value={rd.basis_deviation} max={5} threshold={3} color="#a78bfa" sub={`${rd.basis_current.toFixed(1)}% ann.`} />
           <div style={{ marginTop: 3, display: 'flex', justifyContent: 'flex-end' }}>
             <DataQualityBadge freshness={0} completeness={60} fallback_active={true} source="MOCK" />
           </div>
         </div>
+
+        {/* Sentimento — Fear & Greed real via Alternative.me quando disponível */}
         {(() => {
           const fngScore = fngData != null ? (fngData.value - 50) / 50 : null;
           const sentimentVal = fngScore != null ? Math.abs(fngScore) : Math.abs(rd.sentiment_24h);
-          const sentimentSub = fngScore != null ? `F&G: ${fngData.value} · ${fngData.label}` : `Score: ${rd.sentiment_24h > 0 ? '+' : ''}${rd.sentiment_24h.toFixed(2)}`;
+          const sentimentSub = fngScore != null
+            ? `F&G: ${fngData.value} · ${fngData.label}`
+            : `Score: ${rd.sentiment_24h > 0 ? '+' : ''}${rd.sentiment_24h.toFixed(2)}`;
           const isSentLive = fngScore != null && IS_LIVE;
           return (
             <div>
@@ -612,13 +681,28 @@ export default function SmartAlerts() {
             </div>
           );
         })()}
+
+        {/* Cluster BTC — derivado de liquidações reais quando disponível */}
         <div>
-          <RiskGauge label="Cluster BTC" icon="🔥" value={100 - nearestCluster.distance_pct * 10} max={100} threshold={80} color="#f97316"
-            sub={`$${(nearestCluster.price / 1000).toFixed(0)}K · ${nearestCluster.distance_pct.toFixed(1)}% dist`} />
+          <RiskGauge
+            label="Cluster BTC"
+            icon="🔥"
+            value={100 - nearestCluster.distance_pct * 10}
+            max={100}
+            threshold={80}
+            color="#f97316"
+            sub={`$${(nearestCluster.price / 1000).toFixed(0)}K · ${nearestCluster.distance_pct.toFixed(1)}% dist`}
+          />
           <div style={{ marginTop: 3, display: 'flex', justifyContent: 'flex-end' }}>
-            <DataQualityBadge freshness={isClusterLive ? 100 : 0} completeness={isClusterLive ? 100 : 60} fallback_active={!isClusterLive} source={isClusterLive ? 'Binance' : 'MOCK'} />
+            <DataQualityBadge
+              freshness={isClusterLive ? 100 : 0}
+              completeness={isClusterLive ? 100 : 60}
+              fallback_active={!isClusterLive}
+              source={isClusterLive ? 'Binance' : 'MOCK'}
+            />
           </div>
         </div>
+
       </div>
 
       {/* Tabs */}
@@ -643,17 +727,26 @@ export default function SmartAlerts() {
       {/* ── AI & SUGESTÕES ── */}
       {tab === 'ai' && (
         <>
+          {/* Category filter */}
           <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
-            <button onClick={() => setCategoryFilter('all')} style={{ padding: '4px 12px', borderRadius: 20, border: `1px solid ${categoryFilter === 'all' ? 'rgba(59,130,246,0.4)' : '#1a2535'}`, background: categoryFilter === 'all' ? 'rgba(59,130,246,0.12)' : 'transparent', color: categoryFilter === 'all' ? '#60a5fa' : '#475569', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>Todos</button>
+            <button onClick={() => setCategoryFilter('all')} style={{
+              padding: '4px 12px', borderRadius: 20, border: `1px solid ${categoryFilter === 'all' ? 'rgba(59,130,246,0.4)' : '#1a2535'}`,
+              background: categoryFilter === 'all' ? 'rgba(59,130,246,0.12)' : 'transparent',
+              color: categoryFilter === 'all' ? '#60a5fa' : '#475569', cursor: 'pointer', fontSize: 11, fontWeight: 700,
+            }}>Todos</button>
             {CATEGORIES.map(c => (
-              <button key={c.id} onClick={() => setCategoryFilter(c.id)} style={{ padding: '4px 12px', borderRadius: 20, border: `1px solid ${categoryFilter === c.id ? c.color + '40' : '#1a2535'}`, background: categoryFilter === c.id ? `${c.color}12` : 'transparent', color: categoryFilter === c.id ? c.color : '#475569', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>{c.icon} {c.label}</button>
+              <button key={c.id} onClick={() => setCategoryFilter(c.id)} style={{
+                padding: '4px 12px', borderRadius: 20, border: `1px solid ${categoryFilter === c.id ? c.color + '40' : '#1a2535'}`,
+                background: categoryFilter === c.id ? `${c.color}12` : 'transparent',
+                color: categoryFilter === c.id ? c.color : '#475569', cursor: 'pointer', fontSize: 11, fontWeight: 700,
+              }}>{c.icon} {c.label}</button>
             ))}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {filteredSuggestions.map(s => <AISuggestionCard key={s.id} item={s} prefs={prefs} />)}
           </div>
           <div style={{ marginTop: 14, padding: '10px 13px', background: 'rgba(30,45,69,0.3)', border: '1px solid #1a2535', borderRadius: 9, fontSize: 10, color: '#334155', lineHeight: 1.7 }}>
-            ⚠️ <strong style={{ color: '#475569' }}>Aviso:</strong> Todas as sugestões da AI são baseadas em dados quantitativos históricos e não constituem recomendação de investimento.
+            ⚠️ <strong style={{ color: '#475569' }}>Aviso:</strong> Todas as sugestões da AI são baseadas em dados quantitativos históricos e não constituem recomendação de investimento. Probabilidades são estimativas de modelos estatísticos, não garantias.
           </div>
         </>
       )}
@@ -699,7 +792,7 @@ export default function SmartAlerts() {
       {tab === 'config' && (
         <div>
           <div style={{ fontSize: 11, color: '#475569', marginBottom: 16 }}>
-            Configure a prioridade e os gatilhos de cada alerta.
+            Configure a prioridade e os gatilhos de cada alerta. <strong style={{ color: '#64748b' }}>Toggle</strong> para ativar/desativar · Clique no <strong style={{ color: '#64748b' }}>threshold</strong> para editar · Selecione a <strong style={{ color: '#64748b' }}>prioridade</strong> para ordenar na aba AI.
           </div>
           {CATEGORIES.map(cat => {
             const catRules = rules.filter(r => cat.types.includes(r.type));
@@ -771,17 +864,17 @@ export default function SmartAlerts() {
           <div style={{ fontSize: 11, color: '#4a5568', marginBottom: 12 }}>Ciclo atual · {history.length} alertas · Deduplicados · Anti-spam cooldown</div>
           {history.map(a => <AlertCycleDetail key={a.id} alert={{
             ...a,
-            title:        a.title       ?? a.message ?? a.type,
-            created_at:   a.created_at  ?? a.triggered_at,
-            grade:        a.grade       ?? 'B',
-            score:        a.score       ?? 50,
-            prob:         a.prob        ?? 0.5,
-            conf:         a.conf        ?? 0.5,
-            metrics:      a.metrics     ?? {},
-            run_id:       a.run_id      ?? `hist-${a.id}`,
+            title:       a.title       ?? a.message ?? a.type,
+            created_at:  a.created_at  ?? a.triggered_at,
+            grade:       a.grade       ?? 'B',
+            score:       a.score       ?? 50,
+            prob:        a.prob        ?? 0.5,
+            conf:        a.conf        ?? 0.5,
+            metrics:     a.metrics     ?? {},
+            run_id:      a.run_id      ?? `hist-${a.id}`,
             cooldown_min: a.cooldown_min ?? 60,
-            dedupe_key:   a.dedupe_key  ?? a.id,
-            asset:        a.asset       ?? 'BTC',
+            dedupe_key:  a.dedupe_key  ?? a.id,
+            asset:       a.asset       ?? 'BTC',
           }} />)}
           <div style={{ marginTop: 16, padding: '10px 14px', background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.12)', borderRadius: 8, fontSize: 11, color: '#4a5568' }}>
             <strong style={{ color: '#60a5fa' }}>Deduplicação:</strong> Cada alerta tem <span style={{ fontFamily: 'JetBrains Mono, monospace', color: '#8899a6' }}>dedupe_key</span> = (tipo + ativo + bucket). Cooldown padrão 60min previne spam.
