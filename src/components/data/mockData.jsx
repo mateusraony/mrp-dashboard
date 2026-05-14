@@ -68,12 +68,12 @@ export const btcFutures = {
     fundingRate: parseFloat((0.0002 + Math.sin(i * 0.4) * 0.0004 + (Math.random() - 0.5) * 0.0002).toFixed(6)),
   })),
   open_interest_usdt: 18_420_000_000,
-  oi_prev_1d: 17_980_000_000,
-  oi_prev_1w: 16_200_000_000,
-  oi_prev_1m: 14_100_000_000,
-  oi_delta_pct: 2.34,
-  oi_delta_pct_1w: 13.70,
-  oi_delta_pct_1m: 30.64,
+  oi_prev_1d: 17_980_000_000,   // +2.45%
+  oi_prev_1w: 16_200_000_000,   // +13.7%
+  oi_prev_1m: 14_100_000_000,   // +30.6%
+  oi_delta_pct: 2.34,           // 1D
+  oi_delta_pct_1w: 13.70,       // 1W
+  oi_delta_pct_1m: 30.64,       // 1M
   funding_avg_7d: 0.000524,
   funding_avg_30d: 0.000398,
   long_short_ratio: 1.23,
@@ -107,8 +107,8 @@ export const btcSpotFlow = {
   ret_1h: 0.0087,
   ret_4h: -0.0124,
   ret_1d: 0.0215,
-  ret_1w: 0.0842,
-  ret_1m: -0.0531,
+  ret_1w: 0.0842,    // +8.42% weekly
+  ret_1m: -0.0531,   // -5.31% monthly
   volume_1h_usdt: 1_234_500_000,
   volume_1d_usdt: 28_450_000_000,
   volume_1w_usdt: 182_300_000_000,
@@ -236,16 +236,19 @@ export const onChain = {
 };
 
 // ─── ON-CHAIN AVANÇADO (CryptoQuant / Glassnode) ─────────────────────────────
+// NUPL — Net Unrealized Profit/Loss  [-1, 1]
 export const btcNUPL = {
-  value: 0.48,
+  value: 0.48,         // 0.48 = "Crença" — zona saudável antes de euforia
   prev_7d: 0.44,
   prev_30d: 0.38,
   delta_7d: 0.48 - 0.44,
   delta_30d: 0.48 - 0.38,
-  zone: 'Crença',
-  zone_color: '#10b981',
+  // Zonas: <0 = Capitulação, 0–0.25 = Esperança, 0.25–0.5 = Otimismo/Crença,
+  //        0.5–0.75 = Entusiasmo/Ganância, >0.75 = Euforia
+  zone: 'Crença',           // zona atual
+  zone_color: '#10b981',    // verde = zona saudável
   interpretation: 'Mercado em zona de Crença (NUPL 0.48) — holders no lucro mas sem euforia. Zona historicamente associada a continuação de alta com cautela.',
-  quality: 'B',
+  quality: 'B',             // fonte: Glassnode (estimado)
   history: {
     '1d': Array.from({length: 24}, (_, i) => ({ t: i, v: parseFloat((0.44 + i*0.00167 + (Math.random()-0.5)*0.015).toFixed(3)) })),
     '1w': Array.from({length: 7},  (_, i) => ({ t: i, v: parseFloat((0.38 + i*0.0143 + (Math.random()-0.5)*0.02).toFixed(3)) })),
@@ -253,13 +256,14 @@ export const btcNUPL = {
   },
 };
 
+// SOPR — Spent Output Profit Ratio
 export const btcSOPR = {
-  value: 1.028,
+  value: 1.028,        // >1 = coins vendidas em lucro, <1 = em prejuízo
   prev_7d: 1.012,
   prev_30d: 0.994,
   delta_7d: 1.028 - 1.012,
   delta_30d: 1.028 - 0.994,
-  smoothed_7d: 1.018,
+  smoothed_7d: 1.018,  // média 7d para reduzir ruído
   interpretation: 'SOPR > 1 confirma que holders estão realizando lucro — pressão vendedora presente mas não extrema. Queda para <1 seria sinal de capitulação.',
   quality: 'B',
   history: {
@@ -269,13 +273,16 @@ export const btcSOPR = {
   },
 };
 
+// Exchange Netflow — entradas/saídas de BTC nas exchanges
 export const btcExchangeNetflow = {
-  netflow_24h: -4_820,
+  // Positivo = mais BTC entrando na exchange (pressão vendedora)
+  // Negativo = mais BTC saindo da exchange (acúmulo / retirada)
+  netflow_24h: -4_820,     // BTC — saída líquida de 4.820 BTC (acumulação)
   inflow_24h: 38_450,
   outflow_24h: 43_270,
-  netflow_7d: -28_400,
-  netflow_30d: +12_300,
-  exchange_reserves: 2_340_000,
+  netflow_7d: -28_400,     // BTC saindo líquido na semana
+  netflow_30d: +12_300,    // 30d — leve entrada (venda)
+  exchange_reserves: 2_340_000,   // BTC total em exchanges (baixo = bullish)
   reserves_prev_30d: 2_420_000,
   reserves_delta_30d_pct: (2_340_000 - 2_420_000) / 2_420_000 * 100,
   signal: 'Saída líquida de 4.820 BTC em 24h — acumulação: holders retirando coins para cold wallet',
@@ -287,27 +294,30 @@ export const btcExchangeNetflow = {
   },
 };
 
+// Whale Transactions (>$1M e >$10M)
 export const btcWhaleActivity = {
-  txs_over_1m_24h: 1_842,
-  txs_over_10m_24h: 284,
-  txs_over_1m_7d_avg: 1_650,
+  txs_over_1m_24h: 1_842,    // transações > $1M nas últimas 24h
+  txs_over_10m_24h: 284,     // transações > $10M
+  txs_over_1m_7d_avg: 1_650, // média 7d
   txs_over_10m_7d_avg: 241,
-  delta_1m_vs_avg: ((1842 - 1650) / 1650 * 100),
-  delta_10m_vs_avg: ((284 - 241) / 241 * 100),
+  delta_1m_vs_avg: ((1842 - 1650) / 1650 * 100),  // +11.6% acima da média
+  delta_10m_vs_avg: ((284 - 241) / 241 * 100),      // +17.8% acima da média
   signal: 'Transações de baleias +11.6% acima da média 7d — atividade institucional elevada',
   quality: 'B',
   history_1m: Array.from({length: 24}, (_, i) => ({ t: i, v: Math.round(1500 + Math.sin(i*0.5)*200 + (Math.random()-0.5)*150) })),
   history_10m: Array.from({length: 24}, (_, i) => ({ t: i, v: Math.round(230 + Math.sin(i*0.5)*30 + (Math.random()-0.5)*25) })),
 };
 
+// Realized Price & MVRV
 export const btcRealizedMetrics = {
-  realized_price: 46_840,
+  realized_price: 46_840,    // custo médio de todas as moedas em circulação
   current_price: 84_298.70,
-  mvrv_ratio: 84298.70 / 46840,
-  mvrv_zscore: 1.84,
+  mvrv_ratio: 84298.70 / 46840,   // Market Value / Realized Value ≈ 1.80
+  mvrv_zscore: 1.84,               // Z-score — >7 = bolha histórica, <0 = fundo
+  // Zonas MVRV: <1 = subvalorizado, 1–2.5 = neutro/acumulação, 2.5–3.7 = caro, >3.7 = extremo
   mvrv_zone: 'Neutro-Alto',
   mvrv_zone_color: '#f59e0b',
-  realized_price_delta_30d: ((46840 - 44200) / 44200 * 100),
+  realized_price_delta_30d: ((46840 - 44200) / 44200 * 100),  // +5.97%
   interpretation: 'MVRV 1.80 — mercado negociando 80% acima do custo realizado. Zona neutra-alta. Historicamente, MVRV > 3.5 antecede topos de ciclo.',
   quality: 'B',
   history_mvrv: {
@@ -316,8 +326,9 @@ export const btcRealizedMetrics = {
   },
 };
 
+// Hash Rate & Dificuldade
 export const btcHashRate = {
-  hash_rate_eh: 842.4,
+  hash_rate_eh: 842.4,      // EH/s (exahashes por segundo)
   hash_rate_prev_7d: 831.2,
   hash_rate_prev_30d: 798.5,
   delta_7d_pct: (842.4 - 831.2) / 831.2 * 100,
@@ -325,8 +336,8 @@ export const btcHashRate = {
   difficulty: 113_756_612_395_875,
   difficulty_prev: 108_522_647_629_500,
   difficulty_adj_pct: (113756612395875 - 108522647629500) / 108522647629500 * 100,
-  next_adj_est_pct: 2.8,
-  next_adj_blocks: 1247,
+  next_adj_est_pct: 2.8,   // estimativa próximo ajuste
+  next_adj_blocks: 1247,   // blocos até próximo ajuste
   signal: 'Hash rate em ATH — mineradores expandindo. Dificuldade +4.8% no último ajuste.',
   quality: 'A',
   history: {
@@ -336,6 +347,7 @@ export const btcHashRate = {
   },
 };
 
+// OI por exchange (concentração de risco)
 export const oiByExchange = [
   { exchange: 'Binance',  oi_b: 7.84, share_pct: 42.6, change_24h: 2.1 },
   { exchange: 'Bybit',    oi_b: 4.12, share_pct: 22.4, change_24h: 3.4 },
@@ -345,13 +357,14 @@ export const oiByExchange = [
   { exchange: 'Outros',   oi_b: 0.39, share_pct: 2.2,  change_24h: 1.2 },
 ];
 
+// Put/Call Ratio & Max Pain (Options)
 export const btcOptionsExtended = {
-  put_call_ratio_vol: 0.82,
-  put_call_ratio_oi: 0.94,
+  put_call_ratio_vol: 0.82,     // Por volume — <1 = mais calls = bullish
+  put_call_ratio_oi: 0.94,      // Por OI
   put_call_ratio_7d_avg: 0.71,
-  max_pain: 81_000,
-  max_pain_distance_pct: ((81000 - 84298.70) / 84298.70 * 100),
-  gamma_exposure_usd: -342_000_000,
+  max_pain: 81_000,             // Strike onde mais opções expiram sem valor
+  max_pain_distance_pct: ((81000 - 84298.70) / 84298.70 * 100),  // -3.91% abaixo do spot
+  gamma_exposure_usd: -342_000_000,  // negativo = dealer short gamma = maior vol
   oi_by_strike: [
     { strike: 76000, call_oi: 1842, put_oi: 3210 },
     { strike: 78000, call_oi: 2134, put_oi: 2840 },
@@ -433,14 +446,14 @@ export const topNews = [
     relevance: 0.88, sentiment: -0.08, tags: ['yields', 'jobs', 'macro'],
   },
   {
-    title: 'Gold surges past $4,715 as dollar weakens; crypto markets mixed',
+    title: 'Gold surges past $2,912 as dollar weakens; crypto markets mixed',
     source: 'FT', url: '#', published: new Date(Date.now() - 8 * 3600000),
     relevance: 0.85, sentiment: 0.22, tags: ['gold', 'USD', 'crypto'],
   },
   {
-    title: 'VIX at 17.19 as geopolitical tensions ease; equity markets rally',
+    title: 'VIX spikes above 22 as geopolitical tensions drive equity volatility',
     source: 'CNBC', url: '#', published: new Date(Date.now() - 12 * 3600000),
-    relevance: 0.82, sentiment: 0.28, tags: ['VIX', 'volatility', 'equities'],
+    relevance: 0.82, sentiment: -0.35, tags: ['VIX', 'volatility', 'equities'],
   },
 ];
 
@@ -455,7 +468,7 @@ export const recentAlerts = [
     cooldown_min: 60,
     metrics: { funding: '+0.071%', OI_delta: '+2.34%', LS_ratio: '1.23' },
     dedupe_key: 'SQUEEZE_WATCH:BTCUSDT:long_crowding',
-    run_id: 'run_20260510_142500',
+    run_id: 'run_20260307_142500',
   },
   {
     id: 'a002', type: 'MACRO_EVENT', emoji: '📅',
@@ -465,8 +478,8 @@ export const recentAlerts = [
     created_at: new Date(Date.now() - 3 * 3600000),
     cooldown_min: 360,
     metrics: { event: 'CPI', agency: 'BLS', tier: 'Tier-1' },
-    dedupe_key: 'MACRO_EVENT:CPI:2026-05-12',
-    run_id: 'run_20260510_110000',
+    dedupe_key: 'MACRO_EVENT:CPI:2026-03-12',
+    run_id: 'run_20260307_110000',
   },
   {
     id: 'a003', type: 'OPTIONS_VOL', emoji: '📊',
@@ -477,7 +490,7 @@ export const recentAlerts = [
     cooldown_min: 120,
     metrics: { iv_atm: '62.4%', skew: '-3.1pp (put skew)', regime: 'elevated_vol' },
     dedupe_key: 'OPTIONS_VOL:BTC:iv_shift',
-    run_id: 'run_20260510_090000',
+    run_id: 'run_20260307_090000',
   },
 ];
 
@@ -515,12 +528,12 @@ export const liquidityBins = [
 
 // ─── BTC DOMINANCE ───────────────────────────────────────────────────────────
 export const btcDominance = {
-  value: 58.4,
+  value: 58.4,       // %
   prev_7d: 55.1,
   prev_30d: 52.8,
   delta_7d: 58.4 - 55.1,
   delta_30d: 58.4 - 52.8,
-  trend: 'rising',
+  trend: 'rising',   // rising = capital fluindo para BTC (risk-off altcoins)
   signal: 'BTC acumulando dominância — altcoins sob pressão relativa',
   quality: 'A',
 };
@@ -528,18 +541,18 @@ export const btcDominance = {
 // ─── LIQUIDAÇÕES 24H ─────────────────────────────────────────────────────────
 export const liquidations24h = {
   total_usd: 312_450_000,
-  longs_usd: 224_180_000,
-  shorts_usd: 88_270_000,
+  longs_usd: 224_180_000,   // 71.7% longs
+  shorts_usd: 88_270_000,   // 28.3% shorts
   largest_single: 4_200_000,
   btc_longs_usd: 98_400_000,
   btc_shorts_usd: 31_200_000,
   signal: 'Predominância de liquidações de longs — pressão vendedora residual',
-  quality: 'B',
+  quality: 'B',  // fonte: Coinglass
 };
 
 // ─── STABLECOIN SUPPLY ────────────────────────────────────────────────────────
 export const stablecoinSupply = {
-  usdt_supply_b: 142.8,
+  usdt_supply_b: 142.8,   // bilhões
   usdc_supply_b: 58.3,
   total_b: 201.1,
   prev_7d_b: 197.4,
@@ -551,17 +564,19 @@ export const stablecoinSupply = {
 };
 
 // ─── YIELD CURVE SPREAD ────────────────────────────────────────────────────────
+// Calculado a partir de macroBoard: 10Y - 2Y
 export const yieldCurveSpread = {
   spread_bp: (4.37 - 3.90) * 100,   // 47bp — curva normal (positiva)
   prev_7d_bp: (4.44 - 3.97) * 100,
   prev_30d_bp: (4.28 - 4.02) * 100,
-  regime: 'normal',
+  regime: 'normal',   // 'normal' | 'flat' | 'inverted'
   signal: 'Curva positiva (+47bp) — sem sinal recessivo imediato',
   recession_watch: false,
   quality: 'A',
 };
 
-// ─── CORRELAÇÕES BTC ─────────────────────────────────────────────────────────
+// ─── CORRELAÇÕES BTC — histórico por janela ───────────────────────────────────
+// Gera pontos históricos simulados para cada par
 function genCorrHistory(base, volatility, points) {
   return Array.from({ length: points }, (_, i) => {
     const drift = (Math.random() - 0.5) * volatility;
@@ -610,18 +625,18 @@ export const creditSpreadHistory = {
 
 // ─── HY CREDIT SPREAD ─────────────────────────────────────────────────────────
 export const creditSpread = {
-  hy_spread_bp: 342,
-  ig_spread_bp: 98,
+  hy_spread_bp: 342,    // High Yield spread (OAS)
+  ig_spread_bp: 98,     // Investment Grade spread
   prev_7d_hy: 318,
   prev_30d_hy: 285,
-  delta_7d_bp: 342 - 318,
-  delta_30d_bp: 342 - 285,
-  regime: 'widening',
+  delta_7d_bp: 342 - 318,   // +24bp em 7d — widening = risco sistêmico crescendo
+  delta_30d_bp: 342 - 285,  // +57bp em 30d
+  regime: 'widening',       // 'tightening' | 'stable' | 'widening'
   signal: 'HY spread widening +57bp em 1M — sinal de stress de crédito',
   quality: 'B',
 };
 
-// ─── MACRO HISTÓRICO ──────────────────────────────────────────────────────────
+// ─── MACRO HISTÓRICO — Mini sparklines com janela 1D/1W/1M ──────────────────
 function genMacroHistory(current, prev7d, prev30d, points, window) {
   if (window === '1d') {
     const start = current * 0.9985;
@@ -667,6 +682,7 @@ export const macroHistory = {
 };
 
 // ─── AI ANALYSIS ─────────────────────────────────────────────────────────────
+// Structured AI recommendation per asset / module
 export const aiAnalysis = {
   generated_at: new Date(),
   model: 'quant-risk-v2',
@@ -677,9 +693,9 @@ export const aiAnalysis = {
     probability_correction: 0.62,
     timeframe: '4h–24h',
     trigger: 'Funding > 0.08% OR price -2% from $84,300',
-    rationale: 'Funding positivo elevado (+0.071%) com OI crescendo +2.34% 1D e +13.7% 1W indica posicionamento comprado sobrecarregado. O VIX em 17.19 (-20.4% no mês) sinaliza ambiente de risco favorável. Yield curve positiva (+47bp). Probabilidade de flush de longs nos próximos ciclos de funding é 62% baseado em dados históricos.',
+    rationale: 'Funding positivo elevado (+0.071%) com OI crescendo +2.34% 1D e +13.7% 1W indica posicionamento comprado sobrecarregado. O VIX em 22.14 (+14.1% no mês) sinaliza ambiente de risco adverso. Yield curve positiva porém em flattening (+28.1bp). Probabilidade de flush de longs nos próximos ciclos de funding é 62% baseado em dados históricos.',
     bull_case: 'CVD positivo (+58K) e Fear & Greed em 58 (Greed) podem sustentar o preço acima de $83,000 no curto prazo. Institutional flow forte (OI +30.6% em 1M).',
-    bear_case: 'Funding persistente acima de 0.06% tende a se auto-corrigir. DXY em 118.5 (queda de 3.6% em 1M) pode reverter. IV ATM elevada em 62.4% com put skew ativo.',
+    bear_case: 'Funding persistente acima de 0.06% tende a se auto-corrigir. VIX escalando. DXY queda de 3.4% em 1M pode reverter. IV ATM elevada em 62.4% com put skew ativo.',
   },
   modules: {
     derivatives: {
@@ -690,7 +706,7 @@ export const aiAnalysis = {
       probability: 0.62,
       timeframe: '4h–12h',
       trigger: 'Funding > 0.08% por 2 ciclos consecutivos OU OI delta 1H > +0.5%',
-      analysis: 'Funding rate atual +0.0712% (1.4× acima da referência). OI expandiu +2.34% no dia, +13.7% na semana e +30.6% no mês — nível de posicionamento agressivo. L/S ratio 1.23 confirma bias comprado.',
+      analysis: 'Funding rate atual +0.0712% (1.4× acima da referência). OI expandiu +2.34% no dia, +13.7% na semana e +30.6% no mês — nível de posicionamento agressivo. L/S ratio 1.23 confirma bias comprado. Histórico indica flush quando funding fica acima de 0.08% com OI crescendo — janela de risco 4-12h.',
     },
     spot: {
       score: 54,
@@ -700,7 +716,7 @@ export const aiAnalysis = {
       probability: 0.54,
       timeframe: '1h–4h',
       trigger: 'CVD vira negativo OU Ret 1H < -0.5%',
-      analysis: 'CVD intraday positivo (+58K) indica pressão compradora no curto prazo. Porém, desempenho semanal +8.42% cria resistência por realização de lucro. Ret 4H negativo (-1.24%) sugere pressão de distribuição.',
+      analysis: 'CVD intraday positivo (+58K) indica pressão compradora no curto prazo. Porém, desempenho semanal +8.42% cria resistência por realização de lucro. Ret 4H negativo (-1.24%) sugere pressão de distribuição. Sinal misto: flow curto prazo bullish, mas estrutura 1W overextended.',
     },
     options: {
       score: 65,
@@ -710,17 +726,17 @@ export const aiAnalysis = {
       probability: 0.58,
       timeframe: '1d–7d',
       trigger: 'IV ATM > 70% OU Skew < -5pp',
-      analysis: 'IV ATM em 62.4% — regime de volatilidade elevada. Put skew de -3.1pp indica mercado pagando prêmio por proteção de downside. Delta 1M da IV +5.4pp confirma tendência de alta de volatilidade no mês.',
+      analysis: 'IV ATM em 62.4% — regime de volatilidade elevada. Put skew de -3.1pp indica mercado pagando prêmio por proteção de downside. Delta 1M da IV +5.4pp confirma tendência de alta de volatilidade no mês. Mercado está se hedgeando ativamente — sinal de que grandes players antecipam movimento direcional.',
     },
     macro: {
       score: 52,
-      signal: 'AMBIENTE FAVORÁVEL — MONITORAR',
+      signal: 'AMBIENTE MISTO — MONITORAR',
       direction: 'neutral',
       confidence: 0.67,
       probability: 0.52,
       timeframe: '1d–7d',
-      trigger: 'CPI > estimativa OU Fed hawkish surprise',
-      analysis: 'VIX -20.4% no mês (21.6→17.19) indica melhora do apetite a risco. DXY caindo 3.6% no mês é positivo para BTC historicamente. S&P +5.9% no mês mostra resiliência equity. Yield curve positiva (+47bp) — sem sinal recessivo imediato.',
+      trigger: 'CPI > estimativa OU Fed hawkish surprise em 19/Mar',
+      analysis: 'VIX +14.1% no mês (15.8→22.1) indica piora do apetite a risco. DXY caindo 3.4% no mês é positivo para BTC historicamente. S&P +5.7% no mês mostra resiliência equity, mas FOMC em 19/Mar é risco binário. Yield curve positiva (+28.1bp) — sem sinal recessivo imediato. CPI em 12/Mar é o próximo gatilho macro crítico.',
     },
   },
 };
