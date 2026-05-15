@@ -1,5 +1,3 @@
-import { btcSpotFlow, fmtNum, aiAnalysis as aiAnalysisMock } from '../components/data/mockData';
-import { spotSessions } from '../components/data/mockDataAltcoins';
 import { AIModuleCard } from '../components/ui/AIAnalysisPanel';
 import SectionHeader from '../components/ui/SectionHeader';
 import { ModeBadge } from '../components/ui/DataBadge';
@@ -14,6 +12,25 @@ import { useKlines, useBtcTicker } from '@/hooks/useBtcData';
 import { readModuleFlag } from '@/lib/moduleFlags';
 import { DisabledModuleBanner } from '@/components/ui/DisabledModuleBanner';
 import { computeSessionStats } from '@/utils/sessionAnalytics';
+
+// Inline formatter — no external mock dependency
+const fmtNum = (v, d = 0) => v != null ? v.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d }) : '—';
+
+// Fallbacks for spot fields without live API equivalents
+const SPOT_FALLBACK = {
+  price: 0,
+  ret_15m: 0, ret_1h: 0, ret_4h: 0, ret_1d: 0, ret_1w: 0, ret_1m: 0,
+  volume_1h_usdt: 0, volume_1d_usdt: 0, volume_1w_usdt: 0,
+  cvd: 0, cvd_1d: 0, cvd_1w: 0,
+  taker_buy: 1, taker_sell: 1,
+  klines: [],
+};
+const AI_MODULE_FALLBACK = {
+  direction: 'neutral', signal: '', score: 0,
+  probability: 0, confidence: 0,
+  timeframe: '—', trigger: '—', analysis: '',
+};
+const AI_SPOT_FALLBACK = { modules: { spot: AI_MODULE_FALLBACK } };
 
 // Derives spot metrics from 1h klines.
 // 1W fields (volume_1w_usdt, cvd_1w) require ≥168 candles; omitted when partial
@@ -58,25 +75,25 @@ export default function SpotFlow() {
   const spotEnabled       = readModuleFlag('ENABLE_SPOT_FLOW');
   const { data: klines }  = useKlines('1h', 168, spotEnabled);
   const { data: ticker }  = useBtcTicker(spotEnabled);
-  const btcPrice          = ticker?.mark_price ?? btcSpotFlow.price;
+  const btcPrice          = ticker?.mark_price ?? 0;
 
-  // Live spot metrics derived from klines; fallback to mock for uncovered fields
+  // Live spot metrics derived from klines; fallback to static zeros for uncovered fields
   const liveSpot = computeSpotMetrics(klines, btcPrice);
-  const s = liveSpot ? { ...btcSpotFlow, ...liveSpot } : btcSpotFlow;
+  const s = liveSpot ? { ...SPOT_FALLBACK, ...liveSpot } : SPOT_FALLBACK;
 
   // Rule-based AI analysis from live data
   const liveAnalysis = IS_LIVE && liveSpot
     ? computeRuleBasedAnalysis({ spot: { ret1d: liveSpot.ret_1d, cvd1d: liveSpot.cvd_1d, volume1dUsdt: liveSpot.volume_1d_usdt, price: liveSpot.price } })
     : null;
-  const aiAnalysis = liveAnalysis ?? aiAnalysisMock;
+  const aiAnalysis = liveAnalysis ?? AI_SPOT_FALLBACK;
 
   // Calcula sessões live quando klines disponíveis; fallback para mock
   const liveSessions = klines && klines.length >= 24
     ? computeSessionStats(klines, btcPrice)
     : null;
 
-  // Compatibiliza shape: live retorna array, mock é objeto {asia, europe, us}
-  const sessionList = liveSessions ?? Object.values(spotSessions);
+  // Compatibiliza shape: live retorna array; fallback = vazio (sem sessões quando klines indisponíveis)
+  const sessionList = liveSessions ?? [];
   const cvdPositive = s.cvd > 0;
 
   // Usar klines live quando disponível para o gráfico de preço

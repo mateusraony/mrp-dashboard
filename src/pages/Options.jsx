@@ -1,13 +1,41 @@
-import { btcOptions as btcOptionsMock, btcOptionsExtended, aiAnalysis as aiAnalysisMock } from '../components/data/mockData';
 import { useOptionsData } from '@/hooks/useDeribit';
 import { readModuleFlag } from '@/lib/moduleFlags';
 import { DisabledModuleBanner } from '@/components/ui/DisabledModuleBanner';
 import { computeGex, computeMaxPain } from '@/utils/riskCalculations';
 import { computeRuleBasedAnalysis } from '@/utils/ruleBasedAnalysis';
 import { IS_LIVE } from '@/lib/env';
+import { AIModuleCard } from '../components/ui/AIAnalysisPanel';
+import SectionHeader from '../components/ui/SectionHeader';
+import { ModeBadge, GradeBadge } from '../components/ui/DataBadge';
+import TermStructure from '../components/options/TermStructure';
+import IVRankPanel from '../components/options/IVRankPanel';
+import TakerFlowPanel from '../components/options/TakerFlowPanel';
+import DealerFlowPanel from '../components/options/DealerFlowPanel';
+import {
+  LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, ReferenceLine,
+} from 'recharts';
 
-// ─── DATA LAYER (live > mock fallback) ───────────────────────────────────────
-// useOptionsData() retorna OptionsData com chain incluindo gammas reais do Deribit.
+// Fallbacks for options fields without live API equivalents
+const BTC_OPTIONS_FALLBACK = {
+  spot: 0, iv_atm: 0, strikes: [],
+  skew: 0, skew_direction: 'neutral', regime: 'normal',
+  expiry: '—', expiry_hours: 0, quality: 'D',
+  iv_atm_1d_delta: 0, iv_atm_1w_delta: 0, iv_atm_1m_delta: 0,
+};
+const BTC_OPTIONS_EXT_FALLBACK = {
+  put_call_ratio_vol: 1.0, put_call_ratio_oi: 1.0, put_call_ratio_7d_avg: null,
+  max_pain: 0, max_pain_distance_pct: 0, gamma_exposure_usd: 0,
+  oi_by_strike: [],
+};
+const AI_MODULE_FALLBACK = {
+  direction: 'neutral', signal: '', score: 0,
+  probability: 0, confidence: 0,
+  timeframe: '—', trigger: '—', analysis: '',
+};
+const AI_OPTIONS_FALLBACK = { modules: { options: AI_MODULE_FALLBACK } };
+
+// ─── DATA LAYER (live > fallback) ────────────────────────────────────────────
 function useOptionsPageData() {
   const { data: live } = useOptionsData();
 
@@ -25,18 +53,18 @@ function useOptionsPageData() {
 
   const btcOptions = live
     ? {
-        ...btcOptionsMock,
+        ...BTC_OPTIONS_FALLBACK,
         spot:          live.spot,
         iv_atm:        live.iv_atm,
         strikes:       live.chain.map(c => ({ strike: c.strike, call_iv: c.call_iv, put_iv: c.put_iv })),
-        skew:          chainSkew ?? btcOptionsMock.skew,
-        skew_direction: skew_direction ?? btcOptionsMock.skew_direction,
-        regime:        regime ?? btcOptionsMock.regime,
-        expiry:        nearestExpiry?.label ?? btcOptionsMock.expiry,
-        expiry_hours:  nearestExpiry ? Math.round(nearestExpiry.days_to * 24) : btcOptionsMock.expiry_hours,
+        skew:          chainSkew ?? BTC_OPTIONS_FALLBACK.skew,
+        skew_direction: skew_direction ?? BTC_OPTIONS_FALLBACK.skew_direction,
+        regime:        regime ?? BTC_OPTIONS_FALLBACK.regime,
+        expiry:        nearestExpiry?.label ?? BTC_OPTIONS_FALLBACK.expiry,
+        expiry_hours:  nearestExpiry ? Math.round(nearestExpiry.days_to * 24) : BTC_OPTIONS_FALLBACK.expiry_hours,
         quality:       live.quality,
       }
-    : btcOptionsMock;
+    : BTC_OPTIONS_FALLBACK;
 
   // GEX calculado da chain viva (fórmula validada em scripts/validate_gex.py)
   const gexData = live
@@ -59,7 +87,7 @@ function useOptionsPageData() {
         live.chain.map(c => ({ strike: c.strike, call_oi: c.call_oi, put_oi: c.put_oi, call_iv: c.call_iv, put_iv: c.put_iv })),
         live.spot,
       )
-    : btcOptionsExtended.max_pain;
+    : BTC_OPTIONS_EXT_FALLBACK.max_pain;
 
   const liveOiByStrike = live
     ? live.chain.map(c => ({ strike: c.strike, call_oi: c.call_oi, put_oi: c.put_oi }))
@@ -77,19 +105,9 @@ function useOptionsPageData() {
     livePcrVol,
     livePcrOi,
     liveMaxPainDistancePct,
+    hasLiveData:           !!live,
   };
 }
-import { AIModuleCard } from '../components/ui/AIAnalysisPanel';
-import SectionHeader from '../components/ui/SectionHeader';
-import { ModeBadge, GradeBadge } from '../components/ui/DataBadge';
-import TermStructure from '../components/options/TermStructure';
-import IVRankPanel from '../components/options/IVRankPanel';
-import TakerFlowPanel from '../components/options/TakerFlowPanel';
-import DealerFlowPanel from '../components/options/DealerFlowPanel';
-import {
-  LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, ReferenceLine,
-} from 'recharts';
 
 const regimeLabels = {
   low_vol:      { label: 'Low Vol', color: '#10b981', bg: 'rgba(16,185,129,0.1)' },
@@ -99,22 +117,22 @@ const regimeLabels = {
 };
 
 export default function Options() {
-  const { btcOptions, liveGex, liveMaxPain, liveOiByStrike, livePcrVol, livePcrOi, liveMaxPainDistancePct } = useOptionsPageData();
+  const { btcOptions, liveGex, liveMaxPain, liveOiByStrike, livePcrVol, livePcrOi, liveMaxPainDistancePct, hasLiveData } = useOptionsPageData();
   const o = btcOptions;
-  const regime = regimeLabels[o.regime];
+  const regime = regimeLabels[o.regime] ?? regimeLabels.normal;
 
   // Rule-based AI analysis from live options data
-  const liveAnalysis = IS_LIVE && o.iv_atm !== btcOptionsMock.iv_atm
+  const liveAnalysis = IS_LIVE && hasLiveData
     ? computeRuleBasedAnalysis({
         options: {
           ivAtm:              o.iv_atm,
           skew:               o.skew,
-          pcrVol:             livePcrVol ?? btcOptionsExtended.put_call_ratio_vol,
-          maxPainDistancePct: liveMaxPainDistancePct ?? btcOptionsExtended.max_pain_distance_pct,
+          pcrVol:             livePcrVol ?? BTC_OPTIONS_EXT_FALLBACK.put_call_ratio_vol,
+          maxPainDistancePct: liveMaxPainDistancePct ?? BTC_OPTIONS_EXT_FALLBACK.max_pain_distance_pct,
         },
       })
     : null;
-  const aiAnalysis = liveAnalysis ?? aiAnalysisMock;
+  const aiAnalysis = liveAnalysis ?? AI_OPTIONS_FALLBACK;
 
   const smileData = o.strikes.map(s => ({
     strike: s.strike / 1000,
@@ -124,9 +142,11 @@ export default function Options() {
   }));
 
   const atmStrike = o.spot;
-  const nearestStrike = o.strikes.reduce((prev, curr) =>
-    Math.abs(curr.strike - atmStrike) < Math.abs(prev.strike - atmStrike) ? curr : prev
-  );
+  const nearestStrike = o.strikes.length > 0
+    ? o.strikes.reduce((prev, curr) =>
+        Math.abs(curr.strike - atmStrike) < Math.abs(prev.strike - atmStrike) ? curr : prev
+      )
+    : null;
 
   if (!readModuleFlag('ENABLE_OPTIONS')) {
     return <DisabledModuleBanner moduleName="ENABLE_OPTIONS" />;
@@ -242,8 +262,8 @@ export default function Options() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, marginBottom: 16 }}>
         {/* Put/Call Ratio */}
         {(() => {
-          const pcrVol = livePcrVol ?? btcOptionsExtended.put_call_ratio_vol;
-          const pcrOi  = livePcrOi  ?? btcOptionsExtended.put_call_ratio_oi;
+          const pcrVol = livePcrVol ?? BTC_OPTIONS_EXT_FALLBACK.put_call_ratio_vol;
+          const pcrOi  = livePcrOi  ?? BTC_OPTIONS_EXT_FALLBACK.put_call_ratio_oi;
           return (
             <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: 20 }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 14 }}>Put/Call Ratio</div>
@@ -253,7 +273,7 @@ export default function Options() {
                   <div style={{ fontSize: 28, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: pcrVol < 0.8 ? '#10b981' : pcrVol > 1.2 ? '#ef4444' : '#f59e0b' }}>
                     {pcrVol.toFixed(2)}
                   </div>
-                  <div style={{ fontSize: 10, color: '#4a5568', marginTop: 2 }}>Média 7d: {btcOptionsExtended.put_call_ratio_7d_avg.toFixed(2)}</div>
+                  <div style={{ fontSize: 10, color: '#4a5568', marginTop: 2 }}>Média 7d: {BTC_OPTIONS_EXT_FALLBACK.put_call_ratio_7d_avg?.toFixed(2) ?? '—'}</div>
                 </div>
                 <div>
                   <div style={{ fontSize: 10, color: '#4a5568', marginBottom: 3 }}>Por OI</div>
@@ -289,11 +309,11 @@ export default function Options() {
             </div>
             <div style={{ fontSize: 10, color: '#4a5568', lineHeight: 1.6 }}>
               Strike onde o maior número de opções expiram sem valor — maior prejuízo para compradores de opções.
-              Preço tende a ser "atraído" para este nível próximo ao vencimento. Distância atual: {Math.abs(liveMaxPainDistancePct ?? btcOptionsExtended.max_pain_distance_pct).toFixed(1)}%.
+              Preço tende a ser "atraído" para este nível próximo ao vencimento. Distância atual: {Math.abs(liveMaxPainDistancePct ?? BTC_OPTIONS_EXT_FALLBACK.max_pain_distance_pct).toFixed(1)}%.
             </div>
           </div>
           {(() => {
-            const gexUsd = liveGex ? liveGex.net_gex_usd : btcOptionsExtended.gamma_exposure_usd;
+            const gexUsd = liveGex ? liveGex.net_gex_usd : BTC_OPTIONS_EXT_FALLBACK.gamma_exposure_usd;
             const gexColor = gexUsd < 0 ? '#ef4444' : '#10b981';
             const gexLabel = liveGex?.dealer_position === 'short_gamma' ? ' (Short GEX — dealers amplificam moves)'
               : liveGex?.dealer_position === 'long_gamma' ? ' (Long GEX — dealers amortecendo moves)'
@@ -320,7 +340,7 @@ export default function Options() {
       <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: 20, marginBottom: 16 }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 14 }}>OI por Strike — Calls vs Puts</div>
         <ResponsiveContainer width="100%" height={160}>
-          <BarChart data={liveOiByStrike ?? btcOptionsExtended.oi_by_strike} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+          <BarChart data={liveOiByStrike ?? BTC_OPTIONS_EXT_FALLBACK.oi_by_strike} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#1e2d45" vertical={false} />
             <XAxis dataKey="strike" tick={{ fontSize: 9, fill: '#4a5568' }} tickLine={false}
               tickFormatter={v => `$${(v/1000).toFixed(0)}K`} />
