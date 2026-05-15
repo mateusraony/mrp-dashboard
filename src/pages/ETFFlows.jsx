@@ -5,6 +5,7 @@ import { etfFlows } from '../components/data/mockDataExtended';
 import { GradeBadge } from '../components/ui/DataBadge';
 import { DataTrustBadge } from '../components/ui/DataTrustBadge';
 import { useBtcTicker } from '@/hooks/useBtcData';
+import { useEtfRedditPosts } from '@/hooks/useEtfReddit';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, Cell,
@@ -58,6 +59,7 @@ const ETF_BTC_HOLDINGS = {
 export function ETFContent() {
   const [sortBy, setSortBy] = useState('aum');
   const { data: ticker } = useBtcTicker();
+  const { data: redditPosts } = useEtfRedditPosts();
   const livePrice = ticker?.mark_price ?? null;
   const d = etfFlows;
 
@@ -302,6 +304,43 @@ export function ETFContent() {
       }}>
         <span style={{ color: '#10b981', fontWeight: 700 }}>📡 Sinal ETF: </span>
         {d.signal}
+      </div>
+
+      {/* Reddit Pulse — discussões recentes sobre BTC ETF */}
+      <div style={{ marginTop: 20, background: 'linear-gradient(135deg, #131e2e 0%, #111827 100%)', border: '1px solid #1e2d45', borderRadius: 14, padding: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+          <span style={{ fontSize: 18 }}>🟠</span>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#e2e8f0' }}>Reddit Pulse — BTC ETF</div>
+            <div style={{ fontSize: 10, color: '#475569' }}>Discussões recentes em r/ETFs e r/Bitcoin · atualizado a cada 30min</div>
+          </div>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {(redditPosts ?? []).map((post, i) => (
+            <a
+              key={i}
+              href={post.permalink}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: '10px 12px', background: '#0d1421', border: '1px solid #1a2535', borderRadius: 8, textDecoration: 'none', transition: 'border-color 0.15s' }}
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 42, alignItems: 'center' }}>
+                <span style={{ fontSize: 12, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: post.score > 100 ? '#10b981' : '#60a5fa' }}>{post.score > 999 ? `${(post.score / 1000).toFixed(1)}k` : post.score}</span>
+                <span style={{ fontSize: 8, color: '#334155' }}>pontos</span>
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: '#cbd5e1', lineHeight: 1.4, marginBottom: 4 }}>{post.title}</div>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 3, background: 'rgba(255,69,0,0.12)', color: '#ff6b35', border: '1px solid rgba(255,69,0,0.2)', fontWeight: 700 }}>r/{post.subreddit}</span>
+                  <span style={{ fontSize: 9, color: '#334155' }}>{new Date(post.created_utc * 1000).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                </div>
+              </div>
+            </a>
+          ))}
+          {(!redditPosts || redditPosts.length === 0) && (
+            <div style={{ padding: '20px', textAlign: 'center', color: '#334155', fontSize: 11 }}>Carregando posts do Reddit…</div>
+          )}
+        </div>
       </div>
     </div>
   );
