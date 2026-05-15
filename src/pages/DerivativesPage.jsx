@@ -1,5 +1,6 @@
 // ─── DERIVATIVES — Overview + Avançado ───────────────────────────────────────
 import { useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { DerivativesOverview } from './Derivatives';
 import { AdvancedContent } from './DerivativesAdvanced';
 
@@ -9,7 +10,8 @@ const TABS = [
 ];
 
 export default function DerivativesPage() {
-  const [tab, setTab] = useState('overview');
+  const { state } = useLocation();
+  const [tab, setTab] = useState(state?.tab ?? 'overview');
   return (
     <div>
       <div style={{ display: 'flex', gap: 2, marginBottom: 20, background: '#0d1421', padding: 4, borderRadius: 8, border: '1px solid #1a2535', width: 'fit-content' }}>

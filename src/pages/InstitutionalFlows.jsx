@@ -1,5 +1,6 @@
 // ─── FLUXOS INSTITUCIONAIS — ETFs + Stablecoins ──────────────────────────────
 import { useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { ETFContent } from './ETFFlows';
 import { StablecoinContent } from './StablecoinFlow';
 
@@ -9,7 +10,8 @@ const TABS = [
 ];
 
 export default function InstitutionalFlows() {
-  const [tab, setTab] = useState('etf');
+  const { state } = useLocation();
+  const [tab, setTab] = useState(state?.tab ?? 'etf');
   return (
     <div>
       <div style={{ display: 'flex', gap: 2, marginBottom: 20, background: '#0d1421', padding: 4, borderRadius: 8, border: '1px solid #1a2535', width: 'fit-content' }}>

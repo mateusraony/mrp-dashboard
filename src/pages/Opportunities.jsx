@@ -1,5 +1,6 @@
 // ─── OPORTUNIDADES — Ações AI + Estratégias ───────────────────────────────────
 import { useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { ActionsContent } from './ActionDashboard';
 import { StrategiesContent } from './Strategies';
 
@@ -9,7 +10,8 @@ const TABS = [
 ];
 
 export default function Opportunities() {
-  const [tab, setTab] = useState('actions');
+  const { state } = useLocation();
+  const [tab, setTab] = useState(state?.tab ?? 'actions');
   return (
     <div>
       <div style={{ display: 'flex', gap: 2, marginBottom: 20, background: '#0d1421', padding: 4, borderRadius: 8, border: '1px solid #1a2535', width: 'fit-content' }}>
