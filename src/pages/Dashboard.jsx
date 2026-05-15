@@ -27,7 +27,14 @@ const AI_MODULE_FALLBACK = {
   probability: 0, confidence: 0,
   timeframe: '—', trigger: '—', analysis: '',
 };
+const AI_OVERALL_FALLBACK = {
+  recommendation: '—', direction: 'neutral', confidence: 0,
+  probability_correction: 0, timeframe: '—', trigger: '—',
+  rationale: '—', bull_case: '—', bear_case: '—',
+};
 const AI_ANALYSIS_FALLBACK = {
+  model: 'mock',
+  overall: AI_OVERALL_FALLBACK,
   modules: {
     derivatives: AI_MODULE_FALLBACK,
     spot:        AI_MODULE_FALLBACK,

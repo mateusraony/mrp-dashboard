@@ -38,6 +38,7 @@ function ProbBar({ label, value, color }) {
 }
 
 export function AIModuleCard({ module, title, icon }) {
+  if (!module) return null;
   const dir = directionConfig[module.direction] || directionConfig.neutral;
   return (
     <div style={{
@@ -112,6 +113,7 @@ export function AIModuleCard({ module, title, icon }) {
 }
 
 export default function AIAnalysisPanel({ analysis, compact = false }) {
+  if (!analysis?.overall) return null;
   const dir = directionConfig[analysis.overall.direction] || directionConfig.neutral;
 
   const OverallCard = () => (
