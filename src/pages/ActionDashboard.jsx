@@ -432,21 +432,21 @@ export function ActionsContent() {
       {tab === 'Performance' && (
         <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '18px 20px' }}>
           <div style={{ fontSize: 13, fontWeight: 800, color: '#e2e8f0', marginBottom: 10 }}>📈 Performance do Sistema AI</div>
-          {/* Banner: dados simulados */}
-          {!IS_LIVE && (
-            <div style={{
-              marginBottom: 16, padding: '10px 14px', borderRadius: 8,
-              background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.3)',
-              borderLeft: '4px solid #8b5cf6',
-              display: 'flex', gap: 10, alignItems: 'center',
-            }}>
-              <span style={{ fontSize: 14, flexShrink: 0 }}>🧪</span>
-              <span style={{ fontSize: 11, color: '#a78bfa', fontWeight: 700 }}>Dados de demonstração</span>
-              <span style={{ fontSize: 11, color: '#6d28d9' }}>
-                — este histórico é simulado e não representa performance real do sistema.
-              </span>
+          <div style={{
+            marginBottom: 16, padding: '10px 14px', borderRadius: 8,
+            background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.2)',
+            borderLeft: '4px solid #3b82f6',
+            display: 'flex', gap: 10, alignItems: 'flex-start',
+          }}>
+            <span style={{ fontSize: 14, flexShrink: 0 }}>📊</span>
+            <div>
+              <div style={{ fontSize: 11, color: '#60a5fa', fontWeight: 700, marginBottom: 3 }}>Histórico em construção</div>
+              <div style={{ fontSize: 11, color: '#475569', lineHeight: 1.6 }}>
+                O histórico de performance será preenchido conforme as oportunidades identificadas pelo Rule Engine forem registradas e encerradas.
+                Os <strong style={{ color: '#10b981' }}>sinais ao vivo</strong> já estão ativos na aba Oportunidades.
+              </div>
             </div>
-          )}
+          </div>
           <PerformancePanel />
         </div>
       )}
