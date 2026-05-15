@@ -28,7 +28,12 @@ const BTC_OPTIONS_EXT_FALLBACK = {
   max_pain: 0, max_pain_distance_pct: 0, gamma_exposure_usd: 0,
   oi_by_strike: [],
 };
-const AI_OPTIONS_FALLBACK = { modules: { options: { headline: '', signals: [], score: 0, bias: 'NEUTRO' } } };
+const AI_MODULE_FALLBACK = {
+  direction: 'neutral', signal: '', score: 0,
+  probability: 0, confidence: 0,
+  timeframe: '—', trigger: '—', analysis: '',
+};
+const AI_OPTIONS_FALLBACK = { modules: { options: AI_MODULE_FALLBACK } };
 
 // ─── DATA LAYER (live > fallback) ────────────────────────────────────────────
 function useOptionsPageData() {

@@ -36,7 +36,12 @@ const PERP_VS_DATED_FALLBACK = {
   perp_oi_b: 0, perp_pct: 50, dated_oi_b: 0, dated_pct: 50,
   cme_oi_b: 0, cme_pct_of_dated: 0, signal: 'Dados indisponíveis — requer API paga (CoinGlass)',
 };
-const AI_DERIVATIVES_FALLBACK = { modules: { derivatives: { headline: '', signals: [], score: 0, bias: 'NEUTRO' } } };
+const AI_MODULE_FALLBACK = {
+  direction: 'neutral', signal: '', score: 0,
+  probability: 0, confidence: 0,
+  timeframe: '—', trigger: '—', analysis: '',
+};
+const AI_DERIVATIVES_FALLBACK = { modules: { derivatives: AI_MODULE_FALLBACK } };
 
 // ─── DATA LAYER (live > fallback) ────────────────────────────────────────────
 function useDerivativesData() {
@@ -44,7 +49,15 @@ function useDerivativesData() {
   const { data: oiExch } = useOiByExchange();
 
   const liveBtcFutures = ticker
-    ? { ...BTC_FUTURES_FALLBACK, mark_price: ticker.mark_price, funding_rate: ticker.last_funding_rate, oi_delta_pct: ticker.oi_delta_pct, open_interest: ticker.open_interest }
+    ? {
+        ...BTC_FUTURES_FALLBACK,
+        mark_price:         ticker.mark_price,
+        index_price:        ticker.mark_price, // indexPrice absent from PremiumIndexSchema; mark_price is best proxy
+        funding_rate:       ticker.last_funding_rate,
+        oi_delta_pct:       ticker.oi_delta_pct,
+        open_interest:      ticker.open_interest,
+        open_interest_usdt: ticker.open_interest * ticker.mark_price,
+      }
     : BTC_FUTURES_FALLBACK;
 
   const oiByExchange = oiExch

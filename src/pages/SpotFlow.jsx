@@ -25,7 +25,12 @@ const SPOT_FALLBACK = {
   taker_buy: 1, taker_sell: 1,
   klines: [],
 };
-const AI_SPOT_FALLBACK = { modules: { spot: { headline: '', signals: [], score: 0, bias: 'NEUTRO' } } };
+const AI_MODULE_FALLBACK = {
+  direction: 'neutral', signal: '', score: 0,
+  probability: 0, confidence: 0,
+  timeframe: '—', trigger: '—', analysis: '',
+};
+const AI_SPOT_FALLBACK = { modules: { spot: AI_MODULE_FALLBACK } };
 
 // Derives spot metrics from 1h klines.
 // 1W fields (volume_1w_usdt, cvd_1w) require ≥168 candles; omitted when partial
