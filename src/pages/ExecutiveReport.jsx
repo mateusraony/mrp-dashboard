@@ -359,7 +359,7 @@ function StablecoinSection({ period }) {
       title="Stablecoin Flow"
       icon="💧"
       subtitle="USDT + USDC · Mint/Burn · Supply por chain · Anomalias"
-      links={[{ label: 'Ver Completo', page: 'StablecoinFlow', icon: '💧' }]}
+      links={[{ label: 'Ver Completo', page: 'InstitutionalFlows', icon: '💧' }]}
     >
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 12 }}>
         <Metric label="Supply Total" value={`$${s.total_b.toFixed(1)}B`} color="#60a5fa" sub={`${sign(delta)}${delta.toFixed(1)}% ${period.toLowerCase()}`} />
@@ -460,7 +460,7 @@ function DerivativesSection({ period, liveTicker }) {
       subtitle="Funding · OI · Liquidações · Basis · Carry Trade · Options"
       links={[
         { label: 'Derivatives', page: 'Derivatives', icon: '⟆' },
-        { label: 'Deriv. Avançado', page: 'DerivativesAdvanced', icon: '⚗️' },
+        { label: 'Deriv. Avançado', page: 'Derivatives', icon: '⚗️' },
         { label: 'Options', page: 'Options', icon: '◬' },
       ]}
     >
@@ -658,9 +658,9 @@ function ETFMacroSection({ period }) {
       icon="🏦"
       subtitle="IBIT · FBTC · GBTC · AUM · Flows institucionais"
       links={[
-        { label: 'ETF Flows', page: 'ETFFlows', icon: '🏦' },
+        { label: 'ETF Flows', page: 'InstitutionalFlows', icon: '🏦' },
         { label: 'Macro Board', page: 'Macro', icon: '⊞' },
-        { label: 'Calendário', page: 'Calendar', icon: '◷' },
+        { label: 'Calendário', page: 'MacroCalendar', icon: '◷' },
       ]}
     >
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 12 }}>
@@ -742,16 +742,16 @@ const ALL_MODULES = [
   { label: 'Derivatives', page: 'Derivatives', icon: '⟆', desc: 'Futuros & Funding' },
   { label: 'Spot Flow', page: 'SpotFlow', icon: '⟴', desc: 'CVD & Volume' },
   { label: 'Options', page: 'Options', icon: '◬', desc: 'IV & Greeks' },
-  { label: 'ETF Flows', page: 'ETFFlows', icon: '🏦', desc: 'IBIT · FBTC · GBTC' },
-  { label: 'Stablecoin', page: 'StablecoinFlow', icon: '💧', desc: 'Mint · Burn' },
+  { label: 'ETF Flows', page: 'InstitutionalFlows', icon: '🏦', desc: 'IBIT · FBTC · GBTC' },
+  { label: 'Stablecoin', page: 'InstitutionalFlows', icon: '💧', desc: 'Mint · Burn' },
   { label: 'Regime', page: 'MarketRegime', icon: '🎯', desc: 'Risk-On · Off' },
   { label: 'Macro Board', page: 'Macro', icon: '⊞', desc: 'S&P · DXY · Yields' },
   { label: 'On-Chain', page: 'OnChain', icon: '⛓', desc: 'NUPL · MVRV' },
-  { label: 'Calendário', page: 'Calendar', icon: '◷', desc: 'CPI · FOMC · NFP' },
+  { label: 'Calendário', page: 'MacroCalendar', icon: '◷', desc: 'CPI · FOMC · NFP' },
   { label: 'Notícias AI', page: 'NewsIntelligence', icon: '🧠', desc: 'Sentimento' },
-  { label: 'Estratégias', page: 'Strategies', icon: '⚡', desc: 'Setups · Carry' },
+  { label: 'Estratégias', page: 'Opportunities', icon: '⚡', desc: 'Setups · Carry' },
   { label: 'Preditivo', page: 'PredictivePanel', icon: '🔮', desc: 'BTC 24h' },
-  { label: 'Deriv. Avançado', page: 'DerivativesAdvanced', icon: '⚗️', desc: 'Liq · OI Strike' },
+  { label: 'Deriv. Avançado', page: 'Derivatives', icon: '⚗️', desc: 'Liq · OI Strike' },
   { label: 'Smart Alerts', page: 'SmartAlerts', icon: '🔔', desc: 'AI · Anomalias' },
   { label: 'Automações', page: 'Automations', icon: '⚙️', desc: 'Rules · Webhook' },
 ];
