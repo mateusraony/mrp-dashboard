@@ -6,10 +6,18 @@ import {
   AreaChart, Area, BarChart, Bar, ResponsiveContainer,
   XAxis, YAxis, Tooltip, CartesianGrid, ReferenceLine, Cell,
 } from 'recharts';
-import {
-  tradeOpportunities, performanceHistory, performanceStats, pnlChartData,
-} from '../components/data/mockDataActionDashboard';
-import { globalRisk, fearGreed, btcFutures } from '../components/data/mockData';
+// Fallbacks — performance histórica sem API live; regime/F&G fallbacks para inicialização
+const TRADE_OPPORTUNITIES_FALLBACK = []; // Oportunidades virão do rule engine live
+const PERFORMANCE_HISTORY_FALLBACK = [];
+const PERFORMANCE_STATS_FALLBACK = {
+  win_rate: 0, avg_pnl_pct: 0, cumulative_pnl_pct: 0,
+  max_drawdown: 0, sharpe_ratio: '—', total_trades: 0,
+  grade_a_win_rate: 0, grade_b_win_rate: 0,
+};
+const PNL_CHART_FALLBACK = [];
+const GLOBAL_RISK_FALLBACK = { score: 50, regime: 'NEUTRAL', prob: 0, module_scores: {} };
+const FEAR_GREED_FALLBACK = { value: 50, label: 'Neutral', classification: 'Neutral' };
+const BTC_FUTURES_FALLBACK = { funding_rate: 0 };
 import AIInsightPanel from '../components/ai/AIInsightPanel';
 import { ModeBadge } from '../components/ui/DataBadge';
 import { useBtcTicker, useFearGreed } from '@/hooks/useBtcData';
@@ -150,13 +158,13 @@ function OpportunityCard({ op, onSelect, selected }) {
 
 // ─── PERFORMANCE PANEL ────────────────────────────────────────────────────────
 function PerformancePanel() {
-  const st = performanceStats;
+  const st = PERFORMANCE_STATS_FALLBACK;
 
   return (
     <div>
       {/* Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 14 }}>
-        <StatCard label="Win Rate" value={`${st.win_rate.toFixed(0)}%`} color="#10b981" sub={`${performanceHistory.filter(h=>h.result==='WIN').length} de ${st.total_trades} trades`} mockBadge />
+        <StatCard label="Win Rate" value={`${st.win_rate.toFixed(0)}%`} color="#10b981" sub={`${PERFORMANCE_HISTORY_FALLBACK.filter(h=>h.result==='WIN').length} de ${st.total_trades} trades`} mockBadge />
         <StatCard label="PnL Médio" value={`${st.avg_pnl_pct > 0 ? '+' : ''}${st.avg_pnl_pct.toFixed(2)}%`} color={st.avg_pnl_pct > 0 ? '#10b981' : '#ef4444'} sub="Por trade" />
         <StatCard label="PnL Acumulado" value={`+${st.cumulative_pnl_pct.toFixed(1)}%`} color="#60a5fa" sub="Todas as operações" />
         <StatCard label="Max Drawdown" value={`${st.max_drawdown.toFixed(2)}%`} color="#ef4444" sub={`Sharpe: ${st.sharpe_ratio}`} />
@@ -166,7 +174,7 @@ function PerformancePanel() {
       <div style={{ marginBottom: 14 }}>
         <div style={{ fontSize: 9, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>P&L Acumulado por Trade</div>
         <ResponsiveContainer width="100%" height={120}>
-          <AreaChart data={pnlChartData} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
+          <AreaChart data={PNL_CHART_FALLBACK} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
             <defs>
               <linearGradient id="pnlGrad" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
@@ -187,12 +195,12 @@ function PerformancePanel() {
       <div style={{ marginBottom: 14 }}>
         <div style={{ fontSize: 9, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>P&L por Trade</div>
         <ResponsiveContainer width="100%" height={80}>
-          <BarChart data={pnlChartData} margin={{ top: 0, right: 4, left: -24, bottom: 0 }}>
+          <BarChart data={PNL_CHART_FALLBACK} margin={{ top: 0, right: 4, left: -24, bottom: 0 }}>
             <XAxis dataKey="date" tick={{ fontSize: 8, fill: '#334155' }} axisLine={false} tickLine={false} />
             <Tooltip contentStyle={{ background: '#0d1421', border: '1px solid #1a2535', fontSize: 9, borderRadius: 6 }} formatter={v => { const n = Number(v); return [`${n > 0 ? '+' : ''}${n.toFixed(2)}%`, 'P&L']; }} />
             <ReferenceLine y={0} stroke="#1e2d45" />
             <Bar dataKey="pnl" radius={[3, 3, 0, 0]}>
-              {pnlChartData.map((e, i) => <Cell key={i} fill={e.pnl >= 0 ? '#10b981' : '#ef4444'} fillOpacity={0.8} />)}
+              {PNL_CHART_FALLBACK.map((e, i) => <Cell key={i} fill={e.pnl >= 0 ? '#10b981' : '#ef4444'} fillOpacity={0.8} />)}
             </Bar>
           </BarChart>
         </ResponsiveContainer>
@@ -201,7 +209,7 @@ function PerformancePanel() {
       {/* History table */}
       <div style={{ fontSize: 9, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Histórico de Operações</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-        {performanceHistory.map(h => (
+        {PERFORMANCE_HISTORY_FALLBACK.map(h => (
           <div key={h.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: '#0d1421', border: '1px solid #1a2535', borderRadius: 7 }}>
             <TypeBadge type={h.type} />
             <span style={{ flex: 1, fontSize: 10, color: '#8899a6' }}>{h.strategy}</span>
@@ -249,8 +257,8 @@ export function ActionsContent() {
   // Regime live > mock fallback
   const liveRegime = riskScore
     ? (riskScore.regime === 'RISCO ELEVADO' ? 'RISK-OFF' : riskScore.regime === 'SAUDÁVEL' ? 'RISK-ON' : 'NEUTRAL')
-    : globalRisk.regime;
-  const liveScore = riskScore?.score ?? globalRisk.score;
+    : GLOBAL_RISK_FALLBACK.regime;
+  const liveScore = riskScore?.score ?? GLOBAL_RISK_FALLBACK.score;
   const regColor = liveRegime === 'RISK-ON' ? '#10b981' : liveRegime === 'RISK-OFF' ? '#ef4444' : '#f59e0b';
 
   // Live opportunities from rule-based analysis
@@ -284,7 +292,7 @@ export function ActionsContent() {
       }));
   }, [ticker, fng, riskScore]);
 
-  const allOpportunities = [...liveOpportunities, ...tradeOpportunities];
+  const allOpportunities = [...liveOpportunities, ...TRADE_OPPORTUNITIES_FALLBACK];
 
   const filtered = allOpportunities.filter(op => {
     const typeOk = typeFilter === 'ALL' || op.type === typeFilter;
@@ -324,10 +332,10 @@ export function ActionsContent() {
       <div style={{ marginBottom: 14 }}>
         <AIInsightPanel
           moduleId="ACTION_DASHBOARD"
-          probability={globalRisk.prob}
+          probability={GLOBAL_RISK_FALLBACK.prob}
           regime={liveRegime === 'RISK-ON' ? 'risk_on' : 'caution'}
-          recommendation={`${filtered.length} oportunidades ativas. ${tradeOpportunities.filter(o => o.ai_grade === 'A').length} com Grade A. Win rate histórico: ${performanceStats.win_rate.toFixed(0)}% · PnL acum: +${performanceStats.cumulative_pnl_pct.toFixed(1)}%.`}
-          reasoning={`Regime ${liveRegime} com score ${liveScore}/100. F&G ${fng?.value ?? fearGreed.value} (${fng?.label ?? fearGreed.classification}). Funding ${((ticker?.last_funding_rate ?? btcFutures.funding_rate) * 100).toFixed(4)}% — oportunidades de carry e flush em evidência. Grade A = Win rate 100% histórico.`}
+          recommendation={`${filtered.length} oportunidades ativas. ${TRADE_OPPORTUNITIES_FALLBACK.filter(o => o.ai_grade === 'A').length} com Grade A. Win rate histórico: ${PERFORMANCE_STATS_FALLBACK.win_rate.toFixed(0)}% · PnL acum: +${PERFORMANCE_STATS_FALLBACK.cumulative_pnl_pct.toFixed(1)}%.`}
+          reasoning={`Regime ${liveRegime} com score ${liveScore}/100. F&G ${fng?.value ?? FEAR_GREED_FALLBACK.value} (${fng?.label ?? FEAR_GREED_FALLBACK.classification}). Funding ${((ticker?.last_funding_rate ?? BTC_FUTURES_FALLBACK.funding_rate) * 100).toFixed(4)}% — oportunidades de carry e flush em evidência. Grade A = Win rate 100% histórico.`}
           actions={['Ver Carry Trade', 'Monitorar Flush', 'Checar Hedge', 'Ver Arbitragem']}
           compact
         />

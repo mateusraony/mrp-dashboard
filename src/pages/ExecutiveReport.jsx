@@ -6,15 +6,6 @@ import {
   AreaChart, Area, BarChart, Bar, RadarChart, Radar, PolarGrid, PolarAngleAxis, Line, ComposedChart, ResponsiveContainer, XAxis, YAxis, Tooltip,
   CartesianGrid, Cell, ReferenceLine,
 } from 'recharts';
-import { dailyMintBurn, stablecoinSnapshot, stablecoinAnomalies, supplyByChain } from '../components/data/mockDataStablecoin';
-import { marketRegime } from '../components/data/mockDataRegime';
-import {
-  btcFutures, fearGreed, globalRisk, macroBoard, stablecoinSupply,
-  btcNUPL, btcSOPR, btcRealizedMetrics, btcExchangeNetflow, btcWhaleActivity,
-  btcCorrelations, btcOptions, btcOptionsExtended,
-  liquidations24h, btcDominance, creditSpread, yieldCurveSpread,
-} from '../components/data/mockData';
-import { liquidationClusters, futuresBasis, etfFlows, lthSthSupply, oiRatio } from '../components/data/mockDataExtended';
 import AIInsightPanel from '../components/ai/AIInsightPanel';
 import { ModeBadge } from '../components/ui/DataBadge';
 import { sendNotificationEmail } from '@/lib/notificationClient';
@@ -24,6 +15,44 @@ import { useMarketRegime } from '@/hooks/useMarketRegime';
 import { useOnChainCycle, useOnChainExtended } from '@/hooks/useCoinMetrics';
 import { IS_LIVE } from '@/lib/env';
 import { computeRuleBasedAnalysis } from '@/utils/ruleBasedAnalysis';
+
+// ─── Fallbacks — dados sem API gratuita equivalente ──────────────────────────
+const FEAR_GREED_FALLBACK        = { value: 50, classification: 'Neutral', label: 'Neutral' };
+const GLOBAL_RISK_FALLBACK       = { score: 50, regime: 'NEUTRAL', prob: 0 };
+const MACRO_BOARD_FALLBACK       = { series: [] };
+const STABLECOIN_SUPPLY_FALLBACK = { total_b: 0, delta_7d_pct: 0, delta_30d_pct: 0, usdt_supply_b: 0, usdc_supply_b: 0 };
+const BTC_NUPL_FALLBACK          = { value: 0, zone: '—', zone_color: '#94a3b8', history: { '1d': [], '1w': [], '1m': [] }, delta_7d: 0, delta_30d: 0 };
+const BTC_SOPR_FALLBACK          = { value: 0, smoothed_7d: 0 };
+const BTC_REALIZED_METRICS_FALLBACK = { mvrv_ratio: 0, mvrv_zone: '—', mvrv_zone_color: '#94a3b8', mvrv_zscore: 0, realized_price: 0 };
+const BTC_EXCHANGE_NETFLOW_FALLBACK = { netflow_24h: 0, exchange_reserves: 0, reserves_delta_30d_pct: 0, netflow_7d: 0 };
+const BTC_WHALE_ACTIVITY_FALLBACK   = { txs_over_1m_24h: 0, delta_1m_vs_avg: 0, txs_over_10m_24h: 0, delta_10m_vs_avg: 0 };
+const BTC_CORRELATIONS_FALLBACK  = { pairs: [] };
+const BTC_OPTIONS_MOCK_FALLBACK  = { iv_atm: 0, iv_atm_1d_delta: 0, skew: 0, skew_direction: 'neutral' };
+const BTC_OPTIONS_EXT_FALLBACK   = { put_call_ratio_oi: 1, max_pain: 0, max_pain_distance_pct: 0 };
+const LIQUIDATIONS_24H_FALLBACK  = { total_usd: 1, longs_usd: 0 };
+const BTC_DOMINANCE_FALLBACK     = { value: 0, delta_7d: 0, delta_30d: 0 };
+const CREDIT_SPREAD_FALLBACK     = { hy_spread_bp: 0, regime: 'stable', delta_7d_bp: 0 };
+const YIELD_CURVE_SPREAD_FALLBACK = { spread_bp: 0, regime: '—' };
+const BTC_FUTURES_MOCK_FALLBACK  = {
+  funding_rate: 0, mark_price: 0,
+  ret_1d: 0, ret_1w: 0, ret_1m: 0,
+  open_interest_usdt: 0, oi_delta_pct: 0, oi_delta_pct_1w: 0, oi_delta_pct_1m: 0,
+  long_short_ratio: 1, funding_history: [],
+};
+const LIQUIDATION_CLUSTERS_FALLBACK = { clusters: [], spot: 0, total_longs_at_risk_10pct: 0, total_shorts_at_risk_10pct: 0 };
+const FUTURES_BASIS_FALLBACK     = { futures: [], cme_basis_annualized: 0, cme_basis_prev_7d: 0 };
+const ETF_FLOWS_FALLBACK         = { total_aum_b: 0, net_flow_today_m: 0, net_flow_7d_m: 0, net_flow_30d_m: 0, consec_inflow_days: 0, funds: [] };
+const LTH_STH_SUPPLY_FALLBACK    = { lth_pct: 50, sth_pct: 50, lth_supply: 0, sth_supply: 0, lth_profit_pct: 0, sth_profit_pct: 0 };
+const OI_RATIO_FALLBACK          = { ratio_pct: 0, zone: '—' };
+const MARKET_REGIME_FALLBACK     = {
+  regime: 'NEUTRAL', score: 50, confidence: 0,
+  suggestion: { title: '—', rationale: 'Análise em processamento.' },
+  components: [],
+};
+const DAILY_MINT_BURN_FALLBACK      = [];
+const STABLECOIN_SNAPSHOT_FALLBACK  = { total_net_24h_m: 0, sigma_vs_7d: 0, usdt: { net_24h_m: 0 }, usdc: { net_24h_m: 0 } };
+const STABLECOIN_ANOMALIES_FALLBACK = [];
+const SUPPLY_BY_CHAIN_FALLBACK      = [];
 
 const TODAY = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
 
@@ -120,21 +149,21 @@ function PeriodSelector({ active, onChange }) {
 
 // ─── GLOBAL OVERVIEW ──────────────────────────────────────────────────────────
 function GlobalOverview({ period, liveTicker, liveFng, liveRisk }) {
-  const f = btcFutures;
-  const sp = macroBoard.series.find(s => s.id === 'SP500');
-  const vix = macroBoard.series.find(s => s.id === 'VIX');
-  const dxy = macroBoard.series.find(s => s.id === 'DXY');
-  const gold = macroBoard.series.find(s => s.id === 'GOLD');
-  const us10y = macroBoard.series.find(s => s.id === 'US10Y');
+  const f = BTC_FUTURES_MOCK_FALLBACK;
+  const sp = MACRO_BOARD_FALLBACK.series.find(s => s.id === 'SP500');
+  const vix = MACRO_BOARD_FALLBACK.series.find(s => s.id === 'VIX');
+  const dxy = MACRO_BOARD_FALLBACK.series.find(s => s.id === 'DXY');
+  const gold = MACRO_BOARD_FALLBACK.series.find(s => s.id === 'GOLD');
+  const us10y = MACRO_BOARD_FALLBACK.series.find(s => s.id === 'US10Y');
 
   // Merge live data over mock where available
   const btcPrice = liveTicker?.mark_price ?? f.mark_price;
   const btcRet1d = f.ret_1d; // only mock has historical returns
-  const fngValue = liveFng?.value ?? fearGreed.value;
-  const fngLabel = liveFng?.label ?? fearGreed.classification;
-  const riskScore = liveRisk?.score ?? globalRisk.score;
-  const riskRegime = liveRisk?.regime ?? globalRisk.regime;
-  const riskProb = globalRisk.prob; // live RiskScoreResult has no probability field
+  const fngValue = liveFng?.value ?? FEAR_GREED_FALLBACK.value;
+  const fngLabel = liveFng?.label ?? FEAR_GREED_FALLBACK.classification;
+  const riskScore = liveRisk?.score ?? GLOBAL_RISK_FALLBACK.score;
+  const riskRegime = liveRisk?.regime ?? GLOBAL_RISK_FALLBACK.regime;
+  const riskProb = GLOBAL_RISK_FALLBACK.prob; // live RiskScoreResult has no probability field
 
   const getSpDelta = () => period === 'Diário' ? sp?.delta_1d : period === 'Semanal' ? sp?.delta_7d : sp?.delta_30d;
   const getDxyDelta = () => period === 'Diário' ? dxy?.delta_1d : period === 'Semanal' ? dxy?.delta_7d : dxy?.delta_30d;
@@ -185,16 +214,16 @@ function GlobalOverview({ period, liveTicker, liveFng, liveRisk }) {
       {/* Macro rates row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 12 }}>
         <Metric label="US 10Y" value={`${fmt(us10y?.value, 3)}%`} color={col(us10y?.delta_1d, true)} sub={`${sign(us10y?.delta_1d_bp)}${fmt(us10y?.delta_1d_bp, 1)}bp 1D`} size={14} />
-        <Metric label="Yield Spread (10-2Y)" value={`${fmt(yieldCurveSpread.spread_bp, 1)}bp`} color={yieldCurveSpread.spread_bp > 0 ? '#10b981' : '#ef4444'} sub={yieldCurveSpread.regime} size={14} />
-        <Metric label="HY Credit Spread" value={`${creditSpread.hy_spread_bp}bp`} color={creditSpread.regime === 'widening' ? '#ef4444' : '#10b981'} sub={`${sign(creditSpread.delta_7d_bp)}${creditSpread.delta_7d_bp}bp 7D`} size={14} />
-        <Metric label="BTC Dominance" value={`${btcDominance.value}%`} color="#60a5fa" sub={`${sign(btcDominance.delta_7d)}${fmt(btcDominance.delta_7d, 1)}pp 7D`} size={14} />
+        <Metric label="Yield Spread (10-2Y)" value={`${fmt(YIELD_CURVE_SPREAD_FALLBACK.spread_bp, 1)}bp`} color={YIELD_CURVE_SPREAD_FALLBACK.spread_bp > 0 ? '#10b981' : '#ef4444'} sub={YIELD_CURVE_SPREAD_FALLBACK.regime} size={14} />
+        <Metric label="HY Credit Spread" value={`${CREDIT_SPREAD_FALLBACK.hy_spread_bp}bp`} color={CREDIT_SPREAD_FALLBACK.regime === 'widening' ? '#ef4444' : '#10b981'} sub={`${sign(CREDIT_SPREAD_FALLBACK.delta_7d_bp)}${CREDIT_SPREAD_FALLBACK.delta_7d_bp}bp 7D`} size={14} />
+        <Metric label="BTC Dominance" value={`${BTC_DOMINANCE_FALLBACK.value}%`} color="#60a5fa" sub={`${sign(BTC_DOMINANCE_FALLBACK.delta_7d)}${fmt(BTC_DOMINANCE_FALLBACK.delta_7d, 1)}pp 7D`} size={14} />
       </div>
 
       {/* Correlações rápidas */}
       <div style={{ padding: '10px 12px', borderRadius: 8, background: '#0a1018', border: '1px solid #0f1d2e' }}>
         <div style={{ fontSize: 9, color: '#334155', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.07em' }}>Correlações BTC</div>
         <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-          {btcCorrelations.pairs.map((p, i) => {
+          {BTC_CORRELATIONS_FALLBACK.pairs.map((p, i) => {
             const corrVal = period === 'Diário' ? p.corr_1d : period === 'Semanal' ? p.corr_1w : p.corr_1m;
             return (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
@@ -214,11 +243,11 @@ function GlobalOverview({ period, liveTicker, liveFng, liveRisk }) {
 // ─── REGIME SECTION ───────────────────────────────────────────────────────────
 function RegimeSection({ period, liveRegime, regimeLoading }) {
   const r = {
-    regime:     liveRegime?.label?.toUpperCase().replace('-', '-') ?? marketRegime.regime,
-    score:      liveRegime?.score ?? marketRegime.score,
-    confidence: marketRegime.confidence,  // sem equivalente live
-    suggestion: marketRegime.suggestion,  // sem equivalente live
-    components: liveRegime?.components ?? marketRegime.components,
+    regime:     liveRegime?.label?.toUpperCase().replace('-', '-') ?? MARKET_REGIME_FALLBACK.regime,
+    score:      liveRegime?.score ?? MARKET_REGIME_FALLBACK.score,
+    confidence: MARKET_REGIME_FALLBACK.confidence,  // sem equivalente live
+    suggestion: MARKET_REGIME_FALLBACK.suggestion,  // sem equivalente live
+    components: liveRegime?.components ?? MARKET_REGIME_FALLBACK.components,
   };
   const regColor = (r.regime === 'RISK-ON' || r.regime === 'Risk-On') ? '#10b981' : (r.regime === 'RISK-OFF' || r.regime === 'Risk-Off') ? '#ef4444' : '#f59e0b';
   // Em modo live, enquanto o regime ainda está carregando, não exibir score stale
@@ -303,19 +332,19 @@ function RegimeSection({ period, liveRegime, regimeLoading }) {
 
 // ─── STABLECOIN SECTION ───────────────────────────────────────────────────────
 function StablecoinSection({ period }) {
-  const s = stablecoinSupply;
-  const snap = stablecoinSnapshot;
+  const s = STABLECOIN_SUPPLY_FALLBACK;
+  const snap = STABLECOIN_SNAPSHOT_FALLBACK;
 
   // LTH/STH: dados live via CoinMetrics (mesmo cálculo do LthSthCard.jsx)
   const { data: extended } = useOnChainExtended();
   const TOTAL_SUPPLY = 19_850_000;
-  const lthPct    = extended ? extended.hodl_wave_1yr_pct * 100 : lthSthSupply.lth_pct;
-  const sthPct    = extended ? (100 - lthPct) : lthSthSupply.sth_pct;
-  const lthSupply = extended ? Math.round(TOTAL_SUPPLY * lthPct / 100) : lthSthSupply.lth_supply;
-  const sthSupply = extended ? TOTAL_SUPPLY - lthSupply : lthSthSupply.sth_supply;
+  const lthPct    = extended ? extended.hodl_wave_1yr_pct * 100 : LTH_STH_SUPPLY_FALLBACK.lth_pct;
+  const sthPct    = extended ? (100 - lthPct) : LTH_STH_SUPPLY_FALLBACK.sth_pct;
+  const lthSupply = extended ? Math.round(TOTAL_SUPPLY * lthPct / 100) : LTH_STH_SUPPLY_FALLBACK.lth_supply;
+  const sthSupply = extended ? TOTAL_SUPPLY - lthSupply : LTH_STH_SUPPLY_FALLBACK.sth_supply;
 
   const days = period === 'Diário' ? 7 : period === 'Semanal' ? 14 : 30;
-  const chartData = dailyMintBurn.slice(-days).map((h, i) => ({
+  const chartData = DAILY_MINT_BURN_FALLBACK.slice(-days).map((h, i) => ({
     dia: h.label,
     mint: parseFloat((h.usdt_mint + h.usdc_mint).toFixed(1)),
     burn: parseFloat((h.usdt_burn + h.usdc_burn).toFixed(1)),
@@ -357,7 +386,7 @@ function StablecoinSection({ period }) {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <div>
           <div style={{ fontSize: 9, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Supply por Chain</div>
-          {supplyByChain.map((ch, i) => (
+          {SUPPLY_BY_CHAIN_FALLBACK.map((ch, i) => (
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
               <div style={{ width: 6, height: 6, borderRadius: '50%', background: ch.color, flexShrink: 0 }} />
               <span style={{ fontSize: 10, color: '#8899a6', flex: 1 }}>{ch.chain}</span>
@@ -371,7 +400,7 @@ function StablecoinSection({ period }) {
         </div>
         <div>
           <div style={{ fontSize: 9, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Anomalias Detectadas</div>
-          {stablecoinAnomalies.map((a, i) => (
+          {STABLECOIN_ANOMALIES_FALLBACK.map((a, i) => (
             <div key={i} style={{ marginBottom: 7, padding: '7px 10px', borderRadius: 7, background: '#0a1018', border: `1px solid ${a.severity === 'HIGH' ? 'rgba(239,68,68,0.2)' : 'rgba(245,158,11,0.2)'}` }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
                 <span style={{ fontSize: 9, fontWeight: 700, color: a.severity === 'HIGH' ? '#ef4444' : '#f59e0b' }}>{a.severity}</span>
@@ -388,9 +417,9 @@ function StablecoinSection({ period }) {
       <div style={{ fontSize: 9, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>LTH vs STH Supply</div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
         <Metric label="LTH Supply" value={`${lthPct.toFixed(1)}%`} color="#10b981" sub={`${(lthSupply / 1e6).toFixed(2)}M BTC`} size={14} />
-        <Metric label="LTH em Lucro" value={`${lthSthSupply.lth_profit_pct}%`} color="#10b981" sub="Long-Term Holders" size={14} />
+        <Metric label="LTH em Lucro" value={`${LTH_STH_SUPPLY_FALLBACK.lth_profit_pct}%`} color="#10b981" sub="Long-Term Holders" size={14} />
         <Metric label="STH Supply" value={`${sthPct.toFixed(1)}%`} color="#f59e0b" sub={`${(sthSupply / 1e6).toFixed(2)}M BTC`} size={14} />
-        <Metric label="STH em Lucro" value={`${lthSthSupply.sth_profit_pct}%`} color={lthSthSupply.sth_profit_pct > 60 ? '#f59e0b' : '#ef4444'} sub="Short-Term Holders" size={14} />
+        <Metric label="STH em Lucro" value={`${LTH_STH_SUPPLY_FALLBACK.sth_profit_pct}%`} color={LTH_STH_SUPPLY_FALLBACK.sth_profit_pct > 60 ? '#f59e0b' : '#ef4444'} sub="Short-Term Holders" size={14} />
       </div>
     </SectionCard>
   );
@@ -398,9 +427,9 @@ function StablecoinSection({ period }) {
 
 // ─── DERIVATIVES SECTION ──────────────────────────────────────────────────────
 function DerivativesSection({ period, liveTicker }) {
-  const f = btcFutures;
-  const basis = futuresBasis;
-  const liq = liquidationClusters;
+  const f = BTC_FUTURES_MOCK_FALLBACK;
+  const basis = FUTURES_BASIS_FALLBACK;
+  const liq = LIQUIDATION_CLUSTERS_FALLBACK;
   const fundingRate = liveTicker?.last_funding_rate ?? f.funding_rate;
   const openInterest = liveTicker
     ? liveTicker.open_interest * liveTicker.mark_price
@@ -420,7 +449,7 @@ function DerivativesSection({ period, liveTicker }) {
     oi: parseFloat(((f.open_interest_usdt / 1e9) * (0.8 + i / histLen * 0.2 + (Math.sin(i) * 0.02))).toFixed(2)),
   }));
 
-  const liqClusters = [...liquidationClusters.clusters].sort((a, b) => a.price - b.price);
+  const liqClusters = [...LIQUIDATION_CLUSTERS_FALLBACK.clusters].sort((a, b) => a.price - b.price);
   const maxLiq = Math.max(...liqClusters.map(c => Math.max(c.longs_usd, c.shorts_usd)));
 
   return (
@@ -439,14 +468,14 @@ function DerivativesSection({ period, liveTicker }) {
         <Metric label="Funding Rate" value={`${(fundingRate * 100).toFixed(4)}%`} color={fundingRate > 0.0006 ? '#f59e0b' : '#10b981'} sub={`Ann: ${fundingAnn.toFixed(1)}%`} />
         <Metric label="Open Interest" value={fmtM(openInterest)} color="#60a5fa" sub={`+${oiDelta1d}% 1D · +${f.oi_delta_pct_1w}% 1W`} />
         <Metric label="Basis Jun26" value={`${basis.futures[1]?.basis_annualized?.toFixed(1)}%`} color="#10b981" sub={`Carry vs US10Y: +${carrySpread.toFixed(1)}pp`} />
-        <Metric label="OI/Mkt Cap" value={`${oiRatio.ratio_pct.toFixed(2)}%`} color={oiRatio.ratio_pct > 1.2 ? '#f59e0b' : '#10b981'} sub={oiRatio.zone} />
+        <Metric label="OI/Mkt Cap" value={`${OI_RATIO_FALLBACK.ratio_pct.toFixed(2)}%`} color={OI_RATIO_FALLBACK.ratio_pct > 1.2 ? '#f59e0b' : '#10b981'} sub={OI_RATIO_FALLBACK.zone} />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 12 }}>
         <Metric label="L/S Ratio" value={f.long_short_ratio.toFixed(2)} color={f.long_short_ratio > 1 ? '#10b981' : '#ef4444'} sub="Global accounts" size={14} />
         <Metric label="Longs Risco -10%" value={fmtM(liq.total_longs_at_risk_10pct)} color="#ef4444" sub="Liquidação cascata" size={14} />
         <Metric label="Shorts Risco +10%" value={fmtM(liq.total_shorts_at_risk_10pct)} color="#a78bfa" sub="Short squeeze" size={14} />
-        <Metric label="Liq. 24h Total" value={fmtM(liquidations24h.total_usd)} color="#f59e0b" sub={`Longs: ${((liquidations24h.longs_usd / liquidations24h.total_usd) * 100).toFixed(0)}%`} size={14} />
+        <Metric label="Liq. 24h Total" value={fmtM(LIQUIDATIONS_24H_FALLBACK.total_usd)} color="#f59e0b" sub={`Longs: ${((LIQUIDATIONS_24H_FALLBACK.longs_usd / LIQUIDATIONS_24H_FALLBACK.total_usd) * 100).toFixed(0)}%`} size={14} />
       </div>
 
       {/* Charts row */}
@@ -485,7 +514,7 @@ function DerivativesSection({ period, liveTicker }) {
         <div style={{ fontSize: 8, color: '#334155', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Clusters de Liquidação</div>
         <div style={{ display: 'flex', gap: 3, alignItems: 'flex-end', height: 50 }}>
           {liqClusters.map((c, i) => {
-            const isAbove = c.price > liquidationClusters.spot;
+            const isAbove = c.price > LIQUIDATION_CLUSTERS_FALLBACK.spot;
             const val = isAbove ? c.shorts_usd : c.longs_usd;
             const h = Math.round((val / maxLiq) * 44) + 6;
             const clr = isAbove ? '#a78bfa' : '#ef4444';
@@ -525,10 +554,10 @@ function DerivativesSection({ period, liveTicker }) {
       {/* Options quick */}
       <div style={{ fontSize: 9, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Options Snapshot</div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
-        <Metric label="IV ATM" value={`${(btcOptions.iv_atm * 100).toFixed(1)}%`} color="#a78bfa" sub={`+${(btcOptions.iv_atm_1d_delta * 100).toFixed(1)}pp 1D`} size={14} />
-        <Metric label="Skew" value={`${(btcOptions.skew * 100).toFixed(1)}pp`} color={btcOptions.skew < 0 ? '#ef4444' : '#10b981'} sub={btcOptions.skew_direction} size={14} />
-        <Metric label="Put/Call Ratio" value={btcOptionsExtended.put_call_ratio_oi.toFixed(2)} color="#60a5fa" sub="por OI" size={14} />
-        <Metric label="Max Pain" value={`$${(btcOptionsExtended.max_pain / 1000).toFixed(0)}K`} color="#f59e0b" sub={`${btcOptionsExtended.max_pain_distance_pct.toFixed(1)}% do spot`} size={14} />
+        <Metric label="IV ATM" value={`${(BTC_OPTIONS_MOCK_FALLBACK.iv_atm * 100).toFixed(1)}%`} color="#a78bfa" sub={`+${(BTC_OPTIONS_MOCK_FALLBACK.iv_atm_1d_delta * 100).toFixed(1)}pp 1D`} size={14} />
+        <Metric label="Skew" value={`${(BTC_OPTIONS_MOCK_FALLBACK.skew * 100).toFixed(1)}pp`} color={BTC_OPTIONS_MOCK_FALLBACK.skew < 0 ? '#ef4444' : '#10b981'} sub={BTC_OPTIONS_MOCK_FALLBACK.skew_direction} size={14} />
+        <Metric label="Put/Call Ratio" value={BTC_OPTIONS_EXT_FALLBACK.put_call_ratio_oi.toFixed(2)} color="#60a5fa" sub="por OI" size={14} />
+        <Metric label="Max Pain" value={`$${(BTC_OPTIONS_EXT_FALLBACK.max_pain / 1000).toFixed(0)}K`} color="#f59e0b" sub={`${BTC_OPTIONS_EXT_FALLBACK.max_pain_distance_pct.toFixed(1)}% do spot`} size={14} />
       </div>
     </SectionCard>
   );
@@ -537,23 +566,23 @@ function DerivativesSection({ period, liveTicker }) {
 // ─── ON-CHAIN SECTION ─────────────────────────────────────────────────────────
 function OnChainSection({ period, liveOnChain }) {
   const nupl = {
-    value:      liveOnChain?.nupl            ?? btcNUPL.value,
-    zone:       liveOnChain?.nupl_zone       ?? btcNUPL.zone,
-    zone_color: liveOnChain?.nupl_zone_color ?? btcNUPL.zone_color,
-    history:    btcNUPL.history,   // mantém histórico mock (formato diferente)
-    delta_7d:   btcNUPL.delta_7d,  // sem equivalente live
-    delta_30d:  btcNUPL.delta_30d, // sem equivalente live
+    value:      liveOnChain?.nupl            ?? BTC_NUPL_FALLBACK.value,
+    zone:       liveOnChain?.nupl_zone       ?? BTC_NUPL_FALLBACK.zone,
+    zone_color: liveOnChain?.nupl_zone_color ?? BTC_NUPL_FALLBACK.zone_color,
+    history:    BTC_NUPL_FALLBACK.history,   // mantém histórico mock (formato diferente)
+    delta_7d:   BTC_NUPL_FALLBACK.delta_7d,  // sem equivalente live
+    delta_30d:  BTC_NUPL_FALLBACK.delta_30d, // sem equivalente live
   };
-  const sopr = btcSOPR; // sem API gratuita — permanece mock
+  const sopr = BTC_SOPR_FALLBACK; // sem API gratuita — permanece mock
   const mvrv = {
-    mvrv_ratio:      liveOnChain?.mvrv_current    ?? btcRealizedMetrics.mvrv_ratio,
-    mvrv_zone:       liveOnChain?.mvrv_zone        ?? btcRealizedMetrics.mvrv_zone,
-    mvrv_zone_color: liveOnChain?.mvrv_zone_color  ?? btcRealizedMetrics.mvrv_zone_color,
-    mvrv_zscore:     liveOnChain?.mvrv_zscore      ?? btcRealizedMetrics.mvrv_zscore,
-    realized_price:  liveOnChain?.realized_price   ?? btcRealizedMetrics.realized_price,
+    mvrv_ratio:      liveOnChain?.mvrv_current    ?? BTC_REALIZED_METRICS_FALLBACK.mvrv_ratio,
+    mvrv_zone:       liveOnChain?.mvrv_zone        ?? BTC_REALIZED_METRICS_FALLBACK.mvrv_zone,
+    mvrv_zone_color: liveOnChain?.mvrv_zone_color  ?? BTC_REALIZED_METRICS_FALLBACK.mvrv_zone_color,
+    mvrv_zscore:     liveOnChain?.mvrv_zscore      ?? BTC_REALIZED_METRICS_FALLBACK.mvrv_zscore,
+    realized_price:  liveOnChain?.realized_price   ?? BTC_REALIZED_METRICS_FALLBACK.realized_price,
   };
-  const netflow = btcExchangeNetflow;
-  const whale = btcWhaleActivity;
+  const netflow = BTC_EXCHANGE_NETFLOW_FALLBACK;
+  const whale = BTC_WHALE_ACTIVITY_FALLBACK;
 
   const histKey = period === 'Diário' ? '1d' : period === 'Semanal' ? '1w' : '1m';
   const nuplHist = nupl.history[histKey] || nupl.history['1w'];
@@ -616,7 +645,7 @@ function OnChainSection({ period, liveOnChain }) {
 
 // ─── ETF & MACRO SECTION ──────────────────────────────────────────────────────
 function ETFMacroSection({ period }) {
-  const etf = etfFlows;
+  const etf = ETF_FLOWS_FALLBACK;
   const topFunds = etf.funds.slice(0, 5);
 
   const flowKey = period === 'Diário' ? 'flow_today_m' : period === 'Semanal' ? 'flow_7d_m' : 'flow_30d_m';
@@ -665,16 +694,16 @@ function ETFMacroSection({ period }) {
 
 // ─── PERIOD SUMMARY TABLE ─────────────────────────────────────────────────────
 function PeriodSummaryTable() {
-  const f = btcFutures;
+  const f = BTC_FUTURES_MOCK_FALLBACK;
   const rows = [
     { metric: 'BTC Price', d: `+${fmt(f.ret_1d * 100, 2)}%`, w: `+${fmt(f.ret_1w * 100, 2)}%`, m: `${fmt(f.ret_1m * 100, 2)}%`, y: '+124.8%', dC: col(f.ret_1d), wC: col(f.ret_1w), mC: col(f.ret_1m), yC: '#10b981' },
     { metric: 'Open Interest', d: `+${f.oi_delta_pct}%`, w: `+${f.oi_delta_pct_1w}%`, m: `+${f.oi_delta_pct_1m}%`, y: '+284%', dC: col(f.oi_delta_pct), wC: col(f.oi_delta_pct_1w), mC: col(f.oi_delta_pct_1m), yC: '#10b981' },
-    { metric: 'Stablecoin Supply', d: '+0.3%', w: `+${stablecoinSupply.delta_7d_pct.toFixed(1)}%`, m: `+${stablecoinSupply.delta_30d_pct.toFixed(1)}%`, y: '+42%', dC: '#10b981', wC: '#10b981', mC: '#10b981', yC: '#10b981' },
-    { metric: 'NUPL', d: `+${btcNUPL.delta_7d.toFixed(3)}`, w: `+${btcNUPL.delta_7d.toFixed(3)}`, m: `+${btcNUPL.delta_30d.toFixed(3)}`, y: '+0.22', dC: '#10b981', wC: '#10b981', mC: '#10b981', yC: '#10b981' },
+    { metric: 'Stablecoin Supply', d: '+0.3%', w: `+${STABLECOIN_SUPPLY_FALLBACK.delta_7d_pct.toFixed(1)}%`, m: `+${STABLECOIN_SUPPLY_FALLBACK.delta_30d_pct.toFixed(1)}%`, y: '+42%', dC: '#10b981', wC: '#10b981', mC: '#10b981', yC: '#10b981' },
+    { metric: 'NUPL', d: `+${BTC_NUPL_FALLBACK.delta_7d.toFixed(3)}`, w: `+${BTC_NUPL_FALLBACK.delta_7d.toFixed(3)}`, m: `+${BTC_NUPL_FALLBACK.delta_30d.toFixed(3)}`, y: '+0.22', dC: '#10b981', wC: '#10b981', mC: '#10b981', yC: '#10b981' },
     { metric: 'Funding Rate', d: '0.0712%', w: '0.0524%', m: '0.0398%', y: '~0.02%', dC: '#f59e0b', wC: '#f59e0b', mC: '#10b981', yC: '#10b981' },
     { metric: 'ETF AUM', d: '+$284.6M', w: '+$1.84B', m: '+$8.42B', y: '+$112B', dC: '#10b981', wC: '#10b981', mC: '#10b981', yC: '#10b981' },
-    { metric: 'BTC Dominance', d: `+${fmt(btcDominance.delta_7d / 7, 2)}pp`, w: `+${fmt(btcDominance.delta_7d, 2)}pp`, m: `+${fmt(btcDominance.delta_30d, 2)}pp`, y: '+12pp', dC: '#60a5fa', wC: '#60a5fa', mC: '#60a5fa', yC: '#60a5fa' },
-    { metric: 'VIX', d: '+1.6%', w: `+${fmt(macroBoard.series.find(s => s.id === 'VIX')?.delta_7d * 100, 1)}%`, m: `+${fmt(macroBoard.series.find(s => s.id === 'VIX')?.delta_30d * 100, 1)}%`, y: '—', dC: '#ef4444', wC: '#ef4444', mC: '#ef4444', yC: '#f59e0b' },
+    { metric: 'BTC Dominance', d: `+${fmt(BTC_DOMINANCE_FALLBACK.delta_7d / 7, 2)}pp`, w: `+${fmt(BTC_DOMINANCE_FALLBACK.delta_7d, 2)}pp`, m: `+${fmt(BTC_DOMINANCE_FALLBACK.delta_30d, 2)}pp`, y: '+12pp', dC: '#60a5fa', wC: '#60a5fa', mC: '#60a5fa', yC: '#60a5fa' },
+    { metric: 'VIX', d: '+1.6%', w: `+${fmt(MACRO_BOARD_FALLBACK.series.find(s => s.id === 'VIX')?.delta_7d * 100, 1)}%`, m: `+${fmt(MACRO_BOARD_FALLBACK.series.find(s => s.id === 'VIX')?.delta_30d * 100, 1)}%`, y: '—', dC: '#ef4444', wC: '#ef4444', mC: '#ef4444', yC: '#f59e0b' },
   ];
 
   return (
@@ -732,24 +761,24 @@ function EmailScheduler({ onClose, liveTicker, liveFng, liveRisk, liveRegime, li
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
 
-  const f = btcFutures;
+  const f = BTC_FUTURES_MOCK_FALLBACK;
   const btcPrice = liveTicker?.mark_price ?? f.mark_price;
   const fundingRate = liveTicker?.last_funding_rate ?? f.funding_rate;
   const openInterest = (liveTicker?.open_interest != null)
     ? liveTicker.open_interest * liveTicker.mark_price
     : f.open_interest_usdt;
-  const fngValue = liveFng?.value ?? fearGreed.value;
-  const fngLabel = liveFng?.label ?? fearGreed.classification;
-  const riskScore = liveRisk?.score ?? globalRisk.score;
-  const riskRegime = liveRisk?.regime ?? globalRisk.regime;
+  const fngValue = liveFng?.value ?? FEAR_GREED_FALLBACK.value;
+  const fngLabel = liveFng?.label ?? FEAR_GREED_FALLBACK.classification;
+  const riskScore = liveRisk?.score ?? GLOBAL_RISK_FALLBACK.score;
+  const riskRegime = liveRisk?.regime ?? GLOBAL_RISK_FALLBACK.regime;
   // regime live-with-fallback para o email
-  const emailRegimeScore = liveRegime?.score ?? marketRegime.score;
-  const emailRegimeLabel = liveRegime?.label?.toUpperCase().replace('-', '-') ?? marketRegime.regime;
+  const emailRegimeScore = liveRegime?.score ?? MARKET_REGIME_FALLBACK.score;
+  const emailRegimeLabel = liveRegime?.label?.toUpperCase().replace('-', '-') ?? MARKET_REGIME_FALLBACK.regime;
   // on-chain live-with-fallback para o email
-  const emailNuplValue = liveOnChain?.nupl ?? btcNUPL.value;
-  const emailNuplZone  = liveOnChain?.nupl_zone ?? btcNUPL.zone;
-  const emailMvrvRatio = liveOnChain?.mvrv_current ?? btcRealizedMetrics.mvrv_ratio;
-  const emailMvrvZone  = liveOnChain?.mvrv_zone ?? btcRealizedMetrics.mvrv_zone;
+  const emailNuplValue = liveOnChain?.nupl ?? BTC_NUPL_FALLBACK.value;
+  const emailNuplZone  = liveOnChain?.nupl_zone ?? BTC_NUPL_FALLBACK.zone;
+  const emailMvrvRatio = liveOnChain?.mvrv_current ?? BTC_REALIZED_METRICS_FALLBACK.mvrv_ratio;
+  const emailMvrvZone  = liveOnChain?.mvrv_zone ?? BTC_REALIZED_METRICS_FALLBACK.mvrv_zone;
 
   const handleSend = async () => {
     if (!email) return;
@@ -770,37 +799,37 @@ BTC: $${fmt(btcPrice, 0)} | 1D: ${sign(f.ret_1d * 100)}${fmt(f.ret_1d * 100, 2)}
 
 ══════════════════════════════════════════
 🎯 REGIME DE MERCADO
-Score: ${emailRegimeScore}/100 · Confiança: ${marketRegime.confidence}%
+Score: ${emailRegimeScore}/100 · Confiança: ${MARKET_REGIME_FALLBACK.confidence}%
 Regime: ${emailRegimeLabel}
-Estratégia: ${marketRegime.suggestion?.title || '—'}
+Estratégia: ${MARKET_REGIME_FALLBACK.suggestion?.title || '—'}
 
 ══════════════════════════════════════════
 💧 STABLECOIN FLOW
-Supply Total: $${stablecoinSupply.total_b.toFixed(1)}B
-7D: ${sign(stablecoinSupply.delta_7d_pct)}${stablecoinSupply.delta_7d_pct.toFixed(1)}% | 30D: ${sign(stablecoinSupply.delta_30d_pct)}${stablecoinSupply.delta_30d_pct.toFixed(1)}%
-USDT: $${stablecoinSupply.usdt_supply_b.toFixed(1)}B | USDC: $${stablecoinSupply.usdc_supply_b.toFixed(1)}B
+Supply Total: $${STABLECOIN_SUPPLY_FALLBACK.total_b.toFixed(1)}B
+7D: ${sign(STABLECOIN_SUPPLY_FALLBACK.delta_7d_pct)}${STABLECOIN_SUPPLY_FALLBACK.delta_7d_pct.toFixed(1)}% | 30D: ${sign(STABLECOIN_SUPPLY_FALLBACK.delta_30d_pct)}${STABLECOIN_SUPPLY_FALLBACK.delta_30d_pct.toFixed(1)}%
+USDT: $${STABLECOIN_SUPPLY_FALLBACK.usdt_supply_b.toFixed(1)}B | USDC: $${STABLECOIN_SUPPLY_FALLBACK.usdc_supply_b.toFixed(1)}B
 
 ══════════════════════════════════════════
 ⟆ DERIVATIVOS
 Funding Rate: ${(fundingRate * 100).toFixed(4)}% (ann: ${(fundingRate * 3 * 365 * 100).toFixed(1)}%)
 Open Interest: $${(openInterest / 1e9).toFixed(2)}B
   1D: +${f.oi_delta_pct}% | 1W: +${f.oi_delta_pct_1w}% | 1M: +${f.oi_delta_pct_1m}%
-Basis Jun26: ${futuresBasis.futures[1]?.basis_annualized.toFixed(1)}% vs US10Y 4.5%
-Longs em risco (−10%): $${(liquidationClusters.total_longs_at_risk_10pct / 1e9).toFixed(2)}B
+Basis Jun26: ${FUTURES_BASIS_FALLBACK.futures[1]?.basis_annualized.toFixed(1)}% vs US10Y 4.5%
+Longs em risco (−10%): $${(LIQUIDATION_CLUSTERS_FALLBACK.total_longs_at_risk_10pct / 1e9).toFixed(2)}B
 
 ══════════════════════════════════════════
 ⛓ ON-CHAIN
 NUPL: ${emailNuplValue.toFixed(3)} (${emailNuplZone})
-SOPR: ${btcSOPR.value.toFixed(3)}
+SOPR: ${BTC_SOPR_FALLBACK.value.toFixed(3)}
 MVRV: ${emailMvrvRatio.toFixed(2)} (${emailMvrvZone})
-Exchange Netflow 24h: ${btcExchangeNetflow.netflow_24h > 0 ? '+' : ''}${btcExchangeNetflow.netflow_24h.toLocaleString()} BTC
+Exchange Netflow 24h: ${BTC_EXCHANGE_NETFLOW_FALLBACK.netflow_24h > 0 ? '+' : ''}${BTC_EXCHANGE_NETFLOW_FALLBACK.netflow_24h.toLocaleString()} BTC
 
 ══════════════════════════════════════════
 🏦 ETF FLOWS
-AUM Total: $${etfFlows.total_aum_b.toFixed(1)}B
-Net Hoje: +$${etfFlows.net_flow_today_m.toFixed(0)}M
-Net 7D: +$${etfFlows.net_flow_7d_m.toFixed(0)}M
-${etfFlows.consec_inflow_days} dias consecutivos de entrada
+AUM Total: $${ETF_FLOWS_FALLBACK.total_aum_b.toFixed(1)}B
+Net Hoje: +$${ETF_FLOWS_FALLBACK.net_flow_today_m.toFixed(0)}M
+Net 7D: +$${ETF_FLOWS_FALLBACK.net_flow_7d_m.toFixed(0)}M
+${ETF_FLOWS_FALLBACK.consec_inflow_days} dias consecutivos de entrada
 
 ══════════════════════════════════════════
 Acesse: https://app.cryptowatch.io · Dados: ${IS_LIVE ? '🛰️ LIVE' : '🧪 DEMO'}
@@ -849,14 +878,14 @@ CryptoWatch Intelligence Suite
 
 // ─── PDF EXPORT ───────────────────────────────────────────────────────────────
 function exportPDF({ liveRegime = null, liveOnChain = null } = {}) {
-  const f = btcFutures;
+  const f = BTC_FUTURES_MOCK_FALLBACK;
   // live-with-fallback para variáveis usadas no template HTML
-  const pdfRegimeScore = liveRegime?.score ?? marketRegime.score;
-  const pdfRegimeLabel = liveRegime?.label?.toUpperCase().replace('-', '-') ?? marketRegime.regime;
-  const pdfNuplValue   = liveOnChain?.nupl           ?? btcNUPL.value;
-  const pdfNuplZone    = liveOnChain?.nupl_zone       ?? btcNUPL.zone;
-  const pdfMvrvRatio   = liveOnChain?.mvrv_current    ?? btcRealizedMetrics.mvrv_ratio;
-  const pdfMvrvZone    = liveOnChain?.mvrv_zone       ?? btcRealizedMetrics.mvrv_zone;
+  const pdfRegimeScore = liveRegime?.score ?? MARKET_REGIME_FALLBACK.score;
+  const pdfRegimeLabel = liveRegime?.label?.toUpperCase().replace('-', '-') ?? MARKET_REGIME_FALLBACK.regime;
+  const pdfNuplValue   = liveOnChain?.nupl           ?? BTC_NUPL_FALLBACK.value;
+  const pdfNuplZone    = liveOnChain?.nupl_zone       ?? BTC_NUPL_FALLBACK.zone;
+  const pdfMvrvRatio   = liveOnChain?.mvrv_current    ?? BTC_REALIZED_METRICS_FALLBACK.mvrv_ratio;
+  const pdfMvrvZone    = liveOnChain?.mvrv_zone       ?? BTC_REALIZED_METRICS_FALLBACK.mvrv_zone;
   const printWindow = window.open('', '_blank');
   printWindow.document.write(`
     <html><head>
@@ -884,51 +913,51 @@ function exportPDF({ liveRegime = null, liveOnChain = null } = {}) {
 
       <h2>🌐 Visão Global</h2>
       <div class="grid">
-        <div class="metric"><div class="label">Regime Global</div><div class="value">${globalRisk.regime}</div><div class="sub">Score: ${globalRisk.score}/100</div></div>
+        <div class="metric"><div class="label">Regime Global</div><div class="value">${GLOBAL_RISK_FALLBACK.regime}</div><div class="sub">Score: ${GLOBAL_RISK_FALLBACK.score}/100</div></div>
         <div class="metric"><div class="label">BTC Price</div><div class="value">$${fmt(f.mark_price, 0)}</div><div class="sub">1D: ${sign(f.ret_1d * 100)}${fmt(f.ret_1d * 100, 2)}%</div></div>
-        <div class="metric"><div class="label">Fear & Greed</div><div class="value">${fearGreed.value}</div><div class="sub">${fearGreed.classification}</div></div>
-        <div class="metric"><div class="label">BTC Dominance</div><div class="value">${btcDominance.value}%</div><div class="sub">7D: ${sign(btcDominance.delta_7d)}${fmt(btcDominance.delta_7d, 1)}pp</div></div>
+        <div class="metric"><div class="label">Fear & Greed</div><div class="value">${FEAR_GREED_FALLBACK.value}</div><div class="sub">${FEAR_GREED_FALLBACK.classification}</div></div>
+        <div class="metric"><div class="label">BTC Dominance</div><div class="value">${BTC_DOMINANCE_FALLBACK.value}%</div><div class="sub">7D: ${sign(BTC_DOMINANCE_FALLBACK.delta_7d)}${fmt(BTC_DOMINANCE_FALLBACK.delta_7d, 1)}pp</div></div>
       </div>
 
       <h2>🎯 Regime de Mercado</h2>
       <div class="grid">
         <div class="metric"><div class="label">Score</div><div class="value">${pdfRegimeScore}/100</div></div>
         <div class="metric"><div class="label">Regime</div><div class="value">${pdfRegimeLabel}</div></div>
-        <div class="metric"><div class="label">Confiança</div><div class="value">${marketRegime.confidence}%</div></div>
-        <div class="metric"><div class="label">VIX</div><div class="value">${macroBoard.series.find(s => s.id === 'VIX')?.value.toFixed(1)}</div></div>
+        <div class="metric"><div class="label">Confiança</div><div class="value">${MARKET_REGIME_FALLBACK.confidence}%</div></div>
+        <div class="metric"><div class="label">VIX</div><div class="value">${MACRO_BOARD_FALLBACK.series.find(s => s.id === 'VIX')?.value.toFixed(1)}</div></div>
       </div>
-      <div class="ai">💡 ${marketRegime.suggestion?.rationale?.slice(0, 300) || 'Análise em processamento.'}...</div>
+      <div class="ai">💡 ${MARKET_REGIME_FALLBACK.suggestion?.rationale?.slice(0, 300) || 'Análise em processamento.'}...</div>
 
       <h2>💧 Stablecoin Flow</h2>
       <div class="grid">
-        <div class="metric"><div class="label">Supply Total</div><div class="value">$${stablecoinSupply.total_b.toFixed(1)}B</div><div class="sub">7D: ${sign(stablecoinSupply.delta_7d_pct)}${stablecoinSupply.delta_7d_pct.toFixed(1)}%</div></div>
-        <div class="metric"><div class="label">USDT</div><div class="value">$${stablecoinSupply.usdt_supply_b.toFixed(1)}B</div></div>
-        <div class="metric"><div class="label">USDC</div><div class="value">$${stablecoinSupply.usdc_supply_b.toFixed(1)}B</div></div>
-        <div class="metric"><div class="label">Net Mint 24h</div><div class="value">+$${stablecoinSnapshot.total_net_24h_m.toFixed(0)}M</div></div>
+        <div class="metric"><div class="label">Supply Total</div><div class="value">$${STABLECOIN_SUPPLY_FALLBACK.total_b.toFixed(1)}B</div><div class="sub">7D: ${sign(STABLECOIN_SUPPLY_FALLBACK.delta_7d_pct)}${STABLECOIN_SUPPLY_FALLBACK.delta_7d_pct.toFixed(1)}%</div></div>
+        <div class="metric"><div class="label">USDT</div><div class="value">$${STABLECOIN_SUPPLY_FALLBACK.usdt_supply_b.toFixed(1)}B</div></div>
+        <div class="metric"><div class="label">USDC</div><div class="value">$${STABLECOIN_SUPPLY_FALLBACK.usdc_supply_b.toFixed(1)}B</div></div>
+        <div class="metric"><div class="label">Net Mint 24h</div><div class="value">+$${STABLECOIN_SNAPSHOT_FALLBACK.total_net_24h_m.toFixed(0)}M</div></div>
       </div>
 
       <h2>⟆ Derivativos</h2>
       <div class="grid">
         <div class="metric"><div class="label">Funding Rate</div><div class="value">${(f.funding_rate * 100).toFixed(4)}%</div><div class="sub">Ann: ${(f.funding_rate * 3 * 365 * 100).toFixed(1)}%</div></div>
         <div class="metric"><div class="label">Open Interest</div><div class="value">$${(f.open_interest_usdt / 1e9).toFixed(2)}B</div><div class="sub">+${f.oi_delta_pct}% 1D</div></div>
-        <div class="metric"><div class="label">Basis Jun26</div><div class="value">${futuresBasis.futures[1]?.basis_annualized.toFixed(1)}%</div><div class="sub">vs US10Y 4.5%</div></div>
-        <div class="metric"><div class="label">Longs em Risco −10%</div><div class="value">$${(liquidationClusters.total_longs_at_risk_10pct / 1e9).toFixed(2)}B</div></div>
+        <div class="metric"><div class="label">Basis Jun26</div><div class="value">${FUTURES_BASIS_FALLBACK.futures[1]?.basis_annualized.toFixed(1)}%</div><div class="sub">vs US10Y 4.5%</div></div>
+        <div class="metric"><div class="label">Longs em Risco −10%</div><div class="value">$${(LIQUIDATION_CLUSTERS_FALLBACK.total_longs_at_risk_10pct / 1e9).toFixed(2)}B</div></div>
       </div>
 
       <h2>⛓ On-Chain</h2>
       <div class="grid">
         <div class="metric"><div class="label">NUPL</div><div class="value">${pdfNuplValue.toFixed(3)}</div><div class="sub">${pdfNuplZone}</div></div>
-        <div class="metric"><div class="label">SOPR</div><div class="value">${btcSOPR.value.toFixed(3)}</div></div>
+        <div class="metric"><div class="label">SOPR</div><div class="value">${BTC_SOPR_FALLBACK.value.toFixed(3)}</div></div>
         <div class="metric"><div class="label">MVRV</div><div class="value">${pdfMvrvRatio.toFixed(2)}</div><div class="sub">${pdfMvrvZone}</div></div>
-        <div class="metric"><div class="label">Netflow 24h</div><div class="value">${btcExchangeNetflow.netflow_24h > 0 ? '+' : ''}${(btcExchangeNetflow.netflow_24h / 1000).toFixed(1)}K BTC</div></div>
+        <div class="metric"><div class="label">Netflow 24h</div><div class="value">${BTC_EXCHANGE_NETFLOW_FALLBACK.netflow_24h > 0 ? '+' : ''}${(BTC_EXCHANGE_NETFLOW_FALLBACK.netflow_24h / 1000).toFixed(1)}K BTC</div></div>
       </div>
 
       <h2>🏦 ETF Flows</h2>
       <div class="grid">
-        <div class="metric"><div class="label">AUM Total</div><div class="value">$${etfFlows.total_aum_b.toFixed(1)}B</div></div>
-        <div class="metric"><div class="label">Net Hoje</div><div class="value">+$${etfFlows.net_flow_today_m.toFixed(0)}M</div></div>
-        <div class="metric"><div class="label">Net 7D</div><div class="value">+$${etfFlows.net_flow_7d_m.toFixed(0)}M</div></div>
-        <div class="metric"><div class="label">Dias Consecutivos</div><div class="value">${etfFlows.consec_inflow_days}d entrada</div></div>
+        <div class="metric"><div class="label">AUM Total</div><div class="value">$${ETF_FLOWS_FALLBACK.total_aum_b.toFixed(1)}B</div></div>
+        <div class="metric"><div class="label">Net Hoje</div><div class="value">+$${ETF_FLOWS_FALLBACK.net_flow_today_m.toFixed(0)}M</div></div>
+        <div class="metric"><div class="label">Net 7D</div><div class="value">+$${ETF_FLOWS_FALLBACK.net_flow_7d_m.toFixed(0)}M</div></div>
+        <div class="metric"><div class="label">Dias Consecutivos</div><div class="value">${ETF_FLOWS_FALLBACK.consec_inflow_days}d entrada</div></div>
       </div>
 
       <h2>📅 Comparativo Multi-Período</h2>
@@ -936,8 +965,8 @@ function exportPDF({ liveRegime = null, liveOnChain = null } = {}) {
         <tr><th>Métrica</th><th>Diário</th><th>Semanal</th><th>Mensal</th><th>Anual</th></tr>
         <tr><td>BTC Price</td><td>${sign(f.ret_1d * 100)}${fmt(f.ret_1d * 100, 2)}%</td><td>${sign(f.ret_1w * 100)}${fmt(f.ret_1w * 100, 2)}%</td><td>${fmt(f.ret_1m * 100, 2)}%</td><td>+124.8%</td></tr>
         <tr><td>Open Interest</td><td>+${f.oi_delta_pct}%</td><td>+${f.oi_delta_pct_1w}%</td><td>+${f.oi_delta_pct_1m}%</td><td>+284%</td></tr>
-        <tr><td>Stablecoin Supply</td><td>+0.3%</td><td>${sign(stablecoinSupply.delta_7d_pct)}${stablecoinSupply.delta_7d_pct.toFixed(1)}%</td><td>${sign(stablecoinSupply.delta_30d_pct)}${stablecoinSupply.delta_30d_pct.toFixed(1)}%</td><td>+42%</td></tr>
-        <tr><td>NUPL</td><td>+${btcNUPL.delta_7d.toFixed(3)}</td><td>+${btcNUPL.delta_7d.toFixed(3)}</td><td>+${btcNUPL.delta_30d.toFixed(3)}</td><td>+0.22</td></tr>
+        <tr><td>Stablecoin Supply</td><td>+0.3%</td><td>${sign(STABLECOIN_SUPPLY_FALLBACK.delta_7d_pct)}${STABLECOIN_SUPPLY_FALLBACK.delta_7d_pct.toFixed(1)}%</td><td>${sign(STABLECOIN_SUPPLY_FALLBACK.delta_30d_pct)}${STABLECOIN_SUPPLY_FALLBACK.delta_30d_pct.toFixed(1)}%</td><td>+42%</td></tr>
+        <tr><td>NUPL</td><td>+${BTC_NUPL_FALLBACK.delta_7d.toFixed(3)}</td><td>+${BTC_NUPL_FALLBACK.delta_7d.toFixed(3)}</td><td>+${BTC_NUPL_FALLBACK.delta_30d.toFixed(3)}</td><td>+0.22</td></tr>
       </table>
 
       <div class="footer">
@@ -971,14 +1000,14 @@ export default function ExecutiveReport() {
 
   const aiRegime = liveAnalysis
     ? (liveAnalysis.overall.direction.startsWith('bull') ? 'risk_on' : liveAnalysis.overall.direction.startsWith('bear') ? 'risk_off' : 'caution')
-    : (globalRisk.regime === 'RISK-ON' ? 'risk_on' : globalRisk.regime === 'RISK-OFF' ? 'risk_off' : 'caution');
-  const aiProbability = liveAnalysis ? Math.round(liveAnalysis.overall.confidence * 100) : globalRisk.prob;
+    : (GLOBAL_RISK_FALLBACK.regime === 'RISK-ON' ? 'risk_on' : GLOBAL_RISK_FALLBACK.regime === 'RISK-OFF' ? 'risk_off' : 'caution');
+  const aiProbability = liveAnalysis ? Math.round(liveAnalysis.overall.confidence * 100) : GLOBAL_RISK_FALLBACK.prob;
   const aiRecommendation = liveAnalysis
     ? `${liveAnalysis.overall.recommendation} · Período: ${period}.`
-    : `Score global ${globalRisk.score}/100 — ${globalRisk.regime}. Período analisado: ${period}. Funding elevado + OI crescente + stablecoin expansivo = atenção a flush de longs.`;
+    : `Score global ${GLOBAL_RISK_FALLBACK.score}/100 — ${GLOBAL_RISK_FALLBACK.regime}. Período analisado: ${period}. Funding elevado + OI crescente + stablecoin expansivo = atenção a flush de longs.`;
   const aiReasoning = liveAnalysis
     ? `${liveAnalysis.overall.rationale} — ${liveAnalysis.overall.trigger}`
-    : `Regime ${globalRisk.regime} confirmado por supply stablecoin +${stablecoinSupply.delta_7d_pct.toFixed(1)}% 7D e ETF inflows positivos ($${etfFlows.net_flow_7d_m.toFixed(0)}M semana). Contrapeso: VIX ${macroBoard.series.find(s => s.id === 'VIX')?.value.toFixed(1)} e funding ${(btcFutures.funding_rate * 100).toFixed(4)}% persistente — prob. flush longs 62%. Carry trade atrativo (+${((futuresBasis.futures[1]?.basis_annualized || 0) - 4.512).toFixed(1)}pp vs US10Y).`;
+    : `Regime ${GLOBAL_RISK_FALLBACK.regime} confirmado por supply stablecoin +${STABLECOIN_SUPPLY_FALLBACK.delta_7d_pct.toFixed(1)}% 7D e ETF inflows positivos ($${ETF_FLOWS_FALLBACK.net_flow_7d_m.toFixed(0)}M semana). Contrapeso: VIX ${MACRO_BOARD_FALLBACK.series.find(s => s.id === 'VIX')?.value.toFixed(1)} e funding ${(BTC_FUTURES_MOCK_FALLBACK.funding_rate * 100).toFixed(4)}% persistente — prob. flush longs 62%. Carry trade atrativo (+${((FUTURES_BASIS_FALLBACK.futures[1]?.basis_annualized || 0) - 4.512).toFixed(1)}pp vs US10Y).`;
 
   return (
     <div style={{ maxWidth: 1280, margin: '0 auto' }}>

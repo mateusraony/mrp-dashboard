@@ -1,8 +1,40 @@
 import { useState, useEffect, useRef } from 'react';
-import {
-  btcFutures, btcSpotFlow, macroBoard, onChain,
-  fearGreed, recentAlerts, globalRisk, sourceHealth, fmtNum, fmtPct, aiAnalysis as aiAnalysisMockData,
-} from '../components/data/mockData';
+
+// Inline formatters
+const fmtNum = (v, d = 2) => v != null ? v.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d }) : '—';
+const fmtPct = (v, d = 4) => v != null ? (v * 100).toFixed(d) + '%' : '—';
+
+// Fallbacks — sem equivalente live gratuito
+const BTC_FUTURES_FALLBACK = {
+  mark_price: 0, index_price: 0,
+  funding_rate: 0, next_funding_time: new Date(Date.now() + 8 * 3600 * 1000),
+  open_interest: 0, open_interest_usdt: 0,
+  oi_delta_pct: 0, oi_delta_pct_1w: 0,
+  long_short_ratio: 1, top_trader_ls: 1,
+};
+const BTC_SPOT_FLOW_FALLBACK = { ret_1d: 0, ret_1w: 0, cvd: 0 };
+const MACRO_BOARD_FALLBACK = { series: [] };
+const ON_CHAIN_FALLBACK = {
+  fees:    { fastestFee: 0, halfHourFee: 0, hourFee: 0, economyFee: 0 },
+  mempool: { count: 0, vsize: 0 },
+};
+const FEAR_GREED_FALLBACK = { value: 50, label: 'Neutral', history: [] };
+const RECENT_ALERTS_FALLBACK = [];
+const GLOBAL_RISK_FALLBACK = { score: 50, regime: 'NEUTRAL', prob: 0, module_scores: {} };
+const SOURCE_HEALTH_FALLBACK = [];
+const AI_MODULE_FALLBACK = {
+  direction: 'neutral', signal: '', score: 0,
+  probability: 0, confidence: 0,
+  timeframe: '—', trigger: '—', analysis: '',
+};
+const AI_ANALYSIS_FALLBACK = {
+  modules: {
+    derivatives: AI_MODULE_FALLBACK,
+    spot:        AI_MODULE_FALLBACK,
+    options:     AI_MODULE_FALLBACK,
+    macro:       AI_MODULE_FALLBACK,
+  },
+};
 import { DATA_MODE, IS_LIVE } from '@/lib/env';
 import { DataTrustBadge } from '../components/ui/DataTrustBadge';
 import { useBtcTicker, useFearGreed as useFearGreedHook } from '@/hooks/useBtcData';
@@ -26,8 +58,8 @@ function useDashboardLiveData() {
     ticker:     ticker ?? null,
     fng:        fng    ?? null,
     riskScore:  riskScore ?? null,
-    btcFutures: ticker ? { ...btcFutures, mark_price: ticker.mark_price, funding_rate: ticker.last_funding_rate, oi_delta_pct: ticker.oi_delta_pct, open_interest: ticker.open_interest } : btcFutures,
-    fearGreed:  fng    ? { ...fearGreed,  value: fng.value, label: fng.label, classification: fng.label } : fearGreed,
+    btcFutures: ticker ? { ...BTC_FUTURES_FALLBACK, mark_price: ticker.mark_price, index_price: ticker.mark_price, funding_rate: ticker.last_funding_rate, oi_delta_pct: ticker.oi_delta_pct, open_interest: ticker.open_interest, open_interest_usdt: ticker.open_interest * ticker.mark_price } : BTC_FUTURES_FALLBACK,
+    fearGreed:  fng    ? { ...FEAR_GREED_FALLBACK, value: fng.value, label: fng.label, classification: fng.label } : FEAR_GREED_FALLBACK,
     errors: { ticker: tickerError, fng: fngError, risk: riskError },
   };
 }
@@ -92,7 +124,7 @@ function SectionTitle({ icon, label, sub = '', action = null }) {
 // ─── FEAR & GREED ─────────────────────────────────────────────────────────────
 function FearGreedGauge({ liveValue, fngError }) {
   const hasError = fngError && DATA_MODE === 'live';
-  const v = (!hasError && liveValue != null) ? liveValue : fearGreed.value;
+  const v = (!hasError && liveValue != null) ? liveValue : FEAR_GREED_FALLBACK.value;
   const zones = [
     { label: 'Extreme Fear', max: 25, color: '#60a5fa' },
     { label: 'Fear',         max: 45, color: '#10b981' },
@@ -147,9 +179,9 @@ function FearGreedGauge({ liveValue, fngError }) {
       </div>
       {/* 7d bars */}
       <div style={{ display: 'flex', gap: 3, alignItems: 'flex-end', height: 32 }}>
-        {fearGreed.history.map((hv, i) => {
+        {FEAR_GREED_FALLBACK.history.map((hv, i) => {
           const hz = zones.find(z => hv <= z.max) || zones[zones.length-1];
-          const isLast = i === fearGreed.history.length - 1;
+          const isLast = i === FEAR_GREED_FALLBACK.history.length - 1;
           return (
             <div key={i} title={`${hv}`} style={{
               flex: 1, height: `${(hv / 100) * 32}px`,
@@ -170,7 +202,7 @@ function FearGreedGauge({ liveValue, fngError }) {
 // ─── BTC SNAPSHOT ─────────────────────────────────────────────────────────────
 function BTCSnapshot({ liveData, tickerError }) {
   const err = tickerError && DATA_MODE === 'live';
-  const fr = liveData ?? btcFutures;
+  const fr = liveData ?? BTC_FUTURES_FALLBACK;
   const fundingColor = err ? '#4a5568' : (fr.funding_rate > 0.0005 ? '#ef4444' : fr.funding_rate > 0 ? '#f59e0b' : '#10b981');
   const oiColor = err ? '#4a5568' : '#f59e0b';
   const priceStr   = err ? '***' : `$${fmtNum(fr.mark_price, 0)}`;
@@ -200,8 +232,8 @@ function BTCSnapshot({ liveData, tickerError }) {
           <span style={{ fontSize: 26, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: err ? '#4a5568' : '#f1f5f9', letterSpacing: '-0.03em' }}>
             {priceStr}
           </span>
-          <DeltaPill value={btcSpotFlow.ret_1d * 100} suffix="% 1D" />
-          <DeltaPill value={btcSpotFlow.ret_1w * 100} suffix="% 1W" compact />
+          <DeltaPill value={BTC_SPOT_FLOW_FALLBACK.ret_1d * 100} suffix="% 1D" />
+          <DeltaPill value={BTC_SPOT_FLOW_FALLBACK.ret_1w * 100} suffix="% 1W" compact />
         </div>
       </div>
 
@@ -219,7 +251,7 @@ function BTCSnapshot({ liveData, tickerError }) {
         <Stat label="Long/Short Ratio" value={fr.long_short_ratio.toFixed(2)} color="#60a5fa" big
           sub={`Top traders: ${fr.top_trader_ls.toFixed(2)}`}
           help={{ title: 'L/S Ratio', content: 'Proporção de posições longas vs curtas. >1.5 com funding alto = posicionamento perigoso.' }} />
-        <Stat label="CVD Intraday" value={`+${(btcSpotFlow.cvd/1000).toFixed(1)}K`} color="#10b981" big
+        <Stat label="CVD Intraday" value={`+${(BTC_SPOT_FLOW_FALLBACK.cvd/1000).toFixed(1)}K`} color="#10b981" big
           sub="Taker Buy > Sell"
           help={{ title: 'CVD', content: 'Diferença acumulada entre volume comprador e vendedor. Positivo = agressores compradores dominando.' }} />
       </div>
@@ -233,7 +265,7 @@ const MACRO_ICONS = { SP500: '📈', DXY: '💵', GOLD: '🥇', VIX: '🌡️', 
 function MacroRow() {
   const { data: liveMacro, isError: macroError } = useMacroBoard();
   const err = macroError && DATA_MODE === 'live';
-  const series = liveMacro?.series ?? macroBoard.series;
+  const series = liveMacro?.series ?? MACRO_BOARD_FALLBACK.series;
   const invertColors = { DXY: true, VIX: true };
 
   return (
@@ -323,8 +355,8 @@ function AlertRow({ alert }) {
 // ─── DATA QUALITY STRIP ───────────────────────────────────────────────────────
 function DataQualityStrip() {
   const [open, setOpen] = useState(false);
-  const ok = sourceHealth.filter(s => s.grade === 'A').length;
-  const warn = sourceHealth.filter(s => s.grade !== 'A').length;
+  const ok = SOURCE_HEALTH_FALLBACK.filter(s => s.grade === 'A').length;
+  const warn = SOURCE_HEALTH_FALLBACK.filter(s => s.grade !== 'A').length;
 
   return (
     <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, overflow: 'hidden' }}>
@@ -339,7 +371,7 @@ function DataQualityStrip() {
         <ModeBadge />
         <span style={{ fontSize: 10, color: '#334155' }}>{open ? '▲' : '▼'}</span>
       </button>
-      {open && <div style={{ borderTop: '1px solid #1a2535' }}>{sourceHealth.map(s => <SourceRow key={s.source} source={s} />)}</div>}
+      {open && <div style={{ borderTop: '1px solid #1a2535' }}>{SOURCE_HEALTH_FALLBACK.map(s => <SourceRow key={s.source} source={s} />)}</div>}
     </div>
   );
 }
@@ -348,12 +380,12 @@ function DataQualityStrip() {
 function MempoolRow() {
   const { data: liveMempool } = useMempoolState();
   // Live: MempoolData shape (snake_case). Mock: onChain.fees/mempool shape (camelCase).
-  const fastest  = liveMempool?.fees.fastest_fee   ?? onChain.fees.fastestFee;
-  const halfHour = liveMempool?.fees.half_hour_fee  ?? onChain.fees.halfHourFee;
-  const hour     = liveMempool?.fees.hour_fee       ?? onChain.fees.hourFee;
-  const economy  = liveMempool?.fees.economy_fee    ?? onChain.fees.economyFee;
-  const txCount  = liveMempool?.tx_count            ?? onChain.mempool.count;
-  const vsize    = liveMempool?.vsize_bytes          ?? onChain.mempool.vsize;
+  const fastest  = liveMempool?.fees.fastest_fee   ?? ON_CHAIN_FALLBACK.fees.fastestFee;
+  const halfHour = liveMempool?.fees.half_hour_fee  ?? ON_CHAIN_FALLBACK.fees.halfHourFee;
+  const hour     = liveMempool?.fees.hour_fee       ?? ON_CHAIN_FALLBACK.fees.hourFee;
+  const economy  = liveMempool?.fees.economy_fee    ?? ON_CHAIN_FALLBACK.fees.economyFee;
+  const txCount  = liveMempool?.tx_count            ?? ON_CHAIN_FALLBACK.mempool.count;
+  const vsize    = liveMempool?.vsize_bytes          ?? ON_CHAIN_FALLBACK.mempool.vsize;
   const items = [
     { label: 'Fastest', value: fastest,  unit: 'sat/vB', color: '#ef4444' },
     { label: '½ Hour',  value: halfHour, unit: 'sat/vB', color: '#f59e0b' },
@@ -518,7 +550,7 @@ export default function Dashboard() {
         } : undefined,
       }, calibration?.weights)
     : null;
-  const aiAnalysis = liveAnalysis ?? aiAnalysisMockData;
+  const aiAnalysis = liveAnalysis ?? AI_ANALYSIS_FALLBACK;
 
   // ── Sprint 8.2: AI Track Record persistence ──────────────────────────────────
   const persistMutation = usePersistPrediction();
@@ -545,10 +577,10 @@ export default function Dashboard() {
   }, []);
 
   // Usa Risk Score live se disponível; fallback para globalRisk do mock
-  const activeScore  = liveRiskScore?.score  ?? globalRisk.score;
+  const activeScore  = liveRiskScore?.score  ?? GLOBAL_RISK_FALLBACK.score;
   const activeRegime = liveRiskScore
     ? (liveRiskScore.regime === 'RISCO ELEVADO' ? 'RISK-OFF' : liveRiskScore.regime === 'SAUDÁVEL' ? 'RISK-ON' : 'NEUTRAL')
-    : globalRisk.regime;
+    : GLOBAL_RISK_FALLBACK.regime;
   const regimeColor = activeRegime === 'RISK-ON' ? '#10b981' : activeRegime === 'RISK-OFF' ? '#ef4444' : '#f59e0b';
 
   // Análise em linguagem natural via Claude Haiku (AI Etapa 4) — 15min cache
@@ -556,8 +588,8 @@ export default function Dashboard() {
     ? {
         riskScore:      activeScore,
         riskRegime:     activeRegime,
-        fearGreedValue: _fngLive?.value ?? fearGreed.value,
-        fearGreedLabel: _fngLive?.label ?? fearGreed.label,
+        fearGreedValue: _fngLive?.value ?? FEAR_GREED_FALLBACK.value,
+        fearGreedLabel: _fngLive?.label ?? FEAR_GREED_FALLBACK.label,
         fundingRate:    liveTicker.last_funding_rate,
         mtfConfluence:  mtf.confluence,
         mtfDirection:   mtf.confluenceDir,
@@ -584,13 +616,13 @@ export default function Dashboard() {
           Risk Score: <span style={{ fontFamily: 'JetBrains Mono, monospace', color: regimeColor, fontWeight: 700 }}>{activeScore}/100</span>
         </div>
         <div style={{ fontSize: 11, color: '#475569' }}>
-          Prob. Evento: <span style={{ fontFamily: 'JetBrains Mono, monospace', color: '#f1f5f9', fontWeight: 700 }}>{globalRisk.prob}%</span>
+          Prob. Evento: <span style={{ fontFamily: 'JetBrains Mono, monospace', color: '#f1f5f9', fontWeight: 700 }}>{GLOBAL_RISK_FALLBACK.prob}%</span>
         </div>
         <div style={{ flex: 1 }} />
         {/* Resumo rápido de qualidade de dados — visível no topo para novos usuários */}
         {IS_LIVE
           ? <span style={{ fontSize: 10, color: '#10b981', background: 'rgba(16,185,129,0.10)', border: '1px solid rgba(16,185,129,0.22)', borderRadius: 5, padding: '2px 8px', fontWeight: 700, letterSpacing: '0.02em' }}>
-              {sourceHealth.filter(s => s.grade === 'A').length} fontes ao vivo · {sourceHealth.filter(s => s.grade === 'B').length} estimadas · {sourceHealth.filter(s => ['C','D'].includes(s.grade)).length} mock
+              {SOURCE_HEALTH_FALLBACK.filter(s => s.grade === 'A').length} fontes ao vivo · {SOURCE_HEALTH_FALLBACK.filter(s => s.grade === 'B').length} estimadas · {SOURCE_HEALTH_FALLBACK.filter(s => ['C','D'].includes(s.grade)).length} mock
             </span>
           : <span style={{ fontSize: 10, color: '#f59e0b', background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.22)', borderRadius: 5, padding: '2px 8px', fontWeight: 700, letterSpacing: '0.02em' }}>
               DEMO — todos os dados são simulados
@@ -606,9 +638,9 @@ export default function Dashboard() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px,1fr))', gap: 14, marginBottom: 20 }}>
         <RiskMeter
           score={activeScore}
-          prob={globalRisk.prob}
+          prob={GLOBAL_RISK_FALLBACK.prob}
           regime={activeRegime}
-          moduleScores={liveRiskScore?.module_scores ?? globalRisk.module_scores}
+          moduleScores={liveRiskScore?.module_scores ?? GLOBAL_RISK_FALLBACK.module_scores}
         />
         <FearGreedGauge liveValue={_fngLive?.value} fngError={liveErrors.fng} />
         <BTCSnapshot liveData={_btcLive} tickerError={liveErrors.ticker} />
@@ -762,7 +794,7 @@ export default function Dashboard() {
         <SectionTitle icon="◎" label="Alertas Recentes"
           action={<Link to={createPageUrl('Alerts')} style={{ fontSize: 11, color: '#3b82f6', textDecoration: 'none', background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', padding: '3px 9px', borderRadius: 5, fontWeight: 600 }}>Ver todos →</Link>} />
         <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, overflow: 'hidden' }}>
-          {recentAlerts.map(a => <AlertRow key={a.id} alert={a} />)}
+          {RECENT_ALERTS_FALLBACK.map(a => <AlertRow key={a.id} alert={a} />)}
         </div>
       </div>
 

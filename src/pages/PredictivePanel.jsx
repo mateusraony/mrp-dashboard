@@ -1,8 +1,5 @@
 // ─── PREDICTIVE PANEL — BTC 24h Price Projection ────────────────────────────
 import { useState, useMemo } from 'react';
-import {
-  scenarios24h, breakoutTable, institutionalPressure, pricePaths,
-} from '../components/data/mockDataPredictive';
 import { ModeBadge } from '../components/ui/DataBadge';
 import { DataTrustBadge } from '../components/ui/DataTrustBadge';
 import { Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -13,7 +10,23 @@ import { useRiskScore } from '@/hooks/useRiskScore';
 import { computeRuleBasedAnalysis } from '@/utils/ruleBasedAnalysis';
 import { IS_LIVE } from '@/lib/env';
 
-const SPOT_FALLBACK = 84298.70;
+const SPOT_FALLBACK = 84_000;
+
+// Fallbacks — dados preditivos requerem APIs pagas (Glassnode, Bloomberg) ou cálculo histórico
+const SCENARIOS_24H_FALLBACK = [
+  { id: 'bull_strong', label: 'Rally Institucional', prob: 28, direction: 'bull',    color: '#10b981', target_price: SPOT_FALLBACK * 1.048, target_pct:  4.8, trigger: '—', drivers: [], risk: '—', confidence: 0.61 },
+  { id: 'bull_mild',   label: 'Alta Moderada',       prob: 34, direction: 'bull',    color: '#60a5fa', target_price: SPOT_FALLBACK * 1.021, target_pct:  2.1, trigger: '—', drivers: [], risk: '—', confidence: 0.70 },
+  { id: 'neutral',     label: 'Lateral',             prob: 18, direction: 'neutral', color: '#f59e0b', target_price: SPOT_FALLBACK,         target_pct:  0,   trigger: '—', drivers: [], risk: '—', confidence: 0.52 },
+  { id: 'bear_mild',   label: 'Correção Suave',      prob: 14, direction: 'bear',    color: '#f97316', target_price: SPOT_FALLBACK * 0.975, target_pct: -2.5, trigger: '—', drivers: [], risk: '—', confidence: 0.64 },
+  { id: 'bear_strong', label: 'Liquidação',          prob:  6, direction: 'bear',    color: '#ef4444', target_price: SPOT_FALLBACK * 0.930, target_pct: -7.0, trigger: '—', drivers: [], risk: '—', confidence: 0.45 },
+];
+const BREAKOUT_TABLE_FALLBACK = [];
+const INSTITUTIONAL_PRESSURE_FALLBACK = {
+  overall_score:  0,
+  components:     [],
+  interpretation: 'Dados indisponíveis — requer APIs pagas (Glassnode, Bloomberg)',
+};
+const PRICE_PATHS_FALLBACK = { timestamps: [], bull: [], neutral: [], bear: [] };
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 function fmtK(v) { return `$${(v / 1000).toFixed(1)}K`; }
@@ -102,11 +115,11 @@ function BreakoutRow({ b, spotPrice: rowSpot = SPOT_FALLBACK }) {
 
 // ─── PATH CHART ───────────────────────────────────────────────────────────────
 function PathChart({ selected, spotPrice: chartSpot = SPOT_FALLBACK }) {
-  const data = pricePaths.timestamps.map((t, i) => ({
+  const data = PRICE_PATHS_FALLBACK.timestamps.map((t, i) => ({
     t,
-    bull:    pricePaths.bull[i],
-    neutral: pricePaths.neutral[i],
-    bear:    pricePaths.bear[i],
+    bull:    PRICE_PATHS_FALLBACK.bull[i],
+    neutral: PRICE_PATHS_FALLBACK.neutral[i],
+    bear:    PRICE_PATHS_FALLBACK.bear[i],
     spot:    chartSpot,
   }));
 
@@ -141,7 +154,7 @@ function PathChart({ selected, spotPrice: chartSpot = SPOT_FALLBACK }) {
 
 // ─── INSTITUTIONAL PRESSURE ───────────────────────────────────────────────────
 function InstitutionalPanel() {
-  const ip = institutionalPressure;
+  const ip = INSTITUTIONAL_PRESSURE_FALLBACK;
   const scoreColor = ip.overall_score >= 65 ? '#10b981' : ip.overall_score >= 40 ? '#f59e0b' : '#ef4444';
   return (
     <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '16px 18px' }}>
@@ -238,9 +251,9 @@ export default function PredictivePanel() {
 
   // ── Cenários com preços mesclados (live quando disponível) ─────────────
   const scenarios = useMemo(() => {
-    if (!liveScenarioPrices) return scenarios24h;
+    if (!liveScenarioPrices) return SCENARIOS_24H_FALLBACK;
     const SPOT = spotPrice;
-    return scenarios24h.map(s => {
+    return SCENARIOS_24H_FALLBACK.map(s => {
       const liveTarget = liveScenarioPrices[s.id];
       if (liveTarget === undefined || liveTarget === null) return s;
       const target_pct = parseFloat(((liveTarget - SPOT) / SPOT * 100).toFixed(1));
@@ -458,7 +471,7 @@ export default function PredictivePanel() {
                 </tr>
               </thead>
               <tbody>
-                {breakoutTable.map(b => <BreakoutRow key={b.price} b={b} spotPrice={SPOT} />)}
+                {BREAKOUT_TABLE_FALLBACK.map(b => <BreakoutRow key={b.price} b={b} spotPrice={SPOT} />)}
               </tbody>
             </table>
           </div>
