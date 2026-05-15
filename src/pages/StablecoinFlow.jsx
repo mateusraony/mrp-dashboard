@@ -11,13 +11,11 @@ const STABLECOIN_SNAPSHOT_FALLBACK = {
 const LARGE_MINT_EVENTS_FALLBACK = [];
 const LARGE_BURN_EVENTS_FALLBACK = [];
 const STABLECOIN_ANOMALIES_FALLBACK = [];
-const chainPieData = [];
 const MINT_VS_BTC_CORR_FALLBACK = {
   pearson_7d: 0, pearson_30d: 0, lag_hours_optimal: 0,
   note: 'Dados indisponíveis — requer API paga (Glassnode/Nansen)',
 };
 import { useStablecoinData } from '@/hooks/useStablecoin';
-import { DataTrustBadge } from '../components/ui/DataTrustBadge';
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, PieChart, Pie, Cell,
@@ -151,7 +149,7 @@ export function StablecoinContent() {
   }, [defiData]);
 
   const chainPieData = useMemo(() => {
-    if (!defiData?.byChain?.length) return [];
+    if (!defiData?.byChain?.length || defiData.source === 'mock') return [];
     const total = defiData.totalSupply || 1;
     return defiData.byChain.map(c => ({
       chain: c.chain,
