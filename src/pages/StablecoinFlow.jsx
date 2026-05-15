@@ -342,7 +342,7 @@ export function StablecoinContent() {
             <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>Mint Net × BTC Buy Volume (30D)</div>
             <div style={{ fontSize: 9, color: '#334155', marginBottom: 12 }}>Comparação visual: barras = mint líquido · linha = volume de compra BTC normalizado</div>
             <ResponsiveContainer width="100%" height={200}>
-              <ComposedChart data={dailyMintBurn} margin={{ top: 4, right: 4, left: -18, bottom: 0 }}>
+              <ComposedChart data={DAILY_MINT_BURN_FALLBACK} margin={{ top: 4, right: 4, left: -18, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(30,45,69,0.5)" vertical={false} />
                 <XAxis dataKey="label" tick={{ fontSize: 9, fill: '#334155' }} axisLine={false} tickLine={false} interval={4} />
                 <YAxis tick={{ fontSize: 9, fill: '#334155' }} axisLine={false} tickLine={false} />

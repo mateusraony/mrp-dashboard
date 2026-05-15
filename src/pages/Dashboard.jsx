@@ -181,7 +181,7 @@ function FearGreedGauge({ liveValue, fngError }) {
       <div style={{ display: 'flex', gap: 3, alignItems: 'flex-end', height: 32 }}>
         {FEAR_GREED_FALLBACK.history.map((hv, i) => {
           const hz = zones.find(z => hv <= z.max) || zones[zones.length-1];
-          const isLast = i === fearGreed.history.length - 1;
+          const isLast = i === FEAR_GREED_FALLBACK.history.length - 1;
           return (
             <div key={i} title={`${hv}`} style={{
               flex: 1, height: `${(hv / 100) * 32}px`,
