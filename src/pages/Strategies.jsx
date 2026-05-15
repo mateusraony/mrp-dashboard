@@ -384,7 +384,7 @@ export function StrategiesContent() {
         {/* Strategy list */}
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-            <DataTrustBadge mode="mock" confidence="D" source="Engine quantitativa (demo)" reason="Setups estáticos — sem API de sinais em tempo real" />
+            <DataTrustBadge mode="estimated" confidence="B" source="Condições ao vivo + setups demo" reason="Funding, IV e sentimento são ao vivo. Definições de estratégia são demonstração — sem API de sinais proprietária." />
           </div>
           {filtered.map(s => (
             <StrategyCard

@@ -11,7 +11,7 @@ const STABLECOIN_SNAPSHOT_FALLBACK = {
 const LARGE_MINT_EVENTS_FALLBACK = [];
 const LARGE_BURN_EVENTS_FALLBACK = [];
 const STABLECOIN_ANOMALIES_FALLBACK = [];
-const SUPPLY_BY_CHAIN_FALLBACK = [];
+const chainPieData = [];
 const MINT_VS_BTC_CORR_FALLBACK = {
   pearson_7d: 0, pearson_30d: 0, lag_hours_optimal: 0,
   note: 'Dados indisponíveis — requer API paga (Glassnode/Nansen)',
@@ -150,12 +150,22 @@ export function StablecoinContent() {
     };
   }, [defiData]);
 
+  const chainPieData = useMemo(() => {
+    if (!defiData?.byChain?.length) return [];
+    const total = defiData.totalSupply || 1;
+    return defiData.byChain.map(c => ({
+      chain: c.chain,
+      total_b: c.tvl / 1e9,
+      share_pct: c.tvl / total * 100,
+    }));
+  }, [defiData]);
+
   const slicedData = DAILY_MINT_BURN_FALLBACK.slice(-tf);
   const avg7dNet = snap.avg7d_net_m;
   const isRateLimited = defiData?.quality === 'C';
   const isLiveData = defiData?.source === 'DeFiLlama' || defiData?.source === 'cache';
 
-  const CHAIN_COLORS = ['#627eea', '#28a0f0', '#ef0027', '#9945ff'];
+  const CHAIN_COLORS = ['#627eea', '#28a0f0', '#ef0027', '#9945ff', '#f59e0b'];
 
   return (
     <div style={{ maxWidth: 1400, margin: '0 auto' }}>
@@ -179,7 +189,6 @@ export function StablecoinContent() {
       <div style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
           <h1 style={{ fontSize: 20, fontWeight: 900, color: '#f1f5f9', margin: 0, letterSpacing: '-0.03em' }}>Stablecoin Flow Tracker</h1>
-          <DataTrustBadge mode="paid_required" confidence="D" source="Glassnode/Nansen" reason="Mint/burn flows requerem Glassnode (~$29/mês) ou Nansen" />
           {STABLECOIN_ANOMALIES_FALLBACK.length > 0 && (
             <span style={{ fontSize: 10, color: '#ef4444', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 4, padding: '2px 8px', fontWeight: 800 }}>
               🚨 {STABLECOIN_ANOMALIES_FALLBACK.length} anomalia{STABLECOIN_ANOMALIES_FALLBACK.length > 1 ? 's' : ''}
@@ -230,6 +239,16 @@ export function StablecoinContent() {
       {/* ── VISÃO GERAL ── */}
       {tab === 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {slicedData.length === 0 && (
+            <div style={{ padding: '28px 20px', textAlign: 'center', background: '#0d1421', border: '1px solid #1a2535', borderRadius: 12, marginBottom: 14 }}>
+              <div style={{ fontSize: 24, marginBottom: 8 }}>🔒</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#94a3b8', marginBottom: 6 }}>Histórico de Mint/Burn indisponível</div>
+              <div style={{ fontSize: 11, color: '#475569', lineHeight: 1.7 }}>
+                Dados diários de emissão requerem <strong style={{ color: '#60a5fa' }}>Glassnode (~$29/mês)</strong> ou Nansen.<br />
+                Os <strong style={{ color: '#10b981' }}>valores acima</strong> (supply total, net 24h, USDT/USDC) são ao vivo via DeFiLlama.
+              </div>
+            </div>
+          )}
           {/* Net Flow chart (Mint - Burn) */}
           <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '16px 18px' }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>Net Flow Diário — USDT + USDC</div>
@@ -287,7 +306,9 @@ export function StablecoinContent() {
                 <div style={{ fontSize: 9, color: '#334155' }}>Eventos ≥ $250M</div>
               </div>
             </div>
-            {LARGE_MINT_EVENTS_FALLBACK.map(ev => <EventRow key={ev.id} ev={ev} type="mint" />)}
+            {LARGE_MINT_EVENTS_FALLBACK.length > 0
+              ? LARGE_MINT_EVENTS_FALLBACK.map(ev => <EventRow key={ev.id} ev={ev} type="mint" />)
+              : <div style={{ padding: '20px', textAlign: 'center', color: '#334155', fontSize: 11 }}>🔒 Requer Glassnode (~$29/mês)</div>}
           </div>
           {/* Burn events */}
           <div style={{ background: '#111827', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 12, overflow: 'hidden' }}>
@@ -298,7 +319,9 @@ export function StablecoinContent() {
                 <div style={{ fontSize: 9, color: '#334155' }}>Eventos ≥ $150M</div>
               </div>
             </div>
-            {LARGE_BURN_EVENTS_FALLBACK.map(ev => <EventRow key={ev.id} ev={ev} type="burn" />)}
+            {LARGE_BURN_EVENTS_FALLBACK.length > 0
+              ? LARGE_BURN_EVENTS_FALLBACK.map(ev => <EventRow key={ev.id} ev={ev} type="burn" />)
+              : <div style={{ padding: '20px', textAlign: 'center', color: '#334155', fontSize: 11 }}>🔒 Requer Glassnode (~$29/mês)</div>}
             {/* Net summary */}
             <div style={{ padding: '11px 14px', background: 'rgba(16,185,129,0.04)' }}>
               <div style={{ fontSize: 9, color: '#334155', marginBottom: 3 }}>Net 7D por token</div>
@@ -316,16 +339,19 @@ export function StablecoinContent() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
           {/* Pie */}
           <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '16px 18px' }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 14 }}>Supply por Rede</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>Supply por Rede</div>
+            {chainPieData.length > 0 && (
+              <div style={{ fontSize: 9, color: '#10b981', marginBottom: 10 }}>● AO VIVO · DeFiLlama (total por chain)</div>
+            )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
               <PieChart width={160} height={160}>
-                <Pie data={SUPPLY_BY_CHAIN_FALLBACK} dataKey="total_b" nameKey="chain" cx={80} cy={80} outerRadius={70} innerRadius={40} paddingAngle={2}>
-                  {SUPPLY_BY_CHAIN_FALLBACK.map((entry, i) => <Cell key={i} fill={CHAIN_COLORS[i]} />)}
+                <Pie data={chainPieData} dataKey="total_b" nameKey="chain" cx={80} cy={80} outerRadius={70} innerRadius={40} paddingAngle={2}>
+                  {chainPieData.map((entry, i) => <Cell key={i} fill={CHAIN_COLORS[i]} />)}
                 </Pie>
                 <Tooltip formatter={(v) => [`$${Number(v).toFixed(1)}B`, '']} contentStyle={{ background: '#0d1421', border: '1px solid #2a3f5f', borderRadius: 6, fontSize: 11 }} />
               </PieChart>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {SUPPLY_BY_CHAIN_FALLBACK.map((c, i) => (
+                {chainPieData.map((c, i) => (
                   <div key={c.chain} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                     <div style={{ width: 10, height: 10, borderRadius: 2, background: CHAIN_COLORS[i], flexShrink: 0 }} />
                     <div>
@@ -343,13 +369,13 @@ export function StablecoinContent() {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid #1a2535' }}>
-                  {['Rede', 'USDT', 'USDC', 'Total', '%'].map(h => (
+                  {['Rede', 'Total', '%'].map(h => (
                     <th key={h} style={{ fontSize: 9, color: '#334155', textAlign: h === 'Rede' ? 'left' : 'right', padding: '5px 6px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {SUPPLY_BY_CHAIN_FALLBACK.map((c, i) => (
+                {chainPieData.map((c, i) => (
                   <tr key={c.chain} style={{ borderBottom: '1px solid #0f1a28' }}>
                     <td style={{ padding: '8px 6px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -357,8 +383,6 @@ export function StablecoinContent() {
                         <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>{c.chain}</span>
                       </div>
                     </td>
-                    <td style={{ padding: '8px 6px', textAlign: 'right', fontSize: 11, fontFamily: 'JetBrains Mono, monospace', color: '#10b981', fontWeight: 700 }}>${c.usdt_b.toFixed(1)}B</td>
-                    <td style={{ padding: '8px 6px', textAlign: 'right', fontSize: 11, fontFamily: 'JetBrains Mono, monospace', color: '#3b82f6', fontWeight: 700 }}>{c.usdc_b > 0 ? `$${c.usdc_b.toFixed(1)}B` : '—'}</td>
                     <td style={{ padding: '8px 6px', textAlign: 'right', fontSize: 12, fontFamily: 'JetBrains Mono, monospace', color: '#e2e8f0', fontWeight: 900 }}>${c.total_b.toFixed(1)}B</td>
                     <td style={{ padding: '8px 6px', textAlign: 'right', fontSize: 10, fontFamily: 'JetBrains Mono, monospace', color: '#64748b' }}>{c.share_pct.toFixed(1)}%</td>
                   </tr>
