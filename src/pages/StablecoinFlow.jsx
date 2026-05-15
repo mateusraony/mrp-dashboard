@@ -1,9 +1,21 @@
 // ─── STABLECOIN FLOW TRACKER ─────────────────────────────────────────────────
 import { useState } from 'react';
-import {
-  dailyMintBurn, stablecoinSnapshot, largeMintEvents, largeBurnEvents,
-  stablecoinAnomalies, supplyByChain, mintVsBtcCorr,
-} from '../components/data/mockDataStablecoin';
+
+// Fallbacks — dados de mint/burn requerem API paga (Glassnode ~$29/mês ou Nansen)
+const DAILY_MINT_BURN_FALLBACK = [];
+const STABLECOIN_SNAPSHOT_FALLBACK = {
+  total_supply_b: 0, total_net_24h_m: 0, avg7d_net_m: 0, sigma_vs_7d: 0,
+  usdt: { mint_24h_m: 0, net_24h_m: 0 },
+  usdc: { mint_24h_m: 0, net_24h_m: 0 },
+};
+const LARGE_MINT_EVENTS_FALLBACK = [];
+const LARGE_BURN_EVENTS_FALLBACK = [];
+const STABLECOIN_ANOMALIES_FALLBACK = [];
+const SUPPLY_BY_CHAIN_FALLBACK = [];
+const MINT_VS_BTC_CORR_FALLBACK = {
+  pearson_7d: 0, pearson_30d: 0, lag_hours_optimal: 0,
+  note: 'Dados indisponíveis — requer API paga (Glassnode/Nansen)',
+};
 import { DataTrustBadge } from '../components/ui/DataTrustBadge';
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -109,8 +121,8 @@ const TABS = ['Visão Geral', 'Emissões', 'Por Rede', 'Correlação'];
 export function StablecoinContent() {
   const [tab, setTab] = useState(0);
   const [tf, setTf] = useState(30);
-  const snap = stablecoinSnapshot;
-  const slicedData = dailyMintBurn.slice(-tf);
+  const snap = STABLECOIN_SNAPSHOT_FALLBACK;
+  const slicedData = DAILY_MINT_BURN_FALLBACK.slice(-tf);
 
   // Média 7d como referência no gráfico
   const avg7dNet = snap.avg7d_net_m;
@@ -124,9 +136,9 @@ export function StablecoinContent() {
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
           <h1 style={{ fontSize: 20, fontWeight: 900, color: '#f1f5f9', margin: 0, letterSpacing: '-0.03em' }}>Stablecoin Flow Tracker</h1>
           <DataTrustBadge mode="paid_required" confidence="D" source="Glassnode/Nansen" reason="Mint/burn flows requerem Glassnode (~$29/mês) ou Nansen" />
-          {stablecoinAnomalies.length > 0 && (
+          {STABLECOIN_ANOMALIES_FALLBACK.length > 0 && (
             <span style={{ fontSize: 10, color: '#ef4444', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 4, padding: '2px 8px', fontWeight: 800 }}>
-              🚨 {stablecoinAnomalies.length} anomalia{stablecoinAnomalies.length > 1 ? 's' : ''}
+              🚨 {STABLECOIN_ANOMALIES_FALLBACK.length} anomalia{STABLECOIN_ANOMALIES_FALLBACK.length > 1 ? 's' : ''}
             </span>
           )}
         </div>
@@ -136,7 +148,7 @@ export function StablecoinContent() {
       </div>
 
       {/* Anomaly banners */}
-      {stablecoinAnomalies.map(a => <AnomalyBanner key={a.id} anomaly={a} />)}
+      {STABLECOIN_ANOMALIES_FALLBACK.map(a => <AnomalyBanner key={a.id} anomaly={a} />)}
 
       {/* Top stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8, marginBottom: 14 }}>
@@ -145,7 +157,7 @@ export function StablecoinContent() {
         <StatCard label="Desvio vs 7D" value={`${snap.sigma_vs_7d > 0 ? '+' : ''}${snap.sigma_vs_7d.toFixed(0)}%`} color={snap.sigma_vs_7d > 50 ? '#ef4444' : '#f59e0b'} icon="📐" sub={snap.sigma_vs_7d > 50 ? '⚠ Anomalia' : 'Normal'} />
         <StatCard label="USDT Mint 24h" value={`+$${snap.usdt.mint_24h_m.toFixed(0)}M`} color="#10b981" icon="🟢" sub={`Net: +$${snap.usdt.net_24h_m.toFixed(0)}M`} />
         <StatCard label="USDC Mint 24h" value={`+$${snap.usdc.mint_24h_m.toFixed(0)}M`} color="#3b82f6" icon="🔵" sub={`Net: +$${snap.usdc.net_24h_m.toFixed(0)}M`} />
-        <StatCard label="Corr. BTC 7D" value={`${mintVsBtcCorr.pearson_7d >= 0 ? '+' : ''}${mintVsBtcCorr.pearson_7d.toFixed(2)}`} color="#a78bfa" icon="🔗" sub={`Lag ~${mintVsBtcCorr.lag_hours_optimal}h`} />
+        <StatCard label="Corr. BTC 7D" value={`${MINT_VS_BTC_CORR_FALLBACK.pearson_7d >= 0 ? '+' : ''}${MINT_VS_BTC_CORR_FALLBACK.pearson_7d.toFixed(2)}`} color="#a78bfa" icon="🔗" sub={`Lag ~${MINT_VS_BTC_CORR_FALLBACK.lag_hours_optimal}h`} />
       </div>
 
       {/* Tabs */}
@@ -211,9 +223,9 @@ export function StablecoinContent() {
               </ComposedChart>
             </ResponsiveContainer>
             <div style={{ marginTop: 8, fontSize: 9, color: '#334155' }}>
-              Correlação Pearson 7D: <span style={{ fontFamily: 'JetBrains Mono, monospace', color: '#a78bfa', fontWeight: 800 }}>{mintVsBtcCorr.pearson_7d >= 0 ? '+' : ''}{mintVsBtcCorr.pearson_7d.toFixed(2)}</span>
-              {' '}· Lag médio: <span style={{ fontFamily: 'JetBrains Mono, monospace', color: '#60a5fa', fontWeight: 700 }}>~{mintVsBtcCorr.lag_hours_optimal}h</span>
-              {' '}· {mintVsBtcCorr.note}
+              Correlação Pearson 7D: <span style={{ fontFamily: 'JetBrains Mono, monospace', color: '#a78bfa', fontWeight: 800 }}>{MINT_VS_BTC_CORR_FALLBACK.pearson_7d >= 0 ? '+' : ''}{MINT_VS_BTC_CORR_FALLBACK.pearson_7d.toFixed(2)}</span>
+              {' '}· Lag médio: <span style={{ fontFamily: 'JetBrains Mono, monospace', color: '#60a5fa', fontWeight: 700 }}>~{MINT_VS_BTC_CORR_FALLBACK.lag_hours_optimal}h</span>
+              {' '}· {MINT_VS_BTC_CORR_FALLBACK.note}
             </div>
           </div>
         </div>
@@ -231,7 +243,7 @@ export function StablecoinContent() {
                 <div style={{ fontSize: 9, color: '#334155' }}>Eventos ≥ $250M</div>
               </div>
             </div>
-            {largeMintEvents.map(ev => <EventRow key={ev.id} ev={ev} type="mint" />)}
+            {LARGE_MINT_EVENTS_FALLBACK.map(ev => <EventRow key={ev.id} ev={ev} type="mint" />)}
           </div>
           {/* Burn events */}
           <div style={{ background: '#111827', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 12, overflow: 'hidden' }}>
@@ -242,7 +254,7 @@ export function StablecoinContent() {
                 <div style={{ fontSize: 9, color: '#334155' }}>Eventos ≥ $150M</div>
               </div>
             </div>
-            {largeBurnEvents.map(ev => <EventRow key={ev.id} ev={ev} type="burn" />)}
+            {LARGE_BURN_EVENTS_FALLBACK.map(ev => <EventRow key={ev.id} ev={ev} type="burn" />)}
             {/* Net summary */}
             <div style={{ padding: '11px 14px', background: 'rgba(16,185,129,0.04)' }}>
               <div style={{ fontSize: 9, color: '#334155', marginBottom: 3 }}>Net 7D por token</div>
@@ -263,13 +275,13 @@ export function StablecoinContent() {
             <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 14 }}>Supply por Rede</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
               <PieChart width={160} height={160}>
-                <Pie data={supplyByChain} dataKey="total_b" nameKey="chain" cx={80} cy={80} outerRadius={70} innerRadius={40} paddingAngle={2}>
-                  {supplyByChain.map((entry, i) => <Cell key={i} fill={CHAIN_COLORS[i]} />)}
+                <Pie data={SUPPLY_BY_CHAIN_FALLBACK} dataKey="total_b" nameKey="chain" cx={80} cy={80} outerRadius={70} innerRadius={40} paddingAngle={2}>
+                  {SUPPLY_BY_CHAIN_FALLBACK.map((entry, i) => <Cell key={i} fill={CHAIN_COLORS[i]} />)}
                 </Pie>
                 <Tooltip formatter={(v) => [`$${Number(v).toFixed(1)}B`, '']} contentStyle={{ background: '#0d1421', border: '1px solid #2a3f5f', borderRadius: 6, fontSize: 11 }} />
               </PieChart>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {supplyByChain.map((c, i) => (
+                {SUPPLY_BY_CHAIN_FALLBACK.map((c, i) => (
                   <div key={c.chain} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                     <div style={{ width: 10, height: 10, borderRadius: 2, background: CHAIN_COLORS[i], flexShrink: 0 }} />
                     <div>
@@ -293,7 +305,7 @@ export function StablecoinContent() {
                 </tr>
               </thead>
               <tbody>
-                {supplyByChain.map((c, i) => (
+                {SUPPLY_BY_CHAIN_FALLBACK.map((c, i) => (
                   <tr key={c.chain} style={{ borderBottom: '1px solid #0f1a28' }}>
                     <td style={{ padding: '8px 6px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -319,9 +331,9 @@ export function StablecoinContent() {
           {/* Corr stats */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 8 }}>
             {[
-              { label: 'Pearson 30D', value: mintVsBtcCorr.pearson_30d.toFixed(2), color: '#a78bfa', sub: 'Mint líquido × BTC price' },
-              { label: 'Pearson 7D',  value: mintVsBtcCorr.pearson_7d.toFixed(2),  color: '#a78bfa', sub: 'Mais forte recentemente' },
-              { label: 'Lag Ótimo',   value: `~${mintVsBtcCorr.lag_hours_optimal}h`, color: '#60a5fa', sub: 'Tempo até efeito no preço' },
+              { label: 'Pearson 30D', value: MINT_VS_BTC_CORR_FALLBACK.pearson_30d.toFixed(2), color: '#a78bfa', sub: 'Mint líquido × BTC price' },
+              { label: 'Pearson 7D',  value: MINT_VS_BTC_CORR_FALLBACK.pearson_7d.toFixed(2),  color: '#a78bfa', sub: 'Mais forte recentemente' },
+              { label: 'Lag Ótimo',   value: `~${MINT_VS_BTC_CORR_FALLBACK.lag_hours_optimal}h`, color: '#60a5fa', sub: 'Tempo até efeito no preço' },
               { label: 'Sinal Atual', value: snap.sigma_vs_7d > 50 ? '🔥 Alta' : '→ Normal', color: snap.sigma_vs_7d > 50 ? '#ef4444' : '#f59e0b', sub: `Desvio vs 7d: +${snap.sigma_vs_7d.toFixed(0)}%` },
             ].map(s => <StatCard key={s.label} {...s} icon="🔗" />)}
           </div>
@@ -344,7 +356,7 @@ export function StablecoinContent() {
           {/* Interpretation */}
           <div style={{ padding: '13px 15px', background: 'rgba(167,139,250,0.06)', border: '1px solid rgba(167,139,250,0.2)', borderRadius: 10 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: '#a78bfa', marginBottom: 6 }}>🔗 Interpretação da Correlação</div>
-            <div style={{ fontSize: 11, color: '#64748b', lineHeight: 1.8 }}>{mintVsBtcCorr.note}</div>
+            <div style={{ fontSize: 11, color: '#64748b', lineHeight: 1.8 }}>{MINT_VS_BTC_CORR_FALLBACK.note}</div>
             <div style={{ marginTop: 8, display: 'flex', gap: 14, flexWrap: 'wrap' }}>
               <div style={{ fontSize: 10, color: '#334155' }}>📌 <strong style={{ color: '#475569' }}>Mint grande isolado</strong> = capital sendo preparado para deploy. Alta probabilidade de compra em 6-24h.</div>
               <div style={{ fontSize: 10, color: '#334155' }}>📌 <strong style={{ color: '#475569' }}>Burn sem queda de preço</strong> = profit taking institucional — sinal de atenção.</div>
