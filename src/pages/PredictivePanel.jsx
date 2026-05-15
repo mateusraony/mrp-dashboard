@@ -7,6 +7,7 @@ import { Area, XAxis, YAxis, CartesianGrid, Tooltip,
 } from 'recharts';
 import { useBtcTicker, useKlines, useFearGreed } from '@/hooks/useBtcData';
 import { useRiskScore } from '@/hooks/useRiskScore';
+import { useAiInsight } from '@/hooks/useAiInsight';
 import { computeRuleBasedAnalysis } from '@/utils/ruleBasedAnalysis';
 import { IS_LIVE } from '@/lib/env';
 
@@ -199,6 +200,20 @@ function InstitutionalPanel() {
   );
 }
 
+// ─── CLAUDE INSIGHT INLINE ───────────────────────────────────────────────────
+function ClaudeInsight({ text, loading }) {
+  if (!text && !loading) return null;
+  return (
+    <div style={{ marginTop: 8, padding: '10px 12px', borderRadius: 8, background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.15)' }}>
+      <div style={{ fontSize: 8, color: '#3b82f6', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 5 }}>✦ Claude Haiku</div>
+      {loading && !text
+        ? <div style={{ height: 12, borderRadius: 3, background: 'rgba(59,130,246,0.1)' }} />
+        : <div style={{ fontSize: 11, color: '#94a3b8', lineHeight: 1.6 }}>{text}</div>
+      }
+    </div>
+  );
+}
+
 // ─── MAIN PAGE ────────────────────────────────────────────────────────────────
 const TABS = ['Cenários', 'Trajetórias', 'Prob. Rompimento', 'Pressão Institucional'];
 
@@ -248,6 +263,22 @@ export default function PredictivePanel() {
       },
     });
   }, [ticker, fng, riskScore]);
+
+  // ── Claude AI insight ──────────────────────────────────────────────────
+  const scenSummary = SCENARIOS_24H_FALLBACK.map(s => `${s.label} ${s.prob}%`).join(', ');
+  const predPayload = (ticker || fng) ? {
+    page: 'predictive',
+    riskScore: riskScore?.score ?? 50,
+    riskRegime: riskScore?.regime ?? 'MODERADO',
+    fearGreedValue: fng?.value ?? 50,
+    fearGreedLabel: fng?.label ?? 'Neutral',
+    fundingRate: ticker?.last_funding_rate ?? 0,
+    context: {
+      atr: atr14,
+      scenariosSummary: scenSummary,
+    },
+  } : null;
+  const { data: predInsight, isLoading: predAiLoading } = useAiInsight(predPayload);
 
   // ── Cenários com preços mesclados (live quando disponível) ─────────────
   const scenarios = useMemo(() => {
@@ -308,6 +339,9 @@ export default function PredictivePanel() {
           }}>{t}</button>
         ))}
       </div>
+
+      {/* Claude Insight — exibido no topo da página, abaixo dos tabs */}
+      <ClaudeInsight text={predInsight} loading={predAiLoading} />
 
       {/* ── CENÁRIOS ── */}
       {tab === 0 && (

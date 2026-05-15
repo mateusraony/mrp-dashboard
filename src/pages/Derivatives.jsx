@@ -1,4 +1,5 @@
 import { computeRuleBasedAnalysis } from '@/utils/ruleBasedAnalysis';
+import { useAiInsight } from '@/hooks/useAiInsight';
 import { useBtcTicker, useOiByExchange, useLiquidations, useLongShortRatio, useDominance } from '@/hooks/useBtcData';
 import { useMultiVenueSnapshot } from '@/hooks/useMultiVenue';
 import { DataQualityBadge } from '../components/ui/DataQualityBadge';
@@ -71,6 +72,19 @@ const COLORS = {
   positive: '#10b981', negative: '#ef4444', neutral: '#f59e0b',
   blue: '#3b82f6', purple: '#8b5cf6',
 };
+
+function ClaudeInsight({ text, loading }) {
+  if (!text && !loading) return null;
+  return (
+    <div style={{ marginTop: 8, padding: '10px 12px', borderRadius: 8, background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.15)' }}>
+      <div style={{ fontSize: 8, color: '#3b82f6', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 5 }}>✦ Claude Haiku</div>
+      {loading && !text
+        ? <div style={{ height: 12, borderRadius: 3, background: 'rgba(59,130,246,0.1)' }} />
+        : <div style={{ fontSize: 11, color: '#94a3b8', lineHeight: 1.6 }}>{text}</div>
+      }
+    </div>
+  );
+}
 
 function FactorBar({ label, value, max = 1 }) {
   const pct = (value / max) * 100;
@@ -191,6 +205,18 @@ export function DerivativesOverview() {
     ? computeRuleBasedAnalysis({ derivatives: { fundingRate: liveBtc.funding_rate, oiDeltaPct: liveBtc.oi_delta_pct, openInterest: liveBtc.open_interest } })
     : null;
   const aiAnalysis = liveAnalysis ?? AI_DERIVATIVES_FALLBACK;
+
+  // Claude AI insight
+  const derivPayload = hasLiveFutures ? {
+    page: 'derivatives',
+    riskScore: 50,
+    riskRegime: 'MODERADO',
+    fearGreedValue: 50,
+    fearGreedLabel: 'Neutral',
+    fundingRate: liveBtc.funding_rate,
+    context: { oiDeltaPct: liveBtc.oi_delta_pct },
+  } : null;
+  const { data: derivInsight, isLoading: derivAiLoading } = useAiInsight(derivPayload);
   const fundingPos = f.funding_rate > 0;
   const nextFundHours = Math.round((f.next_funding_time.getTime() - Date.now()) / 3600000);
 
@@ -341,6 +367,7 @@ export function DerivativesOverview() {
       <div style={{ marginBottom: 16 }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 10 }}>🤖 AI Analysis — Derivatives</div>
         <AIModuleCard module={aiAnalysis.modules.derivatives} title="Derivatives" icon="⟆" />
+        <ClaudeInsight text={derivInsight} loading={derivAiLoading} />
       </div>
 
       {/* OI por Exchange */}

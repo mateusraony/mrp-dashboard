@@ -1010,6 +1010,23 @@ export default function ExecutiveReport() {
     ? `${liveAnalysis.overall.rationale} — ${liveAnalysis.overall.trigger}`
     : `Regime ${GLOBAL_RISK_FALLBACK.regime} confirmado por supply stablecoin +${STABLECOIN_SUPPLY_FALLBACK.delta_7d_pct.toFixed(1)}% 7D e ETF inflows positivos ($${ETF_FLOWS_FALLBACK.net_flow_7d_m.toFixed(0)}M semana). Contrapeso: VIX ${MACRO_BOARD_FALLBACK.series.find(s => s.id === 'VIX')?.value.toFixed(1)} e funding ${(BTC_FUTURES_MOCK_FALLBACK.funding_rate * 100).toFixed(4)}% persistente — prob. flush longs 62%. Carry trade atrativo (+${((FUTURES_BASIS_FALLBACK.futures[1]?.basis_annualized || 0) - 4.512).toFixed(1)}pp vs US10Y).`;
 
+  // Claude AI insight
+  const execPayload = (liveTicker || liveFng) ? {
+    page: 'executive_report',
+    riskScore: liveRisk?.score ?? 50,
+    riskRegime: liveRisk?.regime ?? 'MODERADO',
+    fearGreedValue: liveFng?.value ?? 50,
+    fearGreedLabel: liveFng?.label ?? 'Neutral',
+    fundingRate: liveTicker?.last_funding_rate ?? 0,
+    context: {
+      nupl: liveOnChain?.nupl,
+      nuplZone: liveOnChain?.nupl_zone,
+      etfFlow7dM: ETF_FLOWS_FALLBACK.net_flow_7d_m,
+      stablecoinDelta7dPct: STABLECOIN_SUPPLY_FALLBACK.delta_7d_pct,
+    },
+  } : null;
+  const { data: execInsightText, isLoading: execAiLoading } = useAiInsight(execPayload);
+
   return (
     <div style={{ maxWidth: 1280, margin: '0 auto' }}>
       {/* Header */}
@@ -1057,6 +1074,9 @@ export default function ExecutiveReport() {
           recommendation={aiRecommendation}
           reasoning={aiReasoning}
           actions={['Reduzir Leverage', 'Monitorar VIX 25+', 'Carry Jun26', 'ETF Flows IBIT']}
+          insight={execInsightText}
+          isLoadingInsight={execAiLoading}
+          modelLabel={execInsightText ? 'claude-haiku-4-5' : undefined}
         />
       </div>
 

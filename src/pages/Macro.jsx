@@ -3,6 +3,7 @@ import { useMacroBoard, useGlobalLiquidity } from '@/hooks/useFred';
 import { useBcbData } from '@/hooks/useBcb';
 import { useFearGreed } from '@/hooks/useBtcData';
 import { useRiskScore } from '@/hooks/useRiskScore';
+import { useAiInsight } from '@/hooks/useAiInsight';
 import { computeRuleBasedAnalysis } from '@/utils/ruleBasedAnalysis';
 import { IS_LIVE } from '@/lib/env';
 import { DataQualityBadge } from '../components/ui/DataQualityBadge';
@@ -526,6 +527,19 @@ function BrMacroPanel({ bcb, isLoading, isError }) {
   );
 }
 
+function ClaudeInsight({ text, loading }) {
+  if (!text && !loading) return null;
+  return (
+    <div style={{ marginTop: 8, padding: '10px 12px', borderRadius: 8, background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.15)' }}>
+      <div style={{ fontSize: 8, color: '#3b82f6', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 5 }}>✦ Claude Haiku</div>
+      {loading && !text
+        ? <div style={{ height: 12, borderRadius: 3, background: 'rgba(59,130,246,0.1)' }} />
+        : <div style={{ fontSize: 11, color: '#94a3b8', lineHeight: 1.6 }}>{text}</div>
+      }
+    </div>
+  );
+}
+
 export default function Macro() {
   const { macroBoard, liquidity, bcb, bcbLoading, bcbError, fng, riskScore } = useMacroPageData();
   const m = macroBoard;
@@ -542,6 +556,22 @@ export default function Macro() {
       })
     : null;
   const aiAnalysis = liveAnalysis ?? aiAnalysisMock;
+
+  // Claude AI insight
+  const vixVal = m.series.find(s => s.id === 'VIX')?.value;
+  const dxyVal = m.series.find(s => s.id === 'DXY')?.value;
+  const spRet  = m.series.find(s => s.id === 'SP500')?.delta_1d;
+  const macroPayload = fng ? {
+    page: 'macro',
+    riskScore: riskScore?.score ?? 50,
+    riskRegime: riskScore?.regime ?? 'MODERADO',
+    fearGreedValue: fng.value,
+    fearGreedLabel: fng.label,
+    fundingRate: 0,
+    context: { vix: vixVal, dxy: dxyVal, spRet1d: spRet },
+  } : null;
+  const { data: macroInsight, isLoading: macroAiLoading } = useAiInsight(macroPayload);
+
   const { yieldSpread, yieldSpreadBp, isInverted } = useMemo(() => {
     const us10y = m.series.find(s => s.id === 'US10Y');
     const us2y  = m.series.find(s => s.id === 'US2Y');
@@ -620,6 +650,7 @@ export default function Macro() {
       <div style={{ marginBottom: 20 }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 10 }}>🤖 AI Analysis — Macro</div>
         <AIModuleCard module={aiAnalysis.modules.macro} title="Macro Board" icon="⊞" />
+        <ClaudeInsight text={macroInsight} loading={macroAiLoading} />
       </div>
 
       {/* Macro Heatmap — Correlações */}

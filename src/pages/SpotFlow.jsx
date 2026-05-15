@@ -2,6 +2,7 @@ import { AIModuleCard } from '../components/ui/AIAnalysisPanel';
 import SectionHeader from '../components/ui/SectionHeader';
 import { ModeBadge } from '../components/ui/DataBadge';
 import { computeRuleBasedAnalysis } from '@/utils/ruleBasedAnalysis';
+import { useAiInsight } from '@/hooks/useAiInsight';
 import { IS_LIVE } from '@/lib/env';
 import {
   AreaChart, Area, Bar, XAxis, YAxis, CartesianGrid,
@@ -15,6 +16,19 @@ import { computeSessionStats } from '@/utils/sessionAnalytics';
 
 // Inline formatter — no external mock dependency
 const fmtNum = (v, d = 0) => v != null ? v.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d }) : '—';
+
+function ClaudeInsight({ text, loading }) {
+  if (!text && !loading) return null;
+  return (
+    <div style={{ marginTop: 8, padding: '10px 12px', borderRadius: 8, background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.15)' }}>
+      <div style={{ fontSize: 8, color: '#3b82f6', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 5 }}>✦ Claude Haiku</div>
+      {loading && !text
+        ? <div style={{ height: 12, borderRadius: 3, background: 'rgba(59,130,246,0.1)' }} />
+        : <div style={{ fontSize: 11, color: '#94a3b8', lineHeight: 1.6 }}>{text}</div>
+      }
+    </div>
+  );
+}
 
 // Fallbacks for spot fields without live API equivalents
 const SPOT_FALLBACK = {
@@ -86,6 +100,22 @@ export default function SpotFlow() {
     ? computeRuleBasedAnalysis({ spot: { ret1d: liveSpot.ret_1d, cvd1d: liveSpot.cvd_1d, volume1dUsdt: liveSpot.volume_1d_usdt, price: liveSpot.price } })
     : null;
   const aiAnalysis = liveAnalysis ?? AI_SPOT_FALLBACK;
+
+  // Claude AI insight
+  const spotPayload = liveSpot ? {
+    page: 'spot_flow',
+    riskScore: 50,
+    riskRegime: 'MODERADO',
+    fearGreedValue: 50,
+    fearGreedLabel: 'Neutral',
+    fundingRate: ticker?.last_funding_rate ?? 0,
+    context: {
+      ret1d: liveSpot.ret_1d,
+      cvd: liveSpot.cvd_1d,
+      volume1dB: liveSpot.volume_1d_usdt / 1e9,
+    },
+  } : null;
+  const { data: spotInsight, isLoading: spotAiLoading } = useAiInsight(spotPayload);
 
   // Calcula sessões live quando klines disponíveis; fallback para mock
   const liveSessions = klines && klines.length >= 24
@@ -329,6 +359,7 @@ export default function SpotFlow() {
       <div style={{ marginBottom: 16 }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 10 }}>🤖 AI Analysis — Spot Flow</div>
         <AIModuleCard module={aiAnalysis.modules.spot} title="Spot Flow" icon="⟴" />
+        <ClaudeInsight text={spotInsight} loading={spotAiLoading} />
       </div>
 
       {/* Price chart full */}
