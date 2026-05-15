@@ -800,7 +800,7 @@ export default function Dashboard() {
       {/* ── ZONA E: Alertas ── */}
       <div style={{ marginBottom: 20 }}>
         <SectionTitle icon="◎" label="Alertas Recentes"
-          action={<Link to={createPageUrl('Alerts')} style={{ fontSize: 11, color: '#3b82f6', textDecoration: 'none', background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', padding: '3px 9px', borderRadius: 5, fontWeight: 600 }}>Ver todos →</Link>} />
+          action={<Link to={createPageUrl('SmartAlerts')} style={{ fontSize: 11, color: '#3b82f6', textDecoration: 'none', background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', padding: '3px 9px', borderRadius: 5, fontWeight: 600 }}>Ver todos →</Link>} />
         <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, overflow: 'hidden' }}>
           {RECENT_ALERTS_FALLBACK.map(a => <AlertRow key={a.id} alert={a} />)}
         </div>

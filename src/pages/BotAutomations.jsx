@@ -350,7 +350,7 @@ export function BotsContent() {
           <p style={{ fontSize: 11, color: '#475569', margin: 0 }}>Telegram · Discord · Webhooks · Regras baseadas em AI</p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <Link to={createPageUrl('ActionDashboard')} style={{ fontSize: 11, padding: '7px 14px', borderRadius: 7, background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', color: '#f59e0b', textDecoration: 'none', fontWeight: 700 }}>
+          <Link to={createPageUrl('Opportunities')} style={{ fontSize: 11, padding: '7px 14px', borderRadius: 7, background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', color: '#f59e0b', textDecoration: 'none', fontWeight: 700 }}>
             ⚡ Dashboard de Ações
           </Link>
           <Link to={createPageUrl('Automations')} style={{ fontSize: 11, padding: '7px 14px', borderRadius: 7, background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)', color: '#60a5fa', textDecoration: 'none', fontWeight: 700 }}>
@@ -478,7 +478,7 @@ export function BotsContent() {
       {/* Footer links */}
       <div style={{ marginTop: 16, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         {[
-          { label: 'Dashboard de Ações', page: 'ActionDashboard', icon: '⚡' },
+          { label: 'Dashboard de Ações', page: 'Opportunities', icon: '⚡' },
           { label: 'Automações Clássicas', page: 'Automations', icon: '⚙️' },
           { label: 'Smart Alerts', page: 'SmartAlerts', icon: '🔔' },
           { label: 'Relatório Executivo', page: 'ExecutiveReport', icon: '📊' },

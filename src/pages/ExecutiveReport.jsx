@@ -75,9 +75,9 @@ function col(v, inv = false) {
   return v > 0 ? pos : v < 0 ? neg : '#f59e0b';
 }
 
-function SectionLink({ label, page, icon }) {
+function SectionLink({ label, page, icon, tab }) {
   return (
-    <Link to={createPageUrl(page)} style={{
+    <Link to={createPageUrl(page)} state={tab ? { tab } : undefined} style={{
       display: 'inline-flex', alignItems: 'center', gap: 4,
       fontSize: 10, color: '#3b82f6', textDecoration: 'none',
       padding: '3px 8px', borderRadius: 5,
@@ -359,7 +359,7 @@ function StablecoinSection({ period }) {
       title="Stablecoin Flow"
       icon="💧"
       subtitle="USDT + USDC · Mint/Burn · Supply por chain · Anomalias"
-      links={[{ label: 'Ver Completo', page: 'StablecoinFlow', icon: '💧' }]}
+      links={[{ label: 'Ver Completo', page: 'InstitutionalFlows', icon: '💧', tab: 'stablecoins' }]}
     >
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 12 }}>
         <Metric label="Supply Total" value={`$${s.total_b.toFixed(1)}B`} color="#60a5fa" sub={`${sign(delta)}${delta.toFixed(1)}% ${period.toLowerCase()}`} />
@@ -460,7 +460,7 @@ function DerivativesSection({ period, liveTicker }) {
       subtitle="Funding · OI · Liquidações · Basis · Carry Trade · Options"
       links={[
         { label: 'Derivatives', page: 'Derivatives', icon: '⟆' },
-        { label: 'Deriv. Avançado', page: 'DerivativesAdvanced', icon: '⚗️' },
+        { label: 'Deriv. Avançado', page: 'Derivatives', icon: '⚗️' },
         { label: 'Options', page: 'Options', icon: '◬' },
       ]}
     >
@@ -658,9 +658,9 @@ function ETFMacroSection({ period }) {
       icon="🏦"
       subtitle="IBIT · FBTC · GBTC · AUM · Flows institucionais"
       links={[
-        { label: 'ETF Flows', page: 'ETFFlows', icon: '🏦' },
+        { label: 'ETF Flows', page: 'InstitutionalFlows', icon: '🏦' },
         { label: 'Macro Board', page: 'Macro', icon: '⊞' },
-        { label: 'Calendário', page: 'Calendar', icon: '◷' },
+        { label: 'Calendário', page: 'MacroCalendar', icon: '◷' },
       ]}
     >
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 12 }}>
@@ -742,16 +742,16 @@ const ALL_MODULES = [
   { label: 'Derivatives', page: 'Derivatives', icon: '⟆', desc: 'Futuros & Funding' },
   { label: 'Spot Flow', page: 'SpotFlow', icon: '⟴', desc: 'CVD & Volume' },
   { label: 'Options', page: 'Options', icon: '◬', desc: 'IV & Greeks' },
-  { label: 'ETF Flows', page: 'ETFFlows', icon: '🏦', desc: 'IBIT · FBTC · GBTC' },
-  { label: 'Stablecoin', page: 'StablecoinFlow', icon: '💧', desc: 'Mint · Burn' },
+  { label: 'ETF Flows', page: 'InstitutionalFlows', icon: '🏦', desc: 'IBIT · FBTC · GBTC', tab: 'etf' },
+  { label: 'Stablecoin', page: 'InstitutionalFlows', icon: '💧', desc: 'Mint · Burn', tab: 'stablecoins' },
   { label: 'Regime', page: 'MarketRegime', icon: '🎯', desc: 'Risk-On · Off' },
   { label: 'Macro Board', page: 'Macro', icon: '⊞', desc: 'S&P · DXY · Yields' },
   { label: 'On-Chain', page: 'OnChain', icon: '⛓', desc: 'NUPL · MVRV' },
-  { label: 'Calendário', page: 'Calendar', icon: '◷', desc: 'CPI · FOMC · NFP' },
+  { label: 'Calendário', page: 'MacroCalendar', icon: '◷', desc: 'CPI · FOMC · NFP' },
   { label: 'Notícias AI', page: 'NewsIntelligence', icon: '🧠', desc: 'Sentimento' },
-  { label: 'Estratégias', page: 'Strategies', icon: '⚡', desc: 'Setups · Carry' },
+  { label: 'Estratégias', page: 'Opportunities', icon: '⚡', desc: 'Setups · Carry', tab: 'strategies' },
   { label: 'Preditivo', page: 'PredictivePanel', icon: '🔮', desc: 'BTC 24h' },
-  { label: 'Deriv. Avançado', page: 'DerivativesAdvanced', icon: '⚗️', desc: 'Liq · OI Strike' },
+  { label: 'Deriv. Avançado', page: 'Derivatives', icon: '⚗️', desc: 'Liq · OI Strike', tab: 'advanced' },
   { label: 'Smart Alerts', page: 'SmartAlerts', icon: '🔔', desc: 'AI · Anomalias' },
   { label: 'Automações', page: 'Automations', icon: '⚙️', desc: 'Rules · Webhook' },
 ];
@@ -1096,7 +1096,7 @@ export default function ExecutiveReport() {
         <div style={{ fontSize: 9, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>Todos os Módulos</div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {ALL_MODULES.map((m, i) => (
-            <Link key={i} to={createPageUrl(m.page)} title={m.desc} style={{
+            <Link key={i} to={createPageUrl(m.page)} state={m.tab ? { tab: m.tab } : undefined} title={m.desc} style={{
               display: 'inline-flex', alignItems: 'center', gap: 4,
               fontSize: 10, color: '#475569', textDecoration: 'none',
               padding: '4px 10px', borderRadius: 5,
