@@ -22,6 +22,7 @@ import AIInsightPanel from '../components/ai/AIInsightPanel';
 import { ModeBadge } from '../components/ui/DataBadge';
 import { useBtcTicker, useFearGreed } from '@/hooks/useBtcData';
 import { useRiskScore } from '@/hooks/useRiskScore';
+import { useAiInsight } from '@/hooks/useAiInsight';
 import { computeRuleBasedAnalysis } from '@/utils/ruleBasedAnalysis';
 import { IS_LIVE } from '@/lib/env';
 
@@ -300,6 +301,21 @@ export function ActionsContent() {
     return typeOk && statusOk;
   });
 
+  // Claude AI insight
+  const actionPayload = (ticker || fng) ? {
+    page: 'action_dashboard',
+    riskScore: liveScore,
+    riskRegime: liveRegime,
+    fearGreedValue: fng?.value ?? 50,
+    fearGreedLabel: fng?.label ?? 'Neutral',
+    fundingRate: ticker?.last_funding_rate ?? 0,
+    context: {
+      opCount: filtered.length,
+      gradeACount: filtered.filter(o => o.ai_grade === 'A').length,
+    },
+  } : null;
+  const { data: aiInsightText, isLoading: aiLoading } = useAiInsight(actionPayload);
+
   return (
     <div style={{ maxWidth: 1240, margin: '0 auto' }}>
       {/* Header */}
@@ -338,6 +354,9 @@ export function ActionsContent() {
           reasoning={`Regime ${liveRegime} com score ${liveScore}/100. F&G ${fng?.value ?? FEAR_GREED_FALLBACK.value} (${fng?.label ?? FEAR_GREED_FALLBACK.classification}). Funding ${((ticker?.last_funding_rate ?? BTC_FUTURES_FALLBACK.funding_rate) * 100).toFixed(4)}% — oportunidades de carry e flush em evidência. Grade A = Win rate 100% histórico.`}
           actions={['Ver Carry Trade', 'Monitorar Flush', 'Checar Hedge', 'Ver Arbitragem']}
           compact
+          insight={aiInsightText}
+          isLoadingInsight={aiLoading}
+          modelLabel={aiInsightText ? 'claude-haiku-4-5' : undefined}
         />
       </div>
 

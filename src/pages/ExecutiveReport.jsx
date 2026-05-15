@@ -8,6 +8,7 @@ import {
 } from 'recharts';
 import AIInsightPanel from '../components/ai/AIInsightPanel';
 import { ModeBadge } from '../components/ui/DataBadge';
+import { useAiInsight } from '@/hooks/useAiInsight';
 import { sendNotificationEmail } from '@/lib/notificationClient';
 import { useBtcTicker, useFearGreed } from '@/hooks/useBtcData';
 import { useRiskScore } from '@/hooks/useRiskScore';

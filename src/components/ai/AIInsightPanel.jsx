@@ -2,7 +2,7 @@
 // Exibe: Regime atual · Probabilidade · Recomendação · Raciocínio
 // Preparado para integração futura com Supabase (campo module_id + snapshot)
 
-export default function AIInsightPanel({ moduleId, title = '', probability, regime, recommendation, reasoning, actions = [], compact = false }) {
+export default function AIInsightPanel({ moduleId, title = '', probability, regime, recommendation, reasoning, actions = [], compact = false, insight = undefined, isLoadingInsight = false, modelLabel = undefined }) {
   const regimeMap = {
     bullish:      { label: '▲ BULLISH',       color: '#10b981', bg: 'rgba(16,185,129,0.08)',  border: 'rgba(16,185,129,0.2)' },
     bearish:      { label: '▼ BEARISH',       color: '#ef4444', bg: 'rgba(239,68,68,0.08)',   border: 'rgba(239,68,68,0.2)' },
@@ -32,7 +32,10 @@ export default function AIInsightPanel({ moduleId, title = '', probability, regi
             <span style={{ fontSize: 14, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: probColor }}>{probability}%</span>
           </div>
         </div>
-        <div style={{ fontSize: 11, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>{recommendation}</div>
+        {isLoadingInsight && !insight
+          ? <div style={{ height: 14, borderRadius: 4, background: 'rgba(59,130,246,0.08)', animation: 'pulse 1.5s infinite', marginBottom: 4 }} />
+          : <div style={{ fontSize: 11, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>{insight || recommendation}</div>
+        }
         {reasoning && <div style={{ fontSize: 9, color: '#64748b', lineHeight: 1.6 }}>{reasoning}</div>}
         {actions.length > 0 && (
           <div style={{ display: 'flex', gap: 5, marginTop: 7, flexWrap: 'wrap' }}>
@@ -46,7 +49,8 @@ export default function AIInsightPanel({ moduleId, title = '', probability, regi
           </div>
         )}
         <div style={{ marginTop: 6, fontSize: 8, color: '#1e3048', fontFamily: 'JetBrains Mono, monospace' }}>
-          🤖 AI · {moduleId} · mock_v1
+          🤖 Modelo: {modelLabel || 'mock_quant_v1'} · {moduleId}
+          {isLoadingInsight && ' · ✦ analisando...'}
         </div>
       </div>
     );
@@ -100,7 +104,10 @@ export default function AIInsightPanel({ moduleId, title = '', probability, regi
       {/* Recommendation */}
       <div style={{ marginBottom: 10, padding: '10px 12px', background: 'rgba(226,232,240,0.03)', border: '1px solid #1a2535', borderRadius: 8 }}>
         <div style={{ fontSize: 9, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 4, fontWeight: 700 }}>📋 RECOMENDAÇÃO</div>
-        <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', lineHeight: 1.5 }}>{recommendation}</div>
+        {isLoadingInsight && !insight
+          ? <div style={{ height: 14, borderRadius: 4, background: 'rgba(59,130,246,0.08)', animation: 'pulse 1.5s infinite', marginBottom: 4 }} />
+          : <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', lineHeight: 1.5 }}>{insight || recommendation}</div>
+        }
       </div>
 
       {/* Reasoning */}
@@ -127,7 +134,8 @@ export default function AIInsightPanel({ moduleId, title = '', probability, regi
       )}
 
       <div style={{ marginTop: 10, fontSize: 8, color: '#1e3048', fontFamily: 'JetBrains Mono, monospace', borderTop: '1px solid #0f1d2e', paddingTop: 8 }}>
-        Modelo: mock_quant_v1 · Fonte: dados sintéticos · Integração Supabase: pendente (module_id: {moduleId})
+        🤖 Modelo: {modelLabel || 'mock_quant_v1'} · {moduleId}
+        {isLoadingInsight && ' · ✦ analisando...'}
       </div>
     </div>
   );

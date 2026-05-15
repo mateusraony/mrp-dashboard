@@ -586,6 +586,7 @@ export default function Dashboard() {
   // Análise em linguagem natural via Claude Haiku (AI Etapa 4) — 15min cache
   const aiInsightPayload = (IS_LIVE && liveTicker)
     ? {
+        page:           'dashboard',
         riskScore:      activeScore,
         riskRegime:     activeRegime,
         fearGreedValue: _fngLive?.value ?? FEAR_GREED_FALLBACK.value,

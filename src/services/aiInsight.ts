@@ -13,14 +13,41 @@ export interface AiInsightPayload {
   fearGreedValue: number;
   fearGreedLabel: string;
   fundingRate:    number;
-  mtfConfluence:  string;
-  mtfDirection:   string;
+  mtfConfluence?: string;
+  mtfDirection?:  string;
   zAlerts?: Array<{
     metric:    string;
     level:     string;
     z:         number;
     direction: string;
   }>;
+  page: string;
+  context?: {
+    oiDeltaPct?: number;
+    probLongFlush?: number;
+    longRiskUsd?: number;
+    closestLongPrice?: number;
+    closestShortPrice?: number;
+    ivAtm?: number;
+    skew?: number;
+    pcrOi?: number;
+    maxPainPct?: number;
+    ret1d?: number;
+    cvd?: number;
+    volume1dB?: number;
+    vix?: number;
+    dxy?: number;
+    spRet1d?: number;
+    yieldSpreadBp?: number;
+    atr?: number;
+    scenariosSummary?: string;
+    nupl?: number;
+    nuplZone?: string;
+    etfFlow7dM?: number;
+    stablecoinDelta7dPct?: number;
+    opCount?: number;
+    gradeACount?: number;
+  };
 }
 
 export async function fetchAiInsight(payload: AiInsightPayload): Promise<string> {

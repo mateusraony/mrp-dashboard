@@ -28,6 +28,7 @@ const BASE_PAYLOAD: AiInsightPayload = {
   fundingRate:    0.0003,
   mtfConfluence:  'FORTE',
   mtfDirection:   'bullish',
+  page:           'dashboard',
 };
 
 function makeJsonResponse(body: unknown, status = 200): Response {
