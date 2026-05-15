@@ -22,6 +22,7 @@ import AIInsightPanel from '../components/ai/AIInsightPanel';
 import { ModeBadge } from '../components/ui/DataBadge';
 import { useBtcTicker, useFearGreed } from '@/hooks/useBtcData';
 import { useRiskScore } from '@/hooks/useRiskScore';
+import { useOptionsData } from '@/hooks/useDeribit';
 import { useAiInsight } from '@/hooks/useAiInsight';
 import { computeRuleBasedAnalysis } from '@/utils/ruleBasedAnalysis';
 import { IS_LIVE } from '@/lib/env';
@@ -254,6 +255,7 @@ export function ActionsContent() {
   const { data: ticker } = useBtcTicker();
   const { data: fng } = useFearGreed(1);
   const { data: riskScore } = useRiskScore();
+  const { data: optionsData } = useOptionsData();
 
   // Regime live > mock fallback
   const liveRegime = riskScore
@@ -265,9 +267,21 @@ export function ActionsContent() {
   // Live opportunities from rule-based analysis
   const liveOpportunities = useMemo(() => {
     if (!IS_LIVE || !ticker) return [];
+    const chainSkew = optionsData && optionsData.chain.length > 0
+      ? optionsData.chain.reduce((acc, c) => acc + (c.put_iv - c.call_iv), 0) / optionsData.chain.length
+      : null;
+    const maxPainDistancePct = optionsData && optionsData.max_pain && ticker.mark_price > 0
+      ? ((optionsData.max_pain - ticker.mark_price) / ticker.mark_price) * 100
+      : 0;
     const analysis = computeRuleBasedAnalysis({
       derivatives: { fundingRate: ticker.last_funding_rate, oiDeltaPct: ticker.oi_delta_pct },
       spot: { ret1d: (ticker.price_change_pct ?? 0) / 100, cvd1d: 0, volume1dUsdt: ticker.volume_24h_usdt ?? 0, price: ticker.mark_price },
+      options: optionsData ? {
+        ivAtm: optionsData.iv_atm,
+        skew: chainSkew ?? 0,
+        pcrVol: optionsData.put_call_ratio_vol,
+        maxPainDistancePct,
+      } : null,
       macro: fng ? { fngValue: fng.value, fngLabel: fng.label, riskScore: riskScore?.score ?? 50, riskRegime: riskScore?.regime ?? 'MODERADO' } : undefined,
     });
     return Object.entries(analysis.modules)
@@ -291,7 +305,7 @@ export function ActionsContent() {
         pnl_pct:     null,
         isLive:      true,
       }));
-  }, [ticker, fng, riskScore]);
+  }, [ticker, fng, riskScore, optionsData]);
 
   const allOpportunities = [...liveOpportunities, ...TRADE_OPPORTUNITIES_FALLBACK];
 

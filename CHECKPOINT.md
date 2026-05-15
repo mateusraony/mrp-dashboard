@@ -1,6 +1,6 @@
 # CHECKPOINT.md — MRP Dashboard
 > Memória técnica viva do projeto. Atualizar ao final de cada bloco importante.
-> Última atualização: 2026-05-15 (Sprint 8.1 — Claude AI Universal: Edge Function multi-page + 8 páginas com useAiInsight)
+> Última atualização: 2026-05-15 (Sprint 9 — DeFiLlama live + Options no motor de trades + Reddit Pulse ETF)
 
 ---
 
@@ -8,8 +8,8 @@
 
 | Aspecto | Status | Evidência Real |
 |---------|--------|---------------|
-| Build (`npm run build`) | ✅ PASSA | 0 erros — Sprint 7.4 (PR #98) |
-| Testes (`npm test`) | ✅ 217/217 | 14 suites |
+| Build (`npm run build`) | ✅ PASSA | 0 erros — Sprint 9 |
+| Testes (`npm test`) | ✅ 270/270 | 17 suites |
 | Deploy (Render) | ✅ ONLINE | https://mrp-dashboard.onrender.com |
 | FRED API Key | ✅ CONFIGURADA | VITE_FRED_API_KEY em .env.local |
 | Supabase URL + ANON_KEY | ✅ CONFIGURADO | .env.local presente |
@@ -71,6 +71,7 @@
 | **P6 — Produção DB + fred-proxy** | ✅ PR #91 | 4 erros de log corrigidos: `system_logs` criada; `macro_event_catalog` criada + seed 8 eventos; 5 colunas adicionadas a `macro_event_schedule` (`actual_source`, `actual_updated_at`, `is_revised`, `retry_count`, `last_error`); `v_macro_actual_pending` + `v_job_health` recriadas com JOIN correto; tabelas `macro_alert_preferences`, `telegram_delivery_log`, `system_job_log` criadas; `fred-proxy` v9 com `AbortSignal.timeout(15_000)` |
 | **P7 — Macro Audit + fred-proxy resiliência** | ✅ PR #92 | Auditoria profunda da página Macro: 5 bugs confirmados em `fred.ts` + `Macro.jsx`; `Promise.all` → `Promise.allSettled` em `fetchMacroBoard` + `fetchGlobalLiquidity`; fred-proxy v10 com logging de erros FRED 4xx; null-guard `yieldSpread` em `Macro.jsx:543` (fix Codex P1); valores verificados vs APIs reais (S&P ~7399, Gold ~$4740, VIX ~17.19, Fed BS ~$6.7T, RRP ~$0.6B, Net Liq ~$5.8T); plano Macro Production Hardening gerado |
 | **Sprint 7.3 — Page migrations batch B + P2 fixes** | ✅ PR #97 mergeado | Derivatives.jsx: remove imports `mockData`+`mockDataExtended` → `fmtNum`/`fmtPct` inline; fallbacks `BTC_FUTURES_FALLBACK`, `LIQUIDITY_BINS_STATIC`, `OI_RATIO_FALLBACK`, `PERP_VS_DATED_FALLBACK`, `AI_DERIVATIVES_FALLBACK`; `hasLiveFutures` flag; DataTrustBadge em Perp vs Dated. Options.jsx + SpotFlow.jsx: idem com seus fallbacks. Strategies.jsx: DataTrustBadge. **P2 fixes (Codex):** (1) `AI_*_FALLBACK` em Derivatives/Options/SpotFlow corrigidos para shape completo de `AIModuleCard` (direction/signal/score/probability/confidence/timeframe/trigger/analysis); (2) `useDerivativesData()` calcula `index_price: ticker.mark_price` e `open_interest_usdt: ticker.open_interest * ticker.mark_price` — `BtcTickerData` não expõe esses campos diretamente. Conflito de merge resolvido via `git rebase origin/main` + `--ours` em 4 arquivos. Build ✅ |
+| **Sprint 9 — DeFiLlama + Options engine + Reddit ETF** | ✅ branch `claude/macro-page-fix-prompt-s6hoI` | **3 features live.** (1) `StablecoinFlow.jsx`: hook `useStablecoinData()` conectado — `snap.total_supply_b/total_net_24h_m/usdt/usdc` vêm da DeFiLlama API em tempo real (TTL 1h); banner amarelo automático quando rate-limit atingido (`quality==='C'`); badge verde "AO VIVO · DeFiLlama" quando dados frescos. (2) `ActionDashboard.jsx`: `useOptionsData()` adicionado; `chainSkew` calculado da chain Deribit; `maxPainDistancePct` do spot; `options: { ivAtm, skew, pcrVol, maxPainDistancePct }` agora passado para `computeRuleBasedAnalysis` — sinais do módulo de opções (IV extrema, put skew, PCR > 1.2) entram na geração de oportunidades. (3) `src/services/reddit.ts` + `src/hooks/useEtfReddit.ts` criados; `ETFFlows.jsx` com seção "Reddit Pulse" — posts ao vivo de r/ETFs e r/Bitcoin sobre BTC ETF flows (sort=new, atualizado a cada 30min); fallback para 3 posts mock em dev. Build ✅ · 270/270 testes ✅ |
 | **Sprint 8.1 — Claude AI Universal** | ✅ branch `claude/macro-page-fix-prompt-s6hoI` | **Claude Haiku 4.5 em todas as páginas com IA.** Edge Function `ai-analysis` expandida com roteamento por `page` (9 páginas: dashboard, derivatives, derivatives_advanced, options, spot_flow, macro, predictive, executive_report, action_dashboard); `context{}` carrega métricas específicas por página; system prompt permanece em cache ephemeral. `aiInsight.ts`: payload com `page + context`. `useAiInsight.ts`: `page` no queryKey = cache de 15min independente por página. `AIInsightPanel`: props `insight/isLoadingInsight/modelLabel` + skeleton loading + footer dinâmico "claude-haiku-4-5". **Páginas mock → Claude** (3): DerivativesAdvanced, ActionDashboard, ExecutiveReport. **Páginas rule-based + Claude** (5): Derivatives, SpotFlow, Options, Macro, PredictivePanel — componente `ClaudeInsight` inline adicionado após AIModuleCard. **Custo estimado**: $1,50–4,00/mês (Claude Haiku 4.5 com prompt caching). **Sem tier gratuito** na API Anthropic — $5 crédito inicial para novas contas. Build ✅ tsc ✅ |
 | **Sprint 7.4 — Page migrations batch C + Codex P1 fixes** | ✅ PR #98 mergeado | **5 páginas limpas de mockData**. Dashboard.jsx: `fmtNum`/`fmtPct` inline + 8 fallback consts. ExecutiveReport.jsx: 30 consts fallback; imports reordenados (todos `import` antes de `const`); fallbacks completos com todos os campos usados (funding_history, smoothed_7d, exchange_reserves, netflow_7d, usdt/usdc net_7d_m, funds[], total_shorts_at_risk_10pct, NUPL history como objeto `{1d:[],1w:[],1m:[]}`). PredictivePanel.jsx: 4 consts fallback (SCENARIOS_24H_FALLBACK baseado em SPOT_FALLBACK=84K). StablecoinFlow.jsx: 7 consts fallback. ActionDashboard.jsx: 7 consts fallback. **Post-merge Codex P1 fixes:** (1) Dashboard.jsx:184 `fearGreed.history` → `FEAR_GREED_FALLBACK.history` (tsc CI falhou, corrigido); (2) StablecoinFlow.jsx:345 `dailyMintBurn` → `DAILY_MINT_BURN_FALLBACK` (tsc CI, corrigido); (3) `STABLECOIN_SNAPSHOT_FALLBACK.usdt/usdc` ganhou `net_7d_m: 0` (crash no tab Emissões, Codex review). Build ✅ tsc ✅ |
 
@@ -197,6 +198,8 @@ Achados principais:
 | **Alternative.me** | `alternative.ts` | `api.alternative.me` | Sem key | Fear & Greed Index |
 | **Deribit** | `deribit.ts` | `deribit.com/api/v2/public` | Sem key | IV ATM, term structure, opções BTC |
 | **BCB OpenData** | `bcb.ts` | `api.bcb.gov.br` | Sem key | SELIC, IPCA, USD/BRL |
+| **DeFiLlama** | `defillama.ts` | `stablecoins.llama.fi` | Sem key | Supply total stablecoins, top5 (USDT/USDC/DAI), supply por chain — TTL 1h cache |
+| **Reddit JSON API** | `reddit.ts` | `www.reddit.com/r/*/search.json` | Sem key | Posts de r/ETFs + r/Bitcoin sobre BTC ETF flows — TTL 30min |
 
 ### ⚠️ CONFIGURADO — Precisa de chave (já configurada em .env.local)
 

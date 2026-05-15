@@ -1,5 +1,5 @@
 // ─── STABLECOIN FLOW TRACKER ─────────────────────────────────────────────────
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 
 // Fallbacks — dados de mint/burn requerem API paga (Glassnode ~$29/mês ou Nansen)
 const DAILY_MINT_BURN_FALLBACK = [];
@@ -16,6 +16,7 @@ const MINT_VS_BTC_CORR_FALLBACK = {
   pearson_7d: 0, pearson_30d: 0, lag_hours_optimal: 0,
   note: 'Dados indisponíveis — requer API paga (Glassnode/Nansen)',
 };
+import { useStablecoinData } from '@/hooks/useStablecoin';
 import { DataTrustBadge } from '../components/ui/DataTrustBadge';
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -121,16 +122,59 @@ const TABS = ['Visão Geral', 'Emissões', 'Por Rede', 'Correlação'];
 export function StablecoinContent() {
   const [tab, setTab] = useState(0);
   const [tf, setTf] = useState(30);
-  const snap = STABLECOIN_SNAPSHOT_FALLBACK;
-  const slicedData = DAILY_MINT_BURN_FALLBACK.slice(-tf);
 
-  // Média 7d como referência no gráfico
+  const { data: defiData } = useStablecoinData();
+
+  const snap = useMemo(() => {
+    if (!defiData || defiData.source === 'mock') return STABLECOIN_SNAPSHOT_FALLBACK;
+    const usdt = defiData.top5.find(t => t.symbol === 'USDT');
+    const usdc = defiData.top5.find(t => t.symbol === 'USDC');
+    const usdtNet24hM = usdt ? (usdt.circulating - usdt.circulatingPrev) / 1e6 : 0;
+    const usdcNet24hM = usdc ? (usdc.circulating - usdc.circulatingPrev) / 1e6 : 0;
+    const totalNet24hM = (defiData.totalSupply * defiData.totalChange24h / 100) / 1e6;
+    return {
+      total_supply_b: defiData.totalSupply / 1e9,
+      total_net_24h_m: totalNet24hM,
+      avg7d_net_m: STABLECOIN_SNAPSHOT_FALLBACK.avg7d_net_m,
+      sigma_vs_7d: STABLECOIN_SNAPSHOT_FALLBACK.sigma_vs_7d,
+      usdt: {
+        mint_24h_m: Math.max(0, usdtNet24hM),
+        net_24h_m: usdtNet24hM,
+        net_7d_m: usdtNet24hM * 7,
+      },
+      usdc: {
+        mint_24h_m: Math.max(0, usdcNet24hM),
+        net_24h_m: usdcNet24hM,
+        net_7d_m: usdcNet24hM * 7,
+      },
+    };
+  }, [defiData]);
+
+  const slicedData = DAILY_MINT_BURN_FALLBACK.slice(-tf);
   const avg7dNet = snap.avg7d_net_m;
+  const isRateLimited = defiData?.quality === 'C';
+  const isLiveData = defiData?.source === 'DeFiLlama' || defiData?.source === 'cache';
 
   const CHAIN_COLORS = ['#627eea', '#28a0f0', '#ef0027', '#9945ff'];
 
   return (
     <div style={{ maxWidth: 1400, margin: '0 auto' }}>
+      {/* Rate-limit notification */}
+      {isRateLimited && (
+        <div style={{ marginBottom: 12, padding: '10px 14px', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 8, display: 'flex', gap: 8, alignItems: 'center' }}>
+          <span style={{ fontSize: 14 }}>⚠️</span>
+          <span style={{ fontSize: 11, color: '#f59e0b' }}>
+            DeFiLlama: limite de requisições atingido — exibindo dados em cache. Próxima tentativa automática em ~1h.
+          </span>
+        </div>
+      )}
+      {/* Live data source badge */}
+      {isLiveData && !isRateLimited && (
+        <div style={{ marginBottom: 12, padding: '6px 12px', background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 6, display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+          <span style={{ fontSize: 9, color: '#10b981', fontWeight: 700 }}>● AO VIVO</span>
+          <span style={{ fontSize: 9, color: '#475569' }}>DeFiLlama · supply total e fluxos 24h</span>
+        </div>
+      )}
       {/* Header */}
       <div style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
