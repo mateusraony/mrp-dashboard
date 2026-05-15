@@ -1,6 +1,6 @@
 # CHECKPOINT.md — MRP Dashboard
 > Memória técnica viva do projeto. Atualizar ao final de cada bloco importante.
-> Última atualização: 2026-05-10 (P7 — Macro Audit + fred-proxy resiliência, PR #92 + Plano Macro Production Hardening)
+> Última atualização: 2026-05-15 (Sprint 7.3 — Page migrations batch B: remove mockData imports de Derivatives/Options/SpotFlow/Strategies)
 
 ---
 
@@ -70,6 +70,7 @@
 | **P5 — Module toggles enforcement** | ✅ PR #90 | `moduleFlags.ts` + `DisabledModuleBanner.jsx`; `enabled: readModuleFlag(...)` em 6 hooks (useDeribit, useMempool, useCoinMetrics, useGdelt, useBtcData#useFearGreed); early-return banner em Options/SpotFlow/OnChain/NewsIntelligence; Codex P2 fixes: link `/Settings`, `useBtcTicker(enabled)`, `useOnChainCycle/Extended(pageEnabled)` |
 | **P6 — Produção DB + fred-proxy** | ✅ PR #91 | 4 erros de log corrigidos: `system_logs` criada; `macro_event_catalog` criada + seed 8 eventos; 5 colunas adicionadas a `macro_event_schedule` (`actual_source`, `actual_updated_at`, `is_revised`, `retry_count`, `last_error`); `v_macro_actual_pending` + `v_job_health` recriadas com JOIN correto; tabelas `macro_alert_preferences`, `telegram_delivery_log`, `system_job_log` criadas; `fred-proxy` v9 com `AbortSignal.timeout(15_000)` |
 | **P7 — Macro Audit + fred-proxy resiliência** | ✅ PR #92 | Auditoria profunda da página Macro: 5 bugs confirmados em `fred.ts` + `Macro.jsx`; `Promise.all` → `Promise.allSettled` em `fetchMacroBoard` + `fetchGlobalLiquidity`; fred-proxy v10 com logging de erros FRED 4xx; null-guard `yieldSpread` em `Macro.jsx:543` (fix Codex P1); valores verificados vs APIs reais (S&P ~7399, Gold ~$4740, VIX ~17.19, Fed BS ~$6.7T, RRP ~$0.6B, Net Liq ~$5.8T); plano Macro Production Hardening gerado |
+| **Sprint 7.3 — Page migrations batch B** | ✅ branch `claude/macro-page-fix-prompt-s6hoI` | Derivatives.jsx: remove imports `mockData`+`mockDataExtended` → `fmtNum`/`fmtPct` inline; `BTC_FUTURES_FALLBACK`, `LIQUIDITY_BINS_STATIC`, `OI_RATIO_FALLBACK`, `PERP_VS_DATED_FALLBACK`, `AI_DERIVATIVES_FALLBACK` inline; `hasLiveFutures` flag; fix misplaced import `oiRatio/perpVsDatedOI`; DataTrustBadge em Perp vs Dated. Options.jsx: remove import `mockData` → `BTC_OPTIONS_FALLBACK`, `BTC_OPTIONS_EXT_FALLBACK`, `AI_OPTIONS_FALLBACK` inline; `hasLiveData` flag; fix misplaced imports bloco pós-função; guard `nearestStrike` em array vazio. SpotFlow.jsx: remove imports `mockData`+`mockDataAltcoins` → `fmtNum` inline, `SPOT_FALLBACK`, `AI_SPOT_FALLBACK`; sessions fallback = `[]` (vazio quando klines indisponíveis). Strategies.jsx: DataTrustBadge adicionado ao painel de estratégias. Build ✅ |
 
 ---
 
@@ -512,6 +513,8 @@ npx tsc -p ./jsconfig.json
 | Item | Descrição | Status |
 |------|-----------|--------|
 | **🔴 MACRO PRODUCTION HARDENING** | 5 bugs fred.ts + Macro.jsx; migração SP500/VIX Yahoo Finance; useMemo; refetchInterval; labels | **PRÓXIMA SESSÃO — ver seção acima** |
+| **Sprint 7.3 — mockData removals batch B** | Derivatives/Options/SpotFlow/Strategies — imports de mockData/mockDataExtended/mockDataAltcoins removidos; fallbacks inline; DataTrustBadge | ✅ CONCLUÍDO (2026-05-15) |
+| **Sprint 7.4 — mockData removals batch C** | Dashboard.jsx, ExecutiveReport.jsx, PredictivePanel.jsx, StablecoinFlow.jsx, ActionDashboard.jsx | 🔜 PRÓXIMO |
 | **Telegram Digest** | Edge Functions + pg_cron ativos | ✅ CONCLUÍDO — remover job duplicado `telegram-digest` no SQL Editor |
 | **GDELT→Supabase wiring** | upsert de artigos novos | ✅ RESOLVIDO (PR #88) — `upsertGdeltArticles` fire-and-forget em `useGdelt.ts` |
 | **MacroCalendar bronze pipeline** | `persistMacroSchedule()` + macro-actual-fetcher | ✅ IMPLEMENTADO — funcional |

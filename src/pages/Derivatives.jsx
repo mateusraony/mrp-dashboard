@@ -1,33 +1,9 @@
-import {
-  btcFutures, liquidityBins,
-  oiByExchange as oiByExchangeMock,
-  fmtNum, fmtPct, aiAnalysis as aiAnalysisMock,
-} from '../components/data/mockData';
 import { computeRuleBasedAnalysis } from '@/utils/ruleBasedAnalysis';
 import { useBtcTicker, useOiByExchange, useLiquidations, useLongShortRatio, useDominance } from '@/hooks/useBtcData';
 import { useMultiVenueSnapshot } from '@/hooks/useMultiVenue';
 import { DataQualityBadge } from '../components/ui/DataQualityBadge';
 import { DataTrustBadge } from '../components/ui/DataTrustBadge';
 import { IS_LIVE } from '@/lib/env';
-
-// ─── DATA LAYER (live > mock fallback) ───────────────────────────────────────
-// oiByExchange live → mapeia oi_usd para oi_b (shape do mock) para compatibilidade do UI
-function useDerivativesData() {
-  const { data: ticker } = useBtcTicker();
-  const { data: oiExch } = useOiByExchange();
-
-  const liveBtcFutures = ticker
-    ? { ...btcFutures, mark_price: ticker.mark_price, funding_rate: ticker.last_funding_rate, oi_delta_pct: ticker.oi_delta_pct, open_interest: ticker.open_interest }
-    : btcFutures;
-
-  // Converter oi_usd (live) → oi_b (mock shape em bilhões BTC) para o UI
-  const oiByExchange = oiExch
-    ? oiExch.map(e => ({ ...e, oi_b: e.oi_usd / 1e9, change_24h: 0 }))
-    : oiByExchangeMock;
-
-  return { btcFutures: liveBtcFutures, oiByExchange };
-}
-import { oiRatio, perpVsDatedOI } from '../components/data/mockDataExtended';
 import { AIModuleCard } from '../components/ui/AIAnalysisPanel';
 import SectionHeader from '../components/ui/SectionHeader';
 import { ModeBadge } from '../components/ui/DataBadge';
@@ -37,6 +13,46 @@ import { BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine,
 } from 'recharts';
 import { format } from 'date-fns';
+
+// Inline formatters — no external mock dependency
+const fmtNum = (v, d = 2) => v != null ? v.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d }) : '—';
+const fmtPct = (v, d = 4) => v != null ? (v * 100).toFixed(d) + '%' : '—';
+
+// Fallbacks for derivative fields without live API equivalents
+const BTC_FUTURES_FALLBACK = {
+  mark_price: 0, index_price: 0,
+  funding_rate: 0, funding_avg_7d: 0, funding_avg_30d: 0,
+  open_interest: 0, open_interest_usdt: 0,
+  oi_delta_pct: 0, oi_delta_pct_1w: 0, oi_delta_pct_1m: 0,
+  long_short_ratio: 1, top_trader_ls: 1,
+  next_funding_time: new Date(Date.now() + 8 * 3600 * 1000),
+  risk_score: 0, risk_direction: 'long_flush',
+  risk_factors: { funding_extreme: 0, oi_spike: 0, vol_spike: 0, crowding: 0, ret_mag: 0 },
+  funding_history: [],
+};
+const LIQUIDITY_BINS_STATIC = [];
+const OI_RATIO_FALLBACK = { ratio_pct: 0, zone: '—', signal: '', prev_7d_ratio: 0, prev_30d_ratio: 0 };
+const PERP_VS_DATED_FALLBACK = {
+  perp_oi_b: 0, perp_pct: 50, dated_oi_b: 0, dated_pct: 50,
+  cme_oi_b: 0, cme_pct_of_dated: 0, signal: 'Dados indisponíveis — requer API paga (CoinGlass)',
+};
+const AI_DERIVATIVES_FALLBACK = { modules: { derivatives: { headline: '', signals: [], score: 0, bias: 'NEUTRO' } } };
+
+// ─── DATA LAYER (live > fallback) ────────────────────────────────────────────
+function useDerivativesData() {
+  const { data: ticker } = useBtcTicker();
+  const { data: oiExch } = useOiByExchange();
+
+  const liveBtcFutures = ticker
+    ? { ...BTC_FUTURES_FALLBACK, mark_price: ticker.mark_price, funding_rate: ticker.last_funding_rate, oi_delta_pct: ticker.oi_delta_pct, open_interest: ticker.open_interest }
+    : BTC_FUTURES_FALLBACK;
+
+  const oiByExchange = oiExch
+    ? oiExch.map(e => ({ ...e, oi_b: e.oi_usd / 1e9, change_24h: 0 }))
+    : [];
+
+  return { btcFutures: liveBtcFutures, oiByExchange, hasLiveFutures: !!ticker };
+}
 
 const COLORS = {
   positive: '#10b981', negative: '#ef4444', neutral: '#f59e0b',
@@ -131,7 +147,7 @@ function LiquidityHeatmap({ bins }) {
 }
 
 export function DerivativesOverview() {
-  const { btcFutures: liveBtc, oiByExchange: liveOi } = useDerivativesData();
+  const { btcFutures: liveBtc, oiByExchange: liveOi, hasLiveFutures } = useDerivativesData();
   const f = liveBtc; // use live data if available
 
   // ── Long/Short Ratio — live via Binance globalLongShortAccountRatio ──────────
@@ -146,22 +162,22 @@ export function DerivativesOverview() {
   const totalOiUsd = oiData ? oiData.reduce((s, e) => s + (e.oi_usd ?? 0), 0) : null;
   const btcMcapUsd = dominance ? dominance.total_mcap_usd * dominance.btc_dominance / 100 : null;
   const liveRatioPct = (totalOiUsd && btcMcapUsd) ? (totalOiUsd / btcMcapUsd) * 100 : null;
-  const displayRatioPct = liveRatioPct ?? oiRatio.ratio_pct;
+  const displayRatioPct = liveRatioPct ?? OI_RATIO_FALLBACK.ratio_pct;
   const displayZone = liveRatioPct !== null
     ? (liveRatioPct < 0.5 ? 'Baixo' : liveRatioPct < 1.0 ? 'Moderado' : liveRatioPct < 1.5 ? 'Elevado' : 'Extremo')
-    : oiRatio.zone;
+    : OI_RATIO_FALLBACK.zone;
   const displayZoneColor = liveRatioPct !== null
     ? (liveRatioPct < 0.5 ? '#10b981' : liveRatioPct < 1.0 ? '#f59e0b' : '#ef4444')
     : '#f59e0b';
   const displaySignal = liveRatioPct !== null
     ? `OI Binance / Market Cap BTC: ${liveRatioPct.toFixed(2)}% — zona ${displayZone.toLowerCase()}. (Somente OI Binance; total cross-exchange via CoinGlass requereria plano pago.)`
-    : oiRatio.signal;
+    : OI_RATIO_FALLBACK.signal;
 
   // Rule-based AI analysis from live ticker
-  const liveAnalysis = IS_LIVE && liveBtc.mark_price !== btcFutures.mark_price
+  const liveAnalysis = IS_LIVE && hasLiveFutures
     ? computeRuleBasedAnalysis({ derivatives: { fundingRate: liveBtc.funding_rate, oiDeltaPct: liveBtc.oi_delta_pct, openInterest: liveBtc.open_interest } })
     : null;
-  const aiAnalysis = liveAnalysis ?? aiAnalysisMock;
+  const aiAnalysis = liveAnalysis ?? AI_DERIVATIVES_FALLBACK;
   const fundingPos = f.funding_rate > 0;
   const nextFundHours = Math.round((f.next_funding_time.getTime() - Date.now()) / 3600000);
 
@@ -348,16 +364,9 @@ export function DerivativesOverview() {
           title="Liquidity Heatmap — Orderbook"
           subtitle="Profundidade do book de futuros por distância do mid price"
         />
-        <LiquidityHeatmap bins={liquidityBins} />
+        <LiquidityHeatmap bins={LIQUIDITY_BINS_STATIC} />
         <div style={{ marginTop: 12, fontSize: 10, color: '#4a5568', fontStyle: 'italic' }}>
-          Bids vs Asks em USD. Barras maiores = parede de liquidez mais profunda. Principais bids:{' '}
-          <span style={{ fontFamily: 'JetBrains Mono, monospace', color: '#8899a6' }}>
-            $83.000 ($11,3M) · $83.500 ($7,5M)
-          </span>
-          . Principais asks:{' '}
-          <span style={{ fontFamily: 'JetBrains Mono, monospace', color: '#8899a6' }}>
-            $86.000 ($16,7M) · $85.500 ($9,5M)
-          </span>
+          Requer WebSocket de orderbook em tempo real (Binance Depth). Dados indisponíveis na versão atual.
         </div>
       </div>
 
@@ -386,39 +395,42 @@ export function DerivativesOverview() {
             <div style={{ height: '100%', borderRadius: 3, width: `${Math.min(100, displayRatioPct / 2 * 100)}%`, background: 'linear-gradient(90deg, #10b981, #f59e0b, #ef4444)' }} />
           </div>
           <div style={{ display: 'flex', gap: 12, fontSize: 10, color: '#475569', marginBottom: 10 }}>
-            <span>7d atrás: <span style={{ fontFamily: 'JetBrains Mono, monospace', color: '#94a3b8' }}>{oiRatio.prev_7d_ratio.toFixed(2)}%</span></span>
-            <span>30d atrás: <span style={{ fontFamily: 'JetBrains Mono, monospace', color: '#94a3b8' }}>{oiRatio.prev_30d_ratio.toFixed(2)}%</span></span>
+            <span>7d atrás: <span style={{ fontFamily: 'JetBrains Mono, monospace', color: '#94a3b8' }}>—</span></span>
+            <span>30d atrás: <span style={{ fontFamily: 'JetBrains Mono, monospace', color: '#94a3b8' }}>—</span></span>
           </div>
           <div style={{ fontSize: 10, color: '#64748b', lineHeight: 1.6 }}>{displaySignal}</div>
         </div>
 
         {/* Perp vs Dated split */}
         <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: 20 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 14 }}>Perp vs Dated Futures OI</div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0' }}>Perp vs Dated Futures OI</div>
+            <DataTrustBadge mode="mock" confidence="D" source="CoinGlass" reason="Requer API paga (CoinGlass)" />
+          </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div>
               <div style={{ fontSize: 9, color: '#475569', marginBottom: 3 }}>Perpétuos</div>
               <div style={{ fontSize: 24, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: '#60a5fa' }}>
-                ${perpVsDatedOI.perp_oi_b.toFixed(1)}B
+                ${PERP_VS_DATED_FALLBACK.perp_oi_b.toFixed(1)}B
               </div>
-              <div style={{ fontSize: 10, color: '#60a5fa', fontWeight: 600 }}>{perpVsDatedOI.perp_pct.toFixed(1)}% do total</div>
+              <div style={{ fontSize: 10, color: '#60a5fa', fontWeight: 600 }}>{PERP_VS_DATED_FALLBACK.perp_pct.toFixed(1)}% do total</div>
             </div>
             <div>
               <div style={{ fontSize: 9, color: '#475569', marginBottom: 3 }}>Datados (incl. CME)</div>
               <div style={{ fontSize: 24, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: '#10b981' }}>
-                ${perpVsDatedOI.dated_oi_b.toFixed(1)}B
+                ${PERP_VS_DATED_FALLBACK.dated_oi_b.toFixed(1)}B
               </div>
-              <div style={{ fontSize: 10, color: '#10b981', fontWeight: 600 }}>{perpVsDatedOI.dated_pct.toFixed(1)}% do total</div>
+              <div style={{ fontSize: 10, color: '#10b981', fontWeight: 600 }}>{PERP_VS_DATED_FALLBACK.dated_pct.toFixed(1)}% do total</div>
             </div>
           </div>
           <div style={{ height: 10, borderRadius: 5, overflow: 'hidden', display: 'flex', marginBottom: 8 }}>
-            <div style={{ width: `${perpVsDatedOI.perp_pct}%`, background: '#3b82f6' }} />
+            <div style={{ width: `${PERP_VS_DATED_FALLBACK.perp_pct}%`, background: '#3b82f6' }} />
             <div style={{ flex: 1, background: '#10b981' }} />
           </div>
           <div style={{ fontSize: 10, color: '#475569' }}>
-            CME (institucional): <span style={{ fontFamily: 'JetBrains Mono, monospace', color: '#94a3b8' }}>${perpVsDatedOI.cme_oi_b.toFixed(2)}B ({perpVsDatedOI.cme_pct_of_dated.toFixed(1)}% dos datados)</span>
+            CME (institucional): <span style={{ fontFamily: 'JetBrains Mono, monospace', color: '#94a3b8' }}>${PERP_VS_DATED_FALLBACK.cme_oi_b.toFixed(2)}B ({PERP_VS_DATED_FALLBACK.cme_pct_of_dated.toFixed(1)}% dos datados)</span>
           </div>
-          <div style={{ fontSize: 10, color: '#64748b', lineHeight: 1.6, marginTop: 8 }}>{perpVsDatedOI.signal}</div>
+          <div style={{ fontSize: 10, color: '#64748b', lineHeight: 1.6, marginTop: 8 }}>{PERP_VS_DATED_FALLBACK.signal}</div>
         </div>
       </div>
 

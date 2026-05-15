@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react';
 import { strategies, marketConditionsSummary } from '../components/data/mockDataStrategies';
 import { ModeBadge } from '../components/ui/DataBadge';
+import { DataTrustBadge } from '../components/ui/DataTrustBadge';
 import { StaleIndicator } from '../components/ui/StaleIndicator';
 import { useBtcTicker, useFearGreed } from '@/hooks/useBtcData';
 import { useOptionsData } from '@/hooks/useDeribit';
@@ -382,6 +383,9 @@ export function StrategiesContent() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 460px', gap: 16, alignItems: 'start' }}>
         {/* Strategy list */}
         <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+            <DataTrustBadge mode="mock" confidence="D" source="Engine quantitativa (demo)" reason="Setups estáticos — sem API de sinais em tempo real" />
+          </div>
           {filtered.map(s => (
             <StrategyCard
               key={s.id}
