@@ -5,8 +5,8 @@ import { useState } from 'react';
 const DAILY_MINT_BURN_FALLBACK = [];
 const STABLECOIN_SNAPSHOT_FALLBACK = {
   total_supply_b: 0, total_net_24h_m: 0, avg7d_net_m: 0, sigma_vs_7d: 0,
-  usdt: { mint_24h_m: 0, net_24h_m: 0 },
-  usdc: { mint_24h_m: 0, net_24h_m: 0 },
+  usdt: { mint_24h_m: 0, net_24h_m: 0, net_7d_m: 0 },
+  usdc: { mint_24h_m: 0, net_24h_m: 0, net_7d_m: 0 },
 };
 const LARGE_MINT_EVENTS_FALLBACK = [];
 const LARGE_BURN_EVENTS_FALLBACK = [];
