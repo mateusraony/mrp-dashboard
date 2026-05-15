@@ -10,6 +10,7 @@ import { useOptionsData } from '@/hooks/useDeribit';
 import { useBtcTicker, useFuturesBasis } from '@/hooks/useBtcData';
 import { useMacroBoard } from '@/hooks/useFred';
 import { DATA_MODE, IS_LIVE } from '@/lib/env';
+import { useAiInsight } from '@/hooks/useAiInsight';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   ReferenceLine, Cell, ComposedChart, Line,
@@ -57,6 +58,23 @@ function LiqHeatmapFull() {
   // Maior ameaça imediata (cluster abaixo/acima mais próximo)
   const closestLong  = [...sorted].filter(c => c.price < SPOT_LIVE).sort((a, b) => b.price - a.price)[0];
   const closestShort = [...sorted].filter(c => c.price > SPOT_LIVE).sort((a, b) => a.price - b.price)[0];
+
+  // Claude AI insight
+  const derivAdvPayload = ticker ? {
+    page: 'derivatives_advanced',
+    riskScore: 50,
+    riskRegime: probLongFlush > 65 ? 'RISCO ELEVADO' : 'MODERADO',
+    fearGreedValue: 50,
+    fearGreedLabel: 'Neutral',
+    fundingRate: ticker.last_funding_rate,
+    context: {
+      probLongFlush,
+      longRiskUsd: longRisk,
+      closestLongPrice: closestLong?.price,
+      closestShortPrice: closestShort?.price,
+    },
+  } : null;
+  const { data: aiInsightText, isLoading: aiLoading } = useAiInsight(derivAdvPayload);
   const distLong  = ((SPOT_LIVE - closestLong?.price) / SPOT_LIVE * 100).toFixed(1);
   const distShort = ((closestShort?.price - SPOT_LIVE) / SPOT_LIVE * 100).toFixed(1);
 
@@ -209,6 +227,9 @@ function LiqHeatmapFull() {
           }
           reasoning={`Ratio longs/shorts em risco ±10%: ${probLongFlush}% / ${100 - probLongFlush}%. Cluster mais próximo de longs: $${(closestLong?.price/1000).toFixed(0)}K (${fmtM(closestLong?.longs_usd)}). Cluster mais próximo de shorts: $${(closestShort?.price/1000).toFixed(0)}K (${fmtM(closestShort?.shorts_usd)}). Short squeeze requereria rompimento de $${(closestShort?.price/1000).toFixed(0)}K com volume.`}
           actions={['Monitorar $' + (closestLong?.price/1000).toFixed(0) + 'K', 'Ver Funding Rate', 'Checar OI Delta']}
+          insight={aiInsightText}
+          isLoadingInsight={aiLoading}
+          modelLabel={aiInsightText ? 'claude-haiku-4-5' : undefined}
         />
       </div>
     </div>

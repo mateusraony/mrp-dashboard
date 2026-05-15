@@ -3,6 +3,7 @@ import { readModuleFlag } from '@/lib/moduleFlags';
 import { DisabledModuleBanner } from '@/components/ui/DisabledModuleBanner';
 import { computeGex, computeMaxPain } from '@/utils/riskCalculations';
 import { computeRuleBasedAnalysis } from '@/utils/ruleBasedAnalysis';
+import { useAiInsight } from '@/hooks/useAiInsight';
 import { IS_LIVE } from '@/lib/env';
 import { AIModuleCard } from '../components/ui/AIAnalysisPanel';
 import SectionHeader from '../components/ui/SectionHeader';
@@ -116,6 +117,19 @@ const regimeLabels = {
   crisis:       { label: 'Crisis', color: '#ef4444', bg: 'rgba(239,68,68,0.1)' },
 };
 
+function ClaudeInsight({ text, loading }) {
+  if (!text && !loading) return null;
+  return (
+    <div style={{ marginTop: 8, padding: '10px 12px', borderRadius: 8, background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.15)' }}>
+      <div style={{ fontSize: 8, color: '#3b82f6', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 5 }}>✦ Claude Haiku</div>
+      {loading && !text
+        ? <div style={{ height: 12, borderRadius: 3, background: 'rgba(59,130,246,0.1)' }} />
+        : <div style={{ fontSize: 11, color: '#94a3b8', lineHeight: 1.6 }}>{text}</div>
+      }
+    </div>
+  );
+}
+
 export default function Options() {
   const { btcOptions, liveGex, liveMaxPain, liveOiByStrike, livePcrVol, livePcrOi, liveMaxPainDistancePct, hasLiveData } = useOptionsPageData();
   const o = btcOptions;
@@ -133,6 +147,23 @@ export default function Options() {
       })
     : null;
   const aiAnalysis = liveAnalysis ?? AI_OPTIONS_FALLBACK;
+
+  // Claude AI insight
+  const optPayload = hasLiveData ? {
+    page: 'options',
+    riskScore: 50,
+    riskRegime: 'MODERADO',
+    fearGreedValue: 50,
+    fearGreedLabel: 'Neutral',
+    fundingRate: 0,
+    context: {
+      ivAtm: o.iv_atm,
+      skew: o.skew,
+      pcrOi: livePcrOi,
+      maxPainPct: liveMaxPainDistancePct,
+    },
+  } : null;
+  const { data: optInsight, isLoading: optAiLoading } = useAiInsight(optPayload);
 
   const smileData = o.strikes.map(s => ({
     strike: s.strike / 1000,
@@ -256,6 +287,7 @@ export default function Options() {
       <div style={{ marginBottom: 16 }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 10 }}>🤖 AI Analysis — Options</div>
         <AIModuleCard module={aiAnalysis.modules.options} title="Options" icon="◬" />
+        <ClaudeInsight text={optInsight} loading={optAiLoading} />
       </div>
 
       {/* Put/Call Ratio + Max Pain */}

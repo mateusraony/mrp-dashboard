@@ -21,7 +21,7 @@ export function useAiInsight(payload: AiInsightPayload | null) {
   const timeBucket = Math.floor(Date.now() / BUCKET_MS);
 
   return useQuery({
-    queryKey: ['ai-insight', timeBucket],
+    queryKey: ['ai-insight', payload?.page ?? 'dashboard', timeBucket],
     queryFn:  () => fetchAiInsight(payload!),
     enabled,
     staleTime: BUCKET_MS,
