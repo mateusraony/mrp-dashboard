@@ -259,7 +259,7 @@ function RegimeSection({ period, liveRegime, regimeLoading }) {
         <span style={{ fontSize: 10, color: '#475569' }}>Conf: {r.confidence}%</span>
       </>;
 
-  const radarData = r.components.map(c => ({ subject: c.label.split(' ')[0], value: Math.round(c.score), fullMark: 100 }));
+  const radarData = r.components.map(c => ({ subject: c.label?.split(' ')?.[0] ?? '—', value: Math.round(c.score ?? 0), fullMark: 100 }));
 
   // Simulated history based on period
   const histLen = period === 'Diário' ? 24 : period === 'Semanal' ? 7 : period === 'Mensal' ? 30 : 52;
@@ -666,7 +666,7 @@ function ETFMacroSection({ period }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 12 }}>
         <Metric label="AUM Total" value={`$${etf.total_aum_b.toFixed(1)}B`} color="#60a5fa" sub={`${etf.consec_inflow_days}d consecutivos entrada`} />
         <Metric label={`Net Flow ${period}`} value={fmtM(etf[netKey] * 1e6)} color={etf[netKey] > 0 ? '#10b981' : '#ef4444'} sub="USD" />
-        <Metric label="IBIT (BlackRock)" value={`$${etf.funds[0].aum_b.toFixed(1)}B`} color="#3b82f6" sub={`Flow: ${fmtM((etf.funds[0][flowKey] || 0) * 1e6)}`} />
+        <Metric label="IBIT (BlackRock)" value={`$${(etf.funds[0]?.aum_b ?? 0).toFixed(1)}B`} color="#3b82f6" sub={`Flow: ${fmtM(((etf.funds[0]?.[flowKey]) ?? 0) * 1e6)}`} />
       </div>
 
       {/* Fund bars */}
