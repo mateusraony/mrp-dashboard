@@ -557,21 +557,7 @@ export default function Macro() {
     : null;
   const aiAnalysis = liveAnalysis ?? aiAnalysisMock;
 
-  // Claude AI insight
-  const vixVal = m.series.find(s => s.id === 'VIX')?.value;
-  const dxyVal = m.series.find(s => s.id === 'DXY')?.value;
-  const spRet  = m.series.find(s => s.id === 'SP500')?.delta_1d;
-  const macroPayload = fng ? {
-    page: 'macro',
-    riskScore: riskScore?.score ?? 50,
-    riskRegime: riskScore?.regime ?? 'MODERADO',
-    fearGreedValue: fng.value,
-    fearGreedLabel: fng.label,
-    fundingRate: 0,
-    context: { vix: vixVal, dxy: dxyVal, spRet1d: spRet },
-  } : null;
-  const { data: macroInsight, isLoading: macroAiLoading } = useAiInsight(macroPayload);
-
+  // Yield spread computed before payload so it can be included in Claude context
   const { yieldSpread, yieldSpreadBp, isInverted } = useMemo(() => {
     const us10y = m.series.find(s => s.id === 'US10Y');
     const us2y  = m.series.find(s => s.id === 'US2Y');
@@ -584,6 +570,26 @@ export default function Macro() {
       isInverted:    spread !== null && spread < 0,
     };
   }, [m.series]);
+
+  // Claude AI insight — yield spread now available
+  const vixVal = m.series.find(s => s.id === 'VIX')?.value;
+  const dxyVal = m.series.find(s => s.id === 'DXY')?.value;
+  const spRet  = m.series.find(s => s.id === 'SP500')?.delta_1d;
+  const macroPayload = fng ? {
+    page: 'macro',
+    riskScore: riskScore?.score ?? 50,
+    riskRegime: riskScore?.regime ?? 'MODERADO',
+    fearGreedValue: fng.value,
+    fearGreedLabel: fng.label,
+    fundingRate: 0,
+    context: {
+      vix: vixVal,
+      dxy: dxyVal,
+      spRet1d: spRet,
+      yieldSpreadBp: yieldSpreadBp !== null ? parseFloat(yieldSpreadBp) : undefined,
+    },
+  } : null;
+  const { data: macroInsight, isLoading: macroAiLoading } = useAiInsight(macroPayload);
 
   const deltaChartData = useMemo(() => m.series.map(s => ({
     name: s.id,

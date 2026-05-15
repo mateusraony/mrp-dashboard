@@ -266,7 +266,7 @@ export default function PredictivePanel() {
 
   // ── Claude AI insight ──────────────────────────────────────────────────
   const scenSummary = SCENARIOS_24H_FALLBACK.map(s => `${s.label} ${s.prob}%`).join(', ');
-  const predPayload = (ticker || fng) ? {
+  const predPayload = (ticker && atr14) ? {
     page: 'predictive',
     riskScore: riskScore?.score ?? 50,
     riskRegime: riskScore?.regime ?? 'MODERADO',
