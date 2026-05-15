@@ -160,6 +160,41 @@ export function onLogAdded(cb: (entry: LogEntry) => void): () => void {
   };
 }
 
+// ─── Interceptação global: console.error / console.warn ──────────────────────
+// Redireciona todos os console.error/warn do app pro DebugPanel.
+// Os originais ainda são chamados (DevTools continua funcionando normalmente).
+
+function _argsToMessage(args: unknown[]): string {
+  return args
+    .map(a =>
+      typeof a === 'string'
+        ? a
+        : a instanceof Error
+          ? `${a.name}: ${a.message}`
+          : (() => { try { return JSON.stringify(a); } catch { return String(a); } })()
+    )
+    .join(' ');
+}
+
+if (typeof window !== 'undefined') {
+  console.error = (...args: unknown[]) => {
+    _origError(...args);
+    // Suprime duplicatas vindas do próprio debugLog (logError já chama _origError)
+    const msg = _argsToMessage(args);
+    if (!msg.startsWith('[DebugLog]')) {
+      _addEntry('error', msg, undefined, 'console.error');
+    }
+  };
+
+  console.warn = (...args: unknown[]) => {
+    _origWarn(...args);
+    const msg = _argsToMessage(args);
+    if (!msg.startsWith('[DebugLog]')) {
+      _addEntry('warn', msg, undefined, 'console.warn');
+    }
+  };
+}
+
 // ─── Interceptação global de erros não tratados ──────────────────────────────
 
 if (typeof window !== 'undefined') {
