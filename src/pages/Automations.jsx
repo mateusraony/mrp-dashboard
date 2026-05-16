@@ -1,13 +1,12 @@
 // ─── AUTOMATIONS — Rule Engine Page ──────────────────────────────────────────
 import { useState, useEffect, useMemo } from 'react';
 import {
-  defaultRules, fireLog as fireLogMock, AVAILABLE_METRICS, NOTIFICATION_CHANNELS, PRIORITY_CONFIG,
+  defaultRules, fireLog, AVAILABLE_METRICS, NOTIFICATION_CHANNELS, PRIORITY_CONFIG,
 } from '../components/data/mockDataAutomations';
 import { ModeBadge } from '../components/ui/DataBadge';
 import { formatDistanceToNow } from 'date-fns';
 import { useBtcTicker } from '@/hooks/useBtcData';
 import { useRiskScore } from '@/hooks/useRiskScore';
-import { useAlertRules, useUpsertAlertRule, useAlertEvents } from '@/hooks/useSupabase';
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 const CATEGORIES = [...new Set(AVAILABLE_METRICS.map(m => m.category))];
@@ -266,11 +265,11 @@ function RuleBuilder({ onSave, onCancel }) {
 }
 
 // ─── DETAIL PANEL ─────────────────────────────────────────────────────────────
-function RuleDetail({ rule, onClose, fireLog }) {
+function RuleDetail({ rule, onClose }) {
   if (!rule) return null;
   const pc = PRIORITY_CONFIG[rule.priority];
   const ch = NOTIFICATION_CHANNELS.find(c => c.id === rule.action.channel);
-  const ruleLogs = (fireLog ?? []).filter(l => l.rule_id === rule.id);
+  const ruleLogs = fireLog.filter(l => l.rule_id === rule.id);
   return (
     <div style={{ background: '#111827', border: `1px solid ${rule.color}30`, borderRadius: 12, padding: '16px 18px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
@@ -406,24 +405,6 @@ export default function Automations() {
   const [selectedId, setSelectedId] = useState(null);
   const [showBuilder, setShowBuilder] = useState(false);
 
-  // ── Supabase: regras persistidas e histórico de disparos ─────────────────
-  const { data: savedRules }         = useAlertRules();
-  const { mutate: persistRule }      = useUpsertAlertRule();
-  const { data: alertEvents }        = useAlertEvents(50);
-  // fireLog: eventos reais do Supabase; fallback para mock durante desenvolvimento
-  const fireLog = alertEvents && alertEvents.length > 0 ? alertEvents : fireLogMock;
-
-  useEffect(() => {
-    if (!savedRules) return;
-    if (savedRules.length > 0) {
-      // @ts-ignore — runtime fields adicionados pelo mock (color, triggered, etc.)
-      setRules(savedRules);
-    } else {
-      // Semear Supabase com as regras default na primeira vez
-      defaultRules.forEach(r => persistRule({ ...r, last_triggered: r.last_triggered instanceof Date ? r.last_triggered.toISOString() : r.last_triggered ?? null }));
-    }
-  }, [savedRules]); // eslint-disable-line react-hooks/exhaustive-deps
-
   // ── Hooks de dados live ──────────────────────────────────────────────────
   const { data: ticker }    = useBtcTicker();
   const { data: riskScore } = useRiskScore();
@@ -526,7 +507,7 @@ export default function Automations() {
                 onSelect={setSelectedId} selected={selectedId === rule.id} />
             ))}
           </div>
-          {selectedId && <RuleDetail rule={selectedRule} onClose={() => setSelectedId(null)} fireLog={fireLog} />}
+          {selectedId && <RuleDetail rule={selectedRule} onClose={() => setSelectedId(null)} />}
         </div>
       )}
 
