@@ -5,6 +5,7 @@ import { useState, useMemo } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip, ReferenceLine, ResponsiveContainer } from 'recharts';
 import { btcCorrelations } from '../data/mockData';
 import { HelpIcon } from '../ui/Tooltip';
+import { useKlines } from '@/hooks/useBtcData';
 
 const WINDOWS = ['1d', '1w', '1m'];
 const WINDOW_LABELS = { '1d': '1 Dia', '1w': '1 Semana', '1m': '1 Mês' };
@@ -100,11 +101,14 @@ function CustomTooltip({ active = false, payload = [], label = 0, window }) {
 }
 
 /**
- * CorrelationChart — aceita prop klines de useKlines() passada pelo Dashboard.
+ * CorrelationChart — busca klines internamente via useKlines().
+ * Aceita prop klines como override (ex: quando pai já buscou os dados).
  * Se klines disponível: calcula correlação Pearson rolling BTC vs índices.
  * Fallback: mock com badge DEMO.
  */
-export default function CorrelationChart({ klines = null }) {
+export default function CorrelationChart({ klines: klinesProp = null }) {
+  const { data: klinesLive } = useKlines('1d', 30);
+  const klines = klinesProp ?? klinesLive ?? null;
   const [window, setWindow] = useState('1w');
 
   // Tenta construir correlações a partir de dados reais de klines
