@@ -155,7 +155,7 @@ export default function TermStructure({ optionsData }) {
             <div style={{ fontSize: 14, fontWeight: 700, color: '#e2e8f0' }}>Term Structure — IV ATM</div>
             <ModeBadge mode="mock" />
             <GradeBadge grade={d.quality} />
-            <span style={{ fontSize: 10, px: 1, paddingLeft: 4, paddingRight: 4, paddingTop: 2, paddingBottom: 2, background: '#1e2d45', color: '#64748b', borderRadius: 4, border: '1px solid #2a3f5f' }}>
+            <span style={{ fontSize: 10, paddingLeft: 4, paddingRight: 4, paddingTop: 2, paddingBottom: 2, background: '#1e2d45', color: '#64748b', borderRadius: 4, border: '1px solid #2a3f5f' }}>
               DEMO
             </span>
           </div>

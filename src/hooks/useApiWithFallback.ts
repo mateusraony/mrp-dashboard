@@ -3,8 +3,9 @@
  * Em falha: loga no debugLog com motivo, retorna último valor conhecido.
  */
 import { useState, useEffect, useRef } from 'react';
-import { withSWR } from '@/services/marketCache';
-import { logError } from '@/lib/debugLog';
+import { withSWR, getStaleCache } from '@/services/marketCache';
+import { logError, logWarn } from '@/lib/debugLog';
+import { IS_LIVE } from '@/lib/env';
 
 export interface ApiWithFallbackResult<T> {
   data: T | null;
@@ -32,7 +33,14 @@ export function useApiWithFallback<T>(
 
   async function load() {
     try {
-      const result = await withSWR(cacheKey, ttlSec, 'api', fetcher, validate ? (v) => (validate(v) ? (v as T) : null) : undefined);
+      // withSWR tenta API, usa cache Supabase como fallback transparente
+      const result = await withSWR(
+        cacheKey,
+        ttlSec,
+        'api',
+        fetcher,
+        validate ? (v: unknown) => (validate(v) ? (v as T) : null) : undefined,
+      );
       setState({
         data: result,
         isLoading: false,
@@ -42,13 +50,27 @@ export function useApiWithFallback<T>(
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      logError(`[${cacheKey}] API falhou — usando cache Supabase. Motivo: ${msg}`, err, 'useApiWithFallback');
-      setState(prev => ({
-        ...prev,
-        isLoading: false,
-        isStale: true,
-        error: msg,
-      }));
+      logError(`[${cacheKey}] API e cache falhou — tentando stale Supabase. Motivo: ${msg}`, err, 'useApiWithFallback');
+
+      // Tenta cache stale diretamente
+      const cached = IS_LIVE ? await getStaleCache<T>(cacheKey) : null;
+      if (cached) {
+        logWarn(`[${cacheKey}] Usando cache Supabase stale de ${cached.updatedAt.toISOString()}`, undefined, 'useApiWithFallback');
+        setState({
+          data: cached.value,
+          isLoading: false,
+          isStale: true,
+          lastUpdated: cached.updatedAt,
+          error: msg,
+        });
+      } else {
+        setState(prev => ({
+          ...prev,
+          isLoading: false,
+          isStale: false,
+          error: msg,
+        }));
+      }
     }
   }
 
