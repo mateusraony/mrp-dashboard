@@ -2,6 +2,31 @@
 // Setups operacionais baseados em IV Rank, Basis, Funding, Sentiment
 import { useState, useMemo } from 'react';
 import { strategies, marketConditionsSummary } from '../components/data/mockDataStrategies';
+
+// Avalia se uma condição de estratégia é atendida com dados live.
+// Retorna boolean quando avaliável, null quando dado não disponível.
+function liveEvalCondition(label, ticker, optionsData, ivRankVal) {
+  const fr = ticker?.last_funding_rate ?? null;
+  const ivAtm = optionsData?.iv_atm ?? null;
+
+  if (fr !== null) {
+    if (label.includes('Funding > 0.06%') || label.includes('Funding > 0,06%')) return fr > 0.0006;
+    if (label.includes('Funding > 0.03%') || label.includes('Funding > 0,03%')) return fr > 0.0003;
+    if (label.includes('Funding positivo')) return fr > 0;
+    if (label.includes('Funding negativo')) return fr < 0;
+    if (label.includes('OI crescendo') && ticker.oi_delta_pct != null) return ticker.oi_delta_pct > 0;
+  }
+  if (ivAtm !== null) {
+    if (label.includes('IV ATM < 70%')) return ivAtm < 0.70;
+    if (label.includes('IV ATM > 80%')) return ivAtm > 0.80;
+  }
+  if (ivRankVal != null) {
+    if (label.includes('IVR > 60')) return ivRankVal > 60;
+    if (label.includes('IVR < 50')) return ivRankVal < 50;
+    if (label.includes('IVR < 40')) return ivRankVal < 40;
+  }
+  return null; // condição não avaliável com APIs gratuitas
+}
 import { ModeBadge } from '../components/ui/DataBadge';
 import { DataTrustBadge } from '../components/ui/DataTrustBadge';
 import { StaleIndicator } from '../components/ui/StaleIndicator';
@@ -295,10 +320,23 @@ export function StrategiesContent() {
     sentiment:     fng ? fng.label : marketConditionsSummary.sentiment,
   }), [ticker, fng, optionsData]);
 
-  const filtered = filter === 'Todos' ? strategies
-    : filter === 'ACTIVE' ? strategies.filter(s => s.status === 'ACTIVE')
-    : filter === 'WATCH' ? strategies.filter(s => s.status === 'WATCH')
-    : strategies.filter(s => s.category === filter);
+  // Re-avalia conditions das estratégias com dados live quando disponíveis
+  const evaluatedStrategies = useMemo(() => {
+    if (!IS_LIVE || !ticker) return strategies;
+    return strategies.map(s => {
+      const updatedConds = s.conditions.map(c => {
+        const liveMet = liveEvalCondition(c.label, ticker, optionsData, mc.iv_rank);
+        return liveMet !== null ? { ...c, met: liveMet } : c;
+      });
+      const metCount = updatedConds.filter(c => c.met).length;
+      return { ...s, conditions: updatedConds, conditions_met: metCount };
+    });
+  }, [ticker, optionsData, mc.iv_rank]);
+
+  const filtered = filter === 'Todos' ? evaluatedStrategies
+    : filter === 'ACTIVE' ? evaluatedStrategies.filter(s => s.status === 'ACTIVE')
+    : filter === 'WATCH' ? evaluatedStrategies.filter(s => s.status === 'WATCH')
+    : evaluatedStrategies.filter(s => s.category === filter);
 
   return (
     <div style={{ maxWidth: 1400, margin: '0 auto' }}>
