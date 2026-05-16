@@ -400,8 +400,8 @@ function evaluateRule(rule, metricsMap) {
 const TABS = ['Regras Ativas', 'Criar Regra', 'Histórico', 'Métricas'];
 
 export default function Automations() {
-  const [rules, setRules]         = useState(defaultRules);
-  const [tab, setTab]             = useState(0);
+  const [rules, setRules]           = useState(defaultRules);
+  const [tab, setTab]               = useState(0);
   const [selectedId, setSelectedId] = useState(null);
   const [showBuilder, setShowBuilder] = useState(false);
 

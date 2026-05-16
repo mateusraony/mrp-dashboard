@@ -20,8 +20,10 @@ function useMacroPageData() {
   const { data: fng } = useFearGreed(1);
   const { data: riskScore } = useRiskScore();
   const macroBoard = live ?? macroBoardMock;
-  // isLiveMacro=true → dados reais do FRED; false → fallback mock (FRED indisponível)
-  const isLiveMacro = IS_LIVE && !!live;
+  // isLiveMacro=true somente quando FRED retornou ao menos uma série quality 'A'.
+  // fetchMacroBoard usa Promise.allSettled e retorna placeholders quality 'C' quando
+  // o FRED proxy falha — live fica truthy mas os dados são zeros sem valor real.
+  const isLiveMacro = IS_LIVE && !!live && live.series.some(s => s.quality === 'A');
   return { macroBoard, isLiveMacro, fredError, liquidity, bcb, bcbLoading, bcbError, fng, riskScore };
 }
 import { AIModuleCard } from '../components/ui/AIAnalysisPanel';
