@@ -1,6 +1,78 @@
 import { useState, useEffect } from 'react';
-import { THRESHOLDS, sourceHealth } from '../components/data/mockData';
 import { logError, logInfo } from '@/lib/debugLog';
+
+// ─── Thresholds — constantes locais (não dependem de mock) ───────────────────
+const THRESHOLDS = {
+  FUNDING_REF: 0.0005,
+  OI_REF_PCT: 1.5,
+  RET_REF: 0.004,
+  VOL_REF: 1.0,
+  CROWD_REF: 0.10,
+  K_DEFAULT: 10,
+  RISK_ALERT_SCORE: 75,
+  GLOBAL_RISKOFF_SCORE: 35,
+  GLOBAL_RISKON_SCORE: 65,
+  MACRO_EVENT_LEAD_HOURS: 6,
+  EVAL_WINDOW_MIN: 240,
+};
+
+// ─── Source Health — endpoints e timeout de probe ─────────────────────────────
+const HEALTH_ENDPOINTS = [
+  { source: 'binance_futures', url: 'https://fapi.binance.com/fapi/v1/ping' },
+  { source: 'binance_spot',    url: 'https://api.binance.com/api/v3/ping' },
+  { source: 'deribit',         url: 'https://www.deribit.com/api/v2/public/get_time' },
+  { source: 'fred',            url: 'https://fred.stlouisfed.org/graph/fredgraph.csv?id=DGS10&vintage_date=' + new Date().toISOString().slice(0, 10) },
+  { source: 'mempool',         url: 'https://mempool.space/api/blocks/tip/height' },
+  { source: 'alternative',     url: 'https://api.alternative.me/fng/?limit=1' },
+];
+
+async function pingEndpoint(url) {
+  const start = Date.now();
+  const controller = new AbortController();
+  const tid = setTimeout(() => controller.abort(), 5000);
+  try {
+    const res = await fetch(url, { signal: controller.signal, mode: 'no-cors' });
+    clearTimeout(tid);
+    const latency = Date.now() - start;
+    return { ok: true, latency_ms: latency };
+  } catch {
+    clearTimeout(tid);
+    return { ok: false, latency_ms: null };
+  }
+}
+
+function useSourceHealth() {
+  const [health, setHealth] = useState(
+    HEALTH_ENDPOINTS.map(e => ({
+      source: e.source, latency_ms: null, staleness_sec: null, fail_count_24h: 0, grade: 'A', checking: true,
+    }))
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    async function check() {
+      const results = await Promise.all(
+        HEALTH_ENDPOINTS.map(async (ep) => {
+          const { ok, latency_ms } = await pingEndpoint(ep.url);
+          const grade = !ok ? 'C' : latency_ms > 2000 ? 'B' : 'A';
+          return {
+            source: ep.source,
+            latency_ms: ok ? latency_ms : null,
+            staleness_sec: null,
+            fail_count_24h: ok ? 0 : 1,
+            grade,
+            checking: false,
+          };
+        })
+      );
+      if (!cancelled) setHealth(results);
+    }
+    check();
+    return () => { cancelled = true; };
+  }, []);
+
+  return health;
+}
 import { ModeBadge, GradeBadge } from '../components/ui/DataBadge';
 import { DATA_MODE, setDataMode } from '@/lib/env';
 import { isSupabaseConfigured } from '@/services/supabase';
@@ -593,6 +665,7 @@ function TelegramSection() {
 }
 
 export default function Settings() {
+  const sourceHealth = useSourceHealth();
   return (
     <div style={{ maxWidth: 900, margin: '0 auto' }}>
       <div style={{ marginBottom: 20 }}>
@@ -703,17 +776,17 @@ export default function Settings() {
             {sourceHealth.map(s => (
               <tr key={s.source}>
                 <td style={{ fontFamily: 'JetBrains Mono, monospace', color: '#8899a6' }}>{s.source}</td>
-                <td style={{ textAlign: 'right', fontFamily: 'JetBrains Mono, monospace', color: '#4a5568' }}>
-                  {s.latency_ms ? `${s.latency_ms}ms` : '—'}
+                <td style={{ textAlign: 'right', fontFamily: 'JetBrains Mono, monospace', color: s.checking ? '#334155' : s.latency_ms > 2000 ? '#f59e0b' : '#4a5568' }}>
+                  {s.checking ? '…' : s.latency_ms ? `${s.latency_ms}ms` : 'timeout'}
                 </td>
                 <td style={{ textAlign: 'right', fontFamily: 'JetBrains Mono, monospace', color: '#4a5568' }}>
                   {s.staleness_sec ? (s.staleness_sec < 60 ? `${s.staleness_sec}s` : `${Math.round(s.staleness_sec/60)}m`) : '—'}
                 </td>
                 <td style={{ textAlign: 'right', fontFamily: 'JetBrains Mono, monospace', color: s.fail_count_24h > 0 ? '#ef4444' : '#4a5568' }}>
-                  {s.fail_count_24h}
+                  {s.checking ? '…' : s.fail_count_24h}
                 </td>
                 <td style={{ textAlign: 'right' }}>
-                  <GradeBadge grade={s.grade} />
+                  {s.checking ? <span style={{ fontSize: 10, color: '#334155' }}>—</span> : <GradeBadge grade={s.grade} />}
                 </td>
               </tr>
             ))}

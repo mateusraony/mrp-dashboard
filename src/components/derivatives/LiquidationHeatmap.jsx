@@ -1,7 +1,9 @@
 // ─── LIQUIDATION HEATMAP COMPONENT ───────────────────────────────────────────
 // Visualiza clusters de liquidação por faixa de preço
-import { liquidationClusters } from '../../components/data/mockDataExtended';
+import { liquidationClusters as mockClusters } from '../../components/data/mockDataExtended';
 import { ModeBadge, GradeBadge } from '../ui/DataBadge';
+import { useLiquidations } from '@/hooks/useBtcData';
+import { useBtcTicker } from '@/hooks/useBtcData';
 
 function fmt(v) {
   if (v >= 1e9) return `$${(v / 1e9).toFixed(2)}B`;
@@ -9,11 +11,49 @@ function fmt(v) {
   return `$${v.toLocaleString()}`;
 }
 
+// Agrupa liquidações reais em clusters de $500
+function buildClusters(liquidations, spotPrice) {
+  if (!liquidations || liquidations.length === 0) return null;
+  const BUCKET = 500;
+  const bucketMap = new Map();
+  for (const liq of liquidations) {
+    const price = liq.price ?? liq.average_price ?? 0;
+    if (!price) continue;
+    const bucket = Math.round(price / BUCKET) * BUCKET;
+    if (!bucketMap.has(bucket)) bucketMap.set(bucket, { price: bucket, longs_usd: 0, shorts_usd: 0 });
+    const usd = Math.abs(liq.usd ?? (price * (liq.quantity ?? 0)));
+    const side = liq.side ?? liq.positionSide ?? '';
+    if (side === 'SELL' || price < spotPrice) {
+      bucketMap.get(bucket).longs_usd += usd;
+    } else {
+      bucketMap.get(bucket).shorts_usd += usd;
+    }
+  }
+  return Array.from(bucketMap.values()).sort((a, b) => a.price - b.price);
+}
+
 export default function LiquidationHeatmap() {
-  const d = liquidationClusters;
-  const allItems = d.clusters;
-  const maxLong = Math.max(...allItems.map(c => c.longs_usd));
-  const maxShort = Math.max(...allItems.map(c => c.shorts_usd));
+  const { data: ticker } = useBtcTicker();
+  const { data: liquidationsRaw } = useLiquidations(50);
+  const spotPrice = ticker?.mark_price ?? mockClusters.spot;
+
+  const liveClusters = liquidationsRaw && liquidationsRaw.length > 0
+    ? buildClusters(liquidationsRaw, spotPrice)
+    : null;
+  const usingLive = liveClusters && liveClusters.length >= 3;
+
+  const allItems = usingLive ? liveClusters : mockClusters.clusters;
+  const d = usingLive ? {
+    ...mockClusters,
+    spot: spotPrice,
+    clusters: liveClusters,
+    total_longs_at_risk_10pct: liveClusters.reduce((s, c) => s + (c.price < spotPrice * 0.9 ? c.longs_usd : 0), 0),
+    total_shorts_at_risk_10pct: liveClusters.reduce((s, c) => s + (c.price > spotPrice * 1.1 ? c.shorts_usd : 0), 0),
+    quality: 'A',
+  } : mockClusters;
+
+  const maxLong = Math.max(...allItems.map(c => c.longs_usd), 1);
+  const maxShort = Math.max(...allItems.map(c => c.shorts_usd), 1);
   const maxVal = Math.max(maxLong, maxShort);
 
   return (
@@ -26,8 +66,13 @@ export default function LiquidationHeatmap() {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: '#e2e8f0' }}>Liquidation Clusters</div>
-            <ModeBadge mode="mock" />
+            <ModeBadge mode={usingLive ? 'live' : 'mock'} />
             <GradeBadge grade={d.quality} />
+            {!usingLive && (
+              <span style={{ fontSize: 10, padding: '2px 6px', background: '#1e2d45', color: '#64748b', borderRadius: 4, border: '1px solid #2a3f5f' }}>
+                DEMO — endpoint requer auth
+              </span>
+            )}
           </div>
           <div style={{ fontSize: 11, color: '#475569' }}>
             Onde estão as ordens de liquidação acumuladas · Spot: <span style={{ fontFamily: 'JetBrains Mono, monospace', color: '#60a5fa' }}>${d.spot.toLocaleString()}</span>
