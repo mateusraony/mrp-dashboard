@@ -190,8 +190,36 @@ function NuplCard({ liveCycle }) {
   );
 }
 
+// ─── PLACEHOLDER — dados que exigem API paga ─────────────────────────────────
+function PaidRequiredCard({ title, glossKey, source, sourceUrl, reason }) {
+  return (
+    <OnChainCard title={title} glossKey={glossKey} accent="#4a6580" grade="D"
+      trustBadge={
+        <DataTrustBadge mode="paid_required" confidence="D" source={source}
+          sourceUrl={sourceUrl} reason={reason} />
+      }
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 0', gap: 10 }}>
+        <div style={{ fontSize: 28, opacity: 0.3 }}>🔒</div>
+        <div style={{ fontSize: 12, color: '#4a6580', textAlign: 'center', maxWidth: 200 }}>
+          Dado não disponível sem assinatura {source}
+        </div>
+        <a href={sourceUrl} target="_blank" rel="noopener noreferrer"
+          style={{ fontSize: 10, color: '#3b82f6', textDecoration: 'none', border: '1px solid #1e3a5f', borderRadius: 4, padding: '3px 8px' }}>
+          Ver planos →
+        </a>
+      </div>
+    </OnChainCard>
+  );
+}
+
 // ─── SOPR CARD ────────────────────────────────────────────────────────────────
 function SoprCard() {
+  if (IS_LIVE) return (
+    <PaidRequiredCard title="SOPR" glossKey="sopr" source="Glassnode"
+      sourceUrl="https://glassnode.com/pricing"
+      reason="SOPR (Spent Output Profit Ratio) requer Glassnode (~$29/mês)" />
+  );
   const s = btcSOPR;
   const isProfit = s.value > 1;
   const color = s.value > 1.05 ? '#f59e0b' : s.value > 1 ? '#10b981' : '#ef4444';
@@ -226,6 +254,11 @@ function SoprCard() {
 
 // ─── EXCHANGE NETFLOW ─────────────────────────────────────────────────────────
 function NetflowCard() {
+  if (IS_LIVE) return (
+    <PaidRequiredCard title="Exchange Netflow" glossKey="netflow" source="Glassnode"
+      sourceUrl="https://glassnode.com/pricing"
+      reason="Exchange Netflow requer Glassnode ou CryptoQuant (~$29/mês)" />
+  );
   const n = btcExchangeNetflow;
   const isOutflow = n.netflow_24h < 0;
   const color = isOutflow ? '#10b981' : '#ef4444';
@@ -264,6 +297,11 @@ function NetflowCard() {
 
 // ─── WHALE ACTIVITY ───────────────────────────────────────────────────────────
 function WhaleCard() {
+  if (IS_LIVE) return (
+    <PaidRequiredCard title="Whale Transactions 24h" glossKey="whale" source="Glassnode"
+      sourceUrl="https://glassnode.com/pricing"
+      reason="Whale Activity (txs >$1M) requer Glassnode (~$29/mês)" />
+  );
   const w = btcWhaleActivity;
   const isElevated = w.delta_1m_vs_avg > 10;
   const color = isElevated ? '#a78bfa' : '#60a5fa';

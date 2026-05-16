@@ -14,13 +14,15 @@ import { Area, AreaChart } from 'recharts';
 // useMacroBoard() retorna MacroBoardData — shape idêntico ao macroBoardMock:
 //   { series: MacroSeriesEntry[], updated_at: number }
 function useMacroPageData() {
-  const { data: live } = useMacroBoard();
+  const { data: live, isError: fredError } = useMacroBoard();
   const { data: liquidity } = useGlobalLiquidity();
   const { data: bcb, isLoading: bcbLoading, isError: bcbError } = useBcbData();
   const { data: fng } = useFearGreed(1);
   const { data: riskScore } = useRiskScore();
   const macroBoard = live ?? macroBoardMock;
-  return { macroBoard, liquidity, bcb, bcbLoading, bcbError, fng, riskScore };
+  // isLiveMacro=true → dados reais do FRED; false → fallback mock (FRED indisponível)
+  const isLiveMacro = IS_LIVE && !!live;
+  return { macroBoard, isLiveMacro, fredError, liquidity, bcb, bcbLoading, bcbError, fng, riskScore };
 }
 import { AIModuleCard } from '../components/ui/AIAnalysisPanel';
 import GoldenRule from '../components/ui/GoldenRule';
@@ -541,7 +543,7 @@ function ClaudeInsight({ text, loading }) {
 }
 
 export default function Macro() {
-  const { macroBoard, liquidity, bcb, bcbLoading, bcbError, fng, riskScore } = useMacroPageData();
+  const { macroBoard, isLiveMacro, fredError, liquidity, bcb, bcbLoading, bcbError, fng, riskScore } = useMacroPageData();
   const m = macroBoard;
 
   // Rule-based AI analysis from live macro data
@@ -619,6 +621,22 @@ export default function Macro() {
           </div>
         </div>
       </div>
+
+      {/* Banner de fallback mock quando FRED está indisponível em modo live */}
+      {IS_LIVE && !isLiveMacro && (
+        <div style={{
+          marginBottom: 16, padding: '10px 14px', borderRadius: 8,
+          background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)',
+          display: 'flex', alignItems: 'center', gap: 10, fontSize: 11, color: '#92400e',
+        }}>
+          <span>⚠️</span>
+          <span>
+            <strong style={{ color: '#f59e0b' }}>FRED API indisponível</strong>
+            {fredError ? ' — erro na requisição.' : ' — sem resposta.'}{' '}
+            Exibindo dados de demonstração. Os valores abaixo não refletem o mercado atual.
+          </span>
+        </div>
+      )}
 
       {/* Regra de Ouro */}
       <GoldenRule compact />
