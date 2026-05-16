@@ -1,8 +1,8 @@
 // ─── BASIS / FUTURES PREMIUM PANEL ───────────────────────────────────────────
 // Spot-Futures basis annualized, carry trade signal, CME premium
-import { futuresBasis, fundingByExchange } from '../../components/data/mockDataExtended';
+import { futuresBasis as mockFuturesBasis, fundingByExchange } from '../../components/data/mockDataExtended';
 import { ModeBadge, GradeBadge } from '../ui/DataBadge';
-import { useBtcTicker } from '@/hooks/useBtcData';
+import { useBtcTicker, useFuturesBasis } from '@/hooks/useBtcData';
 import { useBybitTicker, useOkxTicker } from '@/hooks/useMultiVenue';
 import { IS_LIVE } from '@/lib/env';
 import {
@@ -13,13 +13,37 @@ import {
 function fmtPct(v, d = 2) { return `${v.toFixed(d)}%`; }
 
 export default function BasisPanel() {
-  const d = futuresBasis;
   const us10y = 4.512; // reference from macro board
 
   // Dados live de funding rate por exchange
   const { data: ticker } = useBtcTicker();
   const { data: bybit }  = useBybitTicker();
   const { data: okx }    = useOkxTicker();
+  const { data: liveBasis } = useFuturesBasis();
+
+  // Usar basis live quando disponível, fallback para mock
+  const futures = (liveBasis && liveBasis.length > 0)
+    ? liveBasis.map(f => ({
+        expiry:           f.expiry_label,
+        price:            f.mark_price,
+        days_to_exp:      f.days_to_exp,
+        basis_annualized: f.basis_annualized,
+        basis_abs:        0,
+        basis_pct:        0,
+      }))
+    : mockFuturesBasis.futures;
+
+  const isLiveBasis = liveBasis && liveBasis.length > 0;
+  const d = isLiveBasis
+    ? {
+        ...mockFuturesBasis,
+        futures,
+        spot: ticker?.mark_price ?? mockFuturesBasis.spot,
+        carry_trade_attractive: futures.some(f => f.basis_annualized > us10y),
+        signal: `Basis live: ${futures[0]?.basis_annualized?.toFixed(1) ?? 'N/A'}% (${futures[0]?.expiry ?? ''}). ${futures[0]?.basis_annualized > us10y ? `Carry trade atrativo (+${(futures[0].basis_annualized - us10y).toFixed(1)}pp vs US10Y).` : 'Carry trade não atrativo vs US10Y.'}`,
+        quality: 'A',
+      }
+    : mockFuturesBasis;
 
   // Binance/Bybit/OKX: live quando disponível; Deribit/Bitget/Gate.io: mock
   const fundingChart = [
@@ -52,7 +76,7 @@ export default function BasisPanel() {
         </div>
         {d.carry_trade_attractive && (
           <div style={{ padding: '5px 10px', borderRadius: 7, background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.25)', fontSize: 10, color: '#10b981', fontWeight: 700 }}>
-            ✅ Carry Trade Atrativo
+            Carry Trade Atrativo
           </div>
         )}
       </div>
@@ -143,7 +167,7 @@ export default function BasisPanel() {
         background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.18)',
         fontSize: 11, color: '#64748b', lineHeight: 1.7,
       }}>
-        <span style={{ color: '#10b981', fontWeight: 700 }}>📊 Basis Signal: </span>{d.signal}
+        <span style={{ color: '#10b981', fontWeight: 700 }}>Basis Signal: </span>{d.signal}
       </div>
     </div>
   );

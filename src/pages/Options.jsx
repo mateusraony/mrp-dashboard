@@ -99,6 +99,7 @@ function useOptionsPageData() {
 
   return {
     btcOptions,
+    liveOptionsData:       live ?? null,
     liveGex:               gexData,
     liveMaxPain:           maxPain,
     liveChain:             live?.chain ?? null,
@@ -131,7 +132,7 @@ function ClaudeInsight({ text, loading }) {
 }
 
 export default function Options() {
-  const { btcOptions, liveGex, liveMaxPain, liveOiByStrike, livePcrVol, livePcrOi, liveMaxPainDistancePct, hasLiveData } = useOptionsPageData();
+  const { btcOptions, liveOptionsData, liveGex, liveMaxPain, liveOiByStrike, livePcrVol, livePcrOi, liveMaxPainDistancePct, hasLiveData } = useOptionsPageData();
   const o = btcOptions;
   const regime = regimeLabels[o.regime] ?? regimeLabels.normal;
 
@@ -396,13 +397,13 @@ export default function Options() {
 
       {/* Term Structure */}
       <div style={{ marginBottom: 16 }}>
-        <TermStructure />
+        <TermStructure optionsData={liveOptionsData} />
       </div>
 
       {/* IV Rank + Taker Flow */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
-        <IVRankPanel />
-        <TakerFlowPanel />
+        <IVRankPanel optionsData={liveOptionsData} />
+        <TakerFlowPanel optionsData={liveOptionsData} />
       </div>
 
       {/* Dealer Flow — GEX / Vanna / Charm */}

@@ -5,6 +5,8 @@ import {
   ResponsiveContainer, ReferenceLine, Cell, BarChart, Legend,
 } from 'recharts';
 import { eventVolatilityData, avgVolatilityByEvent } from '../components/data/mockDataMacroCalendar';
+// Nota: eventVolatilityData e avgVolatilityByEvent são dados históricos aproximados.
+// Volatilidade real por evento requereria FRED + tick data histórico (não disponível gratuitamente).
 import { ModeBadge } from '../components/ui/DataBadge';
 import { RefreshButton } from '../components/ui/RefreshButton';
 import GoldenRule from '../components/ui/GoldenRule';

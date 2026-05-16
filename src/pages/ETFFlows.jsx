@@ -45,13 +45,13 @@ function SummaryCard({ label, value, sub, color = '#e2e8f0' }) {
 }
 
 // BTC holdings por ETF — última atualização pública (SEC filings, etf.com)
-// Usado para estimar AUM live = holdings × preço BTC atual
+// Atualizado 2026-05-16 — AUM estimado = holdings × preço live BTC
 const ETF_BTC_HOLDINGS = {
-  IBIT: 524_000,   // BlackRock — ~$52.4B / $100k
-  FBTC: 218_000,   // Fidelity
-  ARKB:  84_000,   // ARK 21Shares
-  BITB:  51_000,   // Bitwise
-  GBTC: 198_000,   // Grayscale
+  IBIT: 572_000,   // BlackRock iShares Bitcoin Trust
+  FBTC: 195_000,   // Fidelity Wise Origin Bitcoin
+  ARKB:  50_000,   // ARK 21Shares Bitcoin ETF
+  BITB:  42_000,   // Bitwise Bitcoin ETF
+  GBTC: 200_000,   // Grayscale Bitcoin Trust
   HODL:  24_000,   // VanEck
   BTCO:  25_000,   // Invesco
 };

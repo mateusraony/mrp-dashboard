@@ -229,4 +229,16 @@ export async function withSWR<T>(
   return result;
 }
 
+/**
+ * Lê o último valor salvo para a chave, independente de TTL.
+ * Usado como fallback de emergência quando a API falha.
+ */
+export async function getStaleCache<T>(
+  cacheKey: string,
+): Promise<{ value: T; updatedAt: Date } | null> {
+  const row = await getCachedRow<T>(cacheKey);
+  if (!row) return null;
+  return { value: row.value_json, updatedAt: new Date(row.updated_at) };
+}
+
 export { pendingRefreshes as _pendingRefreshes };

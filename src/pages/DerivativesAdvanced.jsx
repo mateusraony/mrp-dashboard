@@ -6,8 +6,10 @@ import {
 import { btcOptionsExtended } from '../components/data/mockData';
 import { ModeBadge, GradeBadge } from '../components/ui/DataBadge';
 import AIInsightPanel from '../components/ai/AIInsightPanel';
+import IVRankPanel from '../components/options/IVRankPanel';
+import TakerFlowPanel from '../components/options/TakerFlowPanel';
 import { useOptionsData } from '@/hooks/useDeribit';
-import { useBtcTicker, useFuturesBasis } from '@/hooks/useBtcData';
+import { useBtcTicker, useFuturesBasis, useLiquidations } from '@/hooks/useBtcData';
 import { useMacroBoard } from '@/hooks/useFred';
 import { DATA_MODE, IS_LIVE } from '@/lib/env';
 import { useAiInsight } from '@/hooks/useAiInsight';
@@ -39,11 +41,49 @@ function SectionTitle({ title, sub, badge, mode }) {
 }
 
 // ─── LIQ HEATMAP — Gráfico de barras horizontal duplo (longs ← | → shorts) ──
+// Agrupa liquidações reais em clusters de $500
+function buildClustersFromLiquidations(liquidations, spotPrice) {
+  if (!liquidations || liquidations.length === 0) return null;
+  const BUCKET = 500;
+  const bucketMap = new Map();
+  for (const liq of liquidations) {
+    const price = liq.price ?? liq.average_price ?? 0;
+    if (!price) continue;
+    const bucket = Math.round(price / BUCKET) * BUCKET;
+    if (!bucketMap.has(bucket)) bucketMap.set(bucket, { price: bucket, longs_usd: 0, shorts_usd: 0 });
+    const usd = Math.abs(liq.usd ?? (price * (liq.quantity ?? 0)));
+    const side = liq.side ?? liq.positionSide ?? '';
+    if (side === 'SELL' || price < spotPrice) {
+      bucketMap.get(bucket).longs_usd += usd;
+    } else {
+      bucketMap.get(bucket).shorts_usd += usd;
+    }
+  }
+  return Array.from(bucketMap.values()).sort((a, b) => a.price - b.price);
+}
+
 function LiqHeatmapFull() {
-  const d = liquidationClusters;
   const { data: ticker } = useBtcTicker();
+  const { data: liquidationsRaw } = useLiquidations(50);
   const SPOT_LIVE = ticker?.mark_price ?? SPOT;
   const [hover, setHover] = useState(null);
+
+  // Tenta construir clusters com dados reais; fallback para mock
+  const liveClusters = liquidationsRaw && liquidationsRaw.length > 0
+    ? buildClustersFromLiquidations(liquidationsRaw, SPOT_LIVE)
+    : null;
+
+  const mockClusters = liquidationClusters.clusters;
+  const usingLive = liveClusters && liveClusters.length >= 3;
+  const d = usingLive ? {
+    ...liquidationClusters,
+    clusters: liveClusters,
+    total_longs_at_risk_10pct: liveClusters.reduce((s, c) => s + (c.price < SPOT_LIVE * 0.9 ? c.longs_usd : 0), 0),
+    total_shorts_at_risk_10pct: liveClusters.reduce((s, c) => s + (c.price > SPOT_LIVE * 1.1 ? c.shorts_usd : 0), 0),
+    largest_long_cluster: liveClusters.filter(c => c.price < SPOT_LIVE).sort((a, b) => b.longs_usd - a.longs_usd)[0] ?? liquidationClusters.largest_long_cluster,
+    largest_short_cluster: liveClusters.filter(c => c.price > SPOT_LIVE).sort((a, b) => b.shorts_usd - a.shorts_usd)[0] ?? liquidationClusters.largest_short_cluster,
+    quality: 'A',
+  } : liquidationClusters;
 
   // Ordenar por preço crescente para o gráfico
   const sorted = [...d.clusters].sort((a, b) => a.price - b.price);
@@ -591,10 +631,11 @@ function TermStructurePanel() {
 }
 
 // ─── MAIN PAGE ─────────────────────────────────────────────────────────────────
-const TABS = ['Liq. Heatmap', 'OI por Strike', 'Carry Calculator', 'Term Structure'];
+const TABS = ['Liq. Heatmap', 'OI por Strike', 'Carry Calculator', 'Term Structure', 'IV Rank', 'Taker Flow'];
 
 export function AdvancedContent() {
   const [tab, setTab] = useState(0);
+  const { data: liveOptions } = useOptionsData();
 
   return (
     <div style={{ maxWidth: 1400, margin: '0 auto' }}>
@@ -605,12 +646,12 @@ export function AdvancedContent() {
           <ModeBadge />
         </div>
         <p style={{ fontSize: 11, color: '#475569', margin: 0 }}>
-          Liquidation Clusters · OI por Strike (BTC/ETH) · Carry Calculator · Term Structure de IV
+          Liquidation Clusters · OI por Strike (BTC/ETH) · Carry Calculator · Term Structure de IV · IV Rank · Taker Flow
         </p>
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: 2, borderBottom: '1px solid #0f1d2e', marginBottom: 18 }}>
+      <div style={{ display: 'flex', gap: 2, borderBottom: '1px solid #0f1d2e', marginBottom: 18, flexWrap: 'wrap' }}>
         {TABS.map((t, i) => (
           <button key={t} onClick={() => setTab(i)} style={{
             padding: '8px 16px', border: 'none', cursor: 'pointer', fontSize: 11,
@@ -628,6 +669,8 @@ export function AdvancedContent() {
         {tab === 1 && <OIByStrike />}
         {tab === 2 && <CarryCalculator />}
         {tab === 3 && <TermStructurePanel />}
+        {tab === 4 && <IVRankPanel optionsData={liveOptions} />}
+        {tab === 5 && <TakerFlowPanel optionsData={liveOptions} />}
       </div>
     </div>
   );

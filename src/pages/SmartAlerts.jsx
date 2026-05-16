@@ -3,7 +3,7 @@
 // Usuário configura prioridade e tipo de alerta — sem gestão de portfólio
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { defaultAlertRules as defaultAlertRulesMock, alertHistory, riskDashboard, ALERT_TYPES } from '../components/data/mockDataAlerts';
-import { useAlertRules, useUpsertAlertRule, useDeleteAlertRule } from '@/hooks/useSupabase';
+import { useAlertRules, useUpsertAlertRule, useDeleteAlertRule, useAlertEvents } from '@/hooks/useSupabase';
 import { AlertAuditPanel } from '../components/governance/AlertAuditPanel';
 import { ModeBadge, GradeBadge } from '../components/ui/DataBadge';
 import { DataQualityBadge } from '@/components/ui/DataQualityBadge';
@@ -331,6 +331,7 @@ export default function SmartAlerts() {
   const { data: savedRules } = useAlertRules();
   const { mutate: saveRule } = useUpsertAlertRule();
   const { mutate: removeRule } = useDeleteAlertRule();
+  const { data: alertEvents } = useAlertEvents(50);
 
   const { data: ticker, isLoading: tickerLoading, isError: tickerError } = useBtcTicker();
   const { data: liquidations, isLoading: liqLoading, isError: liqError } = useLiquidations(100);
@@ -404,7 +405,12 @@ export default function SmartAlerts() {
     }
   }, [savedRules]); // eslint-disable-line react-hooks/exhaustive-deps
   const [prefs, setPrefs] = useState(DEFAULT_PREFS);
+  // history: estado local com dados do mock como base; Supabase sobrescreve quando disponível
   const [history, setHistory] = useState(alertHistory);
+  useEffect(() => {
+    // @ts-ignore — AlertEvent do Supabase tem shape diferente do mock; ambos são válidos em runtime
+    if (alertEvents && alertEvents.length > 0) setHistory(alertEvents);
+  }, [alertEvents]);
   const [tab, setTab] = useState('ai');
   const [categoryFilter, setCategoryFilter] = useState('all');
 
@@ -550,8 +556,13 @@ export default function SmartAlerts() {
 
       {tab === 'history' && (
         <div>
-          <div style={{ fontSize: 11, color: '#475569', marginBottom: 12 }}>{alertHistory.length} alertas registrados · {alertHistory.filter(a => a.resolved).length} resolvidos</div>
-          {alertHistory.map(a => {
+          <div style={{ fontSize: 11, color: '#475569', marginBottom: 12 }}>
+            {history.length} alertas registrados · {history.filter(a => a.resolved).length} resolvidos
+            {history.length === 0 && (
+              <span style={{ color: '#4a6580', marginLeft: 8 }}>— sem histórico no Supabase ainda</span>
+            )}
+          </div>
+          {history.map(a => {
             const type = ALERT_TYPES[a.type];
             const sc = a.severity === 'HIGH' ? '#ef4444' : '#f59e0b';
             return (
