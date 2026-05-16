@@ -1,13 +1,47 @@
 // ─── SENTIMENTO DE MERCADO — Social Fear/Greed · Word Cloud · Correlações ─────
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, Cell, BarChart,
 } from 'recharts';
 import { useMarketSentiment } from '../hooks/useMarketSentiment';
+import { useGdeltNews } from '@/hooks/useGdelt';
 import { IS_LIVE } from '../lib/env';
 import { ModeBadge } from '../components/ui/DataBadge';
 import { DataTrustBadge } from '../components/ui/DataTrustBadge';
+
+// Palavras irrelevantes a filtrar da word cloud
+const STOP_WORDS = new Set([
+  'the','a','an','of','in','to','and','for','on','is','are','at','by','as',
+  'its','it','be','or','with','that','this','from','has','have','will','was',
+  'não','de','da','do','em','que','com','por','para','uma','um','os','as',
+  'bitcoin','btc', // sempre óbvios — filtrar para revelar contexto
+]);
+
+// Extrai keywords dos títulos de artigos GDELT e monta word cloud
+function buildWordCloudFromGdelt(articles) {
+  if (!articles || articles.length === 0) return null;
+  const freq = {};
+  const sentSum = {};
+  for (const a of articles) {
+    const words = (a.title || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/);
+    const sent = a.sentiment ?? 0; // -1 | 0 | 1
+    for (const w of words) {
+      if (w.length < 3 || STOP_WORDS.has(w)) continue;
+      freq[w] = (freq[w] ?? 0) + 1;
+      sentSum[w] = (sentSum[w] ?? 0) + sent;
+    }
+  }
+  return Object.entries(freq)
+    .filter(([, v]) => v >= 2)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 30)
+    .map(([text, value]) => {
+      const avgSent = sentSum[text] / value;
+      const color = avgSent > 0.1 ? '#10b981' : avgSent < -0.1 ? '#ef4444' : '#f59e0b';
+      return { text: text.charAt(0).toUpperCase() + text.slice(1), value, sentiment: avgSent, color };
+    });
+}
 
 // ─── Static data (social APIs requerem plano pago) ────────────────────────────
 const wordCloudData = [
@@ -169,6 +203,11 @@ export default function MarketSentiment() {
   const { data: sentiment } = useMarketSentiment();
   const s = sentiment ?? SENTIMENT_FALLBACK;
 
+  // Word cloud: keywords extraídas de artigos GDELT quando disponíveis
+  const { data: gdeltArticles } = useGdeltNews('bitcoin crypto');
+  const liveWordCloud = useMemo(() => buildWordCloudFromGdelt(gdeltArticles), [gdeltArticles]);
+  const activeWordCloud = (IS_LIVE && liveWordCloud) ? liveWordCloud : wordCloudData;
+
   const generateAIAnalysis = async () => {
     // TODO: integrar com API real de AI (OpenAI/Claude) quando dados reais forem conectados
     setIsGenerating(true);
@@ -241,7 +280,7 @@ export default function MarketSentiment() {
           <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '18px 20px' }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>☁️ Nuvem de Palavras</div>
             <div style={{ fontSize: 9, color: '#334155', marginBottom: 10 }}>Tamanho = volume de menções · Cor = sentimento (verde/vermelho)</div>
-            <WordCloud words={wordCloudData} />
+            <WordCloud words={activeWordCloud} />
           </div>
 
           {/* 7d history */}
@@ -314,16 +353,16 @@ export default function MarketSentiment() {
           <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '18px 20px' }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>☁️ Nuvem de Palavras Detalhada</div>
             <div style={{ fontSize: 9, color: '#334155', marginBottom: 10 }}>Hover para ver detalhes · Cores = sentimento</div>
-            <WordCloud words={wordCloudData} />
+            <WordCloud words={activeWordCloud} />
             <div style={{ marginTop: 12 }}>
               <div style={{ fontSize: 10, color: '#334155', marginBottom: 6 }}>Top 15 por Menções</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                {wordCloudData.slice(0, 15).map((w, i) => (
+                {activeWordCloud.slice(0, 15).map((w, i) => (
                   <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', background: '#0d1421', borderRadius: 5, border: '1px solid #0f1d2e' }}>
                     <span style={{ fontSize: 9, color: '#334155', width: 16, textAlign: 'right', fontFamily: 'JetBrains Mono, monospace' }}>#{i+1}</span>
                     <span style={{ fontSize: 10, fontWeight: 700, color: w.color, flex: 1 }}>{w.text}</span>
                     <div style={{ flex: 2, height: 3, borderRadius: 2, background: '#1a2535' }}>
-                      <div style={{ height: '100%', borderRadius: 2, width: `${(w.value / wordCloudData[0].value) * 100}%`, background: w.color, opacity: 0.7 }} />
+                      <div style={{ height: '100%', borderRadius: 2, width: `${(w.value / (activeWordCloud[0]?.value ?? 1)) * 100}%`, background: w.color, opacity: 0.7 }} />
                     </div>
                     <span style={{ fontSize: 9, color: '#64748b', fontFamily: 'JetBrains Mono, monospace', width: 55, textAlign: 'right' }}>{w.value.toLocaleString()}</span>
                     <span style={{ fontSize: 9, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', color: w.sentiment >= 0 ? '#10b981' : '#ef4444', width: 40, textAlign: 'right' }}>{w.sentiment >= 0 ? '+' : ''}{w.sentiment.toFixed(2)}</span>
