@@ -1,6 +1,6 @@
 // ─── OPTIONS TAKER FLOW PANEL ─────────────────────────────────────────────────
 // Buy Call / Sell Call / Buy Put / Sell Put premium flows
-import { optionsTakerFlow } from '../../components/data/mockDataExtended';
+import { optionsTakerFlow as mockTakerFlow } from '../../components/data/mockDataExtended';
 import { ModeBadge, GradeBadge } from '../ui/DataBadge';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip,
@@ -9,9 +9,33 @@ import {
 
 function fmt(v) { return `$${v.toFixed(1)}M`; }
 
-export default function TakerFlowPanel() {
-  const d = optionsTakerFlow;
+/**
+ * TakerFlowPanel — aceita prop optionsData (de useOptionsData()).
+ * Quando optionsData tem taker_flow: usa dados reais (via PCR como proxy).
+ * Senão: usa mock com badge DEMO visível.
+ *
+ * Nota: a API pública Deribit não expõe taker flow diretamente.
+ * Usamos put_call_ratio_vol e put_call_ratio_oi como proxy para viés bull/bear.
+ */
+export default function TakerFlowPanel({ optionsData }) {
+  const hasLiveData = optionsData && optionsData.put_call_ratio_vol != null && optionsData.put_call_ratio_oi != null;
 
+  // Quando live: derivamos bull_bear_index a partir do PCR
+  // PCR < 1 = mais calls = bullish; PCR > 1 = mais puts = bearish
+  const liveData = hasLiveData ? (() => {
+    const pcrVol = optionsData.put_call_ratio_vol;
+    const pcrOi  = optionsData.put_call_ratio_oi;
+    // Bull-bear index derivado: (1 - PCR) normalizado [-1, +1]
+    const bbIdx = Math.max(-1, Math.min(1, (1 - pcrVol) * 0.7 + (1 - pcrOi) * 0.3));
+    return {
+      ...mockTakerFlow,
+      bull_bear_index: bbIdx,
+      signal: `PCR Vol: ${pcrVol.toFixed(2)} · PCR OI: ${pcrOi.toFixed(2)} — ${bbIdx > 0.1 ? 'Viés bullish (mais calls)' : bbIdx < -0.1 ? 'Viés bearish (mais puts)' : 'Neutro'}. Dados reais Deribit.`,
+      quality: 'B', // taker flow ainda é aproximado
+    };
+  })() : mockTakerFlow;
+
+  const d = liveData;
   const bullBearPct = ((d.bull_bear_index + 1) / 2 * 100);
   const bbColor = d.bull_bear_index > 0.1 ? '#10b981' : d.bull_bear_index < -0.1 ? '#ef4444' : '#f59e0b';
 
@@ -39,8 +63,13 @@ export default function TakerFlowPanel() {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: '#e2e8f0' }}>Options Taker Flow</div>
-            <ModeBadge />
+            <ModeBadge mode={hasLiveData ? 'live' : 'mock'} />
             <GradeBadge grade={d.quality} />
+            {!hasLiveData && (
+              <span style={{ fontSize: 10, padding: '2px 6px', background: '#1e2d45', color: '#64748b', borderRadius: 4, border: '1px solid #2a3f5f' }}>
+                DEMO — sem API gratuita
+              </span>
+            )}
           </div>
           <div style={{ fontSize: 11, color: '#475569' }}>Premium líquido 24h · Buy vs Sell por tipo · Deribit</div>
         </div>

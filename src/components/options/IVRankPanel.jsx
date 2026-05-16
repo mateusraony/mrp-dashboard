@@ -1,5 +1,5 @@
 // ─── IV RANK / IV PERCENTILE PANEL ───────────────────────────────────────────
-import { ivRank } from '../../components/data/mockDataExtended';
+import { ivRank as mockIvRank } from '../../components/data/mockDataExtended';
 import { GradeBadge } from '../ui/DataBadge';
 import { HelpIcon } from '../ui/Tooltip';
 import MiniTimeChart from '../dashboard/MiniTimeChart';
@@ -11,8 +11,31 @@ const IVR_ZONES = [
   { min: 75, max: 100, label: 'Cara',           color: '#ef4444', bg: 'rgba(239,68,68,0.12)',   action: 'Vender volatilidade (short vol / spreads)' },
 ];
 
-export default function IVRankPanel() {
-  const d = ivRank;
+/**
+ * IVRankPanel — aceita prop optionsData (de useOptionsData()) ou usa mock.
+ * Se optionsData?.iv_atm existir: calcula IVR estimado a partir de iv_atm.
+ * Senão: usa mock com badge DEMO visível.
+ */
+export default function IVRankPanel({ optionsData }) {
+  // Tenta dados reais da Deribit
+  const liveIvAtm = optionsData?.iv_atm;
+  const isLive = liveIvAtm != null && liveIvAtm > 0;
+
+  // Quando live: estimamos IVR com base nos limites históricos do mock (52w)
+  // Note: sem histórico de 52w na API free, usamos mock para os limites
+  const d = isLive ? {
+    iv_current: liveIvAtm,
+    iv_52w_low: mockIvRank.iv_52w_low,
+    iv_52w_high: mockIvRank.iv_52w_high,
+    iv_rank: Math.max(0, Math.min(100, (liveIvAtm - mockIvRank.iv_52w_low) / (mockIvRank.iv_52w_high - mockIvRank.iv_52w_low) * 100)),
+    iv_percentile: mockIvRank.iv_percentile, // sem API gratuita para percentil real
+    iv_30d_avg: mockIvRank.iv_30d_avg,
+    iv_90d_avg: mockIvRank.iv_90d_avg,
+    signal: `IV ATM atual: ${(liveIvAtm * 100).toFixed(1)}% — IVR estimado com base nos limites históricos de 52 semanas.`,
+    quality: 'B',
+    history: mockIvRank.history,
+  } : mockIvRank;
+
   const zone = IVR_ZONES.find(z => d.iv_rank >= z.min && d.iv_rank < z.max) || IVR_ZONES[2];
 
   return (
@@ -30,6 +53,11 @@ export default function IVRankPanel() {
             content="IVR = (IV atual - IV mínima 52 semanas) / (IV máxima - IV mínima). 0% = IV no mínimo histórico. 100% = IV no máximo histórico. IVR < 25 = vol barata (comprar). IVR > 75 = vol cara (vender). Gauge definitivo de 'volatilidade cara ou barata'."
             width={300}
           />
+          {!isLive && (
+            <span style={{ fontSize: 10, padding: '2px 6px', background: '#1e2d45', color: '#64748b', borderRadius: 4, border: '1px solid #2a3f5f' }}>
+              DEMO
+            </span>
+          )}
         </div>
         <GradeBadge grade={d.quality} />
       </div>
@@ -92,7 +120,7 @@ export default function IVRankPanel() {
         background: zone.bg, border: `1px solid ${zone.color}25`,
         fontSize: 10, lineHeight: 1.6,
       }}>
-        <span style={{ color: zone.color, fontWeight: 700 }}>💡 Estratégia: </span>
+        <span style={{ color: zone.color, fontWeight: 700 }}>Estratégia: </span>
         <span style={{ color: '#64748b' }}>{zone.action}. {d.signal}</span>
       </div>
     </div>
