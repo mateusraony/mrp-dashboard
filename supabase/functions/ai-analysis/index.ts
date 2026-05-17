@@ -194,6 +194,14 @@ Deno.serve(async (req) => {
     );
   }
 
+  // Health probe: verifica que a função está ativa e a API key existe sem chamar o Claude.
+  if (payload.page === 'health_check') {
+    return new Response(
+      JSON.stringify({ insight: 'ok' }),
+      { headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } },
+    );
+  }
+
   const client = new Anthropic({ apiKey });
 
   const message = await client.messages.create({
