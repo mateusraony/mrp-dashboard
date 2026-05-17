@@ -23,6 +23,7 @@ import { btcFutures } from '@/components/data/mockData';
 import DebugPanel from '@/components/ui/DebugPanel';
 import { DATA_MODE } from '@/lib/env';
 import { useBtcTicker, useBtcPriceWs } from '@/hooks/useBtcData';
+import { useAiHealthCheck } from '@/hooks/useAiHealthCheck';
 
 // ─── NAVEGAÇÃO ─────────────────────────────────────────────────────────────────
 const NAV_GROUPS = [
@@ -279,6 +280,7 @@ export default function Layout({ children, currentPageName }) {
   const btcDelta    = ticker?.oi_delta_pct  ?? btcFutures.oi_delta_pct;
   const btcIsLive   = wsConnected || ticker != null;
   const deltaPositive = btcDelta >= 0;
+  const aiHealth = useAiHealthCheck();
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#070B14' }}>
@@ -502,6 +504,31 @@ export default function Layout({ children, currentPageName }) {
               {wsConnected ? 'WS' : btcIsLive ? 'REST' : 'MOCK'}
             </span>
           </div>
+
+          {/* Claude AI status */}
+          {aiHealth.status !== 'disabled' && (() => {
+            const AI_CFG = {
+              loading: { dot: '#f59e0b', text: '#92400e', label: 'AI…' },
+              ok:      { dot: '#a78bfa', text: '#7c3aed', label: 'AI ✦' },
+              error:   { dot: '#ef4444', text: '#b91c1c', label: 'AI ✕' },
+            };
+            const cfg = AI_CFG[aiHealth.status] ?? AI_CFG.loading;
+            return (
+              <div
+                title={aiHealth.status === 'ok'
+                  ? `Claude AI online · ${aiHealth.latencyMs}ms`
+                  : aiHealth.status === 'error'
+                  ? `Claude AI offline: ${aiHealth.error}`
+                  : 'Verificando Claude AI…'}
+                style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'default' }}
+              >
+                <div style={{ width: 6, height: 6, borderRadius: '50%', background: cfg.dot }} />
+                <span style={{ fontSize: 9, color: cfg.text, fontFamily: 'JetBrains Mono, monospace', fontWeight: 700, letterSpacing: '0.08em' }}>
+                  {cfg.label}
+                </span>
+              </div>
+            );
+          })()}
         </header>
 
         {/* ── DEMO BANNER ─────────────────────────────────────────────── */}
