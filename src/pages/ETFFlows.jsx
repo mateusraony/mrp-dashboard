@@ -6,6 +6,8 @@ import { GradeBadge } from '../components/ui/DataBadge';
 import { DataTrustBadge } from '../components/ui/DataTrustBadge';
 import { useBtcTicker } from '@/hooks/useBtcData';
 import { useEtfRedditPosts } from '@/hooks/useEtfReddit';
+import { useEtfSummary, useEtfFlowHistory } from '@/hooks/useSoSoValue';
+import { IS_LIVE } from '@/lib/env';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, Cell,
@@ -58,19 +60,46 @@ const ETF_BTC_HOLDINGS = {
 
 export function ETFContent() {
   const [sortBy, setSortBy] = useState('aum');
-  const { data: ticker } = useBtcTicker();
+  const { data: ticker }      = useBtcTicker();
   const { data: redditPosts } = useEtfRedditPosts();
+  const { data: sosoSummary } = useEtfSummary();
+  const { data: sosoHistory } = useEtfFlowHistory(30);
   const livePrice = ticker?.mark_price ?? null;
-  const d = etfFlows;
 
-  // Enriquece cada fundo com AUM estimado via preço live
-  const fundsWithLiveAum = d.funds.map(f => ({
-    ...f,
-    aum_b: livePrice && ETF_BTC_HOLDINGS[f.ticker]
-      ? (ETF_BTC_HOLDINGS[f.ticker] * livePrice) / 1e9
-      : f.aum_b,
-    aum_is_live: !!(livePrice && ETF_BTC_HOLDINGS[f.ticker]),
-  }));
+  // Usa dados reais da SoSoValue quando disponíveis, caso contrário usa mock
+  const sosoAvailable = IS_LIVE && sosoSummary && sosoSummary.funds.length > 0;
+  const d = sosoAvailable
+    ? {
+        ...etfFlows,
+        total_aum_b:      sosoSummary.total_aum_b,
+        net_flow_today_m: sosoSummary.net_flow_today_m,
+        net_flow_7d_m:    sosoSummary.net_flow_7d_m,
+        net_flow_30d_m:   sosoSummary.net_flow_30d_m,
+        funds:            sosoSummary.funds.map(f => ({
+          ...f,
+          // Mescla cor e shares do mock quando disponível
+          color:  etfFlows.funds.find(m => m.ticker === f.ticker)?.color ?? '#94a3b8',
+          shares: etfFlows.funds.find(m => m.ticker === f.ticker)?.shares ?? 0,
+          price:  etfFlows.funds.find(m => m.ticker === f.ticker)?.price ?? 0,
+        })),
+        history_daily: (sosoHistory && sosoHistory.length > 0) ? sosoHistory : etfFlows.history_daily,
+        signal: `Entrada líquida de ${sosoSummary.net_flow_today_m >= 0 ? '+' : ''}$${Math.abs(sosoSummary.net_flow_today_m).toFixed(0)}M hoje via SoSoValue (dados reais).`,
+      }
+    : etfFlows;
+
+  // Enriquece cada fundo com AUM estimado via preço live (quando SoSoValue não tem AUM)
+  const fundsWithLiveAum = d.funds.map(f => {
+    const hasRealAum = sosoAvailable && f.aum_b > 0;
+    return {
+      ...f,
+      aum_b: hasRealAum ? f.aum_b
+        : (livePrice && ETF_BTC_HOLDINGS[f.ticker]
+            ? (ETF_BTC_HOLDINGS[f.ticker] * livePrice) / 1e9
+            : f.aum_b),
+      aum_is_live: hasRealAum || !!(livePrice && ETF_BTC_HOLDINGS[f.ticker]),
+      aum_source:  hasRealAum ? 'SoSoValue' : (livePrice ? 'Binance×SEC' : 'mock'),
+    };
+  });
 
   const sorted = [...fundsWithLiveAum].sort((a, b) => {
     if (sortBy === 'aum') return b.aum_b - a.aum_b;
@@ -89,17 +118,23 @@ export function ETFContent() {
           <h1 style={{ fontSize: 20, fontWeight: 900, color: '#f1f5f9', margin: 0, letterSpacing: '-0.03em' }}>
             Bitcoin Spot ETF Flows
           </h1>
-          <DataTrustBadge mode="paid_required" confidence="D" source="Bloomberg/BitMEX Research" reason="ETF flows requerem Bloomberg Terminal ou BitMEX Research (~$99/mês)" />
-          {livePrice && (
+          {sosoAvailable
+            ? <DataTrustBadge mode="live" confidence="A" source="SoSoValue API" reason="Flows e AUM reais via SoSoValue (free tier)" />
+            : <DataTrustBadge mode="paid_required" confidence="D" source="SoSoValue (chave pendente)" reason="Configure VITE_SOSOVALUE_KEY — cadastro gratuito em sosovalue.com/developer" />
+          }
+          {!sosoAvailable && livePrice && (
             <DataTrustBadge mode="estimated" confidence="B" source="Binance + SEC filings" reason="AUM = holdings BTC conhecidos (SEC) × preço live Binance" />
           )}
-          <GradeBadge grade={d.quality} />
+          <GradeBadge grade={sosoAvailable ? 'A' : d.quality} />
           <span style={{ fontSize: 10, color: '#10b981', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 4, padding: '2px 8px', fontWeight: 600 }}>
             {d.consec_inflow_days} dias consecutivos de entrada
           </span>
         </div>
         <p style={{ fontSize: 11, color: '#475569', lineHeight: 1.6 }}>
-          Fontes: Bloomberg, SEC 13F, ETF.com · Dados D-1 (último dia útil). Principal driver de demand institucional desde jan/2024.
+          {sosoAvailable
+            ? 'Fonte: SoSoValue API (dados reais) · Flows D-1 · AUM calculado pela SoSoValue.'
+            : 'Fonte: simulado — configure VITE_SOSOVALUE_KEY (gratuito em sosovalue.com/developer) para dados reais.'
+          }
         </p>
       </div>
 
@@ -166,7 +201,10 @@ export function ETFContent() {
             <div style={{ fontSize: 14, fontWeight: 700, color: '#e2e8f0' }}>Flows Diários — Últimos 30 dias</div>
             <div style={{ fontSize: 11, color: '#475569', marginTop: 2 }}>Entrada (verde) vs Saída (vermelho) · USD Milhões</div>
           </div>
-          <DataTrustBadge mode="paid_required" confidence="D" source="Bloomberg/BitMEX Research" reason="ETF flows requerem Bloomberg Terminal ou BitMEX Research (~$99/mês)" />
+          {sosoAvailable
+            ? <DataTrustBadge mode="live" confidence="A" source="SoSoValue API" reason="Histórico de flows real via SoSoValue (free tier)" />
+            : <DataTrustBadge mode="mock" confidence="D" source="simulado" reason="Configure VITE_SOSOVALUE_KEY para ativar dados reais" />
+          }
         </div>
         <ResponsiveContainer width="100%" height={200}>
           <BarChart data={d.history_daily} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
@@ -249,7 +287,7 @@ export function ETFContent() {
                       ${fund.aum_b.toFixed(1)}B
                     </span>
                     {fund.aum_is_live && (
-                      <div style={{ fontSize: 8, color: '#10b981', marginTop: 1 }}>estimado live</div>
+                      <div style={{ fontSize: 8, color: '#10b981', marginTop: 1 }}>{fund.aum_source ?? 'live'}</div>
                     )}
                   </td>
                   <td style={{ padding: '12px 16px', textAlign: 'right' }}>
