@@ -5,7 +5,7 @@ import {
   ResponsiveContainer, Cell,
 } from 'recharts';
 import { useMarketSentiment } from '../hooks/useMarketSentiment';
-import { useGdeltNews, useGdeltHistory } from '@/hooks/useGdelt';
+import { useGdeltNews, useGdeltHistory, useGdeltMentionsTimeline } from '@/hooks/useGdelt';
 import { useFearGreed, useKlines } from '@/hooks/useBtcData';
 import { IS_LIVE } from '../lib/env';
 import { ModeBadge } from '../components/ui/DataBadge';
@@ -16,17 +16,17 @@ const STOP_WORDS = new Set([
   'the','a','an','of','in','to','and','for','on','is','are','at','by','as',
   'its','it','be','or','with','that','this','from','has','have','will','was',
   'não','de','da','do','em','que','com','por','para','uma','um','os','as',
-  'bitcoin','btc', // sempre óbvios — filtrar para revelar contexto
+  'bitcoin','btc',
 ]);
 
-// Extrai keywords dos títulos de artigos GDELT e monta word cloud
+
 function buildWordCloudFromGdelt(articles) {
   if (!articles || articles.length === 0) return null;
   const freq = {};
   const sentSum = {};
   for (const a of articles) {
     const words = (a.title || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/);
-    const sent = a.sentiment ?? 0; // -1 | 0 | 1
+    const sent = a.sentiment ?? 0;
     for (const w of words) {
       if (w.length < 3 || STOP_WORDS.has(w)) continue;
       freq[w] = (freq[w] ?? 0) + 1;
@@ -90,10 +90,10 @@ const kolSentiment = [
   { name: 'Raoul Pal',      handle: '@RaoulGMI',    sentiment: 0.62,  stance: 'Macro Bullish', followers_m: 1.3 },
 ];
 
-const mentionsHourly = Array.from({ length: 24 }, (_, i) => ({
+const mentionsHourlyFallback = Array.from({ length: 24 }, (_, i) => ({
   hour: `${String(i).padStart(2, '0')}:00`,
-  mentions: Math.round(11800 * (i >= 12 && i <= 18 ? 1.4 : 1.0) * (0.85 + Math.sin(i) * 0.15)),
-  btc_volume_m: parseFloat((1050 + Math.sin(i * 0.4) * 300).toFixed(0)),
+  mentions: 0,
+  btc_volume_m: 0,
 }));
 
 // ─── Word Cloud Component ─────────────────────────────────────────────────────
@@ -209,9 +209,14 @@ export default function MarketSentiment() {
   const liveWordCloud = useMemo(() => buildWordCloudFromGdelt(gdeltArticles), [gdeltArticles]);
   const activeWordCloud = (IS_LIVE && liveWordCloud) ? liveWordCloud : wordCloudData;
 
-  const { data: gdeltHistory } = useGdeltHistory(7);
-  const { data: fngHistory }   = useFearGreed(7);
-  const { data: klines }       = useKlines('1d', 8);
+  const { data: gdeltHistory }  = useGdeltHistory(7);
+  const { data: fngHistory }    = useFearGreed(7);
+  const { data: klines }        = useKlines('1d', 8);
+  const { data: gdeltTimeline } = useGdeltMentionsTimeline();
+
+  const mentionsHourly = (IS_LIVE && gdeltTimeline && gdeltTimeline.length > 0)
+    ? gdeltTimeline.map(p => ({ hour: `${String(p.hour).padStart(2, '0')}:00`, mentions: p.mentions, btc_volume_m: 0 }))
+    : mentionsHourlyFallback;
 
   const sentimentHistory7dLive = useMemo(() => {
     const hist = fngHistory?.history;
@@ -324,16 +329,36 @@ export default function MarketSentiment() {
             </ResponsiveContainer>
           </div>
 
-          {/* Mentions hourly */}
-          <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '28px 20px', gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>📊 Menções por Hora (Twitter/X)</div>
-            <div style={{ fontSize: 11, color: '#4a5568', textAlign: 'center', maxWidth: 340 }}>
-              Volume horário de menções em redes sociais requer <strong style={{ color: '#94a3b8' }}>Twitter API v2</strong> (~$100/mês) ou <strong style={{ color: '#94a3b8' }}>LunarCrush</strong> (~$49/mês)
+          {/* Mentions hourly — GDELT timelinevolraw */}
+          <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '18px 20px', gridColumn: '1 / -1' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>📰 Cobertura Midiática por Hora (GDELT)</div>
+              <div style={{ fontSize: 9, color: IS_LIVE && gdeltTimeline?.length > 0 ? '#10b981' : '#64748b' }}>
+                {IS_LIVE && gdeltTimeline?.length > 0 ? '● Artigos de mídia global — GDELT Doc 2.0' : 'GDELT indisponível ou sem dados'}
+              </div>
             </div>
-            <a href="https://lunarcrush.com/pricing" target="_blank" rel="noopener noreferrer"
-              style={{ fontSize: 10, color: '#3b82f6', border: '1px solid #1e3a5f', borderRadius: 4, padding: '3px 10px', textDecoration: 'none' }}>
-              Ver planos LunarCrush →
-            </a>
+            <div style={{ fontSize: 9, color: '#334155', marginBottom: 10 }}>Artigos de mídia global monitorados pelo GDELT nas últimas 24h · agrupados por hora UTC</div>
+            {IS_LIVE && mentionsHourly.some(m => m.mentions > 0) ? (
+              <ResponsiveContainer width="100%" height={120}>
+                <ComposedChart data={mentionsHourly} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(30,45,69,0.4)" vertical={false} />
+                  <XAxis dataKey="hour" tick={{ fontSize: 8, fill: '#475569' }} axisLine={false} tickLine={false} interval={3} />
+                  <YAxis tick={{ fontSize: 8, fill: '#475569' }} axisLine={false} tickLine={false} />
+                  <Tooltip contentStyle={{ background: '#0d1421', border: '1px solid #1a2535', fontSize: 9, borderRadius: 6 }} formatter={(v) => [v, 'Artigos']} />
+                  <Bar dataKey="mentions" fill="#3b82f6" fillOpacity={0.7} radius={[2, 2, 0, 0]} />
+                </ComposedChart>
+              </ResponsiveContainer>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '16px 0' }}>
+                <div style={{ fontSize: 10, color: '#4a5568', textAlign: 'center' }}>
+                  Para menções de redes sociais (X, Reddit): <strong style={{ color: '#94a3b8' }}>LunarCrush</strong> (~$49/mês)
+                </div>
+                <a href="https://lunarcrush.com/pricing" target="_blank" rel="noopener noreferrer"
+                  style={{ fontSize: 10, color: '#3b82f6', border: '1px solid #1e3a5f', borderRadius: 4, padding: '3px 10px', textDecoration: 'none' }}>
+                  Ver planos LunarCrush →
+                </a>
+              </div>
+            )}
           </div>
         </div>
       )}

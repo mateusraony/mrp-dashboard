@@ -7,7 +7,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { IS_LIVE } from '@/lib/env';
-import { fetchGdeltNews } from '@/services/gdelt';
+import { fetchGdeltNews, fetchGdeltMentionsTimeline, type GdeltTimelinePoint } from '@/services/gdelt';
 import { fetchGdeltSentimentHistory, upsertGdeltArticles, type GdeltDaySentiment } from '@/services/supabase';
 import { readModuleFlag } from '@/lib/moduleFlags';
 
@@ -60,5 +60,17 @@ export function useGdeltHistory(days = 7) {
     refetchInterval: IS_LIVE ? 10 * 60_000 : false,
     retry:           0,
     enabled:         readModuleFlag('ENABLE_NEWS'),
+  });
+}
+
+/** useGdeltMentionsTimeline — volume de artigos Bitcoin por hora (últimas 24h via GDELT timelinevolraw) */
+export function useGdeltMentionsTimeline() {
+  return useQuery<GdeltTimelinePoint[]>({
+    queryKey:        ['gdelt', 'mentions-timeline'],
+    queryFn:         fetchGdeltMentionsTimeline,
+    refetchInterval: IS_LIVE ? 15 * 60_000 : false,
+    staleTime:       10 * 60_000,
+    retry:           1,
+    enabled:         IS_LIVE && readModuleFlag('ENABLE_NEWS'),
   });
 }

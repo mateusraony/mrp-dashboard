@@ -206,3 +206,52 @@ export async function fetchGdeltNews(
 
   return enriched;
 }
+
+// ─── Timeline Volume (mode=timelinevolraw) ────────────────────────────────────
+
+export interface GdeltTimelinePoint {
+  hour:     number;   // 0-23
+  mentions: number;   // contagem de artigos nessa hora
+  norm:     number;   // 0-1 relativo ao pico do período
+}
+
+/**
+ * fetchGdeltMentionsTimeline — volume de artigos Bitcoin por hora (últimas 24h)
+ * Usa mode=timelinevolraw: retorna contagens reais de artigos por bucket de 15 min.
+ * Agrega em buckets de 1h → array de 24 pontos.
+ */
+export async function fetchGdeltMentionsTimeline(): Promise<GdeltTimelinePoint[]> {
+  if (DATA_MODE === 'mock') return [];
+  try {
+    const params = new URLSearchParams({
+      query:    'bitcoin',
+      mode:     'timelinevolraw',
+      format:   'json',
+      timespan: '24h',
+    });
+    const res = await fetch(`${BASE}?${params}`, { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) return [];
+    const json = await res.json();
+    const points: Array<{ date: string; value: number; normvalue: number }> = json?.timeline ?? [];
+    if (points.length === 0) return [];
+
+    const hourMap = new Map<number, number>();
+    const cutoff  = Date.now() - 24 * 60 * 60 * 1000;
+    for (const pt of points) {
+      const ts = new Date(
+        pt.date.replace(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/, '$1-$2-$3T$4:$5:$6Z'),
+      ).getTime();
+      if (isNaN(ts) || ts < cutoff) continue;
+      const hour = new Date(ts).getUTCHours();
+      hourMap.set(hour, (hourMap.get(hour) ?? 0) + pt.value);
+    }
+    if (hourMap.size === 0) return [];
+    const maxMentions = Math.max(...Array.from(hourMap.values()), 1);
+    return Array.from({ length: 24 }, (_, h) => {
+      const count = hourMap.get(h) ?? 0;
+      return { hour: h, mentions: count, norm: count / maxMentions };
+    });
+  } catch {
+    return [];
+  }
+}

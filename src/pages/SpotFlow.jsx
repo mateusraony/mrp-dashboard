@@ -49,7 +49,7 @@ const AI_SPOT_FALLBACK = { modules: { spot: AI_MODULE_FALLBACK } };
 // Derives spot metrics from 1h klines.
 // 1W fields (volume_1w_usdt, cvd_1w) require ≥168 candles; omitted when partial
 // so the mock 1W values are preserved rather than understating weekly flow.
-// ret_15m / ret_1m require finer / wider timeframes — always stay mock.
+// ret_15m / ret_1m / ret_1w require finer / wider timeframes — computed from dedicated klines hooks.
 function computeSpotMetrics(klines, btcPrice) {
   if (!klines || klines.length < 2) return null;
   const last  = klines[klines.length - 1];
@@ -88,12 +88,36 @@ export default function SpotFlow() {
   // ── Sprint 5.4: live session analytics from Binance klines ──────────────────
   const spotEnabled       = readModuleFlag('ENABLE_SPOT_FLOW');
   const { data: klines }  = useKlines('1h', 168, spotEnabled);
+  const { data: klines15m } = useKlines('15m', 4,  spotEnabled);  // ret_15m
+  const { data: klines1d }  = useKlines('1d',  32, spotEnabled);  // ret_1w (7) + ret_1M (30)
   const { data: ticker }  = useBtcTicker(spotEnabled);
   const btcPrice          = ticker?.mark_price ?? 0;
 
   // Live spot metrics derived from klines; fallback to static zeros for uncovered fields
   const liveSpot = computeSpotMetrics(klines, btcPrice);
   const s = liveSpot ? { ...SPOT_FALLBACK, ...liveSpot } : SPOT_FALLBACK;
+
+  // Finer-grained returns not covered by 1h klines
+  const ret15m = (() => {
+    if (!klines15m || klines15m.length < 2) return 0;
+    const last = klines15m[klines15m.length - 1];
+    const prev = klines15m[klines15m.length - 2];
+    return (last.close - prev.close) / prev.close;
+  })();
+  const ret1M = (() => {
+    if (!klines1d || klines1d.length < 30) return 0;
+    const last = klines1d[klines1d.length - 1];
+    const prev = klines1d[klines1d.length - 30];
+    return (last.close - prev.close) / prev.close;
+  })();
+  const ret1w = (() => {
+    if (!klines1d || klines1d.length < 7) return 0;
+    const last = klines1d[klines1d.length - 1];
+    const prev = klines1d[klines1d.length - 7];
+    return (last.close - prev.close) / prev.close;
+  })();
+  // Patch the finer returns into s
+  Object.assign(s, { ret_15m: ret15m, ret_1m: ret1M, ret_1w: ret1w });
 
   // Rule-based AI analysis from live data
   const liveAnalysis = IS_LIVE && liveSpot

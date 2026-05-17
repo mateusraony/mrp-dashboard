@@ -251,15 +251,14 @@ export interface LiquidationEntry {
   timestamp:  number;
 }
 
+// allForceOrders retorna objetos flat (não envelope { o: ... } do WebSocket)
 const LiquidationItemSchema = z.object({
-  o: z.object({
-    s:   z.string(),                // symbol
-    S:   z.enum(['BUY', 'SELL']),   // side
-    q:   z.coerce.number(),         // quantidade
-    p:   z.coerce.number(),         // preço médio
-    ap:  z.coerce.number().optional(), // preço médio de execução
-    T:   z.coerce.number(),         // timestamp
-  }),
+  symbol:       z.string(),
+  side:         z.enum(['BUY', 'SELL']),
+  origQty:      z.coerce.number(),
+  executedQty:  z.coerce.number().optional(),
+  averagePrice: z.coerce.number(),
+  time:         z.coerce.number(),
 });
 
 const LiquidationsResponseSchema = z.array(LiquidationItemSchema);
@@ -344,16 +343,16 @@ export async function fetchLongShortRatio(
 /**
  * fetchLiquidations — liquidações forçadas recentes de BTCUSDT (Binance Futures)
  *
- * Endpoint público: GET /fapi/v1/forceOrders?symbol=BTCUSDT&limit=50
- * Sem API key. Retorna as últimas 50 ordens de liquidação.
+ * Endpoint público: GET /fapi/v1/allForceOrders?symbol=BTCUSDT&limit=200
+ * Sem API key. Retorna até 1000 ordens de liquidação. Suporta symbol, startTime, endTime, limit.
  */
-export async function fetchLiquidations(symbol = 'BTCUSDT', limit = 50): Promise<LiquidationEntry[]> {
+export async function fetchLiquidations(symbol = 'BTCUSDT', limit = 200): Promise<LiquidationEntry[]> {
   if (DATA_MODE === 'mock') return mockLiquidations();
 
-  const url = `${FUTURES_BASE}/fapi/v1/forceOrders?symbol=${symbol}&limit=${limit}`;
+  const url = `${FUTURES_BASE}/fapi/v1/allForceOrders?symbol=${symbol}&limit=${limit}`;
   const res = await fetch(url);
 
-  // /fapi/v1/forceOrders requer autenticação (não é endpoint público).
+  // Guard mantido por segurança, mas /fapi/v1/allForceOrders é totalmente público (sem auth).
   // Retorna [] sem lançar erro para evitar retry loop.
   if (res.status === 401 || res.status === 403) return [];
   if (!res.ok) throw new Error(`Binance Liquidations error ${res.status}`);
@@ -361,14 +360,18 @@ export async function fetchLiquidations(symbol = 'BTCUSDT', limit = 50): Promise
   const raw = await res.json();
   const parsed = LiquidationsResponseSchema.parse(raw);
 
-  return parsed.map(item => ({
-    symbol:    item.o.s,
-    side:      item.o.S,
-    qty:       item.o.q,
-    price:     item.o.ap ?? item.o.p,
-    usd_value: item.o.q * (item.o.ap ?? item.o.p),
-    timestamp: item.o.T,
-  }));
+  return parsed.map(item => {
+    const qty   = item.executedQty ?? item.origQty;
+    const price = item.averagePrice;
+    return {
+      symbol:    item.symbol,
+      side:      item.side,
+      qty,
+      price,
+      usd_value: qty * price,
+      timestamp: item.time,
+    };
+  });
 }
 
 // ─── Futures Basis (Contango / Backwardation) ─────────────────────────────────
@@ -476,4 +479,16 @@ export async function fetchFuturesBasis(): Promise<FuturesBasisEntry[]> {
   // Ordenar por dias para expiração (mais próximo primeiro)
   results.sort((a, b) => a.days_to_exp - b.days_to_exp);
   return results;
+}
+
+// ─── Open Interest Histórico ──────────────────────────────────────────────────
+
+/** fetchOiHistory — Open Interest histórico 30 dias (Binance openInterestHist, público) */
+export async function fetchOiHistory(): Promise<Array<{ t: number; oi: number }>> {
+  if (DATA_MODE === 'mock') return [];
+  const url = `${FUTURES_BASE}/futures/data/openInterestHist?symbol=BTCUSDT&period=1d&limit=30`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`OI History error ${res.status}`);
+  const raw: Array<{ timestamp: number; sumOpenInterestValue: string }> = await res.json();
+  return raw.map(r => ({ t: r.timestamp, oi: parseFloat((parseFloat(r.sumOpenInterestValue) / 1e9).toFixed(2)) }));
 }

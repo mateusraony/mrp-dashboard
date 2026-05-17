@@ -52,6 +52,14 @@ function useOptionsPageData() {
     : null;
   const nearestExpiry = live?.term_structure?.[0] ?? null;
 
+  // IV deltas from DVOL history (Deribit get_volatility_index_data — already fetched)
+  const dvolHistory = live?.dvol_history ?? [];
+  const dvolLen = dvolHistory.length;
+  const dvolLast = dvolLen > 0 ? dvolHistory[dvolLen - 1].value : null;
+  const ivDelta1d = dvolLen >= 2  ? (dvolLast - dvolHistory[dvolLen - 2].value) / 100 : 0;
+  const ivDelta1w = dvolLen >= 8  ? (dvolLast - dvolHistory[dvolLen - 8].value) / 100 : 0;
+  const ivDelta1m = dvolLen >= 30 ? (dvolLast - dvolHistory[0].value) / 100 : 0;
+
   const btcOptions = live
     ? {
         ...BTC_OPTIONS_FALLBACK,
@@ -64,6 +72,9 @@ function useOptionsPageData() {
         expiry:        nearestExpiry?.label ?? BTC_OPTIONS_FALLBACK.expiry,
         expiry_hours:  nearestExpiry ? Math.round(nearestExpiry.days_to * 24) : BTC_OPTIONS_FALLBACK.expiry_hours,
         quality:       live.quality,
+        iv_atm_1d_delta: ivDelta1d,
+        iv_atm_1w_delta: ivDelta1w,
+        iv_atm_1m_delta: ivDelta1m,
       }
     : BTC_OPTIONS_FALLBACK;
 

@@ -67,7 +67,7 @@ export const strategies = [
     ],
     history_pnl: Array.from({ length: 30 }, (_, i) => ({
       day: i + 1,
-      pnl: parseFloat((i * (carrySpread / 365) + (Math.random() - 0.5) * 0.05).toFixed(3)),
+      pnl: parseFloat((i * (carrySpread / 365)).toFixed(3)),
     })),
   },
 
@@ -117,10 +117,7 @@ export const strategies = [
       'Executar somente quando IVR > 60 para melhor edge histórico',
       'Gap risk: movimento rápido abaixo de $80K pode não permitir stop',
     ],
-    history_pnl: Array.from({ length: 18 }, (_, i) => ({
-      day: i + 1,
-      pnl: parseFloat((Math.min(720, i * 40 + (Math.random() - 0.5) * 50) / 720 * 100).toFixed(1)),
-    })),
+    history_pnl: null,
   },
 
   // ─── 3. LONG VOL — STRADDLE ──────────────────────────────────────────────
@@ -220,7 +217,7 @@ export const strategies = [
     ],
     history_pnl: Array.from({ length: 30 }, (_, i) => ({
       day: i + 1,
-      pnl: parseFloat((i * fundingRate * 3 * 100 + (Math.random() - 0.5) * 0.002).toFixed(4)),
+      pnl: parseFloat((i * fundingRate * 3 * 100).toFixed(4)),
     })),
   },
 
