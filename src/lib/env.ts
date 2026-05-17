@@ -23,6 +23,12 @@ const EnvSchema = z.object({
   // Configurar como Supabase Secret: FRED_API_KEY (sem prefixo VITE_)
   // A Edge Function fred-proxy adiciona a key server-side.
   // Obtenha gratuitamente em https://fred.stlouisfed.org/docs/api/api_key.html
+
+  // ── SoSoValue API (ETF flows: AUM, flows diários/histórico por fundo) ────
+  // Free tier: 20 req/min. Cadastro: https://sosovalue.com/developer
+  // Após registrar, copie a chave e adicione ao .env.local:
+  //   VITE_SOSOVALUE_KEY=sua_chave_aqui
+  VITE_SOSOVALUE_KEY: z.string().min(1).optional(),
 });
 
 // Valida no carregamento do módulo (falha silencioso em dev, hard fail em prod)

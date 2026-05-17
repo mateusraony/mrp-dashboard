@@ -1,6 +1,6 @@
 # CHECKPOINT.md — MRP Dashboard
 > Memória técnica viva do projeto. Atualizar ao final de cada bloco importante.
-> Última atualização: 2026-05-17 (Tier 1–7 dados reais — PRs #111 + sprint em branch claude/verify-content-accuracy-Ubdaz)
+> Última atualização: 2026-05-17 (Tier 1–7 dados reais — PR #112 ✅ mergeado | Item 8: SoSoValue ETF API wired — branch claude/verify-content-accuracy-Ubdaz)
 
 ---
 
@@ -76,6 +76,8 @@
 | **7 rotas 404 + deep-link tabs** | ✅ PR #105 MERGEADO | Auditoria completa de `createPageUrl()` vs rotas registradas: `ActionDashboard`→`Opportunities`, `Alerts`→`SmartAlerts`, `Calendar`→`MacroCalendar`, `ETFFlows`→`InstitutionalFlows`, `StablecoinFlow`→`InstitutionalFlows`, `Strategies`→`Opportunities`, `DerivativesAdvanced`→`Derivatives`. Deep-link via `Link state={{ tab }}` + `useLocation().state?.tab` em InstitutionalFlows/Opportunities/DerivativesPage — links do ExecutiveReport aterrisam na aba correta. Build ✅ |
 | **ExecutiveReport crash fix** | ✅ PR #104 MERGEADO | `ExecutiveReport.jsx`: (1) `etf.funds[0].aum_b` → `etf.funds[0]?.aum_b ?? 0` — crashava quando `ETF_FLOWS_FALLBACK.funds` era `[]`; (2) `c.label.split(' ')[0]` → `c.label?.split(' ')?.[0] ?? '—'` — crashava com `components: []`. Auditoria em 8 outras páginas confirmou sem problemas. Build ✅ |
 | **DebugPanel full visibility** | ✅ PR #103 MERGEADO | `debugLog.ts`: monkey-patch `console.error/warn` — todos os erros de todos os serviços (`supabase.ts`, `defillama.ts`, `fred.ts`, `yahooFinance.ts`, `aiPredictions.ts`) agora aparecem no painel 🐛 automaticamente, sem tocar em nenhum serviço. Guard `[DebugLog]` evita dupla entrada. Build ✅ |
+| **Tier 1–7 — Dados reais (Math.sin/random eliminados)** | ✅ PR #112 MERGEADO | allForceOrders schema flat; IV delta Deribit; SpotFlow klines; ExecutiveReport OI Binance 30d; Automations 6 métricas live; Strategies P&L determinístico; GDELT timelinevolraw 24h |
+| **Item 8 — SoSoValue ETF API** | ✅ WIRED (pendente VITE_SOSOVALUE_KEY) | `src/services/sosovalue.ts` + `src/hooks/useSoSoValue.ts` criados; `ETFFlows.jsx` usa dados reais quando chave configurada; fallback para mock quando ausente; env.ts tem VITE_SOSOVALUE_KEY opcional |
 | **Sprint 7.4 — Page migrations batch C + Codex P1 fixes** | ✅ PR #98 mergeado | **5 páginas limpas de mockData**. Dashboard.jsx: `fmtNum`/`fmtPct` inline + 8 fallback consts. ExecutiveReport.jsx: 30 consts fallback; imports reordenados (todos `import` antes de `const`); fallbacks completos com todos os campos usados (funding_history, smoothed_7d, exchange_reserves, netflow_7d, usdt/usdc net_7d_m, funds[], total_shorts_at_risk_10pct, NUPL history como objeto `{1d:[],1w:[],1m:[]}`). PredictivePanel.jsx: 4 consts fallback (SCENARIOS_24H_FALLBACK baseado em SPOT_FALLBACK=84K). StablecoinFlow.jsx: 7 consts fallback. ActionDashboard.jsx: 7 consts fallback. **Post-merge Codex P1 fixes:** (1) Dashboard.jsx:184 `fearGreed.history` → `FEAR_GREED_FALLBACK.history` (tsc CI falhou, corrigido); (2) StablecoinFlow.jsx:345 `dailyMintBurn` → `DAILY_MINT_BURN_FALLBACK` (tsc CI, corrigido); (3) `STABLECOIN_SNAPSHOT_FALLBACK.usdt/usdc` ganhou `net_7d_m: 0` (crash no tab Emissões, Codex review). Build ✅ tsc ✅ |
 
 ---
