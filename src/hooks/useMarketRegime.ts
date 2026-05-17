@@ -18,6 +18,8 @@ import { useQuery } from '@tanstack/react-query';
 import { useBtcTicker } from '@/hooks/useBtcData';
 import { useMacroBoard } from '@/hooks/useFred';
 import { useOnChainCycle } from '@/hooks/useCoinMetrics';
+import { IS_LIVE } from '@/lib/env';
+import { upsertRegimeScore, fetchRegimeHistory, type RegimeScoreDay } from '@/services/supabase';
 
 // ─── Tipos exportados ─────────────────────────────────────────────────────────
 
@@ -173,9 +175,37 @@ export function useMarketRegime() {
         metric: c.label, value: c.score, fullMark: 100,
       }));
 
-      return { score, label, color, bg, border, components, radarData, updated_at: Date.now() };
+      const result: MarketRegimeResult = { score, label, color, bg, border, components, radarData, updated_at: Date.now() };
+
+      // Persiste uma vez por dia — chave no localStorage evita writes repetidos
+      if (IS_LIVE) {
+        const today = new Date().toISOString().slice(0, 10);
+        const lastSaved = localStorage.getItem('mrp_regime_saved_at');
+        if (lastSaved !== today) {
+          upsertRegimeScore(score, label, components).then(ok => {
+            if (ok) localStorage.setItem('mrp_regime_saved_at', today);
+          }).catch(() => {});
+        }
+      }
+
+      return result;
     },
     staleTime:       25_000,
     refetchInterval: 30_000,
+  });
+}
+
+/**
+ * useRegimeHistory — histórico real de 90 dias de regime scores (Supabase).
+ * Retorna [] quando tabela ainda não tem dados suficientes (primeiros dias de uso).
+ */
+export function useRegimeHistory(days = 90) {
+  return useQuery<RegimeScoreDay[]>({
+    queryKey:        ['regime-history', days],
+    queryFn:         () => fetchRegimeHistory(days),
+    staleTime:       10 * 60_000,
+    refetchInterval: IS_LIVE ? 30 * 60_000 : false,
+    retry:           0,
+    enabled:         IS_LIVE,
   });
 }
