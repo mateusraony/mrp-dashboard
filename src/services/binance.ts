@@ -240,6 +240,26 @@ export async function fetchKlines(
   return raw.map(k => KlineSchema.parse(k));
 }
 
+/**
+ * fetchKlinesAt — candles de preço para um intervalo de tempo específico.
+ * Usado por useEventVolatility para computar janelas ±24h em torno de eventos macro.
+ * DATA_MODE=mock → retorna [] imediatamente (sem rede).
+ */
+export async function fetchKlinesAt(
+  symbol = 'BTCUSDT',
+  interval = '1h',
+  startMs: number,
+  endMs: number,
+  limit = 50,
+): Promise<Kline[]> {
+  if (DATA_MODE === 'mock') return [];
+  const url = `${SPOT_BASE}/api/v3/klines?symbol=${symbol}&interval=${interval}&startTime=${startMs}&endTime=${endMs}&limit=${limit}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Binance Klines error ${res.status}`);
+  const raw = await res.json() as unknown[][];
+  return raw.map(k => KlineSchema.parse(k));
+}
+
 // ─── Liquidações ──────────────────────────────────────────────────────────────
 
 export interface LiquidationEntry {
