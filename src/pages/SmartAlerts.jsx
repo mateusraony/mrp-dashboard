@@ -369,6 +369,8 @@ export default function SmartAlerts() {
     ? (ticker.last_funding_rate * 100 + (multiVenue.bybit.funding_rate ?? 0) * 100 + (multiVenue.okx.funding_rate ?? 0) * 100) / 3
     : null;
 
+  const suggestionsLoading = IS_LIVE && tickerLoading && !ticker && !fngData && !riskScore;
+
   const liveSuggestions = useMemo(() => {
     if (!IS_LIVE || (!ticker && !fngData && !riskScore)) return null;
     const analysis = computeRuleBasedAnalysis({
@@ -490,13 +492,25 @@ export default function SmartAlerts() {
 
       {tab === 'ai' && (
         <>
-          <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
             <button onClick={() => setCategoryFilter('all')} style={{ padding: '4px 12px', borderRadius: 20, border: `1px solid ${categoryFilter === 'all' ? 'rgba(59,130,246,0.4)' : '#1a2535'}`, background: categoryFilter === 'all' ? 'rgba(59,130,246,0.12)' : 'transparent', color: categoryFilter === 'all' ? '#60a5fa' : '#475569', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>Todos</button>
             {CATEGORIES.map(c => <button key={c.id} onClick={() => setCategoryFilter(c.id)} style={{ padding: '4px 12px', borderRadius: 20, border: `1px solid ${categoryFilter === c.id ? c.color + '40' : '#1a2535'}`, background: categoryFilter === c.id ? `${c.color}12` : 'transparent', color: categoryFilter === c.id ? c.color : '#475569', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>{c.icon} {c.label}</button>)}
+            <div style={{ marginLeft: 'auto' }}>
+              {liveSuggestions
+                ? <span style={{ fontSize: 9, color: '#10b981', background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 4, padding: '2px 7px', fontWeight: 700 }}>● LIVE · Rule-based</span>
+                : <span style={{ fontSize: 9, color: '#f59e0b', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 4, padding: '2px 7px', fontWeight: 600 }}>demo · aguardando dados</span>
+              }
+            </div>
           </div>
+          {suggestionsLoading ? (
+            <div style={{ textAlign: 'center', padding: '32px 0', color: '#334155' }}>
+              <div style={{ fontSize: 13, color: '#475569' }}>Carregando análise de mercado...</div>
+            </div>
+          ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {filteredSuggestions.map(s => <AISuggestionCard key={s.id} item={s} prefs={prefs} />)}
           </div>
+          )}
           <div style={{ marginTop: 14, padding: '10px 13px', background: 'rgba(30,45,69,0.3)', border: '1px solid #1a2535', borderRadius: 9, fontSize: 10, color: '#334155', lineHeight: 1.7 }}>⚠️ <strong style={{ color: '#475569' }}>Aviso:</strong> Todas as sugestões da AI são baseadas em dados quantitativos históricos e não constituem recomendação de investimento.</div>
         </>
       )}
