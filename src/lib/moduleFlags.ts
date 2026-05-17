@@ -11,7 +11,7 @@ const DEFAULTS: Record<string, boolean> = {
   ENABLE_ONCHAIN:     true,
   ENABLE_NEWS:        true,
   ENABLE_FEAR_GREED:  true,
-  ENABLE_COINMETRICS: false,
+  ENABLE_COINMETRICS: true,  // CoinMetrics Community (gratuito) — MVRV, NUPL, Realized Price
 };
 
 export function readModuleFlag(key: string): boolean {
