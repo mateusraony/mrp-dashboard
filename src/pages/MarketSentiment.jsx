@@ -2,7 +2,7 @@
 import { useState, useMemo } from 'react';
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, ReferenceLine, Cell, BarChart,
+  ResponsiveContainer, Cell,
 } from 'recharts';
 import { useMarketSentiment } from '../hooks/useMarketSentiment';
 import { useGdeltNews, useGdeltHistory } from '@/hooks/useGdelt';
@@ -345,11 +345,11 @@ export default function MarketSentiment() {
             <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', marginBottom: 12 }}>🔥 Trending Topics</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <div style={{ fontSize: 9, color: '#334155', marginBottom: 6 }}>
-                {IS_LIVE && activeWordCloud.length > 0 ? 'Extraído de notícias GDELT em tempo real' : 'Dados de demonstração'}
+                {IS_LIVE && liveWordCloud && liveWordCloud.length > 0 ? 'Extraído de notícias GDELT em tempo real' : IS_LIVE ? 'GDELT indisponível — dados de demonstração' : 'Dados de demonstração'}
               </div>
-              {(IS_LIVE && activeWordCloud.length > 0 ? activeWordCloud : trendingTopics.map(t => ({ text: t.topic, value: t.mentions_24h, sentiment: t.sentiment, color: t.sentiment > 0.2 ? '#10b981' : t.sentiment < -0.2 ? '#ef4444' : '#f59e0b' }))).slice(0, 8).map((t, i) => {
+              {(IS_LIVE && liveWordCloud && liveWordCloud.length > 0 ? liveWordCloud : trendingTopics.map(t => ({ text: t.topic, value: t.mentions_24h, sentiment: t.sentiment, color: t.sentiment > 0.2 ? '#10b981' : t.sentiment < -0.2 ? '#ef4444' : '#f59e0b' }))).slice(0, 8).map((t, i) => {
                 const sc = (t.color ?? (t.sentiment > 0.2 ? '#10b981' : t.sentiment < -0.2 ? '#ef4444' : '#f59e0b'));
-                const maxVal = activeWordCloud[0]?.value ?? 1;
+                const maxVal = (IS_LIVE && liveWordCloud ? liveWordCloud[0] : activeWordCloud[0])?.value ?? 1;
                 return (
                   <div key={i} style={{ padding: '9px 12px', background: '#0d1421', border: '1px solid #1a2535', borderRadius: 8 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>

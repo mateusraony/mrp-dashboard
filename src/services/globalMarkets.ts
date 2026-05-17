@@ -259,7 +259,7 @@ export async function fetchFxRates(): Promise<FxRateData[]> {
   return rates;
 }
 
-/** fetchCommodities — Gold, Silver, WTI + IBOVESPA via FRED */
+/** fetchCommodities — Gold, Silver, WTI via FRED */
 export async function fetchCommodities(): Promise<CommodityData[]> {
   if (DATA_MODE === 'mock') return mockGlobalMarkets().commodities;
 
@@ -267,7 +267,6 @@ export async function fetchCommodities(): Promise<CommodityData[]> {
     { name: 'Gold',          symbol: 'XAU',  unit: '$/oz',    series: 'GOLDAMGBD228NLBM' },
     { name: 'Silver',        symbol: 'XAG',  unit: '$/oz',    series: 'SLVPRUSD'         },
     { name: 'WTI Crude Oil', symbol: 'WTI',  unit: '$/bbl',   series: 'DCOILWTICO'       },
-    { name: 'IBOVESPA',      symbol: 'IBOV', unit: 'pts',     series: 'IBOVESPA'         },
   ];
 
   const results = await Promise.allSettled(
@@ -279,8 +278,7 @@ export async function fetchCommodities(): Promise<CommodityData[]> {
       const r = results[i];
       if (r.status === 'rejected' || r.value.length === 0) return null;
       const { last, delta_1d, delta_7d, delta_30d } = calcDeltas(r.value);
-      const decimals = c.symbol === 'IBOV' ? 0 : 2;
-      return { ...c, value: parseFloat(last.toFixed(decimals)), delta_1d, delta_7d, delta_30d, source: 'FRED' as const, series_id: c.series };
+      return { ...c, value: parseFloat(last.toFixed(2)), delta_1d, delta_7d, delta_30d, source: 'FRED' as const, series_id: c.series };
     })
     .filter((x): x is NonNullable<typeof x> => x !== null) as CommodityData[];
 }
