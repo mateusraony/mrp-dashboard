@@ -4,9 +4,7 @@ import {
   ComposedChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, Cell, BarChart, Legend,
 } from 'recharts';
-import { eventVolatilityData, avgVolatilityByEvent } from '../components/data/mockDataMacroCalendar';
-// Nota: eventVolatilityData e avgVolatilityByEvent são dados históricos aproximados.
-// Volatilidade real por evento requereria FRED + tick data histórico (não disponível gratuitamente).
+import { eventVolatilityData, avgVolatilityByEvent as avgVolatilityMock } from '../components/data/mockDataMacroCalendar';
 import { ModeBadge } from '../components/ui/DataBadge';
 import { RefreshButton } from '../components/ui/RefreshButton';
 import GoldenRule from '../components/ui/GoldenRule';
@@ -14,6 +12,7 @@ import { format, differenceInHours, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { sendNotificationEmail } from '@/lib/notificationClient';
 import { useMacroCalendar, useMacroAlertPreferences, useToggleMacroAlert } from '@/hooks/useMacroCalendar';
+import { useEventVolatility } from '@/hooks/useEventVolatility';
 import { IS_LIVE } from '@/lib/env';
 
 const AGENCY_COLOR = {
@@ -194,7 +193,9 @@ function VolatilityChart({ selectedEvent }) {
           {RESULT_LABEL[selectedEvent.result_vs_expected]} — {selectedEvent.actual} (exp: {selectedEvent.expected})
         </span>
         <span style={{ fontSize: 10, color: '#475569', marginLeft: 'auto' }}>
-          IV antes: {selectedEvent.iv_before}% → depois: {selectedEvent.iv_after}%
+          {selectedEvent.iv_before > 0
+            ? `IV antes: ${selectedEvent.iv_before}% → depois: ${selectedEvent.iv_after}%`
+            : 'Vol-spike'}
           <span style={{ color: selectedEvent.vol_spike_pct > 0 ? '#ef4444' : '#10b981', fontWeight: 700, marginLeft: 6 }}>
             {selectedEvent.vol_spike_pct > 0 ? '+' : ''}{selectedEvent.vol_spike_pct.toFixed(1)}%
           </span>
@@ -219,14 +220,14 @@ function VolatilityChart({ selectedEvent }) {
 }
 
 // ─── AVG VOLATILITY CHART ─────────────────────────────────────────────────────
-function AvgVolatilityChart() {
+function AvgVolatilityChart({ data }) {
   return (
     <div>
       <div style={{ fontSize: 10, color: '#475569', marginBottom: 8, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
         Impacto Médio BTC por Tipo de Evento (resultado vs expectativa)
       </div>
       <ResponsiveContainer width="100%" height={140}>
-        <BarChart data={avgVolatilityByEvent} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+        <BarChart data={data} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(30,45,69,0.4)" vertical={false} />
           <XAxis dataKey="event" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
           <YAxis tick={{ fontSize: 9, fill: '#475569' }} axisLine={false} tickLine={false} tickFormatter={v => `${v}%`} />
@@ -279,7 +280,6 @@ const TABS = ['Agenda', 'Surpresa', 'Volatilidade', 'Alertas'];
 
 export default function MacroCalendar() {
   const [tab, setTab] = useState('Agenda');
-  const [selectedHistEvent, setSelectedHistEvent] = useState(eventVolatilityData[0]);
   const [toast, setToast] = useState(null);
 
   // ─── Hooks live — FRED API + FOMC estático + alertas persistidos ──────────
@@ -308,8 +308,24 @@ export default function MacroCalendar() {
     [liveEvents, alertPrefs],
   );
 
-  // Enriquece eventVolatilityData com Z-Score de surpresa (fórmula validada Python)
-  const surpriseData = useMemo(() => computeSurpriseZScores(eventVolatilityData), []);
+  // ─── Volatilidade real via Binance klines ─────────────────────────────────
+  const pastEvents = useMemo(
+    () => events
+      .filter(e => e.actual !== null && new Date(e.datetime_utc) < new Date())
+      .map(e => ({ name: e.title, code: e.code, datetime_utc: e.datetime_utc, actual: e.actual, previous: e.previous })),
+    [events],
+  );
+  const { data: evVol } = useEventVolatility(pastEvents);
+
+  const hasLiveVol     = IS_LIVE && evVol && evVol.rows.length > 0;
+  const volatilityData = hasLiveVol ? evVol.rows : eventVolatilityData;
+  const avgVolData     = hasLiveVol ? evVol.avg  : avgVolatilityMock;
+
+  const [selectedHistEvent, setSelectedHistEvent] = useState(null);
+  const activeHistEvent = selectedHistEvent ?? volatilityData[0] ?? null;
+
+  // Enriquece volatilityData com Z-Score de surpresa (fórmula validada Python)
+  const surpriseData = useMemo(() => computeSurpriseZScores(volatilityData), [volatilityData]);
 
   const showToast = (msg, color = '#10b981') => {
     setToast({ msg, color });
@@ -429,8 +445,14 @@ export default function MacroCalendar() {
           {/* Sidebar */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '16px' }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 12 }}>📊 Impacto Histórico Médio</div>
-              <AvgVolatilityChart />
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0' }}>📊 Impacto Histórico Médio</span>
+                {hasLiveVol
+                  ? <span style={{ fontSize: 9, color: '#10b981', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 4, padding: '1px 6px', fontWeight: 600 }}>● Binance klines · B</span>
+                  : <span style={{ fontSize: 9, color: '#f59e0b', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 4, padding: '1px 6px', fontWeight: 600 }}>mock · D</span>
+                }
+              </div>
+              <AvgVolatilityChart data={avgVolData} />
             </div>
             <GoldenRule compact />
           </div>
@@ -448,9 +470,9 @@ export default function MacroCalendar() {
           {/* Summary grid */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 16 }}>
             {[
-              { label: 'Acima do Esperado', count: eventVolatilityData.filter(e => e.result_vs_expected === 'above').length, color: '#ef4444', icon: '▲', desc: 'Inflação/jobs > consenso → hawkish → BTC ↓' },
-              { label: 'Abaixo do Esperado', count: eventVolatilityData.filter(e => e.result_vs_expected === 'below').length, color: '#10b981', icon: '▼', desc: 'Dados fracos → dovish → BTC ↑' },
-              { label: 'Conforme Esperado',  count: eventVolatilityData.filter(e => e.result_vs_expected === 'inline').length, color: '#f59e0b', icon: '=', desc: 'Sem surpresa → vol cai · sell-the-news' },
+              { label: 'Acima do Esperado', count: volatilityData.filter(e => e.result_vs_expected === 'above').length, color: '#ef4444', icon: '▲', desc: 'Inflação/jobs > consenso → hawkish → BTC ↓' },
+              { label: 'Abaixo do Esperado', count: volatilityData.filter(e => e.result_vs_expected === 'below').length, color: '#10b981', icon: '▼', desc: 'Dados fracos → dovish → BTC ↑' },
+              { label: 'Conforme Esperado',  count: volatilityData.filter(e => e.result_vs_expected === 'inline').length, color: '#f59e0b', icon: '=', desc: 'Sem surpresa → vol cai · sell-the-news' },
             ].map(s => (
               <div key={s.label} style={{ background: '#111827', border: `1px solid ${s.color}20`, borderRadius: 10, padding: '14px 16px', borderLeft: `3px solid ${s.color}` }}>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
@@ -531,15 +553,21 @@ export default function MacroCalendar() {
       {tab === 'Volatilidade' && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
           <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '18px 20px' }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', marginBottom: 12 }}>📈 Volatilidade Pré/Pós Evento</div>
-            <VolatilityChart selectedEvent={selectedHistEvent} />
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>📈 Volatilidade Pré/Pós Evento</span>
+              {hasLiveVol
+                ? <span style={{ fontSize: 9, color: '#10b981', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 4, padding: '1px 6px', fontWeight: 600 }}>● Binance klines · {evVol.rows.length} eventos</span>
+                : <span style={{ fontSize: 9, color: '#f59e0b', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 4, padding: '1px 6px', fontWeight: 600 }}>mock · D</span>
+              }
+            </div>
+            <VolatilityChart selectedEvent={activeHistEvent} />
           </div>
           <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '18px 20px' }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', marginBottom: 12 }}>📋 Selecionar Evento Histórico</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {eventVolatilityData.map((ev, i) => {
+              {volatilityData.map((ev, i) => {
                 const rc = RESULT_COLOR[ev.result_vs_expected];
-                const isSelected = selectedHistEvent?.event === ev.event;
+                const isSelected = activeHistEvent?.event === ev.event;
                 return (
                   <button key={i} onClick={() => setSelectedHistEvent(ev)} style={{ padding: '10px 12px', borderRadius: 8, border: `1px solid ${isSelected ? 'rgba(59,130,246,0.4)' : '#1a2535'}`, background: isSelected ? 'rgba(59,130,246,0.08)' : '#0d1421', cursor: 'pointer', textAlign: 'left' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -561,7 +589,7 @@ export default function MacroCalendar() {
           </div>
           <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '18px 20px', gridColumn: '1 / -1' }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', marginBottom: 12 }}>📊 Comparativo por Tipo de Evento</div>
-            <AvgVolatilityChart />
+            <AvgVolatilityChart data={avgVolData} />
           </div>
         </div>
       )}
