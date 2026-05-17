@@ -556,10 +556,14 @@ export default function SmartAlerts() {
 
       {tab === 'history' && (
         <div>
-          <div style={{ fontSize: 11, color: '#475569', marginBottom: 12 }}>
-            {history.length} alertas registrados · {history.filter(a => a.resolved).length} resolvidos
-            {history.length === 0 && (
-              <span style={{ color: '#4a6580', marginLeft: 8 }}>— sem histórico no Supabase ainda</span>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 11, color: '#475569' }}>
+              {history.length} alertas registrados · {history.filter(a => a.resolved).length} resolvidos
+            </span>
+            {(!alertEvents || alertEvents.length === 0) && IS_LIVE && (
+              <span style={{ fontSize: 9, color: '#f59e0b', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 4, padding: '1px 6px', fontWeight: 600 }}>
+                demo · histórico real acumula com o uso
+              </span>
             )}
           </div>
           {history.map(a => {
