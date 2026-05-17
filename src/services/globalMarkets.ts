@@ -190,7 +190,34 @@ function mockGlobalMarkets(): GlobalMarketsData {
 
 // ─── Fetchers individuais (exportados para uso nos hooks) ─────────────────────
 
-/** fetchFxRates — EUR/USD, USD/JPY, GBP/USD, USD/CNY via FRED + USD/BRL via BCB */
+// Frankfurter.app — ECB reference rates (gratuito, sem auth, fallback quando FRED falha)
+// Mapeia par FX → símbolo Frankfurter (base sempre USD)
+const FRANKFURTER_MAP: Record<string, { from: string; to: string; invert: boolean }> = {
+  'EUR/USD': { from: 'EUR', to: 'USD', invert: false },
+  'USD/JPY': { from: 'USD', to: 'JPY', invert: false },
+  'GBP/USD': { from: 'GBP', to: 'USD', invert: false },
+  'USD/CNY': { from: 'USD', to: 'CNY', invert: false },
+};
+
+async function fetchFrankfurterRates(): Promise<Record<string, number>> {
+  try {
+    const res = await fetch('https://api.frankfurter.app/latest?from=EUR&to=USD,JPY,GBP,CNY', { signal: AbortSignal.timeout(4000) });
+    if (!res.ok) return {};
+    const data = await res.json() as { base: string; rates: Record<string, number> };
+    // Converte para os pares que usamos
+    const r = data.rates;
+    return {
+      'EUR/USD': r.USD ?? 0,
+      'USD/JPY': r.JPY ? 1 / (r.USD ?? 1) * r.JPY : 0,
+      'GBP/USD': r.USD && r.GBP ? r.USD / r.GBP : 0,
+      'USD/CNY': r.CNY ? 1 / (r.USD ?? 1) * r.CNY : 0,
+    };
+  } catch {
+    return {};
+  }
+}
+
+/** fetchFxRates — EUR/USD, USD/JPY, GBP/USD, USD/CNY via FRED; Frankfurter.app como fallback */
 export async function fetchFxRates(): Promise<FxRateData[]> {
   if (DATA_MODE === 'mock') return mockGlobalMarkets().fxRates;
 
@@ -206,13 +233,19 @@ export async function fetchFxRates(): Promise<FxRateData[]> {
     fetchBcbData(),
   ]);
 
+  // Carrega Frankfurter só se FRED falhar em algum par
+  const anyFredFailed = fredResults.some(r => r.status === 'rejected' || (r.status === 'fulfilled' && r.value.length === 0));
+  const frankfurter = anyFredFailed ? await fetchFrankfurterRates() : {};
+
   const rates: FxRateData[] = fredPairs.map((p, i) => {
     const r = fredResults[i];
-    if (r.status === 'rejected' || r.value.length === 0) {
-      return { pair: p.pair, value: 0, delta_1d: 0, delta_7d: 0, delta_30d: 0, source: 'FRED' as const, series_id: p.series };
+    if (r.status === 'fulfilled' && r.value.length > 0) {
+      const { last, delta_1d, delta_7d, delta_30d } = calcDeltas(r.value);
+      return { pair: p.pair, value: parseFloat(last.toFixed(4)), delta_1d, delta_7d, delta_30d, source: 'FRED' as const, series_id: p.series };
     }
-    const { last, delta_1d, delta_7d, delta_30d } = calcDeltas(r.value);
-    return { pair: p.pair, value: parseFloat(last.toFixed(4)), delta_1d, delta_7d, delta_30d, source: 'FRED' as const, series_id: p.series };
+    // Fallback Frankfurter
+    const fbVal = frankfurter[p.pair] ?? 0;
+    return { pair: p.pair, value: parseFloat(fbVal.toFixed(4)), delta_1d: 0, delta_7d: 0, delta_30d: 0, source: 'FRED' as const, series_id: p.series };
   });
 
   if (bcbData.usdbrl !== null) {
@@ -226,28 +259,28 @@ export async function fetchFxRates(): Promise<FxRateData[]> {
   return rates;
 }
 
-/** fetchCommodities — Gold, Silver, WTI Crude Oil via FRED */
+/** fetchCommodities — Gold, Silver, WTI via FRED */
 export async function fetchCommodities(): Promise<CommodityData[]> {
   if (DATA_MODE === 'mock') return mockGlobalMarkets().commodities;
 
   const configs = [
-    { name: 'Gold',          symbol: 'XAU', unit: '$/oz',  series: 'GOLDAMGBD228NLBM' },
-    { name: 'Silver',        symbol: 'XAG', unit: '$/oz',  series: 'SLVPRUSD'         },
-    { name: 'WTI Crude Oil', symbol: 'WTI', unit: '$/bbl', series: 'DCOILWTICO'       },
+    { name: 'Gold',          symbol: 'XAU',  unit: '$/oz',    series: 'GOLDAMGBD228NLBM' },
+    { name: 'Silver',        symbol: 'XAG',  unit: '$/oz',    series: 'SLVPRUSD'         },
+    { name: 'WTI Crude Oil', symbol: 'WTI',  unit: '$/bbl',   series: 'DCOILWTICO'       },
   ];
 
   const results = await Promise.allSettled(
     configs.map(c => fetchSeries(c.series, 35)),
   );
 
-  return configs.map((c, i) => {
-    const r = results[i];
-    if (r.status === 'rejected' || r.value.length === 0) {
-      return { ...c, value: 0, delta_1d: 0, delta_7d: 0, delta_30d: 0, source: 'FRED' as const, series_id: c.series };
-    }
-    const { last, delta_1d, delta_7d, delta_30d } = calcDeltas(r.value);
-    return { ...c, value: parseFloat(last.toFixed(2)), delta_1d, delta_7d, delta_30d, source: 'FRED' as const, series_id: c.series };
-  });
+  return configs
+    .map((c, i) => {
+      const r = results[i];
+      if (r.status === 'rejected' || r.value.length === 0) return null;
+      const { last, delta_1d, delta_7d, delta_30d } = calcDeltas(r.value);
+      return { ...c, value: parseFloat(last.toFixed(2)), delta_1d, delta_7d, delta_30d, source: 'FRED' as const, series_id: c.series };
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null) as CommodityData[];
 }
 
 /** fetchCentralBankRates — Fed Funds, ECB, BoJ via FRED + SELIC via BCB */

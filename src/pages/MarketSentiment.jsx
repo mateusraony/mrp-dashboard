@@ -2,10 +2,11 @@
 import { useState, useMemo } from 'react';
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, ReferenceLine, Cell, BarChart,
+  ResponsiveContainer, Cell,
 } from 'recharts';
 import { useMarketSentiment } from '../hooks/useMarketSentiment';
-import { useGdeltNews } from '@/hooks/useGdelt';
+import { useGdeltNews, useGdeltHistory } from '@/hooks/useGdelt';
+import { useFearGreed, useKlines } from '@/hooks/useBtcData';
 import { IS_LIVE } from '../lib/env';
 import { ModeBadge } from '../components/ui/DataBadge';
 import { DataTrustBadge } from '../components/ui/DataTrustBadge';
@@ -208,6 +209,28 @@ export default function MarketSentiment() {
   const liveWordCloud = useMemo(() => buildWordCloudFromGdelt(gdeltArticles), [gdeltArticles]);
   const activeWordCloud = (IS_LIVE && liveWordCloud) ? liveWordCloud : wordCloudData;
 
+  const { data: gdeltHistory } = useGdeltHistory(7);
+  const { data: fngHistory }   = useFearGreed(7);
+  const { data: klines }       = useKlines('1d', 8);
+
+  const sentimentHistory7dLive = useMemo(() => {
+    const hist = fngHistory?.history;
+    if (!IS_LIVE || !hist || hist.length < 2) return null;
+    const btcByDay = klines ? Object.fromEntries(
+      klines.map(k => [new Date(k.time).toISOString().slice(0, 10), k.close])
+    ) : {};
+    const days = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+    return hist.slice(-7).map(f => {
+      const d = new Date(f.timestamp);
+      return {
+        day:       days[d.getDay()],
+        score:     f.value,
+        btc_price: btcByDay[d.toISOString().slice(0, 10)] ?? null,
+      };
+    });
+  }, [fngHistory, klines]);
+  const activeSentHistory = sentimentHistory7dLive ?? sentimentHistory7d;
+
   const generateAIAnalysis = async () => {
     // TODO: integrar com API real de AI (OpenAI/Claude) quando dados reais forem conectados
     setIsGenerating(true);
@@ -258,8 +281,8 @@ export default function MarketSentiment() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginBottom: 12 }}>
             {s.sources.map((src, i) => <SourceCard key={i} src={src} />)}
           </div>
-          <div style={{ padding: '8px 10px', borderRadius: 7, background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.15)', fontSize: 9, color: '#64748b', lineHeight: 1.6 }}>
-            💡 Correlação sentimento → preço BTC: <span style={{ color: '#60a5fa', fontWeight: 700 }}>{socialCorrelation.sentiment_vs_price_24h}</span> · Lag ótimo: <span style={{ color: '#f59e0b' }}>{socialCorrelation.lag_hours_optimal}h</span>
+          <div style={{ padding: '8px 10px', borderRadius: 7, background: 'rgba(100,116,139,0.05)', border: '1px solid rgba(100,116,139,0.15)', fontSize: 9, color: '#64748b', lineHeight: 1.6 }}>
+            💡 Score composto: Fear&amp;Greed (50%) + Funding Rate (30%) + Sentimento GDELT Notícias (20%) — dados gratuitos em tempo real
           </div>
         </div>
       </div>
@@ -287,14 +310,14 @@ export default function MarketSentiment() {
           <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '18px 20px' }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', marginBottom: 12 }}>📈 Sentimento + Preço BTC (7 dias)</div>
             <ResponsiveContainer width="100%" height={200}>
-              <ComposedChart data={sentimentHistory7d} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+              <ComposedChart data={activeSentHistory} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(30,45,69,0.4)" vertical={false} />
                 <XAxis dataKey="day" tick={{ fontSize: 10, fill: '#475569' }} axisLine={false} tickLine={false} />
                 <YAxis yAxisId="score" tick={{ fontSize: 8, fill: '#475569' }} axisLine={false} tickLine={false} domain={[0, 100]} />
                 <YAxis yAxisId="price" orientation="right" tick={{ fontSize: 8, fill: '#475569' }} axisLine={false} tickLine={false} domain={['auto', 'auto']} tickFormatter={v => `$${(v / 1000).toFixed(0)}K`} />
                 <Tooltip contentStyle={{ background: '#0d1421', border: '1px solid #1a2535', fontSize: 9, borderRadius: 6 }} />
                 <Bar yAxisId="score" dataKey="score" radius={[3, 3, 0, 0]} fillOpacity={0.7} name="Score">
-                  {sentimentHistory7d.map((e, i) => <Cell key={i} fill={e.score > 60 ? '#f59e0b' : e.score > 45 ? '#10b981' : '#60a5fa'} />)}
+                  {activeSentHistory.map((e, i) => <Cell key={i} fill={e.score > 60 ? '#f59e0b' : e.score > 45 ? '#10b981' : '#60a5fa'} />)}
                 </Bar>
                 <Line yAxisId="price" dataKey="btc_price" stroke="#f59e0b" strokeWidth={2} dot={false} name="BTC" />
               </ComposedChart>
@@ -302,19 +325,15 @@ export default function MarketSentiment() {
           </div>
 
           {/* Mentions hourly */}
-          <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '18px 20px', gridColumn: '1 / -1' }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', marginBottom: 12 }}>📊 Menções + Volume BTC (24h por hora)</div>
-            <ResponsiveContainer width="100%" height={140}>
-              <ComposedChart data={mentionsHourly} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(30,45,69,0.4)" vertical={false} />
-                <XAxis dataKey="hour" tick={{ fontSize: 8, fill: '#475569' }} axisLine={false} tickLine={false} interval={3} />
-                <YAxis yAxisId="mentions" tick={{ fontSize: 7, fill: '#475569' }} axisLine={false} tickLine={false} tickFormatter={v => `${(v / 1000).toFixed(0)}K`} />
-                <YAxis yAxisId="vol" orientation="right" tick={{ fontSize: 7, fill: '#475569' }} axisLine={false} tickLine={false} tickFormatter={v => `$${v}M`} />
-                <Tooltip contentStyle={{ background: '#0d1421', border: '1px solid #1a2535', fontSize: 9, borderRadius: 6 }} />
-                <Bar yAxisId="mentions" dataKey="mentions" fill="#3b82f6" fillOpacity={0.5} radius={[2, 2, 0, 0]} name="Menções" />
-                <Line yAxisId="vol" dataKey="btc_volume_m" stroke="#f59e0b" strokeWidth={2} dot={false} name="Vol BTC ($M)" />
-              </ComposedChart>
-            </ResponsiveContainer>
+          <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '28px 20px', gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>📊 Menções por Hora (Twitter/X)</div>
+            <div style={{ fontSize: 11, color: '#4a5568', textAlign: 'center', maxWidth: 340 }}>
+              Volume horário de menções em redes sociais requer <strong style={{ color: '#94a3b8' }}>Twitter API v2</strong> (~$100/mês) ou <strong style={{ color: '#94a3b8' }}>LunarCrush</strong> (~$49/mês)
+            </div>
+            <a href="https://lunarcrush.com/pricing" target="_blank" rel="noopener noreferrer"
+              style={{ fontSize: 10, color: '#3b82f6', border: '1px solid #1e3a5f', borderRadius: 4, padding: '3px 10px', textDecoration: 'none' }}>
+              Ver planos LunarCrush →
+            </a>
           </div>
         </div>
       )}
@@ -325,23 +344,21 @@ export default function MarketSentiment() {
           <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '18px 20px' }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', marginBottom: 12 }}>🔥 Trending Topics</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {trendingTopics.map((t, i) => {
-                const sc = t.sentiment > 0.2 ? '#10b981' : t.sentiment < -0.2 ? '#ef4444' : '#f59e0b';
-                const cc = t.change_pct >= 0 ? '#10b981' : '#ef4444';
-                const maxM = Math.max(...trendingTopics.map(x => x.mentions_24h));
+              <div style={{ fontSize: 9, color: '#334155', marginBottom: 6 }}>
+                {IS_LIVE && liveWordCloud && liveWordCloud.length > 0 ? 'Extraído de notícias GDELT em tempo real' : IS_LIVE ? 'GDELT indisponível — dados de demonstração' : 'Dados de demonstração'}
+              </div>
+              {(IS_LIVE && liveWordCloud && liveWordCloud.length > 0 ? liveWordCloud : trendingTopics.map(t => ({ text: t.topic, value: t.mentions_24h, sentiment: t.sentiment, color: t.sentiment > 0.2 ? '#10b981' : t.sentiment < -0.2 ? '#ef4444' : '#f59e0b' }))).slice(0, 8).map((t, i) => {
+                const sc = (t.color ?? (t.sentiment > 0.2 ? '#10b981' : t.sentiment < -0.2 ? '#ef4444' : '#f59e0b'));
+                const maxVal = (IS_LIVE && liveWordCloud ? liveWordCloud[0] : activeWordCloud[0])?.value ?? 1;
                 return (
                   <div key={i} style={{ padding: '9px 12px', background: '#0d1421', border: '1px solid #1a2535', borderRadius: 8 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
-                      <span style={{ fontSize: 10, fontWeight: 800, color: '#e2e8f0', flex: 1 }}>{t.topic}</span>
+                      <span style={{ fontSize: 10, fontWeight: 800, color: '#e2e8f0', flex: 1 }}>{t.text}</span>
                       <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: `${sc}10`, color: sc, border: `1px solid ${sc}20` }}>{sc === '#10b981' ? 'Bullish' : sc === '#ef4444' ? 'Bearish' : 'Neutro'}</span>
-                      <span style={{ fontSize: 9, color: '#475569' }}>{t.platform}</span>
-                      <span style={{ fontSize: 10, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', color: cc }}>{t.change_pct > 0 ? '+' : ''}{t.change_pct.toFixed(1)}%</span>
+                      <span style={{ fontSize: 9, color: '#475569' }}>GDELT</span>
                     </div>
-                    <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                      <div style={{ flex: 1, height: 4, borderRadius: 2, background: '#1a2535' }}>
-                        <div style={{ height: '100%', borderRadius: 2, width: `${(t.mentions_24h / maxM) * 100}%`, background: sc, opacity: 0.7 }} />
-                      </div>
-                      <span style={{ fontSize: 9, fontFamily: 'JetBrains Mono, monospace', color: '#475569', width: 70, textAlign: 'right' }}>{t.mentions_24h.toLocaleString()}</span>
+                    <div style={{ flex: 1, height: 4, borderRadius: 2, background: '#1a2535' }}>
+                      <div style={{ height: '100%', borderRadius: 2, width: `${(t.value / maxVal) * 100}%`, background: sc, opacity: 0.7 }} />
                     </div>
                   </div>
                 );
@@ -376,29 +393,21 @@ export default function MarketSentiment() {
 
       {/* TAB: KOLs */}
       {tab === 'KOLs' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: 14 }}>
-          <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '18px 20px' }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', marginBottom: 12 }}>👥 Key Opinion Leaders — Sentimento</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {kolSentiment.map((k, i) => <KOLCard key={i} kol={k} />)}
-            </div>
-            <div style={{ marginTop: 12, padding: '10px 12px', borderRadius: 8, background: '#0a1018', border: '1px solid #0f1d2e', fontSize: 9, color: '#475569', lineHeight: 1.6 }}>
-              💡 Peso KOL no score: influenciadores com &gt;1M seguidores têm peso 2× no cálculo do sentimento agregado. Divergência entre KOLs bullish e bearish pode sinalizar fase de distribuição.
-            </div>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, padding: '40px 20px', background: '#111827', border: '1px solid #1e2d45', borderRadius: 12 }}>
+          <div style={{ fontSize: 24, opacity: 0.3 }}>🔒</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#e2e8f0' }}>KOL Sentiment Monitor</div>
+          <div style={{ fontSize: 11, color: '#4a5568', textAlign: 'center', maxWidth: 360, lineHeight: 1.7 }}>
+            Monitoramento de Key Opinion Leaders (Saylor, Cathie Wood, etc.) requer acesso à <strong style={{ color: '#94a3b8' }}>Twitter/X API v2 Enterprise</strong> (~$100/mês) para leitura de tweets em tempo real e análise de sentimento por NLP.
           </div>
-          <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '18px 20px' }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', marginBottom: 12 }}>📊 KOL Sentiment Spread</div>
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={kolSentiment} layout="vertical" margin={{ top: 0, right: 10, left: 0, bottom: 0 }}>
-                <XAxis type="number" domain={[-1, 1]} tick={{ fontSize: 8, fill: '#475569' }} axisLine={false} tickLine={false} tickFormatter={v => v.toFixed(1)} />
-                <YAxis type="category" dataKey="name" tick={{ fontSize: 9, fill: '#64748b' }} axisLine={false} tickLine={false} width={90} />
-                <Tooltip contentStyle={{ background: '#0d1421', border: '1px solid #1a2535', fontSize: 9, borderRadius: 6 }} formatter={v => { const n = Number(v); return [`${n > 0 ? '+' : ''}${n.toFixed(2)}`, 'Sentimento']; }} />
-                <ReferenceLine x={0} stroke="#1e2d45" />
-                <Bar dataKey="sentiment" radius={[0, 3, 3, 0]}>
-                  {kolSentiment.map((k, i) => <Cell key={i} fill={k.sentiment > 0 ? '#10b981' : '#ef4444'} fillOpacity={0.8} />)}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <a href="https://developer.twitter.com/en/products/twitter-api" target="_blank" rel="noopener noreferrer"
+              style={{ fontSize: 10, color: '#3b82f6', border: '1px solid #1e3a5f', borderRadius: 4, padding: '4px 10px', textDecoration: 'none' }}>
+              Twitter API v2 →
+            </a>
+            <a href="https://lunarcrush.com" target="_blank" rel="noopener noreferrer"
+              style={{ fontSize: 10, color: '#3b82f6', border: '1px solid #1e3a5f', borderRadius: 4, padding: '4px 10px', textDecoration: 'none' }}>
+              LunarCrush (alternativa) →
+            </a>
           </div>
         </div>
       )}
