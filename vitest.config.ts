@@ -24,13 +24,12 @@ export default defineConfig({
         'src/components/data/**',
         'src/**/__mocks__/**',
       ],
-      // Thresholds calibrados ao estado atual (Phase 4 — 117 testes).
-      // Incrementar conforme novos testes forem adicionados.
+      // Thresholds calibrados ao estado atual (285 testes — Fase 4 completa).
       thresholds: {
-        lines:      10,
-        functions:  10,
-        branches:    6,
-        statements:  9,
+        lines:      20,
+        functions:  20,
+        branches:   15,
+        statements: 20,
       },
     },
   },

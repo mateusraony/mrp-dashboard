@@ -1,15 +1,15 @@
 # CHECKPOINT.md — MRP Dashboard
 > Memória técnica viva do projeto. Atualizar ao final de cada bloco importante.
-> Última atualização: 2026-05-17 (Tier 1–7 ✅ PR #112 | Item 8 SoSoValue ✅ | Item 9: regime_score_history Supabase ✅ | Item 10: MacroCalendar event volatility Binance klines ✅ — branch claude/verify-content-accuracy-Ubdaz)
+> Última atualização: 2026-05-17 (Items 1–10 ✅ | Fases de auditoria 0–6 ✅ | Dívida técnica baixa severidade ✅ | 285 testes | 0 vulnerabilidades)
 
 ---
 
-## 🗂 ESTADO GERAL (verificado em 2026-05-15)
+## 🗂 ESTADO GERAL (verificado em 2026-05-17)
 
 | Aspecto | Status | Evidência Real |
 |---------|--------|---------------|
-| Build (`npm run build`) | ✅ PASSA | 0 erros — Sprint 9 |
-| Testes (`npm test`) | ✅ 270/270 | 17 suites |
+| Build (`npm run build`) | ✅ PASSA | 0 erros |
+| Testes (`npm test`) | ✅ 285/285 | 18 suites |
 | Deploy (Render) | ✅ ONLINE | https://mrp-dashboard.onrender.com |
 | FRED API Key | ✅ CONFIGURADA | VITE_FRED_API_KEY em .env.local |
 | Supabase URL + ANON_KEY | ✅ CONFIGURADO | .env.local presente |
@@ -110,11 +110,11 @@ Auditoria fria e completa conduzida em 7 agentes especializados (arquitetura, da
 |------|--------|------|----|
 | **Fase 0 — Diagnóstico e inventário** | ✅ CONCLUÍDA | 2026-05-03 | — |
 | **Fase 1 — Segurança mínima séria** | ✅ CONCLUÍDA | 2026-05-03 | #58 + #59 |
-| **Fase 2 — Eliminar ilusão de dados** | 🔜 PRÓXIMA | — | — |
-| **Fase 3 — Dados reais gratuitos** | ⏳ PENDENTE | — | — |
-| **Fase 4 — Testes e CI** | ⏳ PENDENTE | — | — |
-| **Fase 5 — Deploy seguro** | ⏳ PENDENTE | — | — |
-| **Fase 6 — Observabilidade** | ⏳ PENDENTE | — | — |
+| **Fase 2 — Eliminar ilusão de dados** | ✅ CONCLUÍDA | 2026-05-17 | PRs #70–73 + fix SmartAlerts history badge |
+| **Fase 3 — Dados reais gratuitos** | ✅ CONCLUÍDA | 2026-05-17 | Items 1–10 (PRs #112–115) |
+| **Fase 4 — Testes e CI** | ✅ CONCLUÍDA | 2026-05-17 | 285 testes · CI .yml existe · thresholds 20%/15%/20%/20% |
+| **Fase 5 — Deploy seguro** | ✅ CONCLUÍDA | 2026-05-17 | 0 vulnerabilidades · FRED → Edge Function · auth stub documentado |
+| **Fase 6 — Observabilidade** | ✅ CONCLUÍDA | 2026-05-17 | debugLog.ts + DebugPanel + console.error/warn interceptado |
 
 ### Fase 0 — Diagnóstico (✅ CONCLUÍDA)
 
