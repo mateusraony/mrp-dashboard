@@ -116,6 +116,30 @@ describe('computeEventVolatilityRow', () => {
     const row = computeEventVolatilityRow(baseEvent, klines)!;
     expect(row.vol_spike_pct).toBeGreaterThan(0);
   });
+
+  it('row contém o campo code do evento de entrada', () => {
+    const klines = makeKlines(80000, { m2: 0, m1: 0, p1: 1, p4: 2, p24: 3 });
+    const row = computeEventVolatilityRow(baseEvent, klines)!;
+    expect(row.code).toBe('US_CPI');
+  });
+
+  it('retorna null quando +24h candle falta e evento < 25h atrás', () => {
+    // evento no futuro próximo (< 25h) — sem candle +24h
+    const recentEvent: MacroEventInput = {
+      ...baseEvent,
+      datetime_utc: new Date(Date.now() - 2 * HOUR_MS).toISOString(), // 2h atrás
+    };
+    // klines só cobrem até agora — sem +24h
+    const eventMs = new Date(recentEvent.datetime_utc).getTime();
+    const klines = [
+      makeKline(eventMs - 3 * HOUR_MS, 80000),
+      makeKline(eventMs - 2 * HOUR_MS, 80000),
+      makeKline(eventMs - 1 * HOUR_MS, 80000),
+      makeKline(eventMs,               80000),
+      makeKline(eventMs + 1 * HOUR_MS, 80000),
+    ];
+    expect(computeEventVolatilityRow(recentEvent, klines)).toBeNull();
+  });
 });
 
 // ─── computeAvgVolatility ─────────────────────────────────────────────────────
@@ -125,16 +149,19 @@ describe('computeAvgVolatility', () => {
     expect(computeAvgVolatility([])).toEqual([]);
   });
 
-  it('agrupa corretamente por tipo de evento', () => {
+  it('agrupa corretamente por tipo de evento usando code (não label)', () => {
     const rows = [
       {
-        event: 'CPI Mar 2026', date: '2026-03-12', result_vs_expected: 'above' as const,
+        // label em português — sem code seria bucketed como OTHER
+        event: 'Consumer Price Index mar. de 2026', code: 'US_CPI',
+        date: '2026-03-12', result_vs_expected: 'above' as const,
         actual: '+0.4%', expected: 'prev: +0.3%',
         windows: [{ label: '+24h', btc_move: -5 }, { label: '+1h', btc_move: -3 }, { label: '-2h', btc_move: 0 }, { label: '-1h', btc_move: 0 }, { label: '-30m', btc_move: 0 }, { label: '+4h', btc_move: -4 }],
         max_drawdown: -5, iv_before: 0, iv_after: 0, vol_spike_pct: 10,
       },
       {
-        event: 'NFP Mar 2026', date: '2026-03-07', result_vs_expected: 'below' as const,
+        event: 'Nonfarm Payrolls mar. de 2026', code: 'US_NFP',
+        date: '2026-03-07', result_vs_expected: 'below' as const,
         actual: '+150K', expected: 'prev: +185K',
         windows: [{ label: '+24h', btc_move: 4 }, { label: '+1h', btc_move: 2 }, { label: '-2h', btc_move: 0 }, { label: '-1h', btc_move: 0 }, { label: '-30m', btc_move: 0 }, { label: '+4h', btc_move: 3 }],
         max_drawdown: 0, iv_before: 0, iv_after: 0, vol_spike_pct: 5,
@@ -150,7 +177,7 @@ describe('computeAvgVolatility', () => {
   it('cada linha tem os campos obrigatórios', () => {
     const rows = [
       {
-        event: 'CPI', date: '2026-03-12', result_vs_expected: 'above' as const,
+        event: 'CPI', code: 'US_CPI', date: '2026-03-12', result_vs_expected: 'above' as const,
         actual: '+0.4%', expected: '—',
         windows: [{ label: '+24h', btc_move: -3 }, { label: '+1h', btc_move: -2 }, { label: '-2h', btc_move: 0 }, { label: '-1h', btc_move: 0 }, { label: '-30m', btc_move: 0 }, { label: '+4h', btc_move: -2 }],
         max_drawdown: -3, iv_before: 0, iv_after: 0, vol_spike_pct: 8,

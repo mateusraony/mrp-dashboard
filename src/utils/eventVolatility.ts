@@ -22,6 +22,7 @@ export interface EventWindow {
 
 export interface EventVolatilityRow {
   event:               string;
+  code:                string;         // código do evento (US_CPI, US_NFP…) — usado na agregação
   date:                string;         // YYYY-MM-DD
   result_vs_expected:  'above' | 'below' | 'inline';
   actual:              string;
@@ -114,6 +115,10 @@ export function computeEventVolatilityRow(
   const p_p4h  = closePriceAt(klines, eventMs + 4 * HOUR_MS);
   const p_p24h = closePriceAt(klines, eventMs + 24 * HOUR_MS);
 
+  // Rejeita eventos cuja janela +24h ainda não existe (evento < 25h atrás).
+  // Evita registrar 0% falso que distorceria médias em computeAvgVolatility.
+  if (p_p24h === null && Date.now() < eventMs + 25 * HOUR_MS) return null;
+
   const move_m2h  = movePct(p_m2h, refPrice);
   const move_m1h  = movePct(p_m1h, refPrice);
   const move_p1h  = movePct(p_p1h, refPrice);
@@ -137,6 +142,7 @@ export function computeEventVolatilityRow(
 
   return {
     event: eventLabel,
+    code:  ev.code,
     date:  ev.datetime_utc.slice(0, 10),
     result_vs_expected,
     actual:   ev.actual   ?? '—',
@@ -186,7 +192,9 @@ export function computeAvgVolatility(rows: EventVolatilityRow[]): AvgVolatilityR
   const buckets: Record<string, { above: number[]; below: number[]; inline: number[] }> = {};
 
   for (const row of rows) {
-    const cat  = eventCategory(row.event.toUpperCase().split(' ')[0]);
+    // Usa o código do evento (US_CPI, US_NFP…) para categorização precisa,
+    // evitando falsos "OTHER" causados por labels em português ("Nonfarm Payrolls…").
+    const cat  = eventCategory(row.code);
     if (!buckets[cat]) buckets[cat] = { above: [], below: [], inline: [] };
     const move24h = row.windows.find(w => w.label === '+24h')?.btc_move ?? 0;
     buckets[cat][row.result_vs_expected].push(move24h);
