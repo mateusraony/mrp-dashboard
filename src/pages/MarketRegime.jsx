@@ -1,6 +1,6 @@
 // ─── MARKET REGIME PAGE ───────────────────────────────────────────────────────
 import { useState } from 'react';
-import { useMarketRegime } from '../hooks/useMarketRegime';
+import { useMarketRegime, useRegimeHistory } from '../hooks/useMarketRegime';
 import { IS_LIVE } from '../lib/env';
 import { ModeBadge } from '../components/ui/DataBadge';
 import {
@@ -186,7 +186,8 @@ const REGIME_TABS = ['Radar & Score', 'Histórico', 'Transições', 'Sugestões 
 
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 export default function MarketRegime() {
-  const { data, isLoading } = useMarketRegime();
+  const { data, isLoading }         = useMarketRegime();
+  const { data: regimeHistoryData } = useRegimeHistory(90);
   const [tab, setTab] = useState(0);
 
   if (isLoading || !data) {
@@ -200,10 +201,19 @@ export default function MarketRegime() {
   const neutral_score  = Math.round(Math.max(0, 100 - Math.abs(score - 50) * 2));
   const risk_off_score = Math.round(Math.max(0, (38 - score) / 38 * 100));
 
-  const regimeHistory    = buildHistory(score);
+  // Usa histórico real (Supabase) quando disponível; fallback para seed determinístico
+  const hasRealHistory = IS_LIVE && regimeHistoryData && regimeHistoryData.length >= 7;
+  const regimeHistory = hasRealHistory
+    ? regimeHistoryData.map(d => ({
+        label:  `${d.scored_at.slice(8)}/${d.scored_at.slice(5, 7)}`,
+        score:  d.score,
+        regime: d.label,
+      }))
+    : buildHistory(score);
+
   const regimeTransitions = buildTransitions(regimeHistory);
-  const suggestions      = EXPOSURE_SUGGESTIONS[label] ?? EXPOSURE_SUGGESTIONS['Neutral'];
-  const histColor        = score >= 62 ? '#10b981' : score <= 38 ? '#ef4444' : '#f59e0b';
+  const suggestions       = EXPOSURE_SUGGESTIONS[label] ?? EXPOSURE_SUGGESTIONS['Neutral'];
+  const histColor         = score >= 62 ? '#10b981' : score <= 38 ? '#ef4444' : '#f59e0b';
 
   return (
     <div style={{ maxWidth: 1400, margin: '0 auto' }}>
@@ -324,9 +334,11 @@ export default function MarketRegime() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '16px 18px' }}>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0' }}>Score de Regime — Últimos 90 Dias</span>
-              <span style={{ fontSize: 9, color: '#94a3b8' }}>Últimos 90 dias (estimado)</span>
-              <ModeBadge mode="estimated" />
+              <span style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0' }}>Score de Regime — Últimos {regimeHistory.length} Dias</span>
+              {hasRealHistory
+                ? <span style={{ fontSize: 9, color: '#10b981', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 4, padding: '1px 6px', fontWeight: 600 }}>● Supabase · {regimeHistory.length}d reais</span>
+                : <><span style={{ fontSize: 9, color: '#94a3b8' }}>Estimado — histórico real acumula com o uso</span><ModeBadge mode="estimated" /></>
+              }
             </div>
             <div style={{ fontSize: 9, color: '#334155', marginBottom: 12 }}>
               Score composto ponderado · &gt;62 = Risk-On · 38–62 = Neutral · &lt;38 = Risk-Off

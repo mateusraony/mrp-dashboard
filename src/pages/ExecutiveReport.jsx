@@ -12,7 +12,7 @@ import { useAiInsight } from '@/hooks/useAiInsight';
 import { sendNotificationEmail } from '@/lib/notificationClient';
 import { useBtcTicker, useFearGreed, useBtcOiHistory } from '@/hooks/useBtcData';
 import { useRiskScore } from '@/hooks/useRiskScore';
-import { useMarketRegime } from '@/hooks/useMarketRegime';
+import { useMarketRegime, useRegimeHistory } from '@/hooks/useMarketRegime';
 import { useOnChainCycle, useOnChainExtended } from '@/hooks/useCoinMetrics';
 import { IS_LIVE } from '@/lib/env';
 import { computeRuleBasedAnalysis } from '@/utils/ruleBasedAnalysis';
@@ -242,16 +242,15 @@ function GlobalOverview({ period, liveTicker, liveFng, liveRisk }) {
 }
 
 // ─── REGIME SECTION ───────────────────────────────────────────────────────────
-function RegimeSection({ period, liveRegime, regimeLoading }) {
+function RegimeSection({ period, liveRegime, regimeLoading, regimeHistoryData }) {
   const r = {
     regime:     liveRegime?.label?.toUpperCase().replace('-', '-') ?? MARKET_REGIME_FALLBACK.regime,
     score:      liveRegime?.score ?? MARKET_REGIME_FALLBACK.score,
-    confidence: MARKET_REGIME_FALLBACK.confidence,  // sem equivalente live
-    suggestion: MARKET_REGIME_FALLBACK.suggestion,  // sem equivalente live
+    confidence: MARKET_REGIME_FALLBACK.confidence,
+    suggestion: MARKET_REGIME_FALLBACK.suggestion,
     components: liveRegime?.components ?? MARKET_REGIME_FALLBACK.components,
   };
   const regColor = (r.regime === 'RISK-ON' || r.regime === 'Risk-On') ? '#10b981' : (r.regime === 'RISK-OFF' || r.regime === 'Risk-Off') ? '#ef4444' : '#f59e0b';
-  // Em modo live, enquanto o regime ainda está carregando, não exibir score stale
   const scoreDisplay = (IS_LIVE && regimeLoading)
     ? <span style={{ fontSize: 13, color: '#475569', fontFamily: 'JetBrains Mono, monospace' }}>Carregando regime...</span>
     : <><span style={{ fontSize: 22, fontWeight: 900, color: regColor, fontFamily: 'JetBrains Mono, monospace' }}>{r.score}/100</span>
@@ -261,13 +260,15 @@ function RegimeSection({ period, liveRegime, regimeLoading }) {
 
   const radarData = r.components.map(c => ({ subject: c.label?.split(' ')?.[0] ?? '—', value: Math.round(c.score ?? 0), fullMark: 100 }));
 
-  // Simulated history based on period
+  // Usa histórico real (Supabase) quando disponível; fallback para tendência linear
   const histLen = period === 'Diário' ? 24 : period === 'Semanal' ? 7 : period === 'Mensal' ? 30 : 52;
-  // Histórico real via Supabase regime_score_history virá em sprint futuro — tendência linear honesta até lá
-  const histData = Array.from({ length: histLen }, (_, i) => ({
-    t: i,
-    score: Math.max(0, Math.min(100, Math.round(r.score - (histLen - 1 - i) * 0.4))),
-  }));
+  const hasRealHist = IS_LIVE && regimeHistoryData && regimeHistoryData.length >= 3;
+  const histData = hasRealHist
+    ? regimeHistoryData.slice(-histLen).map((d, i) => ({ t: i, score: d.score }))
+    : Array.from({ length: histLen }, (_, i) => ({
+        t: i,
+        score: Math.max(0, Math.min(100, Math.round(r.score - (histLen - 1 - i) * 0.4))),
+      }));
 
   return (
     <SectionCard
@@ -991,6 +992,7 @@ export default function ExecutiveReport() {
   const { data: liveFng } = useFearGreed(1);
   const { data: liveRisk } = useRiskScore();
   const { data: liveRegime, isLoading: regimeLoading } = useMarketRegime();
+  const { data: regimeHistoryData } = useRegimeHistory(90);
   const { data: liveOnChain } = useOnChainCycle();
   const { data: oiHistoryData } = useBtcOiHistory();
 
@@ -1087,7 +1089,7 @@ export default function ExecutiveReport() {
       {/* Sections */}
       <div id="exec-report-content" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <GlobalOverview period={period} liveTicker={liveTicker} liveFng={liveFng} liveRisk={liveRisk} />
-        <RegimeSection period={period} liveRegime={liveRegime} regimeLoading={regimeLoading} />
+        <RegimeSection period={period} liveRegime={liveRegime} regimeLoading={regimeLoading} regimeHistoryData={regimeHistoryData} />
         <StablecoinSection period={period} />
         <DerivativesSection period={period} liveTicker={liveTicker} oiHistoryData={oiHistoryData} />
         <OnChainSection period={period} liveOnChain={liveOnChain} />

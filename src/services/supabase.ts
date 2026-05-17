@@ -609,3 +609,66 @@ export async function upsertGdeltArticles(
     // fire-and-forget — falha silenciosa para não bloquear UI
   }
 }
+
+// ─── Regime Score History ─────────────────────────────────────────────────────
+
+export interface RegimeScoreDay {
+  scored_at:  string;   // YYYY-MM-DD
+  score:      number;   // 0-100
+  label:      string;   // 'Risk-On' | 'Risk-Off' | 'Neutral'
+}
+
+const RegimeScoreDaySchema = z.object({
+  scored_at: z.string(),
+  score:     z.coerce.number(),
+  label:     z.string(),
+});
+
+/**
+ * upsertRegimeScore — persiste o score do dia (uma vez por dia, fire-and-forget).
+ * Usa upsert por scored_at (UNIQUE) para ser idempotente.
+ */
+export async function upsertRegimeScore(
+  score: number,
+  label: string,
+  components: unknown[] = [],
+): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+
+  const sb = getClient();
+  const today = new Date().toISOString().slice(0, 10);
+
+  try {
+    await sb.from('regime_score_history').upsert(
+      { scored_at: today, score, label, components, updated_at: new Date().toISOString() },
+      { onConflict: 'scored_at', ignoreDuplicates: false },
+    );
+  } catch {
+    // fire-and-forget — não bloqueia UI
+  }
+}
+
+/**
+ * fetchRegimeHistory — últimos N dias de scores do Supabase.
+ * Retorna [] quando tabela vazia ou Supabase não configurado.
+ */
+export async function fetchRegimeHistory(days = 90): Promise<RegimeScoreDay[]> {
+  if (!isSupabaseConfigured()) return [];
+
+  const sb = getClient();
+  const since = new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+
+  try {
+    const { data, error } = await sb
+      .from('regime_score_history')
+      .select('scored_at, score, label')
+      .gte('scored_at', since)
+      .order('scored_at', { ascending: true })
+      .limit(days);
+
+    if (error || !data) return [];
+    return (data as unknown[]).map(r => RegimeScoreDaySchema.parse(r)) as RegimeScoreDay[];
+  } catch {
+    return [];
+  }
+}
