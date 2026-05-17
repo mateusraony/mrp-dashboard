@@ -182,8 +182,8 @@ export function useMarketRegime() {
         const today = new Date().toISOString().slice(0, 10);
         const lastSaved = localStorage.getItem('mrp_regime_saved_at');
         if (lastSaved !== today) {
-          upsertRegimeScore(score, label, components).then(() => {
-            localStorage.setItem('mrp_regime_saved_at', today);
+          upsertRegimeScore(score, label, components).then(ok => {
+            if (ok) localStorage.setItem('mrp_regime_saved_at', today);
           }).catch(() => {});
         }
       }

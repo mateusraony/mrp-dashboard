@@ -632,19 +632,20 @@ export async function upsertRegimeScore(
   score: number,
   label: string,
   components: unknown[] = [],
-): Promise<void> {
-  if (!isSupabaseConfigured()) return;
+): Promise<boolean> {
+  if (!isSupabaseConfigured()) return false;
 
   const sb = getClient();
   const today = new Date().toISOString().slice(0, 10);
 
   try {
-    await sb.from('regime_score_history').upsert(
+    const { error } = await sb.from('regime_score_history').upsert(
       { scored_at: today, score, label, components, updated_at: new Date().toISOString() },
       { onConflict: 'scored_at', ignoreDuplicates: false },
     );
+    return !error;
   } catch {
-    // fire-and-forget — não bloqueia UI
+    return false;
   }
 }
 
@@ -663,11 +664,11 @@ export async function fetchRegimeHistory(days = 90): Promise<RegimeScoreDay[]> {
       .from('regime_score_history')
       .select('scored_at, score, label')
       .gte('scored_at', since)
-      .order('scored_at', { ascending: true })
+      .order('scored_at', { ascending: false })
       .limit(days);
 
     if (error || !data) return [];
-    return (data as unknown[]).map(r => RegimeScoreDaySchema.parse(r)) as RegimeScoreDay[];
+    return (data as unknown[]).map(r => RegimeScoreDaySchema.parse(r)).reverse() as RegimeScoreDay[];
   } catch {
     return [];
   }
