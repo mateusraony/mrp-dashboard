@@ -1,6 +1,6 @@
 # CHECKPOINT.md — MRP Dashboard
 > Memória técnica viva do projeto. Atualizar ao final de cada bloco importante.
-> Última atualização: 2026-05-15 (PR #105 merged — 7 rotas 404 corrigidas + deep-link tabs via router state)
+> Última atualização: 2026-05-17 (Tier 1–7 dados reais — PRs #111 + sprint em branch claude/verify-content-accuracy-Ubdaz)
 
 ---
 

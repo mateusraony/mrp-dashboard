@@ -5,8 +5,11 @@ import {
 } from '../components/data/mockDataAutomations';
 import { ModeBadge } from '../components/ui/DataBadge';
 import { formatDistanceToNow } from 'date-fns';
-import { useBtcTicker } from '@/hooks/useBtcData';
+import { useBtcTicker, useKlines } from '@/hooks/useBtcData';
 import { useRiskScore } from '@/hooks/useRiskScore';
+import { useMacroBoard, useYieldCurve } from '@/hooks/useFred';
+import { useOnChainCycle } from '@/hooks/useCoinMetrics';
+import { useStablecoinData } from '@/hooks/useStablecoin';
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 const CATEGORIES = [...new Set(AVAILABLE_METRICS.map(m => m.category))];
@@ -406,17 +409,44 @@ export default function Automations() {
   const [showBuilder, setShowBuilder] = useState(false);
 
   // ── Hooks de dados live ──────────────────────────────────────────────────
-  const { data: ticker }    = useBtcTicker();
-  const { data: riskScore } = useRiskScore();
+  const { data: ticker }       = useBtcTicker();
+  const { data: riskScore }    = useRiskScore();
+  const { data: klines1h }     = useKlines('1h', 2);
+  const { data: macroBoard }   = useMacroBoard();
+  const { data: yieldCurve }   = useYieldCurve();
+  const { data: onChainCycle } = useOnChainCycle();
+  const { data: stablecoin }   = useStablecoinData();
 
   // ── Mapa de valores live para as métricas presentes no AVAILABLE_METRICS ──
-  const liveMetrics = useMemo(() => ({
-    'btc.price':    ticker?.mark_price        ?? 84312,
-    'funding.rate': ticker
-      ? ticker.last_funding_rate * 100        // decimal → percentual (%unit)
-      : 0.0712,
-    'risk.long_flush': riskScore?.score       ?? 68,
-  }), [ticker, riskScore]);
+  const liveMetrics = useMemo(() => {
+    const m = {
+      'btc.price':       ticker?.mark_price ?? 84312,
+      'funding.rate':    ticker ? ticker.last_funding_rate * 100 : 0.0712,
+      'risk.long_flush': riskScore?.score ?? 68,
+    };
+    // BTC 1h return
+    if (klines1h && klines1h.length >= 2) {
+      const [prev, last] = klines1h;
+      m['btc.ret_1h'] = parseFloat(((last.close - prev.close) / prev.close * 100).toFixed(3));
+    }
+    // VIX e DXY delta 30d via FRED/Yahoo (já em useMacroBoard)
+    if (macroBoard?.series) {
+      const vix = macroBoard.series.find(s => s.id === 'VIX');
+      if (vix?.value != null) m['vix.value'] = parseFloat(vix.value.toFixed(2));
+      const dxy = macroBoard.series.find(s => s.id === 'DXY');
+      if (dxy?.delta_30d != null) m['dxy.delta_30d'] = parseFloat((dxy.delta_30d * 100).toFixed(2));
+    }
+    // Yield spread 10Y-2Y via FRED
+    if (yieldCurve?.spread_10y2y != null)
+      m['yield_spread'] = parseFloat((yieldCurve.spread_10y2y * 100).toFixed(1));
+    // NUPL via CoinMetrics Community (gratuito)
+    if (onChainCycle?.nupl != null)
+      m['nupl.value'] = parseFloat(onChainCycle.nupl.toFixed(3));
+    // Stablecoin net 24h via DeFiLlama
+    if (stablecoin?.totalChange24h != null && stablecoin?.totalSupply != null)
+      m['stable.net_24h'] = parseFloat(((stablecoin.totalChange24h / 100) * stablecoin.totalSupply / 1e6).toFixed(1));
+    return m;
+  }, [ticker, riskScore, klines1h, macroBoard, yieldCurve, onChainCycle, stablecoin]);
 
   // ── Sincroniza current_values das regras com dados live ──────────────────
   useEffect(() => {

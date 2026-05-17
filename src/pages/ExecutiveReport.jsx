@@ -10,7 +10,7 @@ import AIInsightPanel from '../components/ai/AIInsightPanel';
 import { ModeBadge } from '../components/ui/DataBadge';
 import { useAiInsight } from '@/hooks/useAiInsight';
 import { sendNotificationEmail } from '@/lib/notificationClient';
-import { useBtcTicker, useFearGreed } from '@/hooks/useBtcData';
+import { useBtcTicker, useFearGreed, useBtcOiHistory } from '@/hooks/useBtcData';
 import { useRiskScore } from '@/hooks/useRiskScore';
 import { useMarketRegime } from '@/hooks/useMarketRegime';
 import { useOnChainCycle, useOnChainExtended } from '@/hooks/useCoinMetrics';
@@ -263,9 +263,10 @@ function RegimeSection({ period, liveRegime, regimeLoading }) {
 
   // Simulated history based on period
   const histLen = period === 'Diário' ? 24 : period === 'Semanal' ? 7 : period === 'Mensal' ? 30 : 52;
+  // Histórico real via Supabase regime_score_history virá em sprint futuro — tendência linear honesta até lá
   const histData = Array.from({ length: histLen }, (_, i) => ({
     t: i,
-    score: Math.round(r.score - (histLen - i) * 0.3 + (Math.sin(i * 0.4) * 8)),
+    score: Math.max(0, Math.min(100, Math.round(r.score - (histLen - 1 - i) * 0.4))),
   }));
 
   return (
@@ -427,7 +428,7 @@ function StablecoinSection({ period }) {
 }
 
 // ─── DERIVATIVES SECTION ──────────────────────────────────────────────────────
-function DerivativesSection({ period, liveTicker }) {
+function DerivativesSection({ period, liveTicker, oiHistoryData }) {
   const f = BTC_FUTURES_MOCK_FALLBACK;
   const basis = FUTURES_BASIS_FALLBACK;
   const liq = LIQUIDATION_CLUSTERS_FALLBACK;
@@ -445,10 +446,12 @@ function DerivativesSection({ period, liveTicker }) {
     rate: parseFloat((h.fundingRate * 100).toFixed(4)),
   }));
 
-  const oiHist = Array.from({ length: histLen }, (_, i) => ({
-    t: i,
-    oi: parseFloat(((f.open_interest_usdt / 1e9) * (0.8 + i / histLen * 0.2 + (Math.sin(i) * 0.02))).toFixed(2)),
-  }));
+  const oiHist = (IS_LIVE && oiHistoryData && oiHistoryData.length > 0)
+    ? oiHistoryData.map((d, i) => ({ t: i, oi: d.oi }))
+    : Array.from({ length: histLen }, (_, i) => ({
+        t: i,
+        oi: parseFloat(((f.open_interest_usdt / 1e9) * (0.8 + i / histLen * 0.2)).toFixed(2)),
+      }));
 
   const liqClusters = [...LIQUIDATION_CLUSTERS_FALLBACK.clusters].sort((a, b) => a.price - b.price);
   const maxLiq = Math.max(...liqClusters.map(c => Math.max(c.longs_usd, c.shorts_usd)));
@@ -989,6 +992,7 @@ export default function ExecutiveReport() {
   const { data: liveRisk } = useRiskScore();
   const { data: liveRegime, isLoading: regimeLoading } = useMarketRegime();
   const { data: liveOnChain } = useOnChainCycle();
+  const { data: oiHistoryData } = useBtcOiHistory();
 
   const liveAnalysis = useMemo(() => {
     if (!IS_LIVE || (!liveTicker && !liveFng)) return null;
@@ -1085,7 +1089,7 @@ export default function ExecutiveReport() {
         <GlobalOverview period={period} liveTicker={liveTicker} liveFng={liveFng} liveRisk={liveRisk} />
         <RegimeSection period={period} liveRegime={liveRegime} regimeLoading={regimeLoading} />
         <StablecoinSection period={period} />
-        <DerivativesSection period={period} liveTicker={liveTicker} />
+        <DerivativesSection period={period} liveTicker={liveTicker} oiHistoryData={oiHistoryData} />
         <OnChainSection period={period} liveOnChain={liveOnChain} />
         <ETFMacroSection period={period} />
         <PeriodSummaryTable />

@@ -12,7 +12,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState, useEffect } from 'react';
 import { IS_LIVE } from '@/lib/env';
-import { fetchBtcTicker, fetchOiByExchange, fetchKlines, fetchLiquidations, fetchLongShortRatio, fetchFuturesBasis, type BtcTickerData } from '@/services/binance';
+import { fetchBtcTicker, fetchOiByExchange, fetchKlines, fetchLiquidations, fetchLongShortRatio, fetchFuturesBasis, fetchOiHistory, type BtcTickerData } from '@/services/binance';
 import { fetchDominance, fetchTopAltcoins } from '@/services/coingecko';
 import { fetchFearGreed } from '@/services/alternative';
 import { subscribeBtcPrice, subscribeStatus } from '@/services/binanceWs';
@@ -199,5 +199,17 @@ export function useFuturesBasis() {
     queryFn:         fetchFuturesBasis,
     staleTime:       60_000,
     refetchInterval: IS_LIVE ? 60_000 : false,
+  });
+}
+
+/** useBtcOiHistory — Open Interest diário últimos 30 dias via Binance openInterestHist */
+export function useBtcOiHistory() {
+  return useQuery({
+    queryKey:        ['btc-oi-history'],
+    queryFn:         fetchOiHistory,
+    refetchInterval: IS_LIVE ? 5 * 60_000 : false,
+    staleTime:       4 * 60_000,
+    retry:           1,
+    enabled:         IS_LIVE,
   });
 }
