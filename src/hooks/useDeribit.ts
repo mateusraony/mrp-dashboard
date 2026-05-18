@@ -55,7 +55,7 @@ export function useOptionsData() {
         reportApiFailure('deribit');
         const stale = await getStaleCache<OptionsData>('deribit:options');
         if (stale) {
-          return { data: stale.data, lastUpdated: stale.lastUpdated, isFallback: true, debugError: String(err) };
+          return { data: stale.value, lastUpdated: stale.updatedAt.toISOString(), isFallback: true, debugError: String(err) };
         }
         return { data: EMPTY_OPTIONS, lastUpdated: null, isFallback: true, debugError: String(err) };
       }
@@ -97,7 +97,7 @@ export function useDvolHistory(days = 30) {
         reportApiFailure('deribit');
         const stale = await getStaleCache<Array<{ timestamp: number; value: number }>>(`deribit:dvol:${days}`);
         if (stale) {
-          return { data: stale.data, lastUpdated: stale.lastUpdated, isFallback: true, debugError: String(err) };
+          return { data: stale.value, lastUpdated: stale.updatedAt.toISOString(), isFallback: true, debugError: String(err) };
         }
         return { data: [], lastUpdated: null, isFallback: true, debugError: String(err) };
       }
