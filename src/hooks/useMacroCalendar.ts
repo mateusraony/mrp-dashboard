@@ -11,7 +11,12 @@ import {
   fetchMacroCalendarEvents,
   fetchAlertPreferences,
   upsertAlertPreference,
+  type MacroCalendarEvent,
 } from '@/services/macroCalendarService';
+import { withCache, getStaleCache } from '@/services/marketCache';
+import { logError } from '@/lib/debugLog';
+import { reportApiFailure, reportApiRecovery } from '@/lib/apiHealthMonitor';
+import { type DataState } from '@/hooks/useBtcData';
 
 // Sentinel UUID anônimo — persiste em localStorage para identificar o usuário sem auth real
 const SENTINEL_KEY = 'mrp_user_sentinel';
@@ -27,9 +32,22 @@ function getUserSentinel(): string {
 // ─── Hook principal: eventos do calendário ────────────────────────────────────
 
 export function useMacroCalendar() {
-  return useQuery({
+  return useQuery<DataState<MacroCalendarEvent[]>, Error, MacroCalendarEvent[]>({
     queryKey:        ['macroCalendar', 'events'],
-    queryFn:         fetchMacroCalendarEvents,
+    queryFn:         async (): Promise<DataState<MacroCalendarEvent[]>> => {
+      try {
+        const data = await withCache('macro-calendar:events', 3600, 'macro_calendar', fetchMacroCalendarEvents);
+        reportApiRecovery('macro_calendar');
+        return { data, lastUpdated: new Date().toISOString(), isFallback: false, debugError: null };
+      } catch (err) {
+        logError('Macro calendar fetch failed', { error: String(err) }, 'macro-calendar');
+        reportApiFailure('macro_calendar');
+        const stale = await getStaleCache<MacroCalendarEvent[]>('macro-calendar:events');
+        if (stale) return { data: stale.value, lastUpdated: stale.updatedAt.toISOString(), isFallback: true, debugError: String(err) };
+        return { data: null, lastUpdated: null, isFallback: true, debugError: String(err) };
+      }
+    },
+    select:          (state) => state.data ?? [],
     staleTime:       30 * 60_000,
     refetchInterval: IS_LIVE ? 60 * 60_000 : false,
     retry:           2,
