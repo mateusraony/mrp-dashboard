@@ -22,6 +22,7 @@ const SPOT = 84298.70;
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 function fmtM(v) {
+  if (v == null || isNaN(v)) return '—';
   if (v >= 1e9) return `$${(v / 1e9).toFixed(2)}B`;
   if (v >= 1e6) return `$${(v / 1e6).toFixed(0)}M`;
   return `$${v.toLocaleString()}`;
@@ -115,8 +116,8 @@ function LiqHeatmapFull() {
     },
   } : null;
   const { data: aiInsightText, isLoading: aiLoading } = useAiInsight(derivAdvPayload);
-  const distLong  = ((SPOT_LIVE - closestLong?.price) / SPOT_LIVE * 100).toFixed(1);
-  const distShort = ((closestShort?.price - SPOT_LIVE) / SPOT_LIVE * 100).toFixed(1);
+  const distLong  = closestLong  ? ((SPOT_LIVE - closestLong.price)  / SPOT_LIVE * 100).toFixed(1) : '—';
+  const distShort = closestShort ? ((closestShort.price - SPOT_LIVE) / SPOT_LIVE * 100).toFixed(1) : '—';
 
   return (
     <div>
@@ -141,12 +142,12 @@ function LiqHeatmapFull() {
         </div>
         <div style={{ background: 'rgba(239,68,68,0.04)', border: '1px solid #1a2535', borderRadius: 8, padding: '10px 12px' }}>
           <div style={{ fontSize: 8, color: '#ef4444', fontWeight: 700, marginBottom: 2, textTransform: 'uppercase' }}>Cluster Long + Próximo</div>
-          <div style={{ fontSize: 18, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: '#ef4444' }}>${(closestLong?.price / 1000).toFixed(0)}K</div>
+          <div style={{ fontSize: 18, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: '#ef4444' }}>{closestLong ? `$${(closestLong.price / 1000).toFixed(0)}K` : '—'}</div>
           <div style={{ fontSize: 8, color: '#334155' }}>−{distLong}% do spot · {fmtM(closestLong?.longs_usd)}</div>
         </div>
         <div style={{ background: 'rgba(16,185,129,0.04)', border: '1px solid #1a2535', borderRadius: 8, padding: '10px 12px' }}>
           <div style={{ fontSize: 8, color: '#10b981', fontWeight: 700, marginBottom: 2, textTransform: 'uppercase' }}>Cluster Short + Próximo</div>
-          <div style={{ fontSize: 18, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: '#10b981' }}>${(closestShort?.price / 1000).toFixed(0)}K</div>
+          <div style={{ fontSize: 18, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: '#10b981' }}>{closestShort ? `$${(closestShort.price / 1000).toFixed(0)}K` : '—'}</div>
           <div style={{ fontSize: 8, color: '#334155' }}>+{distShort}% do spot · {fmtM(closestShort?.shorts_usd)}</div>
         </div>
       </div>
@@ -246,7 +247,7 @@ function LiqHeatmapFull() {
         if (!c) return null;
         return (
           <div style={{ marginTop: 12, padding: '10px 14px', background: '#0d1421', border: '1px solid #2a3f5f', borderRadius: 8, fontSize: 10, display: 'flex', gap: 20, flexWrap: 'wrap' }}>
-            <span style={{ color: '#94a3b8', fontWeight: 700 }}>${c.price.toLocaleString()}</span>
+            <span style={{ color: '#94a3b8', fontWeight: 700 }}>${(c.price ?? 0).toLocaleString()}</span>
             <span>Longs: <strong style={{ color: '#ef4444' }}>{fmtM(c.longs_usd)}</strong></span>
             <span>Shorts: <strong style={{ color: '#10b981' }}>{fmtM(c.shorts_usd)}</strong></span>
             <span style={{ color: '#475569' }}>{c.price > SPOT_LIVE ? `+${((c.price - SPOT_LIVE)/SPOT_LIVE*100).toFixed(1)}% acima do spot` : `−${((SPOT_LIVE - c.price)/SPOT_LIVE*100).toFixed(1)}% abaixo do spot`}</span>
@@ -263,10 +264,10 @@ function LiqHeatmapFull() {
           recommendation={
             probLongFlush > 65
               ? `Alta concentração de longs em risco — ${fmtM(longRisk)} seriam liquidados em queda de 10%. Reduzir exposição comprada.`
-              : `Estrutura equilibrada. Maior ameaça imediata: cluster de longs em $${(closestLong?.price/1000).toFixed(0)}K (−${distLong}% do spot).`
+              : `Estrutura equilibrada. Maior ameaça imediata: cluster de longs em ${closestLong ? `$${(closestLong.price/1000).toFixed(0)}K` : '—'} (−${distLong}% do spot).`
           }
-          reasoning={`Ratio longs/shorts em risco ±10%: ${probLongFlush}% / ${100 - probLongFlush}%. Cluster mais próximo de longs: $${(closestLong?.price/1000).toFixed(0)}K (${fmtM(closestLong?.longs_usd)}). Cluster mais próximo de shorts: $${(closestShort?.price/1000).toFixed(0)}K (${fmtM(closestShort?.shorts_usd)}). Short squeeze requereria rompimento de $${(closestShort?.price/1000).toFixed(0)}K com volume.`}
-          actions={['Monitorar $' + (closestLong?.price/1000).toFixed(0) + 'K', 'Ver Funding Rate', 'Checar OI Delta']}
+          reasoning={`Ratio longs/shorts em risco ±10%: ${probLongFlush}% / ${100 - probLongFlush}%. Cluster mais próximo de longs: ${closestLong ? `$${(closestLong.price/1000).toFixed(0)}K` : '—'} (${fmtM(closestLong?.longs_usd)}). Cluster mais próximo de shorts: ${closestShort ? `$${(closestShort.price/1000).toFixed(0)}K` : '—'} (${fmtM(closestShort?.shorts_usd)}). Short squeeze requereria rompimento de ${closestShort ? `$${(closestShort.price/1000).toFixed(0)}K` : '—'} com volume.`}
+          actions={[closestLong ? 'Monitorar $' + (closestLong.price/1000).toFixed(0) + 'K' : 'Aguardando clusters', 'Ver Funding Rate', 'Checar OI Delta']}
           insight={aiInsightText}
           isLoadingInsight={aiLoading}
           modelLabel={aiInsightText ? 'claude-haiku-4-5' : undefined}
@@ -479,7 +480,7 @@ function CarryCalculator() {
                 </div>
                 <div style={{ width: 80, flexShrink: 0 }}>
                   <div style={{ fontSize: 8, color: '#334155', marginBottom: 1 }}>Preço futuro</div>
-                  <div style={{ fontSize: 11, fontFamily: 'JetBrains Mono, monospace', color: '#e2e8f0', fontWeight: 700 }}>${fx.price.toLocaleString()}</div>
+                  <div style={{ fontSize: 11, fontFamily: 'JetBrains Mono, monospace', color: '#e2e8f0', fontWeight: 700 }}>${(fx.price ?? 0).toLocaleString()}</div>
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
@@ -618,7 +619,7 @@ function TermStructurePanel() {
                   <div style={{ height: '100%', width: `${barW}%`, background: '#a78bfa', opacity: 0.7 }} />
                 </div>
               </div>
-              <div style={{ width: 60, textAlign: 'right', fontSize: 9, color: '#475569', flexShrink: 0 }}>{e.oi_contracts.toLocaleString()} cont.</div>
+              <div style={{ width: 60, textAlign: 'right', fontSize: 9, color: '#475569', flexShrink: 0 }}>{(e.oi_contracts ?? 0).toLocaleString()} cont.</div>
             </div>
           );
         })}
