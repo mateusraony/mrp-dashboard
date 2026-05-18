@@ -339,15 +339,18 @@ export default function SmartAlerts() {
   const { data: fngData } = useFearGreed(1);
   const multiVenue = useMultiVenueSnapshot();
 
-  const _loggedRef = useRef(false);
+  const _loggedRef    = useRef(false);
+  const _errTickerRef = useRef(false);
+  const _errLiqRef    = useRef(false);
+  const _errRiskRef   = useRef(false);
   useEffect(() => {
     if (ticker && riskScore && !_loggedRef.current) {
       _loggedRef.current = true;
       logInfo('SmartAlerts gauges loaded', { funding: ticker.last_funding_rate, riskScore: riskScore.score, riskRegime: riskScore.regime, liqCount: liquidations?.length ?? 0, bybitFunding: multiVenue.bybit?.funding_rate ?? null, okxFunding: multiVenue.okx?.funding_rate ?? null }, 'alerts');
     }
-    if (tickerError) logError('SmartAlerts ticker fetch failed', undefined, 'alerts');
-    if (liqError) logError('SmartAlerts liquidations fetch failed', undefined, 'alerts');
-    if (riskError) logError('SmartAlerts riskScore fetch failed', undefined, 'alerts');
+    if (tickerError && !_errTickerRef.current) { _errTickerRef.current = true; logError('SmartAlerts ticker fetch failed', undefined, 'alerts'); }
+    if (liqError    && !_errLiqRef.current)    { _errLiqRef.current    = true; logError('SmartAlerts liquidations fetch failed', undefined, 'alerts'); }
+    if (riskError   && !_errRiskRef.current)   { _errRiskRef.current   = true; logError('SmartAlerts riskScore fetch failed', undefined, 'alerts'); }
   }, [ticker, riskScore, liquidations, tickerError, liqError, riskError, multiVenue]);
 
   const spotPrice = ticker?.mark_price ?? SPOT_PRICE;
