@@ -14,7 +14,7 @@ import { useState, useEffect } from 'react';
 import { IS_LIVE } from '@/lib/env';
 import { fetchBtcTicker, fetchOiByExchange, fetchKlines, fetchLiquidations, fetchLongShortRatio, fetchFuturesBasis, fetchOiHistory, type BtcTickerData } from '@/services/binance';
 import { fetchDominance, fetchTopAltcoins } from '@/services/coingecko';
-import { fetchFearGreed } from '@/services/alternative';
+import { fetchFearGreed, type FearGreedData } from '@/services/alternative';
 import { subscribeBtcPrice, subscribeStatus } from '@/services/binanceWs';
 import { readModuleFlag } from '@/lib/moduleFlags';
 import { withCache, getStaleCache } from '@/services/marketCache';
@@ -183,17 +183,49 @@ export function useLiquidations(limit = 50) {
   });
 }
 
+const EMPTY_FEAR_GREED: FearGreedData = {
+  value: 0, label: 'Unknown',
+  previous_close: 0, previous_week: 0, previous_month: 0,
+  history: [],
+};
+
 /**
  * useFearGreed — Fear & Greed Index com histórico 30d
- * Atualiza a cada hora em modo live (dado muda ~1x/dia).
+ * Padrão DataState: withCache(3600s) → fallback getStaleCache → isFallback=true.
+ * TTL 1h: dado atualiza ~1x/dia; callers ganham isFallback + lastUpdated.
  */
 export function useFearGreed(limit = 30) {
   return useQuery({
     queryKey: ['sentiment', 'fear-greed', limit],
-    queryFn:  () => fetchFearGreed(limit),
+    queryFn: async (): Promise<DataState<FearGreedData>> => {
+      try {
+        const data = await withCache(
+          `fear-greed:${limit}`,
+          3600,
+          'alternative_me',
+          () => fetchFearGreed(limit),
+        );
+        reportApiRecovery('alternative_me');
+        return { data, lastUpdated: new Date().toISOString(), isFallback: false, debugError: null };
+      } catch (err) {
+        logError('Fear & Greed fetch failed', { error: String(err), limit }, 'fear-greed');
+        reportApiFailure('alternative_me');
+        const stale = await getStaleCache<FearGreedData>(`fear-greed:${limit}`);
+        if (stale) {
+          return { data: stale.value, lastUpdated: stale.updatedAt.toISOString(), isFallback: true, debugError: String(err) };
+        }
+        return { data: null, lastUpdated: null, isFallback: true, debugError: String(err) };
+      }
+    },
     staleTime: 3_500_000,
     refetchInterval: FNG_INTERVAL,
-    enabled:  readModuleFlag('ENABLE_FEAR_GREED'),
+    retry: 2,
+    retryDelay: (attempt: number) => Math.min(1000 * 2 ** attempt, 10_000),
+    enabled: readModuleFlag('ENABLE_FEAR_GREED'),
+    select: (state: DataState<FearGreedData>) => {
+      const data = state.data ?? EMPTY_FEAR_GREED;
+      return { ...data, isFallback: state.isFallback, lastUpdated: state.lastUpdated };
+    },
   });
 }
 
