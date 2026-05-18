@@ -35,7 +35,9 @@ function subscribe(fn: (s: AiHealthState) => void) {
 
 // ─── Probe (chamada com payload mínimo) ────────────────────────────────────────
 
-let _probed = false;
+let _probed          = false;
+let _nextRetryAt     = 0;
+const RETRY_BACKOFF  = 5 * 60 * 1000; // 5 min entre retries após falha
 
 export async function probeAiHealth(): Promise<void> {
   if (_probed) return;
@@ -43,6 +45,9 @@ export async function probeAiHealth(): Promise<void> {
     setState({ status: 'disabled', latencyMs: null, error: null, checkedAt: null });
     return;
   }
+  // Respeita backoff após falha anterior
+  if (Date.now() < _nextRetryAt) return;
+
   _probed = true;
   setState({ status: 'loading', latencyMs: null, error: null, checkedAt: null });
 
@@ -54,7 +59,8 @@ export async function probeAiHealth(): Promise<void> {
       method:  'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
       body:    JSON.stringify({ riskScore: 50, riskRegime: 'NEUTRO', fearGreedValue: 50, fearGreedLabel: 'Neutral', fundingRate: 0, page: 'health_check' }),
-      signal:  AbortSignal.timeout(12_000),
+      // 20s para cobrir cold start da Edge Function (Supabase spin-up pode levar 10-15s)
+      signal:  AbortSignal.timeout(20_000),
     });
     const latencyMs = Date.now() - t0;
     if (!res.ok) {
@@ -62,16 +68,23 @@ export async function probeAiHealth(): Promise<void> {
       const msg = `HTTP ${res.status}: ${(err.error as string | undefined) ?? res.statusText}`;
       setState({ status: 'error', latencyMs, error: msg, checkedAt: new Date().toISOString() });
       logError('Claude AI health check failed', { msg }, 'ai-health');
+      _probed = false;
+      _nextRetryAt = Date.now() + RETRY_BACKOFF;
       return;
     }
     setState({ status: 'ok', latencyMs, error: null, checkedAt: new Date().toISOString() });
     logInfo(`Claude AI online · ${latencyMs}ms`, { latencyMs }, 'ai-health');
   } catch (e) {
     const latencyMs = Date.now() - t0;
-    const msg = e instanceof Error ? e.message : String(e);
+    const isTimeout = e instanceof Error && (e.name === 'TimeoutError' || e.name === 'AbortError');
+    const msg = isTimeout ? `Timeout (${Math.round(latencyMs / 1000)}s) — Edge Function em cold start` : (e instanceof Error ? e.message : String(e));
     setState({ status: 'error', latencyMs, error: msg, checkedAt: new Date().toISOString() });
-    logError('Claude AI health check exception', { msg }, 'ai-health');
-    _probed = false; // permite retry em próxima montagem
+    // Só persiste no Supabase se não for timeout (cold start é esperado)
+    if (!isTimeout) {
+      logError('Claude AI health check exception', { msg }, 'ai-health');
+    }
+    _probed = false;
+    _nextRetryAt = Date.now() + RETRY_BACKOFF;
   }
 }
 

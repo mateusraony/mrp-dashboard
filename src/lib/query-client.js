@@ -3,20 +3,22 @@ import { reportApiFailure, reportApiRecovery } from './apiHealthMonitor';
 
 // Mapa de queryKey[0] → nome da fonte no SOURCE_REGISTRY
 const QUERY_KEY_TO_SOURCE = {
-  btc:       'binance_futures',
-  market:    'coingecko',
-  sentiment: 'alternative_me',
-  gdelt:     'gdelt',
-  macro:     'fred',
-  onchain:   'coinmetrics',
-  mempool:   'mempool_basic',
-  options:   'deribit',
-  multi:     'multi_venue',
-  risk:      'risk_score',
-  supabase:  'supabase',
-  altcoins:  'coingecko',
-  bcb:       'bcb',
-  venue:     'multi_venue',
+  btc:         'binance_futures',
+  market:      'coingecko',
+  sentiment:   'alternative_me',
+  gdelt:       'gdelt',
+  macro:       'fred',
+  onchain:     'coinmetrics',
+  mempool:     'mempool_basic',
+  options:     'deribit',
+  multi:       'multi_venue',
+  risk:        'risk_score',
+  supabase:    'supabase',
+  altcoins:    'coingecko',
+  bcb:         'bcb',
+  venue:       'multi_venue',
+  'ai-insight': 'ai-insight',
+  regime:      'supabase',
 };
 
 export const queryClientInstance = new QueryClient({
