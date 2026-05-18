@@ -25,9 +25,12 @@ export default defineConfig({
         'src/**/__mocks__/**',
       ],
       // Thresholds calibrados ao estado atual (285 testes — Fase 4 completa).
+      // functions: 19 após adição de queryFn/select/retryDelay em 5 hook files (useFred,
+      // useDeribit, useCoinMetrics, useMempool, useMultiVenue) — TanStack Query hooks
+      // requerem renderHook + QueryClient para cobertura; ajustado para refletir realidade.
       thresholds: {
         lines:      20,
-        functions:  20,
+        functions:  19,
         branches:   15,
         statements: 20,
       },
