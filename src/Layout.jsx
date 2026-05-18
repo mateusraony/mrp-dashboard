@@ -504,6 +504,15 @@ export default function Layout({ children, currentPageName }) {
               {wsConnected ? 'WS' : btcIsLive ? 'REST' : 'MOCK'}
             </span>
           </div>
+          {/* Staleness indicator — visível somente quando ticker vem do cache Supabase */}
+          {ticker?.isFallback && (
+            <div
+              title={ticker.lastUpdated ? `Cache de ${new Date(ticker.lastUpdated).toLocaleString('pt-BR')}` : 'Dados em cache — API indisponível'}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 9, color: '#f59e0b', cursor: 'help' }}
+            >
+              ⚠ Cache{ticker.lastUpdated ? ` · ${new Date(ticker.lastUpdated).toLocaleDateString('pt-BR')}` : ''}
+            </div>
+          )}
 
           {/* Claude AI status */}
           {aiHealth.status !== 'disabled' && (() => {
