@@ -46,16 +46,17 @@ function SummaryCard({ label, value, sub, color = '#e2e8f0' }) {
   );
 }
 
-// BTC holdings por ETF — última atualização pública (SEC filings, etf.com)
-// Atualizado 2026-05-16 — AUM estimado = holdings × preço live BTC
-const ETF_BTC_HOLDINGS = {
-  IBIT: 572_000,   // BlackRock iShares Bitcoin Trust
-  FBTC: 195_000,   // Fidelity Wise Origin Bitcoin
-  ARKB:  50_000,   // ARK 21Shares Bitcoin ETF
-  BITB:  42_000,   // Bitwise Bitcoin ETF
-  GBTC: 200_000,   // Grayscale Bitcoin Trust
-  HODL:  24_000,   // VanEck
-  BTCO:  25_000,   // Invesco
+// BTC holdings por ETF — fallback estático (SEC filings/etf.com)
+// Usado apenas quando SoSoValue não retorna btc_holdings nem aum_b.
+// Atualizado 2026-05-18 — valores estimados a partir de filings públicos.
+const ETF_BTC_HOLDINGS_FALLBACK = {
+  IBIT: 620_000,   // BlackRock iShares Bitcoin Trust
+  FBTC: 215_000,   // Fidelity Wise Origin Bitcoin
+  ARKB:  58_000,   // ARK 21Shares Bitcoin ETF
+  BITB:  50_000,   // Bitwise Bitcoin ETF
+  GBTC: 183_000,   // Grayscale Bitcoin Trust (declínio pós-conversão)
+  HODL:  28_000,   // VanEck
+  BTCO:  28_000,   // Invesco
 };
 
 export function ETFContent() {
@@ -88,16 +89,21 @@ export function ETFContent() {
     : etfFlows;
 
   // Enriquece cada fundo com AUM estimado via preço live (quando SoSoValue não tem AUM)
+  // Hierarquia: SoSoValue AUM > SoSoValue btc_holdings × price > static fallback × price > mock
   const fundsWithLiveAum = d.funds.map(f => {
-    const hasRealAum = sosoAvailable && f.aum_b > 0;
+    const hasRealAum      = sosoAvailable && f.aum_b > 0;
+    const liveBtcHoldings = sosoAvailable && f.btc_holdings > 0 ? f.btc_holdings : null;
+    const holdings        = liveBtcHoldings ?? ETF_BTC_HOLDINGS_FALLBACK[f.ticker] ?? 0;
     return {
       ...f,
-      aum_b: hasRealAum ? f.aum_b
-        : (livePrice && ETF_BTC_HOLDINGS[f.ticker]
-            ? (ETF_BTC_HOLDINGS[f.ticker] * livePrice) / 1e9
-            : f.aum_b),
-      aum_is_live: hasRealAum || !!(livePrice && ETF_BTC_HOLDINGS[f.ticker]),
-      aum_source:  hasRealAum ? 'SoSoValue' : (livePrice ? 'Binance×SEC' : 'mock'),
+      aum_b: hasRealAum
+        ? f.aum_b
+        : (livePrice && holdings > 0 ? (holdings * livePrice) / 1e9 : f.aum_b),
+      aum_is_live: hasRealAum || !!(livePrice && liveBtcHoldings),
+      aum_source: hasRealAum       ? 'SoSoValue'
+        : (livePrice && liveBtcHoldings ? 'SoSoValue×BTC'
+          : livePrice                   ? 'SEC×BTC'
+          : 'mock'),
     };
   });
 
