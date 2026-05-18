@@ -2,6 +2,7 @@
 // Visualiza clusters de liquidação por faixa de preço
 import { liquidationClusters as mockClusters } from '../../components/data/mockDataExtended';
 import { ModeBadge, GradeBadge } from '../ui/DataBadge';
+import { DataTrustBadge } from '../ui/DataTrustBadge';
 import { useLiquidations } from '@/hooks/useBtcData';
 import { useBtcTicker } from '@/hooks/useBtcData';
 
@@ -69,9 +70,13 @@ export default function LiquidationHeatmap() {
             <ModeBadge mode={usingLive ? 'live' : 'mock'} />
             <GradeBadge grade={d.quality} />
             {!usingLive && (
-              <span style={{ fontSize: 10, padding: '2px 6px', background: '#1e2d45', color: '#64748b', borderRadius: 4, border: '1px solid #2a3f5f' }}>
-                DEMO — endpoint requer auth
-              </span>
+              <DataTrustBadge
+                mode="paid_required"
+                confidence="D"
+                source="Binance Futures API"
+                sourceUrl="https://www.binance.com/en/support/faq/how-to-create-api-keys-on-binance-360002502072"
+                reason="Clustering de liquidações requer Binance API Key com permissão Futures. Cadastro gratuito em binance.com."
+              />
             )}
           </div>
           <div style={{ fontSize: 11, color: '#475569' }}>
@@ -162,6 +167,13 @@ export default function LiquidationHeatmap() {
           <span>Longs em risco se -10%: <span style={{ color: '#ef4444', fontFamily: 'JetBrains Mono, monospace', fontWeight: 700 }}>${(d.total_longs_at_risk_10pct / 1e9).toFixed(2)}B</span></span>
           <span>Shorts em risco se +10%: <span style={{ color: '#10b981', fontFamily: 'JetBrains Mono, monospace', fontWeight: 700 }}>${(d.total_shorts_at_risk_10pct / 1e9).toFixed(2)}B</span></span>
         </div>
+
+        {!usingLive && (
+          <div style={{ marginTop: 10, padding: '6px 10px', borderRadius: 6, background: 'rgba(249,115,22,0.06)', border: '1px solid rgba(249,115,22,0.18)', fontSize: 10, color: '#78716c', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+            <span>🔒 Dados simulados — configure uma Binance API Key para clustering real</span>
+            <a href="https://www.binance.com/en/support/faq/how-to-create-api-keys-on-binance-360002502072" target="_blank" rel="noopener noreferrer" style={{ color: '#f97316', textDecoration: 'none', fontWeight: 700, whiteSpace: 'nowrap' }}>Ver como →</a>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -5,6 +5,7 @@ import { useState, useMemo } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip, ReferenceLine, ResponsiveContainer } from 'recharts';
 import { btcCorrelations } from '../data/mockData';
 import { HelpIcon } from '../ui/Tooltip';
+import { DataTrustBadge } from '../ui/DataTrustBadge';
 import { useKlines } from '@/hooks/useBtcData';
 
 const WINDOWS = ['1d', '1w', '1m'];
@@ -175,9 +176,13 @@ export default function CorrelationChart({ klines: klinesProp = null }) {
               width={280}
             />
             {!isLive && (
-              <span style={{ fontSize: 9, padding: '2px 6px', background: '#1e2d45', color: '#64748b', borderRadius: 4, border: '1px solid #2a3f5f', marginLeft: 4 }}>
-                DEMO
-              </span>
+              <DataTrustBadge
+                mode="paid_required"
+                confidence="C"
+                source="FRED + Binance"
+                sourceUrl="https://fred.stlouisfed.org"
+                reason="Correlações BTC calculadas com klines Binance (grátis) + séries FRED (requer FRED API Key em Supabase Secrets)."
+              />
             )}
           </div>
           <div style={{ fontSize: 10, color: '#334155', marginTop: 2 }}>

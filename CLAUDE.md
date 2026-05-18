@@ -194,6 +194,37 @@ vitest.config.ts
 - **Amarelo:** `#f59e0b` (warning/neutro)
 - **Fonte mono:** `JetBrains Mono, monospace` (números e dados)
 
+### Regra obrigatória: Padrão para dados que requerem API paga ou autenticação
+
+**NUNCA usar spans inline com texto "DEMO" ou componentes `DemoBadge` locais.**
+
+Sempre que um componente exibir dados que requerem API paga, autenticação ou chave de API não configurada:
+
+1. **Badge no header do card:**
+   ```jsx
+   <DataTrustBadge
+     mode="paid_required"
+     confidence="D"
+     source="NomeProvider"
+     sourceUrl="https://provider.com/pricing"
+     reason="Explicação curta do que é necessário e custo estimado."
+   />
+   ```
+
+2. **Banner no rodapé do card (obrigatório):**
+   ```jsx
+   <div style={{ marginTop: 10, padding: '6px 10px', borderRadius: 6, background: 'rgba(249,115,22,0.06)', border: '1px solid rgba(249,115,22,0.18)', fontSize: 10, color: '#78716c', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+     <span>🔒 Dados simulados — {motivo}</span>
+     <a href={sourceUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#f97316', textDecoration: 'none', fontWeight: 700, whiteSpace: 'nowrap' }}>Ver planos →</a>
+   </div>
+   ```
+
+3. **Registrar em `SOURCE_REGISTRY`** (`src/utils/dataStatus.ts`) com `staticMode: 'paid_required'` e `staticConfidence: 'D'`.
+
+4. **Referência de implementação:** `src/pages/OnChain.jsx` (PaidRequiredCard) e todos os componentes de opções em `src/components/options/`.
+
+---
+
 ### Estrutura de Páginas (target após refactor)
 ```
 VISÃO GERAL
