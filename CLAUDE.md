@@ -18,6 +18,94 @@ Antes de declarar uma tarefa como "concluída", "corrigida" ou "pronta":
 
 ---
 
+## 🔄 REGRA DE OURO #1: SINCRONIZAÇÃO DUPLA COM FALLBACK SEGURO
+
+Toda requisição a APIs externas deve seguir este fluxo obrigatório — **sem exceção**.
+Proibido renderizar tela sem validar o estado de fallback.
+
+### Interface padrão obrigatória
+```typescript
+interface DataState<T> {
+  data:        T | null;
+  lastUpdated: string | null;  // ISO string da última atualização bem-sucedida
+  isFallback:  boolean;        // true = dado vem do cache Supabase, não da API ao vivo
+  debugError:  string | null;
+}
+```
+
+### Fluxo 1 — API Online (Sucesso)
+1. `apiFetch()` busca dado fresco da API externa (com retry automático de 5xx via backoff).
+2. `withCache<T>()` persiste no Supabase `market_cache` de forma assíncrona (fire-and-forget, TTL configurado por fonte).
+3. Renderizar diretamente o dado retornado — **não** fazer read do Supabase depois do write (latência desnecessária).
+4. `isFallback = false`.
+
+### Fluxo 2 — API Offline / Erro (Fallback)
+1. Capturar o erro com `logError(msg, { url, timestamp, error }, 'source-tag')` — persiste em `system_logs`.
+2. Buscar último valor válido via `withCache<T>()` (retorna do `market_cache` com `lastUpdated`).
+3. Renderizar o dado antigo com `isFallback = true` + indicador visual de staleness.
+4. **A tela nunca pode quebrar ou ficar em branco.**
+
+### Fluxo 3 — Hard Refresh (F5 / Navegação)
+1. TanStack Query limpa o estado local automaticamente em `refetchOnMount`.
+2. Nova tentativa à API é disparada; se bem-sucedida, `withCache` atualiza o Supabase.
+3. Resultado renderizado é sempre o mais recente disponível.
+
+### Indicador visual de staleness (obrigatório quando `isFallback = true`)
+```tsx
+// Componente padrão — usar em qualquer card que exiba dado de fallback
+{isFallback && lastUpdated && (
+  <div title={`Última atualização: ${new Date(lastUpdated).toLocaleString('pt-BR')}`}
+    style={{ display:'inline-flex', alignItems:'center', gap:4, fontSize:9,
+             color:'#f59e0b', cursor:'help' }}>
+    ⚠ Cache · {new Date(lastUpdated).toLocaleDateString('pt-BR')}
+  </div>
+)}
+```
+Alternativa: usar `DataTrustBadge mode="error"` com `reason` descrevendo o fallback.
+
+### Utilitários existentes (usar — não reimplementar)
+| Necessidade | Utilitário | Arquivo |
+|---|---|---|
+| Fetch com retry | `apiFetch(url, opts?)` | `src/lib/apiClient.ts` |
+| Cache Supabase com TTL | `withCache<T>(key, ttl, source, fetcher, validate?)` | `src/services/marketCache.ts` |
+| Log de erro para Supabase | `logError(msg, ctx, tag)` | `src/lib/debugLog.ts` |
+| Log de aviso | `logWarn(msg, ctx, tag)` | `src/lib/debugLog.ts` |
+| Monitoramento de saúde | `reportApiFailure(source)` | `src/lib/apiHealthMonitor.ts` |
+
+### Regras complementares
+- **Nunca** usar `console.error` direto — sempre `logError()` que persiste no Supabase.
+- **Nunca** fazer upsert manual em todo tick de API — usar `withCache` com TTL adequado.
+- **Nunca** deixar `catch` vazio — sempre logar e tentar fallback do cache.
+- Dados que atualizam < 30s (BTC price, funding): TTL 30s no cache.
+- Dados diários (FRED, CoinMetrics): TTL 3600s (1h) ou 86400s (1d) no cache.
+- Dados do usuário (alertas, portfólio, settings): vão diretamente ao Supabase — não passam por `withCache`.
+
+### Exemplo de hook conforme padrão
+```typescript
+export function useBtcTickerWithFallback() {
+  return useQuery({
+    queryKey: ['btc', 'ticker'],
+    queryFn: async (): Promise<DataState<BtcTickerData>> => {
+      try {
+        const data = await withCache('btc:ticker', 30, 'binance_futures', fetchBtcTicker);
+        return { data, lastUpdated: new Date().toISOString(), isFallback: false, debugError: null };
+      } catch (err) {
+        logError('BTC ticker fetch failed', { error: String(err) }, 'btc-ticker');
+        reportApiFailure('binance_futures');
+        // withCache já tentou o cache; se lançou, retornar estado de erro com dado null
+        return { data: null, lastUpdated: null, isFallback: true, debugError: String(err) };
+      }
+    },
+    staleTime: 4_000,
+    refetchInterval: IS_LIVE ? 5_000 : false,
+    retry: 2,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 10_000),
+  });
+}
+```
+
+---
+
 ## 🏗 CONTEXTO DO PROJETO
 
 ### O que é
