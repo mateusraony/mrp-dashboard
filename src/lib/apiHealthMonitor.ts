@@ -5,6 +5,9 @@
  * Quando ≥3 fontes falham simultaneamente → dispara alerta crítico
  * via logError() que persiste automaticamente no Supabase system_logs.
  *
+ * Throttle: máximo 1 log crítico por 30 minutos para evitar spam quando
+ * APIs persistentemente falhas causam oscilações no contador.
+ *
  * Uso:
  *   reportApiFailure('binance_futures')  // chamado pelo query-client ao detectar erro
  *   reportApiRecovery('binance_futures') // chamado ao sucesso
@@ -13,31 +16,35 @@
 
 import { logError, logWarn, logInfo } from './debugLog';
 
-const CRITICAL_THRESHOLD = 3;
+const CRITICAL_THRESHOLD      = 3;
+const CRITICAL_LOG_INTERVAL   = 30 * 60 * 1000; // 30 min entre logs críticos
 
 // Set de fontes atualmente em falha (sem duplicatas)
 const _failedSources = new Set<string>();
 
-// Evita spam de logError crítico: só loga quando o conjunto muda de estado
-let _lastCriticalSize = 0;
+// Throttle: timestamp do último logError crítico
+let _lastCriticalLogAt = 0;
 
 /**
  * Reporta falha de uma fonte de dados.
- * - Se ≥3 fontes falharam → logError crítico (persiste no Supabase)
- * - Caso contrário → logWarn local
+ * - Se ≥3 fontes falharam e passaram 30 min do último log → logError crítico
+ * - Caso contrário → logWarn local (não persiste no Supabase)
  */
 export function reportApiFailure(source: string): void {
   _failedSources.add(source);
   const count = _failedSources.size;
 
-  if (count >= CRITICAL_THRESHOLD && count !== _lastCriticalSize) {
-    _lastCriticalSize = count;
-    logError(
-      `CRÍTICO: ${count} APIs em fallback simultâneo`,
-      { sources: Array.from(_failedSources), count },
-      'health-monitor',
-    );
-  } else if (count < CRITICAL_THRESHOLD) {
+  if (count >= CRITICAL_THRESHOLD) {
+    const now = Date.now();
+    if (now - _lastCriticalLogAt > CRITICAL_LOG_INTERVAL) {
+      _lastCriticalLogAt = now;
+      logError(
+        `CRÍTICO: ${count} APIs em fallback simultâneo`,
+        { sources: Array.from(_failedSources), count },
+        'health-monitor',
+      );
+    }
+  } else {
     logWarn(`API em fallback: ${source}`, { total_failed: count }, 'health-monitor');
   }
 }
@@ -52,7 +59,6 @@ export function reportApiRecovery(source: string): void {
   const count = _failedSources.size;
 
   if (wasAboveThreshold && count < CRITICAL_THRESHOLD) {
-    _lastCriticalSize = count;
     logInfo(
       `Sistema saiu do estado crítico: ${count} fonte(s) em falha`,
       { sources: Array.from(_failedSources) },
