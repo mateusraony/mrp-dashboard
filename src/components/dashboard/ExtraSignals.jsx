@@ -5,6 +5,7 @@ import { HelpIcon } from '../ui/Tooltip';
 import MiniTimeChart from './MiniTimeChart';
 import CorrelationChart from './CorrelationChart';
 import { IS_LIVE } from '@/lib/env';
+import { DataTrustBadge } from '../ui/DataTrustBadge';
 import { useDominance, useLiquidations } from '@/hooks/useBtcData';
 import { useStablecoinData } from '@/hooks/useStablecoin';
 import { useYieldCurve } from '@/hooks/useFred';
@@ -82,14 +83,6 @@ function LiveBadge() {
   return (
     <span style={{ fontSize: 9, fontWeight: 700, color: '#10b981', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.25)', borderRadius: 4, padding: '1px 5px', letterSpacing: '0.04em' }}>
       ● LIVE
-    </span>
-  );
-}
-
-function DemoBadge() {
-  return (
-    <span style={{ fontSize: 9, fontWeight: 700, color: '#f59e0b', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: 4, padding: '1px 5px', letterSpacing: '0.04em' }}>
-      DEMO
     </span>
   );
 }
@@ -340,16 +333,23 @@ function CreditSpreadCard() {
         inverted={true}
         formatter={(v) => `${v}bp`}
       />
-      <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap', alignItems: 'center' }}>
         <DeltaBadge val={d.delta_7d_bp} suffix="bp" label="7d" decimals={0} />
         <DeltaBadge val={d.delta_30d_bp} suffix="bp" label="30d" decimals={0} />
         <span style={{ fontSize: 10, background: `${color}12`, color, border: `1px solid ${color}25`, borderRadius: 4, padding: '2px 6px', fontWeight: 700 }}>
           {isWidening ? '↑ Widening' : d.regime === 'tightening' ? '↓ Tightening' : '→ Stable'}
         </span>
-        <DemoBadge />
+        <DataTrustBadge
+          mode="paid_required"
+          confidence="D"
+          source="FRED / Bloomberg"
+          sourceUrl="https://fred.stlouisfed.org/series/BAMLH0A0HYM2"
+          reason="HY Credit Spread (OAS) — série BAMLH0A0HYM2. Disponível via FRED API Key (gratuita) ou Bloomberg Terminal."
+        />
       </div>
-      <div style={{ marginTop: 6, fontSize: 10, color: '#475569' }}>
-        DEMO — API requer Bloomberg/FRED premium
+      <div style={{ marginTop: 10, padding: '6px 10px', borderRadius: 6, background: 'rgba(249,115,22,0.06)', border: '1px solid rgba(249,115,22,0.18)', fontSize: 10, color: '#78716c', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <span>🔒 Dados simulados — HY Credit Spread requer FRED API Key ou Bloomberg</span>
+        <a href="https://fred.stlouisfed.org/series/BAMLH0A0HYM2" target="_blank" rel="noopener noreferrer" style={{ color: '#f97316', textDecoration: 'none', fontWeight: 700, whiteSpace: 'nowrap' }}>Ver no FRED →</a>
       </div>
     </SignalCard>
   );
@@ -364,7 +364,7 @@ export default function ExtraSignals() {
         <span style={{ color: '#10b981', fontWeight: 700 }}>● LIVE</span>
         <span>BTC Dominância (CoinGecko) · Stablecoins (DeFiLlama) · Yield Curve (FRED)</span>
         <span style={{ color: '#475569', marginLeft: 4 }}>·</span>
-        <DemoBadge />
+        <span style={{ color: '#f97316', fontWeight: 700 }}>🔒</span>
         <span>HY Credit Spread</span>
       </div>
       <div style={{

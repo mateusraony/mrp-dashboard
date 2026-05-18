@@ -2,6 +2,7 @@
 // Curva de Volatilidade Implícita ATM por prazo de vencimento
 import { termStructure as mockTermStructure } from '../../components/data/mockDataExtended';
 import { ModeBadge, GradeBadge } from '../ui/DataBadge';
+import { DataTrustBadge } from '../ui/DataTrustBadge';
 import { XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Area, AreaChart,
 } from 'recharts';
@@ -155,9 +156,13 @@ export default function TermStructure({ optionsData }) {
             <div style={{ fontSize: 14, fontWeight: 700, color: '#e2e8f0' }}>Term Structure — IV ATM</div>
             <ModeBadge mode="mock" />
             <GradeBadge grade={d.quality} />
-            <span style={{ fontSize: 10, paddingLeft: 4, paddingRight: 4, paddingTop: 2, paddingBottom: 2, background: '#1e2d45', color: '#64748b', borderRadius: 4, border: '1px solid #2a3f5f' }}>
-              DEMO
-            </span>
+            <DataTrustBadge
+              mode="paid_required"
+              confidence="D"
+              source="Deribit"
+              sourceUrl="https://www.deribit.com/pages/information/api"
+              reason="Term Structure histórica requer conta Deribit com dados completos de vencimentos."
+            />
           </div>
           <div style={{ fontSize: 11, color: '#475569' }}>Curva de volatilidade implícita por prazo · Deribit BTC</div>
         </div>
@@ -221,6 +226,11 @@ export default function TermStructure({ optionsData }) {
       }}>
         <span style={{ color: struct.color, fontWeight: 700 }}>⚡ {struct.label}: </span>
         {d.interpretation}
+      </div>
+
+      <div style={{ marginTop: 10, padding: '6px 10px', borderRadius: 6, background: 'rgba(249,115,22,0.06)', border: '1px solid rgba(249,115,22,0.18)', fontSize: 10, color: '#78716c', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <span>🔒 Dados simulados — conecte conta Deribit para Term Structure real</span>
+        <a href="https://www.deribit.com/pages/information/api" target="_blank" rel="noopener noreferrer" style={{ color: '#f97316', textDecoration: 'none', fontWeight: 700, whiteSpace: 'nowrap' }}>Ver API →</a>
       </div>
     </div>
   );

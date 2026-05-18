@@ -1,6 +1,7 @@
 // ─── IV RANK / IV PERCENTILE PANEL ───────────────────────────────────────────
 import { ivRank as mockIvRank } from '../../components/data/mockDataExtended';
 import { GradeBadge } from '../ui/DataBadge';
+import { DataTrustBadge } from '../ui/DataTrustBadge';
 import { HelpIcon } from '../ui/Tooltip';
 import MiniTimeChart from '../dashboard/MiniTimeChart';
 
@@ -54,9 +55,13 @@ export default function IVRankPanel({ optionsData }) {
             width={300}
           />
           {!isLive && (
-            <span style={{ fontSize: 10, padding: '2px 6px', background: '#1e2d45', color: '#64748b', borderRadius: 4, border: '1px solid #2a3f5f' }}>
-              DEMO
-            </span>
+            <DataTrustBadge
+              mode="paid_required"
+              confidence="D"
+              source="Deribit"
+              sourceUrl="https://www.deribit.com/pages/information/api"
+              reason="IV Rank 52 semanas requer histórico completo de IV ATM via Deribit."
+            />
           )}
         </div>
         <GradeBadge grade={d.quality} />
@@ -123,6 +128,13 @@ export default function IVRankPanel({ optionsData }) {
         <span style={{ color: zone.color, fontWeight: 700 }}>Estratégia: </span>
         <span style={{ color: '#64748b' }}>{zone.action}. {d.signal}</span>
       </div>
+
+      {!isLive && (
+        <div style={{ marginTop: 10, padding: '6px 10px', borderRadius: 6, background: 'rgba(249,115,22,0.06)', border: '1px solid rgba(249,115,22,0.18)', fontSize: 10, color: '#78716c', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <span>🔒 Dados simulados — IV Rank 52 semanas requer conta Deribit</span>
+          <a href="https://www.deribit.com/pages/information/api" target="_blank" rel="noopener noreferrer" style={{ color: '#f97316', textDecoration: 'none', fontWeight: 700, whiteSpace: 'nowrap' }}>Ver API →</a>
+        </div>
+      )}
     </div>
   );
 }

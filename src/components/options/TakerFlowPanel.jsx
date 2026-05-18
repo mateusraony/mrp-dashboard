@@ -2,6 +2,7 @@
 // Buy Call / Sell Call / Buy Put / Sell Put premium flows
 import { optionsTakerFlow as mockTakerFlow } from '../../components/data/mockDataExtended';
 import { ModeBadge, GradeBadge } from '../ui/DataBadge';
+import { DataTrustBadge } from '../ui/DataTrustBadge';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip,
   ResponsiveContainer, Cell,
@@ -66,9 +67,13 @@ export default function TakerFlowPanel({ optionsData }) {
             <ModeBadge mode={hasLiveData ? 'live' : 'mock'} />
             <GradeBadge grade={d.quality} />
             {!hasLiveData && (
-              <span style={{ fontSize: 10, padding: '2px 6px', background: '#1e2d45', color: '#64748b', borderRadius: 4, border: '1px solid #2a3f5f' }}>
-                DEMO — sem API gratuita
-              </span>
+              <DataTrustBadge
+                mode="paid_required"
+                confidence="D"
+                source="Deribit"
+                sourceUrl="https://www.deribit.com/pages/information/api"
+                reason="Options Taker Flow requer acesso a dados de fluxo de prêmio via Deribit API."
+              />
             )}
           </div>
           <div style={{ fontSize: 11, color: '#475569' }}>Premium líquido 24h · Buy vs Sell por tipo · Deribit</div>
@@ -163,6 +168,13 @@ export default function TakerFlowPanel({ optionsData }) {
       }}>
         {d.signal}
       </div>
+
+      {!hasLiveData && (
+        <div style={{ marginTop: 10, padding: '6px 10px', borderRadius: 6, background: 'rgba(249,115,22,0.06)', border: '1px solid rgba(249,115,22,0.18)', fontSize: 10, color: '#78716c', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <span>🔒 Dados simulados — Options Taker Flow requer conta Deribit</span>
+          <a href="https://www.deribit.com/pages/information/api" target="_blank" rel="noopener noreferrer" style={{ color: '#f97316', textDecoration: 'none', fontWeight: 700, whiteSpace: 'nowrap' }}>Ver API →</a>
+        </div>
+      )}
     </div>
   );
 }
