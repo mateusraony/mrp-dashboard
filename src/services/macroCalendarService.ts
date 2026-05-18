@@ -120,6 +120,19 @@ const FOMC_2026: Array<{ date: string; time_et: string; note: string }> = [
   { date: '2026-12-16', time_et: '14:00', note: 'FOMC + SEP + Coletiva' },
 ];
 
+// ─── Datas FOMC 2027 — estimadas com base no padrão histórico do Fed ─────────
+// Datas oficiais serão anunciadas em Nov 2026; atualizar quando publicadas.
+const FOMC_2027: Array<{ date: string; time_et: string; note: string }> = [
+  { date: '2027-01-27', time_et: '14:00', note: 'FOMC + Coletiva (Estimado)' },
+  { date: '2027-03-17', time_et: '14:00', note: 'FOMC + SEP + Coletiva (Estimado)' },
+  { date: '2027-05-05', time_et: '14:00', note: 'FOMC + Coletiva (Estimado)' },
+  { date: '2027-06-16', time_et: '14:00', note: 'FOMC + SEP + Coletiva (Estimado)' },
+  { date: '2027-07-28', time_et: '14:00', note: 'FOMC + Coletiva (Estimado)' },
+  { date: '2027-09-15', time_et: '14:00', note: 'FOMC + SEP + Coletiva (Estimado)' },
+  { date: '2027-11-03', time_et: '14:00', note: 'FOMC + Coletiva (Estimado)' },
+  { date: '2027-12-15', time_et: '14:00', note: 'FOMC + SEP + Coletiva (Estimado)' },
+];
+
 // ─── Catálogo de eventos com mapeamento FRED ──────────────────────────────────
 
 interface CatalogEntry {
@@ -598,9 +611,9 @@ function buildMockEvents(): MacroCalendarEvent[] {
  * Em mock mode ou sem Supabase configurado → retorna eventos mock com datas calculadas.
  * Em live mode com Supabase configurado → busca FRED release dates + últimas observações via fred-proxy.
  *
- * Eventos FOMC sempre vêm de datas estáticas 2026 (hardcoded, mais confiável que FRED).
+ * Eventos FOMC vêm de datas estáticas 2026 (oficiais) + 2027 (estimativas, pendentes anúncio Nov 2026).
  */
-/** Constrói eventos FOMC a partir das datas estáticas 2026. */
+/** Constrói eventos FOMC a partir das datas estáticas 2026 + estimativas 2027. */
 async function buildFomcEvents(
   actualsDb: Map<string, { actual: number; source: string }>,
 ): Promise<MacroCalendarEvent[]> {
@@ -610,7 +623,9 @@ async function buildFomcEvents(
   const fedFundsObs = await fetchObservations('FEDFUNDS', 4).catch(() => []);
   const fedFundsPrev = formatPrevious('US_FOMC', fedFundsObs, false);
 
-  return FOMC_2026.filter(f => f.date >= cutoff).map(fomc => {
+  const ALL_FOMC = [...FOMC_2026, ...FOMC_2027];
+
+  return ALL_FOMC.filter(f => f.date >= cutoff).map(fomc => {
     const { utc, brt } = etToBrt(fomc.date, fomc.time_et);
     const dbActual = actualsDb.get(`US_FOMC|${utc}`);
     return {
