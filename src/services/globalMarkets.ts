@@ -160,22 +160,22 @@ function mockGlobalMarkets(): GlobalMarketsData {
   const now = Date.now();
   return {
     fxRates: [
-      { pair: 'EUR/USD', value: 1.085, delta_1d:  0.001, delta_7d: -0.005, delta_30d:  0.012, source: 'FRED', series_id: 'DEXUSEU' },
-      { pair: 'USD/JPY', value: 149.5, delta_1d: -0.002, delta_7d:  0.008, delta_30d: -0.015, source: 'FRED', series_id: 'DEXJPUS' },
-      { pair: 'GBP/USD', value: 1.265, delta_1d:  0.002, delta_7d:  0.003, delta_30d:  0.005, source: 'FRED', series_id: 'DEXUSUK' },
-      { pair: 'USD/CNY', value: 7.240, delta_1d:  0.001, delta_7d: -0.003, delta_30d:  0.010, source: 'FRED', series_id: 'DEXCHUS' },
-      { pair: 'USD/BRL', value: 5.720, delta_1d: -0.003, delta_7d:  0.012, delta_30d:  0.025, source: 'BCB',  series_id: 'BCB-1'   },
+      { pair: 'EUR/USD', value: 1.126, delta_1d:  0.001, delta_7d:  0.008, delta_30d:  0.022, source: 'FRED', series_id: 'DEXUSEU' },
+      { pair: 'USD/JPY', value: 144.2, delta_1d: -0.003, delta_7d: -0.012, delta_30d: -0.025, source: 'FRED', series_id: 'DEXJPUS' },
+      { pair: 'GBP/USD', value: 1.334, delta_1d:  0.002, delta_7d:  0.006, delta_30d:  0.014, source: 'FRED', series_id: 'DEXUSUK' },
+      { pair: 'USD/CNY', value: 7.190, delta_1d:  0.001, delta_7d: -0.004, delta_30d:  0.008, source: 'FRED', series_id: 'DEXCHUS' },
+      { pair: 'USD/BRL', value: 5.680, delta_1d: -0.004, delta_7d:  0.010, delta_30d:  0.018, source: 'BCB',  series_id: 'BCB-1'   },
     ],
     commodities: [
-      { name: 'Gold',          symbol: 'XAU', unit: '$/oz',  value: 2340, delta_1d:  0.004, delta_7d:  0.018, delta_30d:  0.055, source: 'FRED', series_id: 'GOLDAMGBD228NLBM' },
-      { name: 'Silver',        symbol: 'XAG', unit: '$/oz',  value: 28.5, delta_1d:  0.006, delta_7d:  0.025, delta_30d:  0.080, source: 'FRED', series_id: 'SLVPRUSD'         },
-      { name: 'WTI Crude Oil', symbol: 'WTI', unit: '$/bbl', value: 78.4, delta_1d: -0.010, delta_7d: -0.030, delta_30d:  0.020, source: 'FRED', series_id: 'DCOILWTICO'       },
+      { name: 'Gold',          symbol: 'XAU', unit: '$/oz',  value: 3280, delta_1d:  0.003, delta_7d:  0.012, delta_30d:  0.040, source: 'FRED', series_id: 'GOLDAMGBD228NLBM' },
+      { name: 'Silver',        symbol: 'XAG', unit: '$/oz',  value: 33.2, delta_1d:  0.005, delta_7d:  0.018, delta_30d:  0.065, source: 'FRED', series_id: 'SLVPRUSD'         },
+      { name: 'WTI Crude Oil', symbol: 'WTI', unit: '$/bbl', value: 72.1, delta_1d: -0.008, delta_7d: -0.022, delta_30d:  0.010, source: 'FRED', series_id: 'DCOILWTICO'       },
     ],
     centralBankRates: [
-      { bank: 'Federal Reserve', country: 'EUA',      rate:  5.25, direction: 'hold',    source: 'FRED', series_id: 'FEDFUNDS'         },
-      { bank: 'Banco Central',   country: 'Brasil',   rate: 10.75, direction: 'cutting', source: 'BCB',  series_id: 'BCB-11'           },
-      { bank: 'BCE',             country: 'Eurozona', rate:  4.00, direction: 'cutting', source: 'FRED', series_id: 'ECBDFR'           },
-      { bank: 'BoJ',             country: 'Japão',    rate:  0.10, direction: 'hiking',  source: 'FRED', series_id: 'IRSTCI01JPM156N' },
+      { bank: 'Federal Reserve', country: 'EUA',      rate:  4.33, direction: 'cutting', source: 'FRED', series_id: 'FEDFUNDS'         },
+      { bank: 'Banco Central',   country: 'Brasil',   rate: 13.75, direction: 'hiking',  source: 'BCB',  series_id: 'BCB-11'           },
+      { bank: 'BCE',             country: 'Eurozona', rate:  2.40, direction: 'cutting', source: 'FRED', series_id: 'ECBDFR'           },
+      { bank: 'BoJ',             country: 'Japão',    rate:  0.50, direction: 'hiking',  source: 'FRED', series_id: 'IRSTCI01JPM156N' },
     ],
     btcCorrelations: [
       { asset: 'SP500', label: 'S&P 500',    corr_7d:  0.42, corr_30d:  0.38, corr_90d:  0.31 },
