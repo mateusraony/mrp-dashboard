@@ -4,6 +4,7 @@ import { futuresBasis as mockFuturesBasis, fundingByExchange } from '../../compo
 import { ModeBadge, GradeBadge } from '../ui/DataBadge';
 import { useBtcTicker, useFuturesBasis } from '@/hooks/useBtcData';
 import { useBybitTicker, useOkxTicker } from '@/hooks/useMultiVenue';
+import { useMacroBoard } from '@/hooks/useFred';
 import { IS_LIVE } from '@/lib/env';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -13,7 +14,8 @@ import {
 function fmtPct(v, d = 2) { return `${v.toFixed(d)}%`; }
 
 export default function BasisPanel() {
-  const us10y = 4.512; // reference from macro board
+  const { data: macroBoard } = useMacroBoard();
+  const us10y = macroBoard?.series?.find(s => s.id === 'US10Y')?.value ?? 4.5;
 
   // Dados live de funding rate por exchange
   const { data: ticker } = useBtcTicker();
