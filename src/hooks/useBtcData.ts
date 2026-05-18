@@ -12,8 +12,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState, useEffect } from 'react';
 import { IS_LIVE } from '@/lib/env';
-import { fetchBtcTicker, fetchOiByExchange, fetchKlines, fetchLiquidations, fetchLongShortRatio, fetchFuturesBasis, fetchOiHistory, type BtcTickerData } from '@/services/binance';
-import { fetchDominance, fetchTopAltcoins } from '@/services/coingecko';
+import { fetchBtcTicker, fetchOiByExchange, fetchKlines, fetchLiquidations, fetchLongShortRatio, fetchFuturesBasis, fetchOiHistory, type BtcTickerData, type OiByExchangeEntry, type Kline, type LiquidationEntry, type LongShortRatioData, type FuturesBasisEntry } from '@/services/binance';
+import { fetchDominance, fetchTopAltcoins, type DominanceData, type AltcoinMarketData } from '@/services/coingecko';
 import { fetchFearGreed, type FearGreedData } from '@/services/alternative';
 import { subscribeBtcPrice, subscribeStatus } from '@/services/binanceWs';
 import { readModuleFlag } from '@/lib/moduleFlags';
@@ -89,97 +89,184 @@ export function useBtcTicker(enabled = true) {
 
 /**
  * useOiByExchange — Open Interest por exchange
- * Atualiza a cada 30s em modo live.
+ * Padrão DataState: withCache(30s) → fallback getStaleCache → isFallback=true.
  */
 export function useOiByExchange() {
   return useQuery({
     queryKey: ['btc', 'oi-exchange'],
-    queryFn:  fetchOiByExchange,
+    queryFn: async (): Promise<DataState<OiByExchangeEntry[]>> => {
+      try {
+        const data = await withCache('binance:oi-exchange', 30, 'binance_futures', fetchOiByExchange);
+        reportApiRecovery('binance_futures');
+        return { data, lastUpdated: new Date().toISOString(), isFallback: false, debugError: null };
+      } catch (err) {
+        logError('OI by exchange fetch failed', { error: String(err) }, 'oi-exchange');
+        reportApiFailure('binance_futures');
+        const stale = await getStaleCache<OiByExchangeEntry[]>('binance:oi-exchange');
+        if (stale) return { data: stale.value, lastUpdated: stale.updatedAt.toISOString(), isFallback: true, debugError: String(err) };
+        return { data: null, lastUpdated: null, isFallback: true, debugError: String(err) };
+      }
+    },
     staleTime: 25_000,
     refetchInterval: OI_INTERVAL,
+    retry: 2,
+    retryDelay: (attempt: number) => Math.min(1000 * 2 ** attempt, 10_000),
+    select: (state: DataState<OiByExchangeEntry[]>) => state.data ?? [],
   });
 }
 
 /**
  * useKlines — candles de preço
- * @param interval intervalo dos candles ('1h', '15m', '4h', '1d')
- * @param limit número de candles
- * @param enabled quando false, o query não monta nem faz fetch (default: true)
+ * Padrão DataState: withCache(60s) → fallback getStaleCache → select transforma array.
  */
 export function useKlines(interval = '1h', limit = 48, enabled = true) {
   return useQuery({
     queryKey: ['btc', 'klines', interval, limit],
-    queryFn:  () => fetchKlines('BTCUSDT', interval, limit),
+    queryFn: async (): Promise<DataState<Kline[]>> => {
+      try {
+        const data = await withCache(`binance:klines:${interval}:${limit}`, 60, 'binance_futures', () => fetchKlines('BTCUSDT', interval, limit));
+        reportApiRecovery('binance_futures');
+        return { data, lastUpdated: new Date().toISOString(), isFallback: false, debugError: null };
+      } catch (err) {
+        logError('Klines fetch failed', { error: String(err), interval, limit }, 'klines');
+        reportApiFailure('binance_futures');
+        const stale = await getStaleCache<Kline[]>(`binance:klines:${interval}:${limit}`);
+        if (stale) return { data: stale.value, lastUpdated: stale.updatedAt.toISOString(), isFallback: true, debugError: String(err) };
+        return { data: null, lastUpdated: null, isFallback: true, debugError: String(err) };
+      }
+    },
     staleTime: 55_000,
     refetchInterval: KLINES_INTERVAL,
     enabled,
-    select: (data) => data.map(k => ({
-      time:   k[0],
-      open:   k[1],
-      high:   k[2],
-      low:    k[3],
-      close:  k[4],
-      volume: k[5],
-      // CVD proxy: taker buy - taker sell (baseado nos campos 9 e 10)
-      taker_buy:  k[9],
-      bull:   k[4] >= k[1] ? k[5] : 0,
-      bear:   k[4] < k[1]  ? k[5] : 0,
+    retry: 2,
+    retryDelay: (attempt: number) => Math.min(1000 * 2 ** attempt, 10_000),
+    select: (state: DataState<Kline[]>) => (state.data ?? []).map(k => ({
+      time:      k[0],
+      open:      k[1],
+      high:      k[2],
+      low:       k[3],
+      close:     k[4],
+      volume:    k[5],
+      taker_buy: k[9],
+      bull:  k[4] >= k[1] ? k[5] : 0,
+      bear:  k[4] < k[1]  ? k[5] : 0,
     })),
   });
 }
 
+const EMPTY_DOMINANCE: DominanceData = {
+  btc_dominance: 0, eth_dominance: 0, others_dominance: 0,
+  total_mcap_usd: 0, stablecoin_supply_b: 0, updated_at: 0,
+};
+
 /**
  * useDominance — BTC/ETH dominance e market cap total
- * Atualiza a cada 5min em modo live (respeita rate limit CoinGecko).
+ * Padrão DataState: withCache(300s) → fallback getStaleCache → isFallback=true.
  */
 export function useDominance() {
   return useQuery({
     queryKey: ['market', 'dominance'],
-    queryFn:  fetchDominance,
+    queryFn: async (): Promise<DataState<DominanceData>> => {
+      try {
+        const data = await withCache('coingecko:dominance', 300, 'coingecko', fetchDominance);
+        reportApiRecovery('coingecko');
+        return { data, lastUpdated: new Date().toISOString(), isFallback: false, debugError: null };
+      } catch (err) {
+        logError('Dominance fetch failed', { error: String(err) }, 'dominance');
+        reportApiFailure('coingecko');
+        const stale = await getStaleCache<DominanceData>('coingecko:dominance');
+        if (stale) return { data: stale.value, lastUpdated: stale.updatedAt.toISOString(), isFallback: true, debugError: String(err) };
+        return { data: null, lastUpdated: null, isFallback: true, debugError: String(err) };
+      }
+    },
     staleTime: 290_000,
     refetchInterval: DOM_INTERVAL,
+    retry: 2,
+    retryDelay: (attempt: number) => Math.min(1000 * 2 ** attempt, 10_000),
+    select: (state: DataState<DominanceData>) => {
+      const data = state.data ?? EMPTY_DOMINANCE;
+      return { ...data, isFallback: state.isFallback, lastUpdated: state.lastUpdated };
+    },
   });
 }
 
 /**
  * useTopAltcoins — top altcoins por market cap com retornos
- * Atualiza a cada 5min em modo live.
+ * Padrão DataState: withCache(300s) → fallback getStaleCache → isFallback=true.
  */
 export function useTopAltcoins(limit = 20) {
   return useQuery({
     queryKey: ['market', 'altcoins', limit],
-    queryFn:  () => fetchTopAltcoins(limit),
+    queryFn: async (): Promise<DataState<AltcoinMarketData[]>> => {
+      try {
+        const data = await withCache(`coingecko:altcoins:${limit}`, 300, 'coingecko', () => fetchTopAltcoins(limit));
+        reportApiRecovery('coingecko');
+        return { data, lastUpdated: new Date().toISOString(), isFallback: false, debugError: null };
+      } catch (err) {
+        logError('Top altcoins fetch failed', { error: String(err), limit }, 'altcoins');
+        reportApiFailure('coingecko');
+        const stale = await getStaleCache<AltcoinMarketData[]>(`coingecko:altcoins:${limit}`);
+        if (stale) return { data: stale.value, lastUpdated: stale.updatedAt.toISOString(), isFallback: true, debugError: String(err) };
+        return { data: null, lastUpdated: null, isFallback: true, debugError: String(err) };
+      }
+    },
     staleTime: 290_000,
     refetchInterval: DOM_INTERVAL,
+    retry: 2,
+    retryDelay: (attempt: number) => Math.min(1000 * 2 ** attempt, 10_000),
+    select: (state: DataState<AltcoinMarketData[]>) => state.data ?? [],
   });
 }
 
 /**
  * useLongShortRatio — proporção global de contas long vs short (Binance Futures)
- * Atualiza a cada 1min em modo live. Retorna null se o endpoint exigir auth.
+ * Padrão DataState: withCache(60s) → fallback getStaleCache. Retorna null se auth falhar.
  */
 export function useLongShortRatio(symbol = 'BTCUSDT') {
   return useQuery({
     queryKey:        ['btc', 'longShortRatio', symbol],
-    queryFn:         () => fetchLongShortRatio(symbol, '5m'),
+    queryFn: async (): Promise<DataState<LongShortRatioData | null>> => {
+      try {
+        const data = await withCache(`binance:longshort:${symbol}`, 60, 'binance_futures', () => fetchLongShortRatio(symbol, '5m'));
+        reportApiRecovery('binance_futures');
+        return { data, lastUpdated: new Date().toISOString(), isFallback: false, debugError: null };
+      } catch (err) {
+        logError('LongShortRatio fetch failed', { error: String(err), symbol }, 'longshort');
+        const stale = await getStaleCache<LongShortRatioData>(`binance:longshort:${symbol}`);
+        if (stale) return { data: stale.value, lastUpdated: stale.updatedAt.toISOString(), isFallback: true, debugError: String(err) };
+        return { data: null, lastUpdated: null, isFallback: true, debugError: String(err) };
+      }
+    },
     staleTime:       55_000,
     refetchInterval: IS_LIVE ? 60_000 : false,
     retry:           1,
+    select: (state: DataState<LongShortRatioData | null>) => state.data,
   });
 }
 
 /**
  * useLiquidations — liquidações forçadas recentes de BTCUSDT
- * Atualiza a cada 30s em modo live.
+ * Padrão DataState: withCache(30s) → fallback getStaleCache.
+ * retry:0 mantido — endpoint requer auth, falha é permanente.
  */
 export function useLiquidations(limit = 50) {
   return useQuery({
     queryKey: ['btc', 'liquidations', limit],
-    queryFn:  () => fetchLiquidations('BTCUSDT', limit),
+    queryFn: async (): Promise<DataState<LiquidationEntry[]>> => {
+      try {
+        const data = await withCache(`binance:liquidations:${limit}`, 30, 'binance_futures', () => fetchLiquidations('BTCUSDT', limit));
+        return { data, lastUpdated: new Date().toISOString(), isFallback: false, debugError: null };
+      } catch (err) {
+        const stale = await getStaleCache<LiquidationEntry[]>(`binance:liquidations:${limit}`);
+        if (stale) return { data: stale.value, lastUpdated: stale.updatedAt.toISOString(), isFallback: true, debugError: String(err) };
+        return { data: null, lastUpdated: null, isFallback: true, debugError: String(err) };
+      }
+    },
     staleTime: 25_000,
     refetchInterval: OI_INTERVAL,
-    retry: 0,                    // sem retry: endpoint requer auth, falha é permanente
+    retry: 0,
     refetchOnWindowFocus: false,
+    select: (state: DataState<LiquidationEntry[]>) => state.data ?? [],
   });
 }
 
@@ -260,27 +347,56 @@ export function useBtcPriceWs() {
 
 /**
  * useFuturesBasis — basis anualizado dos futuros trimestrais BTC vs perp.
- *
- * Fonte: Binance /fapi/v1/premiumIndex (público, sem auth).
- * Atualiza a cada 60s em modo live (preço mark muda ~1x/min).
+ * Padrão DataState: withCache(60s) → fallback getStaleCache → isFallback=true.
  */
 export function useFuturesBasis() {
   return useQuery({
     queryKey:        ['futures', 'basis'],
-    queryFn:         fetchFuturesBasis,
+    queryFn: async (): Promise<DataState<FuturesBasisEntry[]>> => {
+      try {
+        const data = await withCache('binance:futures-basis', 60, 'binance_futures', fetchFuturesBasis);
+        reportApiRecovery('binance_futures');
+        return { data, lastUpdated: new Date().toISOString(), isFallback: false, debugError: null };
+      } catch (err) {
+        logError('Futures basis fetch failed', { error: String(err) }, 'futures-basis');
+        reportApiFailure('binance_futures');
+        const stale = await getStaleCache<FuturesBasisEntry[]>('binance:futures-basis');
+        if (stale) return { data: stale.value, lastUpdated: stale.updatedAt.toISOString(), isFallback: true, debugError: String(err) };
+        return { data: null, lastUpdated: null, isFallback: true, debugError: String(err) };
+      }
+    },
     staleTime:       60_000,
     refetchInterval: IS_LIVE ? 60_000 : false,
+    retry: 2,
+    retryDelay: (attempt: number) => Math.min(1000 * 2 ** attempt, 10_000),
+    select: (state: DataState<FuturesBasisEntry[]>) => state.data ?? [],
   });
 }
 
-/** useBtcOiHistory — Open Interest diário últimos 30 dias via Binance openInterestHist */
+/**
+ * useBtcOiHistory — Open Interest diário últimos 30 dias via Binance openInterestHist
+ * Padrão DataState: withCache(300s) → fallback getStaleCache → isFallback=true.
+ */
 export function useBtcOiHistory() {
   return useQuery({
     queryKey:        ['btc-oi-history'],
-    queryFn:         fetchOiHistory,
+    queryFn: async (): Promise<DataState<Array<{ t: number; oi: number }>>> => {
+      try {
+        const data = await withCache('binance:oi-history', 300, 'binance_futures', fetchOiHistory);
+        reportApiRecovery('binance_futures');
+        return { data, lastUpdated: new Date().toISOString(), isFallback: false, debugError: null };
+      } catch (err) {
+        logError('OI history fetch failed', { error: String(err) }, 'oi-history');
+        reportApiFailure('binance_futures');
+        const stale = await getStaleCache<Array<{ t: number; oi: number }>>('binance:oi-history');
+        if (stale) return { data: stale.value, lastUpdated: stale.updatedAt.toISOString(), isFallback: true, debugError: String(err) };
+        return { data: null, lastUpdated: null, isFallback: true, debugError: String(err) };
+      }
+    },
     refetchInterval: IS_LIVE ? 5 * 60_000 : false,
     staleTime:       4 * 60_000,
     retry:           1,
     enabled:         IS_LIVE,
+    select: (state: DataState<Array<{ t: number; oi: number }>>) => state.data ?? [],
   });
 }
