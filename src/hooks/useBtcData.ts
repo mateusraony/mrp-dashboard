@@ -17,6 +17,17 @@ import { fetchDominance, fetchTopAltcoins } from '@/services/coingecko';
 import { fetchFearGreed } from '@/services/alternative';
 import { subscribeBtcPrice, subscribeStatus } from '@/services/binanceWs';
 import { readModuleFlag } from '@/lib/moduleFlags';
+import { withCache, getStaleCache } from '@/services/marketCache';
+import { logError } from '@/lib/debugLog';
+import { reportApiFailure, reportApiRecovery } from '@/lib/apiHealthMonitor';
+
+// ─── DataState — interface padrão de resiliência ──────────────────────────────
+export interface DataState<T> {
+  data:        T | null;
+  lastUpdated: string | null;
+  isFallback:  boolean;
+  debugError:  string | null;
+}
 
 // ─── Intervalos de refetch ────────────────────────────────────────────────────
 const PRICE_INTERVAL   = IS_LIVE ? 5_000   : false;  // 5s quando live
@@ -27,24 +38,52 @@ const FNG_INTERVAL     = IS_LIVE ? 3_600_000: false; // 1h quando live
 
 // ─── Hooks ────────────────────────────────────────────────────────────────────
 
+// Zero-state para quando API falha e cache Supabase está vazio (último recurso)
+const EMPTY_TICKER: BtcTickerData = {
+  mark_price: 0, last_funding_rate: 0, next_funding_time: 0,
+  price_change_pct: 0, volume_24h_usdt: 0, high_24h: 0, low_24h: 0,
+  open_interest: 0, oi_delta_pct: 0,
+};
+
 /**
  * useBtcTicker — preço mark, funding rate, OI, variação 24h
- * Atualiza a cada 5s em modo live.
+ * Padrão DataState: withCache(30s) → fallback getStaleCache → isFallback=true.
+ * Callers ganham isFallback + lastUpdated sem breaking change.
  */
 export function useBtcTicker(enabled = true) {
   return useQuery({
     enabled,
     queryKey: ['btc', 'ticker'],
-    queryFn:  fetchBtcTicker,
+    queryFn: async (): Promise<DataState<BtcTickerData>> => {
+      try {
+        const data = await withCache('btc:ticker', 30, 'binance_futures', fetchBtcTicker);
+        reportApiRecovery('binance_futures');
+        return { data, lastUpdated: new Date().toISOString(), isFallback: false, debugError: null };
+      } catch (err) {
+        logError('BTC ticker fetch failed', { error: String(err) }, 'btc-ticker');
+        reportApiFailure('binance_futures');
+        const stale = await getStaleCache<BtcTickerData>('btc:ticker');
+        if (stale) {
+          return { data: stale.value, lastUpdated: stale.updatedAt.toISOString(), isFallback: true, debugError: String(err) };
+        }
+        return { data: null, lastUpdated: null, isFallback: true, debugError: String(err) };
+      }
+    },
     staleTime: 4_000,
     refetchInterval: PRICE_INTERVAL,
-    // Transformação para UI: formatar valores prontos para exibição
-    select: (data: BtcTickerData) => ({
-      ...data,
-      mark_price_fmt:    data.mark_price.toLocaleString('en-US', { minimumFractionDigits: 0 }),
-      funding_rate_fmt:  `${(data.last_funding_rate * 100).toFixed(4)}%`,
-      price_change_sign: data.oi_delta_pct >= 0 ? '+' : '',
-    }),
+    retry: 2,
+    retryDelay: (attempt: number) => Math.min(1000 * 2 ** attempt, 10_000),
+    select: (state: DataState<BtcTickerData>) => {
+      const data = state.data ?? EMPTY_TICKER;
+      return {
+        ...data,
+        mark_price_fmt:    data.mark_price.toLocaleString('en-US', { minimumFractionDigits: 0 }),
+        funding_rate_fmt:  `${(data.last_funding_rate * 100).toFixed(4)}%`,
+        price_change_sign: data.oi_delta_pct >= 0 ? '+' : '',
+        isFallback:        state.isFallback,
+        lastUpdated:       state.lastUpdated,
+      };
+    },
   });
 }
 
