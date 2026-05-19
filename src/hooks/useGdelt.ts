@@ -67,7 +67,14 @@ export function useGdeltNews(query?: string) {
     refetchInterval: IS_LIVE ? 10 * 60_000 : false,     // 10 min em live
     retry:           1,
     enabled:         readModuleFlag('ENABLE_NEWS'),
-    select:          (state: DataState<GdeltArticleEnriched[]>) => state.data ?? [],
+    select:          (state: DataState<GdeltArticleEnriched[]>) => {
+      // Propaga o erro para que TanStack Query marque isError=true
+      // (sem isso, isError fica false e o componente vê [] sem saber o motivo)
+      if (state.data === null && state.isFallback && state.debugError) {
+        throw new Error(state.debugError);
+      }
+      return state.data ?? [];
+    },
   });
 }
 
