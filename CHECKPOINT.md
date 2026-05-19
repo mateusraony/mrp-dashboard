@@ -1,6 +1,6 @@
 # CHECKPOINT.md — MRP Dashboard
 > Memória técnica viva do projeto. Atualizar ao final de cada bloco importante.
-> Última atualização: 2026-05-19 (Fase de confiança de dados | Páginas 1-5 concluídas)
+> Última atualização: 2026-05-19 (Fase de confiança de dados | Páginas 1-7 concluídas)
 
 ---
 
@@ -21,7 +21,7 @@
 | 4 | **Altcoins** | ✅ CONCLUÍDA | A | Sim | PR #134 mergeado |
 | 5 | **SpotFlow** | ✅ CONCLUÍDA | A | Sim | PR #135 (em revisão) |
 | 6 | **Portfolio** | ✅ CONCLUÍDA | A | Sim | PR #136 (em revisão) |
-| 7 | Derivatives | ⏳ Aguarda | — | — | — |
+| 7 | **Derivatives** | ✅ CONCLUÍDA | A | Sim | PR #137 |
 | 8 | SmartAlerts | ⏳ Aguarda | — | — | — |
 | 9 | MacroCalendar | ⏳ Aguarda | — | — | — |
 | 10 | Macro | ⏳ Aguarda | — | — | — |
@@ -190,6 +190,61 @@
 
 **Alteração:**
 - "🤖 AI Analysis — Spot Flow" → "Análise Spot Flow" + nota "(sinal por regras · Claude Haiku quando configurado)"
+
+---
+
+### Derivatives — Auditoria detalhada
+
+**Status antes:** B — "🤖 AI Analysis" para análise rule-based; mode badges enganosos no fallback
+**Status depois:** A
+
+**Arquivos auditados:**
+- `src/pages/DerivativesPage.jsx` — wrapper com tabs, sem problemas
+- `src/pages/Derivatives.jsx` — Overview tab
+- `src/pages/DerivativesAdvanced.jsx` — Avançado tab (6 sub-seções)
+- `src/components/options/IVRankPanel.jsx` — já conforme ✅
+- `src/components/options/TakerFlowPanel.jsx` — já conforme ✅
+
+**Classificação de dados (Overview):**
+| Dado | Classificação |
+|------|--------------|
+| Mark price, funding rate | `LIVE_REAL` — Binance Futures |
+| OI delta, open interest | `LIVE_REAL` — Binance Futures |
+| OI por Exchange | `LIVE_REAL` — Binance Futures |
+| OI/Market Cap ratio | `CALCULADO` — OI Binance ÷ mcap CoinGecko |
+| Perp vs Dated | `PAGO_INDISPONIVEL` — CoinGlass requer auth |
+| Sinal AIModuleCard | `CALCULADO` — computeRuleBasedAnalysis (if/else) |
+| Claude Haiku insight | `LIVE_REAL` — quando useAiInsight configurado |
+| Histórico funding (funding_history) | `HARDCODED` — array vazio `[]`, nunca populado do ticker |
+| risk_score, risk_factors | `HARDCODED` — zeros no BTC_FUTURES_FALLBACK |
+
+**Classificação de dados (Advanced):**
+| Dado | Classificação |
+|------|--------------|
+| Liq Clusters (Heatmap) | `LIVE_REAL` quando `useLiquidations` retorna ≥3 pontos; `MOCK` caso contrário |
+| probLongFlush | `CALCULADO` — ratio longs/shorts em risco ±10% |
+| Claude Haiku no Heatmap | `LIVE_REAL` — useAiInsight ✅ |
+| OI por Strike BTC | `LIVE_REAL` quando Deribit live; `MOCK` fallback |
+| OI por Strike ETH | `MOCK` — escalado 0.12× do BTC mock |
+| Carry Calculator basis | `LIVE_REAL` via useFuturesBasis (Binance /premiumIndex); `MOCK` fallback |
+| US10Y no Carry Calc | `LIVE_REAL` via FRED |
+| Term Structure IV | `LIVE_REAL` quando Deribit retorna dados; `MOCK` fallback |
+| IV Rank | `LIVE_PARCIAL` — ATM IV ao vivo, limites 52w do mock |
+| Taker Flow | `PAGO_INDISPONIVEL` — requer auth Deribit |
+
+**Pontos positivos pré-existentes:**
+- DataTrustBadge em OI/Market Cap (fonte CALCULADO) ✅
+- DataTrustBadge em Perp vs Dated (PAGO) ✅
+- ModeBadge no header do Advanced ✅
+- IVRankPanel e TakerFlowPanel com badge PAGO e banner locked ✅
+- AIInsightPanel (LiqHeatmap) usa useAiInsight real ✅
+
+**Alterações feitas:**
+| Arquivo | Linha | Alteração |
+|---|---|---|
+| `src/pages/Derivatives.jsx` | 368 | `🤖 AI Analysis — Derivatives` → `Análise Derivatives` + nota metodologia |
+| `src/pages/DerivativesAdvanced.jsx` | 443 | CarryCalculator mode badge: `IS_LIVE ? 'live' : 'mock'` → `(liveBasis?.length > 0) ? 'live' : 'mock'` |
+| `src/pages/DerivativesAdvanced.jsx` | 603 | TermStructurePanel fallback mode badge: `IS_LIVE ? 'live' : 'mock'` → `'mock'` |
 
 ---
 

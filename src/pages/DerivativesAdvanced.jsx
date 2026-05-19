@@ -440,7 +440,7 @@ function CarryCalculator() {
         title="Carry Calculator — Custo de Basis por Vencimento"
         sub={`Basis anualizado vs US10Y (${US10Y}%) · Spot: ${SPOT_LIVE > 0 ? `$${SPOT_LIVE.toLocaleString()}` : '—'}`}
         badge={(liveBasis && liveBasis.length > 0) ? 'A' : futuresBasis.quality}
-        mode={(liveBasis && liveBasis.length > 0) ? 'live' : (IS_LIVE ? 'live' : 'mock')}
+        mode={(liveBasis && liveBasis.length > 0) ? 'live' : 'mock'}
       />
 
       {/* Basis chart */}
@@ -600,7 +600,7 @@ function TermStructurePanel() {
         title="Term Structure — IV por Prazo"
         sub={`Estrutura: ${ts.structure_type} · 1W-1Y spread: +${(ts.front_back_spread * 100).toFixed(1)}pp`}
         badge={ts.quality}
-        mode={IS_LIVE ? 'live' : 'mock'}
+        mode="mock"
       />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {ts.expirations.map((e, i) => {
