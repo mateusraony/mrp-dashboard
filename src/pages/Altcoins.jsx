@@ -115,7 +115,7 @@ export default function Altcoins() {
     return <div style={{ color: '#475569', fontSize: 12, padding: 24 }}>Carregando dados de altcoins...</div>;
   }
 
-  const { altSeasonIndex, sectorRotation, alts, btcRet7d, btcRet30d } = data;
+  const { altSeasonIndex, sectorRotation, alts, btcRet7d, btcRet30d, isFallback, lastUpdated } = data;
 
   const tableAlts = alts
     .filter(a => a.symbol !== 'BTC')
@@ -146,7 +146,14 @@ export default function Altcoins() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4, flexWrap: 'wrap' }}>
           <h1 style={{ fontSize: 20, fontWeight: 900, color: '#f1f5f9', margin: 0, letterSpacing: '-0.03em' }}>Altcoins & Rotação</h1>
           <ModeBadge mode={IS_LIVE ? 'live' : 'mock'} />
-          {(!IS_LIVE || !data) && <DataTrustBadge mode="mock" confidence="D" source="Demo" reason="Alt Season Index simulado — dados estáticos de exemplo" />}
+          {(!IS_LIVE || !alts.length) && <DataTrustBadge mode="mock" confidence="D" source="Demo" reason="Alt Season Index simulado — dados estáticos de exemplo" />}
+          {IS_LIVE && !!alts.length && <span style={{ fontSize: 9, color: '#475569', background: 'rgba(71,85,105,0.1)', border: '1px solid #1e2d45', borderRadius: 4, padding: '2px 7px' }}>CoinGecko · top 50</span>}
+          {isFallback && lastUpdated && (
+            <div title={`Última atualização: ${new Date(lastUpdated).toLocaleString('pt-BR')}`}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 9, color: '#f59e0b', cursor: 'help' }}>
+              ⚠ Cache · {new Date(lastUpdated).toLocaleDateString('pt-BR')}
+            </div>
+          )}
         </div>
         <p style={{ fontSize: 11, color: '#475569', margin: 0 }}>
           Alt Season Index · BTC/ETH Dominância · Top Alts vs BTC · Rotação Setorial
@@ -207,7 +214,7 @@ export default function Altcoins() {
       <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, overflow: 'hidden' }}>
         <div style={{ padding: '14px 18px', borderBottom: '1px solid #1e2d45', display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>Top Altcoins — Performance vs BTC</div>
-          <div style={{ fontSize: 9, color: '#334155', marginLeft: 'auto' }}>90d lookback · vs BTC retornos relativos</div>
+          <div style={{ fontSize: 9, color: '#334155', marginLeft: 'auto' }}>90d lookback · vs BTC retornos relativos · setores: classificação manual</div>
         </div>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
