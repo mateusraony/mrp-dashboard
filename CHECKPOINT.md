@@ -16,7 +16,7 @@
 | # | Página | Status | Classificação | Pode usar? | Commit |
 |---|---|---|---|---|---|
 | 1 | **DataSources** | ✅ CONCLUÍDA | A | Sim, com confiança | PR #130 mergeado |
-| 2 | **Settings** | ✅ CONCLUÍDA | B→A | Sim, com confiança | pendente push |
+| 2 | **Settings** | ✅ CONCLUÍDA | B→A | Sim, com confiança | PR #131 mergeado |
 | 3 | NewsIntelligence | ⏳ Aguarda | — | — | — |
 | 4 | Altcoins | ⏳ Aguarda | — | — | — |
 | 5 | SpotFlow | ⏳ Aguarda | — | — | — |
