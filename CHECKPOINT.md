@@ -1,6 +1,6 @@
 # CHECKPOINT.md — MRP Dashboard
 > Memória técnica viva do projeto. Atualizar ao final de cada bloco importante.
-> Última atualização: 2026-05-19 (Fase de confiança de dados | Páginas 1-11 concluídas)
+> Última atualização: 2026-05-19 (Fase de confiança de dados | Páginas 1-12 concluídas)
 
 ---
 
@@ -26,7 +26,7 @@
 | 9 | **MacroCalendar** | ✅ CONCLUÍDA | A | Sim | PR #139 |
 | 10 | **Macro** | ✅ CONCLUÍDA | A | Sim | PR #140 |
 | 11 | **GlobalMarkets** | ✅ CONCLUÍDA | A | Sim | PR #141 |
-| 12 | Dashboard | ⏳ Aguarda | — | — | — |
+| 12 | **Dashboard** | ✅ CONCLUÍDA | A | Sim | PR #142 |
 | 13 | ExecutiveReport | ⏳ Aguarda | — | — | — |
 | 14 | MarketRegime | ⏳ Aguarda | — | — | — |
 | 15 | PredictivePanel | ⏳ Aguarda | — | — | — |
@@ -373,6 +373,34 @@
 |---|---|---|
 | `src/pages/GlobalMarkets.jsx` | 200 | `"Notícias de Impacto Global"` → `"Contexto de Mercado Global"` + subtítulo honesto |
 | `src/pages/GlobalMarkets.jsx` | 216 | Disclaimer sempre visível (removido guard `!IS_LIVE`); tom mais suave, texto mais claro |
+
+---
+
+### Dashboard — Auditoria detalhada
+
+**Status antes:** B — seção "AI Analysis & Previsões" + `🤖 AI · rule-based-v1` no painel de análise
+**Status depois:** A
+
+**Classificação de dados (Zona D — Análise):**
+| Dado | Classificação |
+|------|--------------|
+| Confluência Multi-Timeframe | `CALCULADO` — `useMtfAnalysis` de klines reais |
+| Alertas Z-Score | `CALCULADO` — `useZScoreAlerts` de klines + funding |
+| Análise Natural — Claude Haiku | `LIVE_REAL` — `useAiInsight` (só aparece quando IS_LIVE + Supabase) |
+| AIAnalysisPanel (rule-based) | `CALCULADO` — `computeRuleBasedAnalysis` (if/else threshold) |
+| AITrackRecord | `LIVE_REAL` — Supabase predictions; demo data quando não configurado |
+
+**Pontos positivos pré-existentes:**
+- Confluência MTF, Z-Score, Claude Haiku: todos já têm labels honestos ✅
+- AITrackRecord: `DataTrustBadge mode="mock"` quando demo; `mode="live"` quando Supabase real ✅
+- `ModeBadge` no header principal ✅
+- Risk Score live via `useRiskScore` ✅
+
+**Alterações feitas:**
+| Arquivo | Linha | Alteração |
+|---|---|---|
+| `src/pages/Dashboard.jsx` | 687 | `🤖 AI Analysis & Previsões` → `📊 Análise & Previsões` + sub-texto honesto |
+| `src/components/ui/AIAnalysisPanel.jsx` | 131 | `🤖 AI · {model}` → `Análise Automática · {model}` (model=`rule-based-v1` auto-descreve) |
 
 ---
 
