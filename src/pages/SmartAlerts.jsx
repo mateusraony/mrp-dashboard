@@ -220,7 +220,7 @@ function AISuggestionCard({ item, prefs }) {
       {expanded && (
         <div style={{ padding: '0 14px 14px', borderTop: '1px solid #1a2535' }}>
           <div style={{ marginTop: 12, marginBottom: 10 }}>
-            <div style={{ fontSize: 9, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 700, marginBottom: 6 }}>🤖 Raciocínio da AI</div>
+            <div style={{ fontSize: 9, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 700, marginBottom: 6 }}>Raciocínio</div>
             <div style={{ fontSize: 11, color: '#64748b', lineHeight: 1.7, background: '#070b14', padding: '10px 12px', borderRadius: 8, border: '1px solid #0f1d2e' }}>{item.reasoning}</div>
           </div>
           <div style={{ marginBottom: 10, padding: '10px 12px', background: `${prio.color}07`, border: `1px solid ${prio.color}20`, borderRadius: 8 }}>
@@ -430,7 +430,7 @@ export default function SmartAlerts() {
   const filteredSuggestions = categoryFilter === 'all' ? activeSuggestions : activeSuggestions.filter(s => s.category === categoryFilter);
 
   const TABS = [
-    { id: 'ai', label: '🤖 AI & Sugestões', badge: activeSuggestions.filter(s => s.priority === 'HIGH' || s.priority === 'CRITICAL').length },
+    { id: 'ai', label: 'Sinais & Sugestões', badge: activeSuggestions.filter(s => s.priority === 'HIGH' || s.priority === 'CRITICAL').length },
     { id: 'active', label: '🔔 Ativos', badge: activeAlerts.length },
     { id: 'config', label: '⚙️ Configurar', badge: rules.filter(r => r.enabled).length },
     { id: 'history', label: '📋 Histórico', badge: null },
