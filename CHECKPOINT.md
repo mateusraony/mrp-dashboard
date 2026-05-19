@@ -1,6 +1,6 @@
 # CHECKPOINT.md — MRP Dashboard
 > Memória técnica viva do projeto. Atualizar ao final de cada bloco importante.
-> Última atualização: 2026-05-19 (Fase de confiança de dados | Páginas 1-15 concluídas)
+> Última atualização: 2026-05-19 (Fase de confiança de dados | Páginas 1-17 concluídas)
 
 ---
 
@@ -30,8 +30,8 @@
 | 13 | **ExecutiveReport** | ✅ CONCLUÍDA | A | Sim | PR #143 |
 | 14 | **MarketRegime** | ✅ CONCLUÍDA | A | Sim | PR #144 |
 | 15 | **PredictivePanel** | ✅ CONCLUÍDA | A | Sim | PR #145 |
-| 16 | OnChain | ⏳ Aguarda | — | — | — |
-| 17 | Options | ⏳ Aguarda | — | — | — |
+| 16 | **OnChain** | ✅ CONCLUÍDA | A | Sim | sem PR — já conforme |
+| 17 | **Options** | ✅ CONCLUÍDA | A | Sim | PR #146 |
 | 18 | MarketSentiment | ⏳ Aguarda | — | — | — |
 | 19 | InstitutionalFlows | ⏳ Aguarda | — | — | — |
 | 20 | Opportunities | ⏳ Aguarda | — | — | — |
@@ -555,6 +555,85 @@
 | `npm run build` | ✅ 0 erros |
 
 **Classificação final:** A — Labels honestos. Preços-alvo via ATR são live. Probabilidades de cenários são referência estática — agora claramente indicadas.
+
+---
+
+### OnChain — Auditoria detalhada
+
+**Status antes:** A — já conforme
+**Status depois:** A — sem alterações necessárias
+
+**Classificação de dados:**
+| Dado | Classificação |
+|------|--------------|
+| NUPL valor atual | `LIVE_PARCIAL` — CoinMetrics Community proxy `(MCap−RCap)/MCap` |
+| NUPL zona, cor | `CALCULADO` — derivado do valor CoinMetrics |
+| NUPL history chart, deltas 7d/30d | `MOCK` — `btcNUPL` mock (CoinMetrics Community não fornece série histórica facilmente) |
+| SOPR (em IS_LIVE) | `PAGO_INDISPONIVEL` — `PaidRequiredCard` com Glassnode |
+| Exchange Netflow (em IS_LIVE) | `PAGO_INDISPONIVEL` — `PaidRequiredCard` com Glassnode |
+| Whale Activity (em IS_LIVE) | `PAGO_INDISPONIVEL` — `PaidRequiredCard` com Glassnode |
+| MVRV ratio, Realized Price | `LIVE_PARCIAL` — CoinMetrics Community via `useOnChainCycle` |
+| CDD, MA30, Z-Score | `LIVE_REAL` — CoinMetrics Community via `useOnChainExtended` |
+| HODL Wave 1yr+, Dormancy proxy | `LIVE_REAL` — CoinMetrics Community via `useOnChainExtended` |
+| Hash Rate, Dificuldade | `LIVE_REAL` — Mempool.space via `useHashrate` |
+| Mempool tx count, fees | `LIVE_REAL` — Mempool.space via `useMempoolState` |
+| LthSthCard | `LIVE_PARCIAL` — CoinMetrics Community (próprio componente) |
+
+**Pontos positivos pré-existentes (exemplar):**
+- Header banner lista fontes e qualidade explicitamente ✅
+- Quality banner colorido: AO VIVO (verde) / ESTIMADO (amarelo) / DEMO (amarelo) ✅
+- `DataTrustBadge mode="estimated"` no NUPL com nota "proxy — não é Glassnode" ✅
+- `PaidRequiredCard` (🔒) para SOPR/Netflow/Whale quando IS_LIVE ✅
+- `DataTrustBadge mode="paid_required"` na Pressão Institucional ✅
+- `DataQualityBadge` no MvrvCard ✅
+- `GradeBadge` por card (A/B/D) ✅
+- `ModeBadge` condicionado a `IS_LIVE && hasLiveData` ✅
+- Badge "CoinMetrics Community · Grátis · Qualidade A" em cada card quando live ✅
+- Nenhum label "AI" ou "🤖" em nenhuma seção ✅
+
+**Alterações feitas:** Nenhuma — página já conforme.
+
+**Classificação final:** A — Melhor página de transparência de dados do projeto. Nenhuma alteração necessária.
+
+---
+
+### Options — Auditoria detalhada
+
+**Status antes:** B — `🤖 AI Analysis — Options` para output de `computeRuleBasedAnalysis`
+**Status depois:** A
+
+**Classificação de dados:**
+| Dado | Classificação |
+|------|--------------|
+| IV ATM, chain strikes, skew | `LIVE_REAL` — Deribit via `useOptionsData` |
+| IV deltas 1D/1W/1M | `CALCULADO` — delta da série DVOL do Deribit |
+| Put/Call skew médio | `CALCULADO` — média de (put_iv − call_iv) por strike |
+| Regime (low_vol/normal/elevated/crisis) | `CALCULADO` — threshold em iv_atm |
+| GEX, Max Pain | `CALCULADO` — `computeGex` e `computeMaxPain` com Black-Scholes 2ª deriv. (validado em scripts/) |
+| Put/Call Ratio Vol e OI | `LIVE_REAL` — Deribit quando disponível |
+| Sinal AIModuleCard | `CALCULADO` — `computeRuleBasedAnalysis` (if/else IV · skew · P/C · max pain) |
+| Claude Haiku insight | `LIVE_REAL` — `useAiInsight` quando `hasLiveData` |
+| IV Rank | `LIVE_PARCIAL` — IV ao vivo, limites 52w do mock (`IVRankPanel` já tem badge pago) |
+| Taker Flow | `PAGO_INDISPONIVEL` — requer Deribit auth (`TakerFlowPanel` já tem badge pago) |
+| DealerFlowPanel (GEX/Vanna/Charm) | `CALCULADO` — Black-Scholes 2ª deriv. do spot + IV live |
+
+**Pontos positivos pré-existentes:**
+- `ModeBadge` + `GradeBadge` no header ✅
+- `ClaudeInsight` com `✦ Claude Haiku` separado e claro ✅
+- `IVRankPanel` e `TakerFlowPanel` com `DataTrustBadge paid_required` ✅
+- `SectionHeader` com grade por gráfico ✅
+
+**Alteração feita:**
+| Arquivo | Linha | Alteração |
+|---|---|---|
+| `src/pages/Options.jsx` | 300 | `🤖 AI Analysis — Options` → `Análise Options` + nota de metodologia |
+
+**Testes executados:**
+| Comando | Resultado |
+|---------|----------|
+| `npm run build` | ✅ 0 erros |
+
+**Classificação final:** A — Label honesto. Claude Haiku claramente separado da análise por regras.
 
 ---
 
