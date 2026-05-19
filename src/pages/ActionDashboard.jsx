@@ -150,7 +150,7 @@ function OpportunityCard({ op, onSelect, selected }) {
       {/* Expanded rationale */}
       {isSelected && (
         <div style={{ marginTop: 12, padding: '10px 12px', borderRadius: 7, background: '#0a1018', border: '1px solid rgba(59,130,246,0.15)' }}>
-          <div style={{ fontSize: 9, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>🤖 Análise AI</div>
+          <div style={{ fontSize: 9, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>📐 Racional por Regras</div>
           <div style={{ fontSize: 11, color: '#94a3b8', lineHeight: 1.65 }}>{op.rationale}</div>
         </div>
       )}
@@ -342,7 +342,7 @@ export function ActionsContent() {
             <ModeBadge mode={IS_LIVE && ticker ? 'live' : 'mock'} />
           </div>
           <p style={{ fontSize: 11, color: '#475569', margin: 0 }}>
-            Feed de oportunidades · AI-driven · Performance em tempo real
+            Feed de oportunidades · baseadas em regras quantitativas · Performance em tempo real
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -364,7 +364,7 @@ export function ActionsContent() {
           moduleId="ACTION_DASHBOARD"
           probability={GLOBAL_RISK_FALLBACK.prob}
           regime={liveRegime === 'RISK-ON' ? 'risk_on' : 'caution'}
-          recommendation={`${filtered.length} oportunidades ativas. ${TRADE_OPPORTUNITIES_FALLBACK.filter(o => o.ai_grade === 'A').length} com Grade A. Win rate histórico: ${PERFORMANCE_STATS_FALLBACK.win_rate.toFixed(0)}% · PnL acum: +${PERFORMANCE_STATS_FALLBACK.cumulative_pnl_pct.toFixed(1)}%.`}
+          recommendation={`${filtered.length} oportunidades ativas. Sinais de alta qualidade (Grade A) gerados por rule engine. Win rate e PnL histórico: sem dados ainda — histórico preenchido conforme sinais forem encerrados.`}
           reasoning={`Regime ${liveRegime} com score ${liveScore}/100. F&G ${fng?.value ?? FEAR_GREED_FALLBACK.value} (${fng?.label ?? FEAR_GREED_FALLBACK.classification}). Funding ${((ticker?.last_funding_rate ?? BTC_FUTURES_FALLBACK.funding_rate) * 100).toFixed(4)}% — oportunidades de carry e flush em evidência. Grade A = Win rate 100% histórico.`}
           actions={['Ver Carry Trade', 'Monitorar Flush', 'Checar Hedge', 'Ver Arbitragem']}
           compact
@@ -431,7 +431,7 @@ export function ActionsContent() {
 
       {tab === 'Performance' && (
         <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '18px 20px' }}>
-          <div style={{ fontSize: 13, fontWeight: 800, color: '#e2e8f0', marginBottom: 10 }}>📈 Performance do Sistema AI</div>
+          <div style={{ fontSize: 13, fontWeight: 800, color: '#e2e8f0', marginBottom: 10 }}>📈 Performance do Sistema</div>
           <div style={{
             marginBottom: 16, padding: '10px 14px', borderRadius: 8,
             background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.2)',

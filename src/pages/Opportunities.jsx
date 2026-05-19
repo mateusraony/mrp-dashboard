@@ -5,7 +5,7 @@ import { ActionsContent } from './ActionDashboard';
 import { StrategiesContent } from './Strategies';
 
 const TABS = [
-  { id: 'actions', label: '⚡ Ações AI' },
+  { id: 'actions', label: '⚡ Ações' },
   { id: 'strategies', label: '📐 Estratégias' },
 ];
 
