@@ -674,37 +674,35 @@ export default function Settings() {
         </h1>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
           <p style={{ fontSize: 12, color: '#4a5568', margin: 0 }}>
-            Configuration · Persistent via Supabase ·
+            Configurações · Telegram persiste no Supabase ·
           </p>
           <ModeBadge />
-          <span style={{
-            fontSize: 10, padding: '2px 6px', borderRadius: 4,
-            background: 'rgba(245,158,11,0.1)', color: '#f59e0b',
-            border: '1px solid rgba(245,158,11,0.2)',
-          }}>POST /admin/settings</span>
         </div>
       </div>
 
-      {/* Auth note */}
+      {/* Supabase persistence info */}
       <div style={{
         marginBottom: 16, padding: '10px 14px',
-        background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.2)',
+        background: isSupabaseConfigured() ? 'rgba(16,185,129,0.05)' : 'rgba(245,158,11,0.05)',
+        border: `1px solid ${isSupabaseConfigured() ? 'rgba(16,185,129,0.2)' : 'rgba(245,158,11,0.2)'}`,
         borderRadius: 8, fontSize: 11, color: '#4a5568',
       }}>
-        <strong style={{ color: '#f59e0b' }}>Security:</strong>{' '}
-        In production, /admin/settings requires header{' '}
-        <span style={{ fontFamily: 'JetBrains Mono, monospace', color: '#8899a6' }}>X-TICK-TOKEN</span>.
-        Changes are persisted to Supabase <span style={{ fontFamily: 'JetBrains Mono, monospace', color: '#8899a6' }}>settings</span> table.
+        {isSupabaseConfigured()
+          ? <><strong style={{ color: '#10b981' }}>Supabase configurado</strong> — configurações de Telegram e preferências são persistidas no banco.</>
+          : <><strong style={{ color: '#f59e0b' }}>Supabase não configurado</strong> — configure <code style={{ fontFamily: 'JetBrains Mono, monospace', color: '#94a3b8' }}>VITE_SUPABASE_URL</code> e <code style={{ fontFamily: 'JetBrains Mono, monospace', color: '#94a3b8' }}>VITE_SUPABASE_ANON_KEY</code> no <code style={{ fontFamily: 'JetBrains Mono, monospace', color: '#94a3b8' }}>.env.local</code> para persistência.</>
+        }
       </div>
 
       {/* Data Mode */}
       <Section title="📡 Data Mode">
         <DataModeToggle />
-        <SettingRow
-          label="CRYPTO_SYMBOLS"
-          value="BTCUSDT"
-          description="Comma-separated symbols to monitor (Binance USDⓈ-M Futures)"
-        />
+        <div style={{ padding: '12px 0', borderBottom: '1px solid rgba(30,45,69,0.5)', display: 'flex', alignItems: 'flex-start', gap: 16 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0', marginBottom: 2 }}>CRYPTO_SYMBOLS</div>
+            <div style={{ fontSize: 11, color: '#4a5568' }}>Símbolo monitorado — atualmente fixo em <code style={{ fontFamily: 'JetBrains Mono, monospace', color: '#60a5fa' }}>BTCUSDT</code> (Binance USDⓈ-M Futures). Configuração via código.</div>
+          </div>
+          <span style={{ fontSize: 10, fontFamily: 'JetBrains Mono, monospace', color: '#60a5fa', padding: '3px 8px', background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: 4, flexShrink: 0, marginTop: 2 }}>BTCUSDT</span>
+        </div>
       </Section>
 
       {/* Modules */}
@@ -717,6 +715,13 @@ export default function Settings() {
 
       {/* Thresholds */}
       <Section title="⚡ Alert Thresholds">
+        <div style={{
+          marginBottom: 12, padding: '7px 12px', borderRadius: 6, fontSize: 10,
+          background: 'rgba(148,163,184,0.06)', border: '1px solid rgba(148,163,184,0.15)',
+          color: '#4a6580',
+        }}>
+          ℹ️ Valores de referência usados nos cálculos internos. O botão "Save" é apenas visual — alterações aqui <strong>não são persistidas</strong> no banco.
+        </div>
         {Object.entries(THRESHOLDS).map(([k, v]) => (
           <SettingRow
             key={k}
@@ -739,8 +744,15 @@ export default function Settings() {
 
       {/* FRED Series */}
       <Section title="📊 FRED Macro Series">
-        <div style={{ fontSize: 11, color: '#4a5568', marginBottom: 10 }}>
-          FRED series IDs fetched daily. Data is not intraday.
+        <div style={{ fontSize: 11, color: '#4a5568', marginBottom: 6 }}>
+          IDs das séries FRED buscadas diariamente via edge function <code style={{ fontFamily: 'JetBrains Mono, monospace', color: '#475569' }}>fred-proxy</code>. Dados não são intraday.
+        </div>
+        <div style={{
+          marginBottom: 12, padding: '7px 12px', borderRadius: 6, fontSize: 10,
+          background: 'rgba(148,163,184,0.06)', border: '1px solid rgba(148,163,184,0.15)',
+          color: '#4a6580',
+        }}>
+          ℹ️ Referência informativa — alterações aqui <strong>não são persistidas</strong>. Para mudar os IDs das séries, edite <code style={{ fontFamily: 'JetBrains Mono, monospace' }}>src/services/fred.ts</code>.
         </div>
         {[
           ['SP500', 'SP500', 'S&P 500 Index'],
@@ -760,7 +772,10 @@ export default function Settings() {
         borderRadius: 12, overflow: 'hidden',
       }}>
         <div style={{ padding: '14px 20px', borderBottom: '1px solid #1e2d45' }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>📡 Source Health (read-only)</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>📡 Source Health (leitura)</div>
+          <div style={{ fontSize: 10, color: '#334155' }}>
+            Teste de conectividade TCP — mede se o servidor responde, não se a API retorna dados válidos. FRED é verificado via servidor FRED diretamente (não via edge function).
+          </div>
         </div>
         <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
