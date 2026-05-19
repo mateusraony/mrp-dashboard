@@ -1,6 +1,6 @@
 # CHECKPOINT.md — MRP Dashboard
 > Memória técnica viva do projeto. Atualizar ao final de cada bloco importante.
-> Última atualização: 2026-05-19 (Fase de confiança de dados | Páginas 1-16 concluídas)
+> Última atualização: 2026-05-19 (Fase de confiança de dados | Páginas 1-17 concluídas)
 
 ---
 
@@ -31,7 +31,7 @@
 | 14 | **MarketRegime** | ✅ CONCLUÍDA | A | Sim | PR #144 |
 | 15 | **PredictivePanel** | ✅ CONCLUÍDA | A | Sim | PR #145 |
 | 16 | **OnChain** | ✅ CONCLUÍDA | A | Sim | sem PR — já conforme |
-| 17 | Options | ⏳ Aguarda | — | — | — |
+| 17 | **Options** | ✅ CONCLUÍDA | A | Sim | PR #146 |
 | 18 | MarketSentiment | ⏳ Aguarda | — | — | — |
 | 19 | InstitutionalFlows | ⏳ Aguarda | — | — | — |
 | 20 | Opportunities | ⏳ Aguarda | — | — | — |
@@ -594,6 +594,46 @@
 **Alterações feitas:** Nenhuma — página já conforme.
 
 **Classificação final:** A — Melhor página de transparência de dados do projeto. Nenhuma alteração necessária.
+
+---
+
+### Options — Auditoria detalhada
+
+**Status antes:** B — `🤖 AI Analysis — Options` para output de `computeRuleBasedAnalysis`
+**Status depois:** A
+
+**Classificação de dados:**
+| Dado | Classificação |
+|------|--------------|
+| IV ATM, chain strikes, skew | `LIVE_REAL` — Deribit via `useOptionsData` |
+| IV deltas 1D/1W/1M | `CALCULADO` — delta da série DVOL do Deribit |
+| Put/Call skew médio | `CALCULADO` — média de (put_iv − call_iv) por strike |
+| Regime (low_vol/normal/elevated/crisis) | `CALCULADO` — threshold em iv_atm |
+| GEX, Max Pain | `CALCULADO` — `computeGex` e `computeMaxPain` com Black-Scholes 2ª deriv. (validado em scripts/) |
+| Put/Call Ratio Vol e OI | `LIVE_REAL` — Deribit quando disponível |
+| Sinal AIModuleCard | `CALCULADO` — `computeRuleBasedAnalysis` (if/else IV · skew · P/C · max pain) |
+| Claude Haiku insight | `LIVE_REAL` — `useAiInsight` quando `hasLiveData` |
+| IV Rank | `LIVE_PARCIAL` — IV ao vivo, limites 52w do mock (`IVRankPanel` já tem badge pago) |
+| Taker Flow | `PAGO_INDISPONIVEL` — requer Deribit auth (`TakerFlowPanel` já tem badge pago) |
+| DealerFlowPanel (GEX/Vanna/Charm) | `CALCULADO` — Black-Scholes 2ª deriv. do spot + IV live |
+
+**Pontos positivos pré-existentes:**
+- `ModeBadge` + `GradeBadge` no header ✅
+- `ClaudeInsight` com `✦ Claude Haiku` separado e claro ✅
+- `IVRankPanel` e `TakerFlowPanel` com `DataTrustBadge paid_required` ✅
+- `SectionHeader` com grade por gráfico ✅
+
+**Alteração feita:**
+| Arquivo | Linha | Alteração |
+|---|---|---|
+| `src/pages/Options.jsx` | 300 | `🤖 AI Analysis — Options` → `Análise Options` + nota de metodologia |
+
+**Testes executados:**
+| Comando | Resultado |
+|---------|----------|
+| `npm run build` | ✅ 0 erros |
+
+**Classificação final:** A — Label honesto. Claude Haiku claramente separado da análise por regras.
 
 ---
 

@@ -297,7 +297,10 @@ export default function Options() {
 
       {/* AI Analysis */}
       <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 10 }}>🤖 AI Analysis — Options</div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 10 }}>
+          Análise Options
+          <span style={{ fontSize: 9, color: '#475569', fontWeight: 400, marginLeft: 8 }}>Sinal calculado por regras de threshold (IV ATM · skew · P/C ratio · max pain) — não por modelo de linguagem. Claude Haiku exibido abaixo quando configurado.</span>
+        </div>
         <AIModuleCard module={aiAnalysis.modules.options} title="Options" icon="◬" />
         <ClaudeInsight text={optInsight} loading={optAiLoading} />
       </div>
