@@ -70,7 +70,7 @@ function AlertCycleDetail({ alert }) {
   );
 }
 
-const SPOT_PRICE = 84298.70;
+const SPOT_PRICE = 0;
 
 // ─── CATEGORIAS DE ALERTAS ───────────────────────────────────────────────────
 const CATEGORIES = [
