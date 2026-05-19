@@ -309,7 +309,7 @@ export default function PredictivePanel() {
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
           <h1 style={{ fontSize: 20, fontWeight: 900, color: '#f1f5f9', margin: 0, letterSpacing: '-0.03em' }}>Painel Preditivo BTC 24H</h1>
           <ModeBadge mode={IS_LIVE && spotPrice ? 'live' : 'mock'} />
-          <span style={{ fontSize: 9, color: '#a78bfa', background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.25)', borderRadius: 4, padding: '2px 8px', fontWeight: 700 }}>🧠 AI-Quantitative</span>
+          <span style={{ fontSize: 9, color: '#a78bfa', background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.25)', borderRadius: 4, padding: '2px 8px', fontWeight: 700 }}>📐 Quantitativo</span>
           {liveAnalysis && (() => {
             const d = liveAnalysis.overall.direction;
             const isBull = d === 'bullish' || d === 'bullish_bias';
@@ -403,7 +403,7 @@ export default function PredictivePanel() {
                 <div style={{ fontSize: 10, fontWeight: 700, color: '#e2e8f0', marginBottom: 8 }}>Confiança do Modelo</div>
                 <ProbBar value={Math.round(selectedScenario.confidence * 100)} color={selectedScenario.color} />
                 <div style={{ fontSize: 9, color: '#334155', marginTop: 6 }}>
-                  Baseado em correlação histórica 30D ({(0.68).toFixed(2)} SPX), stablecoin lag ~12h, VIX {(22.14).toFixed(1)}, funding {(0.0712).toFixed(4)}%
+                  Preços-alvo calculados via ATR(14) dos últimos 30 klines diários (Binance). Probabilidades de cenários são referência estática — não derivadas de modelo preditivo em tempo real.
                 </div>
               </div>
             </div>
@@ -494,7 +494,7 @@ export default function PredictivePanel() {
           <div style={{ padding: '10px 14px', background: 'rgba(167,139,250,0.06)', border: '1px solid rgba(167,139,250,0.2)', borderRadius: 9 }}>
             <span style={{ fontSize: 10, color: '#a78bfa', fontWeight: 700 }}>🎯 Metodologia: </span>
             <span style={{ fontSize: 10, color: '#64748b' }}>
-              Probabilidade de toque calculada com base em clusters de liquidação, correlação SPX 0.68, pressão institucional (ETF +$284M, stablecoin +$421M) e regime atual (Neutral, 58pts). Lag stablecoin ~12h incluído.
+              Tabela requer clusters de liquidação via API paga (Glassnode). Quando disponível: prob. de toque por distância ATR + correlação SPX + lag stablecoin ~12h.
             </span>
           </div>
           <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, overflow: 'hidden' }}>

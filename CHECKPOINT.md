@@ -1,6 +1,6 @@
 # CHECKPOINT.md — MRP Dashboard
 > Memória técnica viva do projeto. Atualizar ao final de cada bloco importante.
-> Última atualização: 2026-05-19 (Fase de confiança de dados | Páginas 1-14 concluídas)
+> Última atualização: 2026-05-19 (Fase de confiança de dados | Páginas 1-15 concluídas)
 
 ---
 
@@ -29,7 +29,7 @@
 | 12 | **Dashboard** | ✅ CONCLUÍDA | A | Sim | PR #142 |
 | 13 | **ExecutiveReport** | ✅ CONCLUÍDA | A | Sim | PR #143 |
 | 14 | **MarketRegime** | ✅ CONCLUÍDA | A | Sim | PR #144 |
-| 15 | PredictivePanel | ⏳ Aguarda | — | — | — |
+| 15 | **PredictivePanel** | ✅ CONCLUÍDA | A | Sim | PR #145 |
 | 16 | OnChain | ⏳ Aguarda | — | — | — |
 | 17 | Options | ⏳ Aguarda | — | — | — |
 | 18 | MarketSentiment | ⏳ Aguarda | — | — | — |
@@ -505,6 +505,56 @@
 | `npm run build` | ✅ 0 erros |
 
 **Classificação final:** A — Score de regime é live e bem rotulado. Sugestões de exposição são editoriais hardcoded — agora claramente nomeadas sem referência a AI.
+
+---
+
+### PredictivePanel — Auditoria detalhada
+
+**Status antes:** B — Badge `🧠 AI-Quantitative` sem IA real; descrições de confiança e metodologia com valores hardcoded aparentando ser live
+**Status depois:** A
+
+**Classificação de dados:**
+| Dado | Classificação |
+|------|--------------|
+| BTC spot price | `LIVE_REAL` — Binance Futures via `useBtcTicker` |
+| Klines 1d/30 | `LIVE_REAL` — Binance via `useKlines` |
+| ATR(14) | `CALCULADO` — média de (high−low) dos últimos 14 klines Binance |
+| Fear & Greed | `LIVE_REAL` — Alternative.me via `useFearGreed` |
+| Risk Score | `LIVE_REAL` — `useRiskScore` |
+| Direção/Sinal (badge) | `CALCULADO` — `computeRuleBasedAnalysis` (if/else funding + FNG + riskScore) |
+| Target prices dos cenários | `CALCULADO` — `spotPrice + ATR14 × multiplicador` quando live |
+| Probabilidades dos cenários (28/34/18/14/6%) | `HARDCODED` — `SCENARIOS_24H_FALLBACK` estático (nunca muda com dados live) |
+| Triggers, drivers, risk dos cenários | `HARDCODED` — `'—'` e `[]` no fallback |
+| Claude Haiku insight (`ClaudeInsight`) | `LIVE_REAL` — `useAiInsight` quando ticker + atr14 disponíveis |
+| Path chart (trajetórias) | `MOCK` — `PRICE_PATHS_FALLBACK` com arrays vazios (sem renderização) |
+| Tabela Prob. Rompimento | `MOCK` — `BREAKOUT_TABLE_FALLBACK = []` (sempre vazia) |
+| Pressão Institucional | `MOCK` — `INSTITUTIONAL_PRESSURE_FALLBACK` com score=0, componentes=[] |
+
+**Pontos positivos pré-existentes:**
+- `ModeBadge` condicionado a `IS_LIVE && spotPrice` (não apenas IS_LIVE) ✅
+- `ClaudeInsight` com `✦ Claude Haiku` claramente separado da análise de regras ✅
+- `DataTrustBadge mode="paid_required"` na Pressão Institucional ✅
+- Fallbacks nomeados `*_FALLBACK` — rastreáveis ✅
+- Spot price mostra `⚠` quando `ticker?.isFallback` ✅
+
+**Problemas:**
+1. Badge `🧠 AI-Quantitative` — nem IA (Claude Haiku é separado) nem quantitativo real (probabilidades são estáticas)
+2. "Confiança do Modelo" descrevia `(0.68).toFixed(2)`, `(22.14).toFixed(1)`, `(0.0712).toFixed(4)` — floats hardcoded no código, não valores live
+3. Tab "Prob. Rompimento" descrevia `ETF +$284M, stablecoin +$421M, Neutral, 58pts` como inputs do cálculo — mas `BREAKOUT_TABLE_FALLBACK = []` (tabela sempre vazia)
+
+**Alterações feitas:**
+| Arquivo | Linha | Alteração |
+|---|---|---|
+| `src/pages/PredictivePanel.jsx` | 312 | Badge `🧠 AI-Quantitative` → `📐 Quantitativo` |
+| `src/pages/PredictivePanel.jsx` | 406 | Substituiu floats hardcoded por descrição honesta: ATR(14) live + probabilidades estáticas |
+| `src/pages/PredictivePanel.jsx` | 497 | Substituiu valores hardcoded por nota de requisito de API paga (Glassnode) |
+
+**Testes executados:**
+| Comando | Resultado |
+|---------|----------|
+| `npm run build` | ✅ 0 erros |
+
+**Classificação final:** A — Labels honestos. Preços-alvo via ATR são live. Probabilidades de cenários são referência estática — agora claramente indicadas.
 
 ---
 
