@@ -49,7 +49,7 @@ export default function AIInsightPanel({ moduleId, title = '', probability, regi
           </div>
         )}
         <div style={{ marginTop: 6, fontSize: 8, color: '#1e3048', fontFamily: 'JetBrains Mono, monospace' }}>
-          🤖 Modelo: {modelLabel || 'mock_quant_v1'} · {moduleId}
+          {modelLabel ? `🤖 ${modelLabel} · ${moduleId}` : `Análise por regras · ${moduleId}`}
           {isLoadingInsight && ' · ✦ analisando...'}
         </div>
       </div>
@@ -68,7 +68,7 @@ export default function AIInsightPanel({ moduleId, title = '', probability, regi
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12, gap: 10 }}>
         <div>
           <div style={{ fontSize: 9, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4, fontWeight: 600 }}>
-            🤖 AI ANALYSIS · {moduleId}
+            {modelLabel ? `🤖 ${modelLabel}` : 'Análise Automática'} · {moduleId}
           </div>
           <div style={{
             fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 5, display: 'inline-block',
@@ -134,7 +134,7 @@ export default function AIInsightPanel({ moduleId, title = '', probability, regi
       )}
 
       <div style={{ marginTop: 10, fontSize: 8, color: '#1e3048', fontFamily: 'JetBrains Mono, monospace', borderTop: '1px solid #0f1d2e', paddingTop: 8 }}>
-        🤖 Modelo: {modelLabel || 'mock_quant_v1'} · {moduleId}
+        {modelLabel ? `🤖 ${modelLabel} · ${moduleId}` : `Análise por regras · ${moduleId}`}
         {isLoadingInsight && ' · ✦ analisando...'}
       </div>
     </div>
