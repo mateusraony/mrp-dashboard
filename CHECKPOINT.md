@@ -1,6 +1,6 @@
 # CHECKPOINT.md — MRP Dashboard
 > Memória técnica viva do projeto. Atualizar ao final de cada bloco importante.
-> Última atualização: 2026-05-19 (Fase de confiança de dados | Páginas 1-12 concluídas)
+> Última atualização: 2026-05-19 (Fase de confiança de dados | Páginas 1-13 concluídas — aguarda PR #143)
 
 ---
 
@@ -27,7 +27,7 @@
 | 10 | **Macro** | ✅ CONCLUÍDA | A | Sim | PR #140 |
 | 11 | **GlobalMarkets** | ✅ CONCLUÍDA | A | Sim | PR #141 |
 | 12 | **Dashboard** | ✅ CONCLUÍDA | A | Sim | PR #142 |
-| 13 | ExecutiveReport | ⏳ Aguarda | — | — | — |
+| 13 | **ExecutiveReport** | ✅ CONCLUÍDA | A | Sim | PR #143 |
 | 14 | MarketRegime | ⏳ Aguarda | — | — | — |
 | 15 | PredictivePanel | ⏳ Aguarda | — | — | — |
 | 16 | OnChain | ⏳ Aguarda | — | — | — |
@@ -401,6 +401,65 @@
 |---|---|---|
 | `src/pages/Dashboard.jsx` | 687 | `🤖 AI Analysis & Previsões` → `📊 Análise & Previsões` + sub-texto honesto |
 | `src/components/ui/AIAnalysisPanel.jsx` | 131 | `🤖 AI · {model}` → `Análise Automática · {model}` (model=`rule-based-v1` auto-descreve) |
+
+---
+
+### ExecutiveReport — Auditoria detalhada
+
+**Status antes:** B — `AIInsightPanel` exibia `🤖 AI ANALYSIS · EXECUTIVE_REPORT` e `🤖 Modelo: mock_quant_v1 · EXECUTIVE_REPORT` mesmo quando Claude Haiku não era usado (apenas regras)
+**Status depois:** A
+
+**Classificação de dados:**
+| Dado | Classificação |
+|------|--------------|
+| BTC price, funding rate, OI | `LIVE_REAL` — Binance Futures via `useBtcTicker` |
+| Fear & Greed | `LIVE_REAL` — Alternative.me via `useFearGreed` |
+| Risk Score | `LIVE_REAL` — `useRiskScore` (funding + liquidações + FNG) |
+| Market Regime | `LIVE_REAL` — `useMarketRegime` (if/else threshold) |
+| Regime history 90d | `LIVE_REAL` — Supabase `marketRegime` via `useRegimeHistory` |
+| On-chain cycle (NUPL, MVRV) | `LIVE_PARCIAL` — CoinMetrics Community (NUPL, MVRV proxy) |
+| OI history | `LIVE_REAL` — Binance via `useBtcOiHistory` |
+| Recomendação AIInsightPanel | `CALCULADO` — `computeRuleBasedAnalysis` (if/else funding · FNG · riskScore) |
+| Claude Haiku insight | `LIVE_REAL` — `useAiInsight` (quando IS_LIVE + liveTicker/liveFng) |
+| NUPL/SOPR/MVRV display | `MOCK` — `BTC_NUPL_FALLBACK`, `BTC_SOPR_FALLBACK`, `BTC_REALIZED_METRICS_FALLBACK` (zeros/valores neutros) |
+| Exchange Netflow/Whale data | `MOCK` — `BTC_EXCHANGE_NETFLOW_FALLBACK`, `BTC_WHALE_ACTIVITY_FALLBACK` (zeros) |
+| ETF Flows section | `MOCK` — `ETF_FLOWS_FALLBACK` (AUM=0, funds=[]) |
+| Stablecoin Supply | `MOCK` — `STABLECOIN_SUPPLY_FALLBACK` (zeros) |
+| Correlações BTC | `MOCK` — `BTC_CORRELATIONS_FALLBACK` (pairs=[]) |
+| S&P500, DXY, VIX, Gold | `MOCK` — `MACRO_BOARD_FALLBACK.series` vazio (sem FRED aqui) |
+| Yield Spread, Credit Spread | `MOCK` — `YIELD_CURVE_SPREAD_FALLBACK`, `CREDIT_SPREAD_FALLBACK` (zeros) |
+| Tabela Comparativo Multi-Período | `HARDCODED` — `PeriodSummaryTable` usa BTC_FUTURES_MOCK_FALLBACK + stubs fixos ('Anual' +124.8% etc.) |
+| Análise BRL→BTC | `HARDCODED` — texto editorial estático |
+
+**Pontos positivos pré-existentes:**
+- `ModeBadge` no header condicionado a `IS_LIVE && (liveTicker || liveFng)` ✅
+- `useAiInsight` real com `execPayload` construído de dados live ✅
+- `modelLabel` condicionado a `execInsightText` (só aparece quando Claude respondeu) ✅
+- Fallbacks explícitos nomeados `*_FALLBACK` ou `*_MOCK_FALLBACK` — rastreáveis ✅
+
+**Problema:**
+- `AIInsightPanel` mostrava `🤖 AI ANALYSIS · EXECUTIVE_REPORT` no header e `🤖 Modelo: mock_quant_v1 · {moduleId}` no rodapé quando `modelLabel` era `undefined` — ou seja, quando Claude Haiku ainda não tinha respondido. Isso sugeria IA onde havia apenas regras de threshold.
+
+**Alterações feitas:**
+| Arquivo | Linha | Alteração |
+|---|---|---|
+| `src/components/ai/AIInsightPanel.jsx` | 52 | Compact footer: `🤖 Modelo: {modelLabel \|\| 'mock_quant_v1'} · {moduleId}` → `{modelLabel ? \`🤖 ${modelLabel} · ${moduleId}\` : \`Análise por regras · ${moduleId}\`}` |
+| `src/components/ai/AIInsightPanel.jsx` | 71 | Full header: `🤖 AI ANALYSIS · {moduleId}` → `{modelLabel ? \`🤖 ${modelLabel}\` : 'Análise Automática'} · {moduleId}` |
+| `src/components/ai/AIInsightPanel.jsx` | 137 | Full footer: `🤖 Modelo: {modelLabel \|\| 'mock_quant_v1'} · {moduleId}` → `{modelLabel ? \`🤖 ${modelLabel} · ${moduleId}\` : \`Análise por regras · ${moduleId}\`}` |
+
+**Nota:** `AIInsightPanel` é usado também em `DerivativesAdvanced.jsx` (LiqHeatmap) — beneficia da mesma correção sem alterações adicionais. `modelLabel` já era `'claude-haiku-4-5'` condicionado ao texto Claude naquela página.
+
+**Seções com dados mock não mascarados (pendente futura sprint):**
+- `PeriodSummaryTable` — tabela com valores hardcoded. Sem indicador visual de mock. Candidato a sprint posterior de dados reais.
+- ETF Flows section — `ETF_FLOWS_FALLBACK` com zeros. Já linkado para `/InstitutionalFlows`.
+- Stablecoin section — `STABLECOIN_SUPPLY_FALLBACK` com zeros. Candidato futuro.
+
+**Testes executados:**
+| Comando | Resultado |
+|---------|----------|
+| `npm run build` | ✅ 0 erros |
+
+**Classificação final:** A — Labels honestos. Claude Haiku identificado quando presente. Seções mock não mascaradas são limitações de dados (APIs pagas/indisponíveis), não engano visual.
 
 ---
 
