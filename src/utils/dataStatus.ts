@@ -2,7 +2,7 @@
  * dataStatus.ts — Utilitários de confiabilidade e registro de fontes de dados
  */
 import type { DataMode, DataConfidence, DataPoint } from '@/types/dataStatus';
-import { DATA_MODE } from '@/lib/env';
+import { DATA_MODE, env } from '@/lib/env';
 import { isSupabaseConfigured } from '@/services/supabase';
 
 // ─── normalizeDataStatus ───────────────────────────────────────────────────────
@@ -227,6 +227,86 @@ export const SOURCE_REGISTRY: Record<string, SourceRegistryEntry> = {
     staticMode: 'live',
     staticConfidence: 'A',
   },
+  binance_ws: {
+    name: 'Binance WebSocket (BTC preço)',
+    url: 'https://fstream.binance.com',
+    free: true,
+    authRequired: false,
+    updateFrequency: '~1s (streaming)',
+    limitation: 'Singleton — reconecta com backoff 1s→30s',
+    staticMode: 'live',
+    staticConfidence: 'A',
+  },
+  defillama: {
+    name: 'DeFiLlama (stablecoins)',
+    url: 'https://stablecoins.llama.fi',
+    free: true,
+    authRequired: false,
+    updateFrequency: '1h',
+    limitation: 'Rate limit generoso; em 429 retorna dado estimado (quality=C)',
+    staticMode: 'live',
+    staticConfidence: 'A',
+  },
+  sosovalue: {
+    name: 'SoSoValue (ETF flows)',
+    url: 'https://sosovalue.com/developer',
+    free: false,
+    authRequired: true,
+    updateFrequency: '1h',
+    limitation: 'Requer VITE_SOSOVALUE_KEY — free tier: 20 req/min. Sem key: sem dados de ETF.',
+    staticMode: 'paid_required',
+    staticConfidence: 'D',
+  },
+  reddit: {
+    name: 'Reddit JSON API (ETF posts)',
+    url: 'https://www.reddit.com',
+    free: true,
+    authRequired: false,
+    updateFrequency: '30min',
+    limitation: 'API pública de subreddit — sem autenticação. Pode sofrer rate limit.',
+    staticMode: 'live',
+    staticConfidence: 'B',
+  },
+  cryptocompare: {
+    name: 'CryptoCompare (fallback CoinGecko)',
+    url: 'https://min-api.cryptocompare.com',
+    free: true,
+    authRequired: false,
+    updateFrequency: '5min',
+    limitation: 'Ativado automaticamente quando CoinGecko retorna 429. Sem key: 100 req/min.',
+    staticMode: 'live',
+    staticConfidence: 'B',
+  },
+  yahoo_finance: {
+    name: 'Yahoo Finance (S&P 500 / VIX)',
+    url: 'https://query1.finance.yahoo.com',
+    free: true,
+    authRequired: false,
+    updateFrequency: '1h',
+    limitation: 'Fallback quando FRED não disponível. Acesso via proxy para evitar CORS.',
+    staticMode: 'live',
+    staticConfidence: 'B',
+  },
+  glassnode: {
+    name: 'Glassnode (NUPL / SOPR / Netflow / Whales)',
+    url: 'https://glassnode.com/pricing',
+    free: false,
+    authRequired: true,
+    updateFrequency: 'N/A',
+    limitation: 'Requer plano Standard (~$29/mês). Sem key: NUPL/SOPR/Netflow/Whales são MOCK fixo.',
+    staticMode: 'paid_required',
+    staticConfidence: 'D',
+  },
+  x_twitter: {
+    name: 'X/Twitter API (sentimento social)',
+    url: 'https://developer.x.com/en/products/twitter-api',
+    free: false,
+    authRequired: true,
+    updateFrequency: 'N/A',
+    limitation: 'Plano Basic mínimo: $100/mês. Sem key: trending topics e KOL sentiment são HARDCODED.',
+    staticMode: 'paid_required',
+    staticConfidence: 'D',
+  },
 };
 
 // ─── getRuntimeMode ───────────────────────────────────────────────────────────
@@ -245,6 +325,11 @@ export function getRuntimeMode(serviceKey: string): DataMode {
   if (DATA_MODE === 'mock' && reg.staticMode !== 'paid_required') return 'mock';
   // FRED requer Supabase configurado (proxy server-side) — sem ele é erro em live mode
   if (serviceKey === 'fred' && !isSupabaseConfigured() && DATA_MODE === 'live') return 'error';
+  // SoSoValue requer VITE_SOSOVALUE_KEY — sem key não há dados de ETF
+  if (serviceKey === 'sosovalue') {
+    if (!env.VITE_SOSOVALUE_KEY) return 'paid_required';
+    return DATA_MODE === 'mock' ? 'mock' : 'live';
+  }
   return reg.staticMode;
 }
 

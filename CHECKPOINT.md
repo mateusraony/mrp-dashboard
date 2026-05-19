@@ -1,6 +1,84 @@
 # CHECKPOINT.md — MRP Dashboard
 > Memória técnica viva do projeto. Atualizar ao final de cada bloco importante.
-> Última atualização: 2026-05-17 (Items 1–10 ✅ | Fases de auditoria 0–6 ✅ | Dívida técnica baixa severidade ✅ | 285 testes | 0 vulnerabilidades)
+> Última atualização: 2026-05-19 (Fase de confiança de dados iniciada | Página 1/21: DataSources ✅)
+
+---
+
+## 🛡 FASE DE CONFIANÇA DE DADOS (iniciada 2026-05-19)
+
+**Objetivo:** Tornar impossível confundir dado real com mock, página por página.
+**Branch:** `claude/inspect-github-project-K4Leg`
+**Commit inicial:** `3d1260d`
+**Regra:** Uma página por vez. Não avança sem confirmação do usuário + build OK.
+
+### Mapa de Páginas — Fase de Confiança
+
+| # | Página | Status | Classificação | Pode usar? | Commit |
+|---|---|---|---|---|---|
+| 1 | **DataSources** | ✅ CONCLUÍDA | A | Sim, com confiança | pendente push |
+| 2 | Settings | ⏳ Aguarda confirmação | — | — | — |
+| 3 | NewsIntelligence | ⏳ Aguarda | — | — | — |
+| 4 | Altcoins | ⏳ Aguarda | — | — | — |
+| 5 | SpotFlow | ⏳ Aguarda | — | — | — |
+| 6 | Portfolio | ⏳ Aguarda | — | — | — |
+| 7 | Derivatives | ⏳ Aguarda | — | — | — |
+| 8 | SmartAlerts | ⏳ Aguarda | — | — | — |
+| 9 | MacroCalendar | ⏳ Aguarda | — | — | — |
+| 10 | Macro | ⏳ Aguarda | — | — | — |
+| 11 | GlobalMarkets | ⏳ Aguarda | — | — | — |
+| 12 | Dashboard | ⏳ Aguarda | — | — | — |
+| 13 | ExecutiveReport | ⏳ Aguarda | — | — | — |
+| 14 | MarketRegime | ⏳ Aguarda | — | — | — |
+| 15 | PredictivePanel | ⏳ Aguarda | — | — | — |
+| 16 | OnChain | ⏳ Aguarda | — | — | — |
+| 17 | Options | ⏳ Aguarda | — | — | — |
+| 18 | MarketSentiment | ⏳ Aguarda | — | — | — |
+| 19 | InstitutionalFlows | ⏳ Aguarda | — | — | — |
+| 20 | Opportunities | ⏳ Aguarda | — | — | — |
+| 21 | Automations | ⏳ Aguarda | — | — | — |
+
+### Auditoria de rotas (revalidada 2026-05-19)
+
+**Conclusão: NENHUMA página é órfã.** Todos os 29 arquivos em `src/pages/` são utilizados.
+- 21 são rotas diretas em `pages.config.js`
+- 8 são sub-componentes de páginas wrapper (Derivatives, DerivativesAdvanced, Automations, BotAutomations, ETFFlows, StablecoinFlow, ActionDashboard, Strategies)
+
+### DataSources — Auditoria detalhada
+
+**Status antes:** B — Bom, mas incompleto
+**Status depois:** A — Pronta para uso como central de auditoria
+
+**O que estava live:**
+- Tabela de fontes via `SOURCE_REGISTRY` (estática, mas correta)
+- `getRuntimeMode()` calculado de DATA_MODE + isSupabaseConfigured()
+- Badges DataTrustBadge por fonte
+
+**O que estava faltando / foi corrigido:**
+- `SOURCE_REGISTRY` não listava: DeFiLlama, SoSoValue, CryptoCompare, Yahoo Finance, Glassnode, X/Twitter, Binance WebSocket, Reddit
+- Sem seção de Edge Functions (7 existem: fred-proxy, ai-analysis, macro-actual-fetcher, macro-alert-worker, send-telegram-digest, telegram-ping, health-check)
+- Sem status do Supabase na tela
+- Sem exibição do override de localStorage separado do DATA_MODE de build
+
+**Alterações feitas:**
+
+| Arquivo | Alteração | Motivo |
+|---|---|---|
+| `src/utils/dataStatus.ts` | +8 entradas no SOURCE_REGISTRY (defillama, sosovalue, reddit, cryptocompare, yahoo_finance, glassnode, x_twitter, binance_ws) | Transparência — fontes reais não listadas |
+| `src/utils/dataStatus.ts` | getRuntimeMode() agora verifica env.VITE_SOSOVALUE_KEY para sosovalue | ETF flows devem mostrar paid_required quando key ausente |
+| `src/pages/DataSources.jsx` | `EnvironmentPanel` — Supabase status, DATA_MODE, localStorage override | Usuário sabia o modo mas não o status do Supabase ou override |
+| `src/pages/DataSources.jsx` | `EdgeFunctionsPanel` — lista 7 edge functions com propósito e status | Página não mostrava edge functions de nenhuma forma |
+| `src/pages/DataSources.jsx` | Substituiu "Data Mode Banner" por `EnvironmentPanel` (mais completo) | Evitar redundância com informação nova mais rica |
+
+**Testes executados:**
+
+| Comando | Resultado |
+|---|---|
+| `npm run build` | ✅ 0 erros |
+| `npx eslint src/pages/DataSources.jsx src/utils/dataStatus.ts --quiet` | ✅ 0 warnings |
+| `npx tsc -p ./jsconfig.json` | ✅ 0 erros |
+
+**Classificação final:** A — Pode usar com confiança como central de auditoria do sistema
+**Próxima página:** Settings (aguarda confirmação do usuário)
 
 ---
 
