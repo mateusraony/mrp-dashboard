@@ -254,19 +254,19 @@ export default function MarketSentiment() {
             <h1 style={{ fontSize: 20, fontWeight: 900, color: '#f1f5f9', margin: 0, letterSpacing: '-0.03em' }}>🧠 Sentimento Social</h1>
             <ModeBadge mode={IS_LIVE ? 'live' : 'mock'} />
             {!IS_LIVE && <DataTrustBadge mode="mock" confidence="D" source="Demo" reason="Dados sociais simulados — Twitter/Reddit sem API real" />}
-            <span style={{ fontSize: 9, padding: '2px 8px', borderRadius: 4, background: 'rgba(167,139,250,0.1)', color: '#a78bfa', border: '1px solid rgba(167,139,250,0.25)', fontWeight: 700 }}>AI-Powered</span>
+            <span style={{ fontSize: 9, padding: '2px 8px', borderRadius: 4, background: 'rgba(167,139,250,0.1)', color: '#a78bfa', border: '1px solid rgba(167,139,250,0.25)', fontWeight: 700 }}>FNG + Funding + GDELT</span>
           </div>
           <p style={{ fontSize: 11, color: '#475569', margin: 0 }}>Twitter/X · Reddit · Telegram · Notícias Cripto · Word Cloud · Correlação BTC</p>
         </div>
         <button onClick={generateAIAnalysis} disabled={isGenerating} style={{ padding: '9px 16px', borderRadius: 8, cursor: isGenerating ? 'default' : 'pointer', fontSize: 11, fontWeight: 700, background: isGenerating ? '#0d1421' : 'rgba(167,139,250,0.12)', border: `1px solid ${isGenerating ? '#1a2535' : 'rgba(167,139,250,0.35)'}`, color: isGenerating ? '#334155' : '#a78bfa' }}>
-          {isGenerating ? '⏳ Analisando...' : '🤖 Gerar Análise AI'}
+          {isGenerating ? '⏳ Verificando...' : 'ℹ️ Status Integração AI'}
         </button>
       </div>
 
       {/* AI Analysis */}
       {aiAnalysis && (
         <div style={{ marginBottom: 14, padding: '14px 16px', borderRadius: 10, background: 'rgba(167,139,250,0.06)', border: '1px solid rgba(167,139,250,0.25)' }}>
-          <div style={{ fontSize: 10, color: '#a78bfa', fontWeight: 700, marginBottom: 6 }}>🤖 Análise AI — Sentimento Social</div>
+          <div style={{ fontSize: 10, color: '#a78bfa', fontWeight: 700, marginBottom: 6 }}>ℹ️ Status da Integração AI</div>
           <div style={{ fontSize: 11, color: '#94a3b8', lineHeight: 1.7 }}>{aiAnalysis}</div>
         </div>
       )}
@@ -461,6 +461,9 @@ export default function MarketSentiment() {
             <div style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.15)', fontSize: 10, color: '#64748b', lineHeight: 1.7 }}>
               <span style={{ color: '#94a3b8', fontWeight: 700 }}>Lag ótimo:</span> {socialCorrelation.lag_hours_optimal}h<br />
               {socialCorrelation.note}
+            </div>
+            <div style={{ marginTop: 8, padding: '6px 10px', borderRadius: 6, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.18)', fontSize: 9, color: '#78716c' }}>
+              ⚠️ Valores de correlação são referências editoriais estáticas — não calculadas de dados live. Correlação em tempo real requer histórico social via LunarCrush (~$49/mês).
             </div>
           </div>
 

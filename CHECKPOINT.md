@@ -32,7 +32,7 @@
 | 15 | **PredictivePanel** | ✅ CONCLUÍDA | A | Sim | PR #145 |
 | 16 | **OnChain** | ✅ CONCLUÍDA | A | Sim | sem PR — já conforme |
 | 17 | **Options** | ✅ CONCLUÍDA | A | Sim | PR #146 |
-| 18 | MarketSentiment | ⏳ Aguarda | — | — | — |
+| 18 | **MarketSentiment** | ✅ CONCLUÍDA | A | Sim | PR #147 |
 | 19 | InstitutionalFlows | ⏳ Aguarda | — | — | — |
 | 20 | Opportunities | ⏳ Aguarda | — | — | — |
 | 21 | Automations | ⏳ Aguarda | — | — | — |
@@ -634,6 +634,57 @@
 | `npm run build` | ✅ 0 erros |
 
 **Classificação final:** A — Label honesto. Claude Haiku claramente separado da análise por regras.
+
+---
+
+### MarketSentiment — Auditoria detalhada
+
+**Status antes:** B — badge `AI-Powered`, botão `🤖 Gerar Análise AI` (stub), painel `🤖 Análise AI`, correlações hardcoded sem disclaimer
+**Status depois:** A
+
+**Classificação de dados:**
+| Dado | Classificação |
+|------|--------------|
+| Score composto (Fear/Greed + Funding + GDELT) | `CALCULADO` — `useMarketSentiment` pondera FNG 50% + Funding 30% + GDELT 20% |
+| Fear & Greed | `LIVE_REAL` — Alternative.me via `useFearGreed` |
+| Funding Rate (componente) | `LIVE_REAL` — Binance via `useBtcTicker` (interno ao hook) |
+| Sentimento GDELT (componente) | `LIVE_REAL` — `useGdelt` |
+| Word Cloud | `LIVE_REAL` quando `gdeltArticles` disponível; `HARDCODED` (`wordCloudData`) como fallback |
+| Histórico 7d sentimento + BTC price | `LIVE_REAL` quando `fngHistory + klines` disponíveis; `HARDCODED` (`sentimentHistory7d`) como fallback |
+| Cobertura midiática por hora | `LIVE_REAL` — GDELT timeline via `useGdeltMentionsTimeline` quando disponível |
+| Trending topics | `LIVE_PARCIAL` — keywords extraídas de `gdeltArticles` quando live; `HARDCODED` (`trendingTopics`) como fallback |
+| `generateAIAnalysis()` | `HARDCODED` — stub que retorna string fixa após 800ms; sem LLM |
+| Correlações (tab Correlações) | `HARDCODED` — `socialCorrelation` const com valores fixos (0.74, 0.68, lag=4h) |
+| KOLs tab | `PAGO_INDISPONIVEL` — `🔒` explícito, requer Twitter API Enterprise ✅ |
+
+**Pontos positivos pré-existentes:**
+- `ModeBadge` no header ✅
+- `DataTrustBadge mode="mock"` quando `!IS_LIVE` ✅
+- Nota "Lag stablecoin ~12h" honesta no footer do score ✅
+- Tab KOLs: `🔒` com explicação de custo da API ✅
+- Cobertura midiática: label correto "GDELT Doc 2.0" quando live ✅
+- Trending: nota "GDELT indisponível — dados de demonstração" quando fallback ✅
+
+**Problemas:**
+1. Badge `AI-Powered` — score é FNG + Funding + GDELT (regras de peso fixo), sem modelo de linguagem
+2. Botão `🤖 Gerar Análise AI` — stub que retorna texto fixo após timeout
+3. Painel resultado com `🤖 Análise AI — Sentimento Social` — stub, não LLM
+4. Correlações hardcoded sem disclaimer
+
+**Alterações feitas:**
+| Arquivo | Linha | Alteração |
+|---|---|---|
+| `src/pages/MarketSentiment.jsx` | 257 | Badge `AI-Powered` → `FNG + Funding + GDELT` |
+| `src/pages/MarketSentiment.jsx` | 262 | Botão `🤖 Gerar Análise AI` → `ℹ️ Status Integração AI` |
+| `src/pages/MarketSentiment.jsx` | 269 | Painel `🤖 Análise AI — Sentimento Social` → `ℹ️ Status da Integração AI` |
+| `src/pages/MarketSentiment.jsx` | ~463 | Disclaimer adicionado após correlações hardcoded |
+
+**Testes executados:**
+| Comando | Resultado |
+|---------|----------|
+| `npm run build` | ✅ 0 erros |
+
+**Classificação final:** A — Score composto claramente rotulado por fonte. Stub de AI renomeado. Correlações com disclaimer.
 
 ---
 
