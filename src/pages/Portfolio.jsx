@@ -374,11 +374,11 @@ export default function Portfolio() {
           </div>
           {/* Max Drawdown */}
           <div style={{ background: '#0d1421', border: '1px solid rgba(245,158,11,0.15)', borderRadius: 10, padding: '12px 14px', borderLeft: '3px solid rgba(245,158,11,0.4)' }}>
-            <div style={{ fontSize: 9, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, marginBottom: 6 }}>Max Drawdown</div>
+            <div style={{ fontSize: 9, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, marginBottom: 6 }}>Stress −20% BTC</div>
             <div style={{ fontSize: 20, fontWeight: 800, fontFamily: 'JetBrains Mono, monospace', color: '#f59e0b', lineHeight: 1 }}>
               {fmtUSD(maxDrawdownUSD)}
             </div>
-            <div style={{ fontSize: 9, color: '#334155', marginTop: 5 }}>Cenário stress -20% BTC</div>
+            <div style={{ fontSize: 9, color: '#334155', marginTop: 5 }}>P&L simulado em queda de 20%</div>
           </div>
           {/* Beta */}
           <div style={{ background: '#0d1421', border: '1px solid rgba(96,165,250,0.15)', borderRadius: 10, padding: '12px 14px', borderLeft: '3px solid rgba(96,165,250,0.4)' }}>

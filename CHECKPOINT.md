@@ -20,7 +20,7 @@
 | 3 | **NewsIntelligence** | ✅ CONCLUÍDA | A | Sim | PR #132 mergeado |
 | 4 | **Altcoins** | ✅ CONCLUÍDA | A | Sim | PR #134 mergeado |
 | 5 | **SpotFlow** | ✅ CONCLUÍDA | A | Sim | PR #135 (em revisão) |
-| 6 | Portfolio | ⏳ Aguarda | — | — | — |
+| 6 | **Portfolio** | ✅ CONCLUÍDA | A | Sim | PR #136 (em revisão) |
 | 7 | Derivatives | ⏳ Aguarda | — | — | — |
 | 8 | SmartAlerts | ⏳ Aguarda | — | — | — |
 | 9 | MacroCalendar | ⏳ Aguarda | — | — | — |
@@ -143,6 +143,33 @@
 - Badge "CoinGecko · top 50" em live mode
 - DataTrustBadge condition: `!data` → `!alts.length` (select nunca retorna null)
 - Nota "setores: classificação manual" no rodapé da tabela
+
+---
+
+### Portfolio — Auditoria detalhada
+
+**Status antes:** B — label "Max Drawdown" enganosa para resultado de stress test
+**Status depois:** A
+
+**Classificação de dados:**
+| Dado | Classificação |
+|------|--------------|
+| BTC mark price | `LIVE_REAL` — Binance Futures |
+| Klines 1d/30d | `LIVE_REAL` — Binance (para vol histórica do VaR) |
+| Posições do usuário | `LIVE_REAL` — Supabase persistido |
+| Greeks, P&L, totais | `CALCULADO` — soma das posições + preço live |
+| VaR 95/99, Sharpe, Beta, Vol | `CALCULADO` — computeLiveRiskMetrics com vol real |
+| "Max Drawdown" (era) | ⚠️ LABEL ERRADO — era stressTest(-20%), não historical MDD |
+| Stress Test chart | `CALCULADO` — stressTest por cenário |
+
+**Pontos positivos pré-existentes:**
+- `StaleIndicator` já implementado quando ticker ausente ✅
+- Nota "⚠ Modelo paramétrico" no VaR ✅
+- `computeLiveRiskMetrics` usa vol real dos klines ✅
+
+**Alteração:**
+- Label "Max Drawdown" → "Stress −20% BTC"
+- Descrição "Cenário stress -20% BTC" → "P&L simulado em queda de 20%"
 
 ---
 
