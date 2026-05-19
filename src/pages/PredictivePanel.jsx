@@ -75,7 +75,7 @@ function ScenarioCard({ s, selected, onSelect }) {
 }
 
 // ─── BREAKOUT ROW ─────────────────────────────────────────────────────────────
-function BreakoutRow({ b, spotPrice: rowSpot = SPOT_FALLBACK }) {
+function BreakoutRow({ b, spotPrice: rowSpot = 0 }) {
   const isNow   = b.side === 'now';
   const isUp    = b.side === 'up';
   const distPct = Math.abs((b.price - rowSpot) / rowSpot * 100);
@@ -114,7 +114,7 @@ function BreakoutRow({ b, spotPrice: rowSpot = SPOT_FALLBACK }) {
 }
 
 // ─── PATH CHART ───────────────────────────────────────────────────────────────
-function PathChart({ selected, spotPrice: chartSpot = SPOT_FALLBACK }) {
+function PathChart({ selected, spotPrice: chartSpot = 0 }) {
   const data = PRICE_PATHS_FALLBACK.timestamps.map((t, i) => ({
     t,
     bull:    PRICE_PATHS_FALLBACK.bull[i],
