@@ -1,6 +1,6 @@
 # CHECKPOINT.md — MRP Dashboard
 > Memória técnica viva do projeto. Atualizar ao final de cada bloco importante.
-> Última atualização: 2026-05-19 (Fase de confiança de dados | Páginas 1-20 concluídas)
+> Última atualização: 2026-05-19 (Fase de confiança de dados | ✅ TODAS AS 21 PÁGINAS CONCLUÍDAS)
 
 ---
 
@@ -35,7 +35,7 @@
 | 18 | **MarketSentiment** | ✅ CONCLUÍDA | A | Sim | PR #147 |
 | 19 | **InstitutionalFlows** | ✅ CONCLUÍDA | A | Sim | PR #148 |
 | 20 | **Opportunities** | ✅ CONCLUÍDA | A | Sim | PR #149 |
-| 21 | Automations | ⏳ Aguarda | — | — | — |
+| 21 | **Automations** | ✅ CONCLUÍDA | A | Sim | PR #150 |
 
 ### Auditoria de rotas (revalidada 2026-05-19)
 

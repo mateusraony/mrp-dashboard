@@ -347,7 +347,7 @@ export function BotsContent() {
             </h1>
             <ModeBadge mode={ticker ? 'live' : 'mock'} />
           </div>
-          <p style={{ fontSize: 11, color: '#475569', margin: 0 }}>Telegram · Discord · Webhooks · Regras baseadas em AI</p>
+          <p style={{ fontSize: 11, color: '#475569', margin: 0 }}>Telegram · Discord · Webhooks · Regras baseadas em métricas de mercado</p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <Link to={createPageUrl('Opportunities')} style={{ fontSize: 11, padding: '7px 14px', borderRadius: 7, background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', color: '#f59e0b', textDecoration: 'none', fontWeight: 700 }}>
@@ -374,12 +374,12 @@ export function BotsContent() {
         ))}
       </div>
 
-      {/* Anomaly live banner */}
+      {/* Anomaly example banner */}
       <div style={{ marginBottom: 14, padding: '10px 14px', borderRadius: 9, background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.2)', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
         <span style={{ fontSize: 13 }}>⚡</span>
-        <span style={{ fontSize: 11, color: '#f59e0b', fontWeight: 700 }}>Gatilho ativo detectado:</span>
+        <span style={{ fontSize: 11, color: '#f59e0b', fontWeight: 700 }}>Exemplo de gatilho:</span>
         <span style={{ fontSize: 11, color: '#94a3b8' }}>Stablecoin Mint Anômalo — USDT +287% da média 7D · Net $420.6M</span>
-        <span style={{ marginLeft: 'auto', fontSize: 9, fontWeight: 700, padding: '3px 8px', borderRadius: 4, background: 'rgba(16,185,129,0.1)', color: '#10b981', border: '1px solid rgba(16,185,129,0.25)' }}>Regra 2 ativa → Telegram</span>
+        <span style={{ marginLeft: 'auto', fontSize: 9, fontWeight: 700, padding: '3px 8px', borderRadius: 4, background: 'rgba(245,158,11,0.1)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.25)' }}>valor de demonstração</span>
       </div>
 
       {/* Tabs */}
