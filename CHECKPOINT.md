@@ -1,6 +1,6 @@
 # CHECKPOINT.md — MRP Dashboard
 > Memória técnica viva do projeto. Atualizar ao final de cada bloco importante.
-> Última atualização: 2026-05-19 (Fase de confiança de dados | Páginas 1-10 concluídas)
+> Última atualização: 2026-05-19 (Fase de confiança de dados | Páginas 1-11 concluídas)
 
 ---
 
@@ -25,7 +25,7 @@
 | 8 | **SmartAlerts** | ✅ CONCLUÍDA | A | Sim | PR #138 |
 | 9 | **MacroCalendar** | ✅ CONCLUÍDA | A | Sim | PR #139 |
 | 10 | **Macro** | ✅ CONCLUÍDA | A | Sim | PR #140 |
-| 11 | GlobalMarkets | ⏳ Aguarda | — | — | — |
+| 11 | **GlobalMarkets** | ✅ CONCLUÍDA | A | Sim | PR #141 |
 | 12 | Dashboard | ⏳ Aguarda | — | — | — |
 | 13 | ExecutiveReport | ⏳ Aguarda | — | — | — |
 | 14 | MarketRegime | ⏳ Aguarda | — | — | — |
@@ -341,6 +341,38 @@
 | Arquivo | Linha | Alteração |
 |---|---|---|
 | `src/pages/Macro.jsx` | 677 | `🤖 AI Analysis — Macro` → `Análise Macro` + nota metodologia |
+
+---
+
+### GlobalMarkets — Auditoria detalhada
+
+**Status antes:** B — manchetes editoriais hardcoded apareciam sem disclaimer em IS_LIVE
+**Status depois:** A
+
+**Classificação de dados:**
+| Dado | Classificação |
+|------|--------------|
+| FX rates (EUR/USD, USD/BRL, GBP/USD, etc.) | `LIVE_REAL` — FRED API + BCB via `useGlobalMarkets` |
+| Commodities (Gold, Silver, WTI) | `LIVE_REAL` — FRED API |
+| Bancos Centrais (Fed, ECB, BoJ, BCB) | `LIVE_REAL` — FRED + BCB via `useBcbData` |
+| Correlações BTC vs SP500/DXY/Gold/VIX | `ESTIMADO` — Pearson de séries FRED (proxy, não fonte direta) ✅ badge já existia |
+| Análise BRL → BTC | `HARDCODED` — texto editorial estático |
+| "Notícias de Impacto Global" | `HARDCODED` — `GLOBAL_NEWS` const, manchetes editoriais fixas |
+
+**Pontos positivos pré-existentes:**
+- `ModeBadge` + `DataTrustBadge` no header ✅
+- `DataTrustBadge mode="estimated"` nas Correlações ✅
+- Loading state e empty states por tab ✅
+- Links "Ver ↗" em IS_LIVE vão para fontes reais ✅
+
+**Problema:**
+- `GLOBAL_NEWS` = manchetes editoriais hardcoded. Disclaimer `"Conteúdo de demonstração"` era condicionado a `!IS_LIVE` — sumia em produção, tornando notícias fixas indistinguíveis de live.
+
+**Alterações feitas:**
+| Arquivo | Linha | Alteração |
+|---|---|---|
+| `src/pages/GlobalMarkets.jsx` | 200 | `"Notícias de Impacto Global"` → `"Contexto de Mercado Global"` + subtítulo honesto |
+| `src/pages/GlobalMarkets.jsx` | 216 | Disclaimer sempre visível (removido guard `!IS_LIVE`); tom mais suave, texto mais claro |
 
 ---
 

@@ -197,8 +197,8 @@ function GlobalNewsPanel() {
     <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, overflow: 'hidden', marginBottom: 14 }}>
       <div style={{ padding: '12px 16px', borderBottom: '1px solid #1a2535', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
         <div>
-          <span style={{ fontSize: 13, fontWeight: 800, color: '#e2e8f0' }}>📰 Notícias de Impacto Global</span>
-          <span style={{ fontSize: 9, color: '#475569', marginLeft: 8 }}>com link para fonte oficial</span>
+          <span style={{ fontSize: 13, fontWeight: 800, color: '#e2e8f0' }}>📰 Contexto de Mercado Global</span>
+          <span style={{ fontSize: 9, color: '#475569', marginLeft: 8 }}>manchetes editoriais fixas · links para fontes reais</span>
         </div>
         <div style={{ display: 'flex', gap: 4, background: '#0d1421', padding: 3, borderRadius: 7, border: '1px solid #1a2535' }}>
           {['dia', 'semana', 'mês'].map(p => (
@@ -212,15 +212,13 @@ function GlobalNewsPanel() {
           ))}
         </div>
       </div>
-      {/* Disclaimer — visível apenas em modo mock */}
-      {!IS_LIVE && (
-        <div style={{ padding: '8px 16px', background: 'rgba(245,158,11,0.08)', borderBottom: '1px solid rgba(245,158,11,0.2)', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 13 }}>⚠️</span>
-          <span style={{ fontSize: 11, color: '#f59e0b', fontWeight: 600 }}>
-            Conteúdo de demonstração — estas manchetes não são notícias reais
-          </span>
-        </div>
-      )}
+      {/* Disclaimer — sempre visível (manchetes são editoriais fixas, não scraped) */}
+      <div style={{ padding: '6px 16px', background: 'rgba(245,158,11,0.06)', borderBottom: '1px solid rgba(245,158,11,0.15)', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{ fontSize: 10 }}>⚠️</span>
+        <span style={{ fontSize: 10, color: '#78716c' }}>
+          Manchetes editoriais fixas — não são notícias em tempo real. Use os links para acessar as fontes diretamente.
+        </span>
+      </div>
       <div>
         {newsData?.items.map((n, i) => {
           const imp = IMPACT_STYLE[n.impact] || IMPACT_STYLE.baixo;
