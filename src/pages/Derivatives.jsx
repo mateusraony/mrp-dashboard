@@ -363,9 +363,10 @@ export function DerivativesOverview() {
         </div>
       </div>
 
-      {/* AI Analysis */}
+      {/* Analysis */}
       <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 10 }}>🤖 AI Analysis — Derivatives</div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>Análise Derivatives</div>
+        <div style={{ fontSize: 9, color: '#475569', marginBottom: 10 }}>Sinal calculado por regras de threshold (funding · OI delta · liquidações) — não por modelo de linguagem. Claude Haiku exibido abaixo quando configurado.</div>
         <AIModuleCard module={aiAnalysis.modules.derivatives} title="Derivatives" icon="⟆" />
         <ClaudeInsight text={derivInsight} loading={derivAiLoading} />
       </div>
