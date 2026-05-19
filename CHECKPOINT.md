@@ -1,6 +1,6 @@
 # CHECKPOINT.md — MRP Dashboard
 > Memória técnica viva do projeto. Atualizar ao final de cada bloco importante.
-> Última atualização: 2026-05-19 (Fase de confiança de dados | Páginas 1-8 concluídas)
+> Última atualização: 2026-05-19 (Fase de confiança de dados | Páginas 1-9 concluídas)
 
 ---
 
@@ -23,7 +23,7 @@
 | 6 | **Portfolio** | ✅ CONCLUÍDA | A | Sim | PR #136 (em revisão) |
 | 7 | **Derivatives** | ✅ CONCLUÍDA | A | Sim | PR #137 |
 | 8 | **SmartAlerts** | ✅ CONCLUÍDA | A | Sim | PR #138 |
-| 9 | MacroCalendar | ⏳ Aguarda | — | — | — |
+| 9 | **MacroCalendar** | ✅ CONCLUÍDA | A | Sim | PR #139 |
 | 10 | Macro | ⏳ Aguarda | — | — | — |
 | 11 | GlobalMarkets | ⏳ Aguarda | — | — | — |
 | 12 | Dashboard | ⏳ Aguarda | — | — | — |
@@ -279,6 +279,39 @@
 |---|---|---|
 | `src/pages/SmartAlerts.jsx` | 433 | Tab label `🤖 AI & Sugestões` → `Sinais & Sugestões` |
 | `src/pages/SmartAlerts.jsx` | 223 | `🤖 Raciocínio da AI` → `Raciocínio` (card expandido) |
+
+---
+
+### MacroCalendar — Auditoria detalhada
+
+**Status antes:** B — label "AI" em dois pontos do template de alertas; tab Surpresa sem badge live/mock
+**Status depois:** A
+
+**Classificação de dados:**
+| Dado | Classificação |
+|------|--------------|
+| Eventos macro (agenda) | `LIVE_REAL` — FRED API + FOMC estático via `useMacroCalendar` |
+| Datas futuras | `LIVE_REAL` — geradas relativamente à data atual (nunca "Encerrado" no futuro) |
+| Resultado actual | `LIVE_REAL` — FRED via macro-actual-fetcher Edge Function |
+| Z-Score de surpresa | `CALCULADO` — fórmula validada em `scripts/validate_macro_surprise.py` |
+| Volatilidade pré/pós evento | `LIVE_REAL` — Binance klines via `useEventVolatility`; fallback mock |
+| Impacto médio BTC por evento | `LIVE_REAL` ou `MOCK` — depende de `hasLiveVol` |
+| btc_impact_hist_avg por evento | `ESTIMADO` — campo estimado na geração do evento |
+| Preferências de alerta | `LIVE_REAL` — Supabase `macro_alert_preferences` |
+
+**Pontos positivos pré-existentes:**
+- Loading state e error state com retry no header ✅
+- Badge "FRED + FOMC Oficial" no header quando IS_LIVE ✅
+- Badge live/mock na Volatilidade sidebar e tab Volatilidade ✅
+- `GoldenRule` component exibido ✅
+- RefreshButton com `lastUpdated` ✅
+
+**Alterações feitas:**
+| Arquivo | Linha | Alteração |
+|---|---|---|
+| `src/pages/MacroCalendar.jsx` | 610 | `"recomendação AI"` → `"histórico de impacto BTC"` (template não inclui AI) |
+| `src/pages/MacroCalendar.jsx` | 623 | `🤖 Impacto histórico BTC:` → `📊 Impacto histórico BTC:` (robô em dado histórico) |
+| `src/pages/MacroCalendar.jsx` | 463 | Tab Surpresa: badge live/mock adicionado ao banner de contextualização |
 
 ---
 

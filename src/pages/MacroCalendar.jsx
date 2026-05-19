@@ -462,9 +462,12 @@ export default function MacroCalendar() {
       {/* TAB: Surpresa */}
       {tab === 'Surpresa' && (
         <div>
-          <div style={{ marginBottom: 14, padding: '10px 14px', background: 'rgba(96,165,250,0.05)', border: '1px solid rgba(96,165,250,0.15)', borderRadius: 8, fontSize: 11, color: '#475569' }}>
-            <strong style={{ color: '#60a5fa' }}>Surprise Layer:</strong>{' '}
-            Compara o resultado real (actual) vs a expectativa de consenso. A magnitude da surpresa é o motor principal da reação do BTC.
+          <div style={{ marginBottom: 14, padding: '10px 14px', background: 'rgba(96,165,250,0.05)', border: '1px solid rgba(96,165,250,0.15)', borderRadius: 8, fontSize: 11, color: '#475569', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            <span><strong style={{ color: '#60a5fa' }}>Surprise Layer:</strong>{' '}Compara o resultado real (actual) vs a expectativa de consenso. A magnitude da surpresa é o motor principal da reação do BTC.</span>
+            {hasLiveVol
+              ? <span style={{ fontSize: 9, color: '#10b981', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 4, padding: '1px 6px', fontWeight: 600, flexShrink: 0 }}>● Binance klines · B</span>
+              : <span style={{ fontSize: 9, color: '#f59e0b', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 4, padding: '1px 6px', fontWeight: 600, flexShrink: 0 }}>mock · D</span>
+            }
           </div>
 
           {/* Summary grid */}
@@ -607,7 +610,7 @@ export default function MacroCalendar() {
                 <div style={{ marginBottom: 8 }}>1. <span style={{ color: '#94a3b8' }}>Configure o canal em Bots & Webhooks</span></div>
                 <div style={{ marginBottom: 8 }}>2. <span style={{ color: '#94a3b8' }}>Ative o alerta por evento abaixo</span></div>
                 <div style={{ marginBottom: 8 }}>3. <span style={{ color: '#94a3b8' }}>Receba push 30min antes via Telegram/Discord</span></div>
-                <div>4. <span style={{ color: '#94a3b8' }}>Mensagem inclui: evento, esperado, histórico de impacto BTC e recomendação AI</span></div>
+                <div>4. <span style={{ color: '#94a3b8' }}>Mensagem inclui: evento, esperado e histórico de impacto BTC</span></div>
               </div>
             </div>
             <div style={{ background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: 12, padding: '14px 16px' }}>
@@ -620,7 +623,7 @@ export default function MacroCalendar() {
 📊 Esperado: +0.3% MoM
 📈 Anterior: +0.4% MoM
 
-🤖 Impacto histórico BTC:
+📊 Impacto histórico BTC:
 • Acima exp → avg -5.8%
 • Abaixo exp → avg +3.4%
 
