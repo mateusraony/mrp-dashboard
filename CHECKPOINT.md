@@ -1,6 +1,6 @@
 # CHECKPOINT.md — MRP Dashboard
 > Memória técnica viva do projeto. Atualizar ao final de cada bloco importante.
-> Última atualização: 2026-05-19 (Fase de confiança de dados | Páginas 1-9 concluídas)
+> Última atualização: 2026-05-19 (Fase de confiança de dados | Páginas 1-10 concluídas)
 
 ---
 
@@ -24,7 +24,7 @@
 | 7 | **Derivatives** | ✅ CONCLUÍDA | A | Sim | PR #137 |
 | 8 | **SmartAlerts** | ✅ CONCLUÍDA | A | Sim | PR #138 |
 | 9 | **MacroCalendar** | ✅ CONCLUÍDA | A | Sim | PR #139 |
-| 10 | Macro | ⏳ Aguarda | — | — | — |
+| 10 | **Macro** | ✅ CONCLUÍDA | A | Sim | PR #140 |
 | 11 | GlobalMarkets | ⏳ Aguarda | — | — | — |
 | 12 | Dashboard | ⏳ Aguarda | — | — | — |
 | 13 | ExecutiveReport | ⏳ Aguarda | — | — | — |
@@ -312,6 +312,35 @@
 | `src/pages/MacroCalendar.jsx` | 610 | `"recomendação AI"` → `"histórico de impacto BTC"` (template não inclui AI) |
 | `src/pages/MacroCalendar.jsx` | 623 | `🤖 Impacto histórico BTC:` → `📊 Impacto histórico BTC:` (robô em dado histórico) |
 | `src/pages/MacroCalendar.jsx` | 463 | Tab Surpresa: badge live/mock adicionado ao banner de contextualização |
+
+---
+
+### Macro — Auditoria detalhada
+
+**Status antes:** B — `🤖 AI Analysis — Macro` para output de `computeRuleBasedAnalysis`
+**Status depois:** A
+
+**Classificação de dados:**
+| Dado | Classificação |
+|------|--------------|
+| Series macro (yields, DXY, VIX, S&P, etc.) | `LIVE_REAL` — FRED via `useMacroBoard` |
+| Global Liquidity (Fed BS, RRP, TGA) | `LIVE_REAL` — FRED via `useGlobalLiquidity` |
+| BCB Layer (SELIC, IPCA, USDBRL) | `LIVE_REAL` — BCB OpenData via `useBcbData` |
+| Sinal AIModuleCard | `CALCULADO` — `computeRuleBasedAnalysis` (if/else de threshold) |
+| Claude Haiku insight | `LIVE_REAL` — `useAiInsight` quando configurado |
+| Fallback mock quando FRED offline | `MOCK` — `macroBoardMock` de mockData |
+
+**Pontos positivos pré-existentes:**
+- Banner de fallback mock explícito quando `IS_LIVE && !isLiveMacro` ✅
+- `ModeBadge` no header ✅
+- DataQualityBadge por série ✅
+- "Dados de demonstração" quando IS_LIVE=false ✅
+- `ClaudeInsight` separado do AIModuleCard — Claude Haiku real ✅
+
+**Alteração feita:**
+| Arquivo | Linha | Alteração |
+|---|---|---|
+| `src/pages/Macro.jsx` | 677 | `🤖 AI Analysis — Macro` → `Análise Macro` + nota metodologia |
 
 ---
 
