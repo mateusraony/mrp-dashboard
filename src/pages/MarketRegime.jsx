@@ -182,7 +182,7 @@ function HistTooltip({ active = false, payload = [], label = '' }) {
   );
 }
 
-const REGIME_TABS = ['Radar & Score', 'Histórico', 'Transições', 'Sugestões AI'];
+const REGIME_TABS = ['Radar & Score', 'Histórico', 'Transições', 'Sugestões'];
 
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 export default function MarketRegime() {
@@ -273,9 +273,9 @@ export default function MarketRegime() {
         </div>
 
         <div style={{ background: `${color}0a`, border: `1px solid ${color}25`, borderRadius: 10, padding: '14px 16px', maxWidth: 280, flexShrink: 0 }}>
-          <div style={{ fontSize: 9, color, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 5 }}>💡 AI Suggestion</div>
+          <div style={{ fontSize: 9, color, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 5 }}>💡 Sugestão de Exposição</div>
           <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', lineHeight: 1.4 }}>{suggestions.label}</div>
-          <div style={{ fontSize: 10, color: '#475569', marginTop: 5 }}>Ver detalhes na aba Sugestões AI</div>
+          <div style={{ fontSize: 10, color: '#475569', marginTop: 5 }}>Ver detalhes na aba Sugestões</div>
         </div>
       </div>
 
@@ -431,7 +431,7 @@ export default function MarketRegime() {
         <div>
           <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: 12, padding: '14px 16px', marginBottom: 14 }}>
             <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 6 }}>
-              <span style={{ fontSize: 20 }}>🤖</span>
+              <span style={{ fontSize: 20 }}>📊</span>
               <div>
                 <div style={{ fontSize: 12, fontWeight: 800, color }}>Regime: {label} (Score: {score})</div>
                 <div style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>{suggestions.label}</div>
