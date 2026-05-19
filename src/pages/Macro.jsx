@@ -672,9 +672,10 @@ export default function Macro() {
         {m.series.map(s => <SeriesCard key={s.id} s={s} />)}
       </div>
 
-      {/* AI Analysis */}
+      {/* Analysis */}
       <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 10 }}>🤖 AI Analysis — Macro</div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>Análise Macro</div>
+        <div style={{ fontSize: 9, color: '#475569', marginBottom: 10 }}>Sinal calculado por regras de threshold (yields · DXY · VIX · risco) — não por modelo de linguagem. Claude Haiku exibido abaixo quando configurado.</div>
         <AIModuleCard module={aiAnalysis.modules.macro} title="Macro Board" icon="⊞" />
         <ClaudeInsight text={macroInsight} loading={macroAiLoading} />
       </div>
