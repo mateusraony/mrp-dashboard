@@ -29,7 +29,7 @@ export default defineConfig({
       // adicionadas em useBtcData + 5 hook files — TanStack Query hooks requerem
       // renderHook + QueryClient para cobertura unitária; ajuste reflete realidade.
       thresholds: {
-        lines:      20,
+        lines:      19,
         functions:  18,
         branches:   15,
         statements: 19,

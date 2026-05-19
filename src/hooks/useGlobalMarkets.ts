@@ -17,9 +17,15 @@ import {
   type GlobalMarketsData,
 } from '@/services/globalMarkets';
 import { useKlines } from '@/hooks/useBtcData';
+import { type DataState } from '@/hooks/useBtcData';
 import { fetchMacroBoard } from '@/services/fred';
+import { withCache, getStaleCache } from '@/services/marketCache';
+import { logError } from '@/lib/debugLog';
+import { reportApiFailure, reportApiRecovery } from '@/lib/apiHealthMonitor';
 
 const GM_INTERVAL = IS_LIVE ? 3_600_000 : false;  // 1h — FRED é diário
+
+type GlobalMarketsBase = Omit<GlobalMarketsData, 'btcCorrelations'>;
 
 /**
  * useGlobalMarketsBase — FX rates, commodities e taxas de banco central.
@@ -27,9 +33,26 @@ const GM_INTERVAL = IS_LIVE ? 3_600_000 : false;  // 1h — FRED é diário
  * Não inclui correlações BTC (calculadas em useGlobalMarkets via klines).
  */
 export function useGlobalMarketsBase() {
-  return useQuery({
+  return useQuery<DataState<GlobalMarketsBase>, Error, GlobalMarketsBase & { isFallback: boolean; lastUpdated: string | null }>({
     queryKey:        ['global-markets', 'base'],
-    queryFn:         fetchGlobalMarketsData,
+    queryFn:         async (): Promise<DataState<GlobalMarketsBase>> => {
+      try {
+        const data = await withCache<GlobalMarketsBase>('global-markets:base', 3600, 'global_markets', fetchGlobalMarketsData);
+        reportApiRecovery('global_markets');
+        return { data, lastUpdated: new Date().toISOString(), isFallback: false, debugError: null };
+      } catch (err) {
+        logError('Global markets base fetch failed', { error: String(err) }, 'global-markets-base');
+        reportApiFailure('global_markets');
+        const stale = await getStaleCache<GlobalMarketsBase>('global-markets:base');
+        if (stale) return { data: stale.value, lastUpdated: stale.updatedAt.toISOString(), isFallback: true, debugError: String(err) };
+        return { data: null, lastUpdated: null, isFallback: true, debugError: String(err) };
+      }
+    },
+    select: (state) => ({
+      ...(state.data ?? { fxRates: [], commodities: [], centralBankRates: [], updated_at: 0, quality: 'B' as const }),
+      isFallback:  state.isFallback,
+      lastUpdated: state.lastUpdated,
+    }),
     staleTime:       3_500_000,                    // ~58min
     refetchInterval: GM_INTERVAL,
     retry:           1,
@@ -51,7 +74,15 @@ export function useGlobalMarkets() {
   return useQuery({
     queryKey: ['global-markets', 'full', base?.updated_at, klines?.length],
     queryFn: async (): Promise<GlobalMarketsData> => {
-      const marketData = base ?? await fetchGlobalMarketsData();
+      // Desestrutura campos de resiliência antes de montar GlobalMarketsData
+      let marketData: GlobalMarketsBase;
+      if (base) {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { isFallback: _f, lastUpdated: _l, ...stripped } = base;
+        marketData = stripped as GlobalMarketsBase;
+      } else {
+        marketData = await fetchGlobalMarketsData();
+      }
 
       // Sem klines → retorna sem correlações calculadas (usa mock interno)
       if (!klines || klines.length < 10) {
@@ -94,7 +125,7 @@ export function useGlobalMarkets() {
         btcCorrelations: computeBtcCorrelations(btcPrices, fredSeries),
       };
     },
-    enabled:         !!base,
+    enabled:         base !== undefined,
     staleTime:       3_500_000,
     refetchInterval: GM_INTERVAL,
     retry:           1,
