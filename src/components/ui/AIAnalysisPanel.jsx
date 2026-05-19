@@ -128,7 +128,7 @@ export default function AIAnalysisPanel({ analysis, compact = false }) {
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16, gap: 10, flexWrap: 'wrap' }}>
         <div>
           <div style={{ fontSize: 10, color: '#475569', marginBottom: 5, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-            🤖 AI · {analysis.model} · {analysis.overall.timeframe}
+            Análise Automática · {analysis.model} · {analysis.overall.timeframe}
           </div>
           <div style={{ fontSize: 18, fontWeight: 900, color: dir.color, letterSpacing: '-0.02em', lineHeight: 1.2 }}>
             {analysis.overall.recommendation}

@@ -684,7 +684,7 @@ export default function Dashboard() {
 
       {/* ── ZONA D: AI Analysis + Track Record (2 cols) ── */}
       <div style={{ marginBottom: 20 }}>
-        <SectionTitle icon="🤖" label="AI Analysis & Previsões" sub="Análise automática baseada em todos os módulos · Com histórico de acertos" />
+        <SectionTitle icon="📊" label="Análise & Previsões" sub="Análise automática por regras de threshold · Claude Haiku quando configurado · Com histórico de acertos" />
 
         {/* Confluência Multi-Timeframe — sempre visível (AGUARDANDO enquanto klines carregam) */}
         <div style={{ marginBottom: 14, background: '#0d1421', border: '1px solid #162032', borderRadius: 12, padding: '14px 18px' }}>
