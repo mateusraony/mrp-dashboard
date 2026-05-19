@@ -1,6 +1,6 @@
 # CHECKPOINT.md — MRP Dashboard
 > Memória técnica viva do projeto. Atualizar ao final de cada bloco importante.
-> Última atualização: 2026-05-19 (Fase de confiança de dados | Páginas 1-7 concluídas)
+> Última atualização: 2026-05-19 (Fase de confiança de dados | Páginas 1-8 concluídas)
 
 ---
 
@@ -22,7 +22,7 @@
 | 5 | **SpotFlow** | ✅ CONCLUÍDA | A | Sim | PR #135 (em revisão) |
 | 6 | **Portfolio** | ✅ CONCLUÍDA | A | Sim | PR #136 (em revisão) |
 | 7 | **Derivatives** | ✅ CONCLUÍDA | A | Sim | PR #137 |
-| 8 | SmartAlerts | ⏳ Aguarda | — | — | — |
+| 8 | **SmartAlerts** | ✅ CONCLUÍDA | A | Sim | PR #138 |
 | 9 | MacroCalendar | ⏳ Aguarda | — | — | — |
 | 10 | Macro | ⏳ Aguarda | — | — | — |
 | 11 | GlobalMarkets | ⏳ Aguarda | — | — | — |
@@ -245,6 +245,40 @@
 | `src/pages/Derivatives.jsx` | 368 | `🤖 AI Analysis — Derivatives` → `Análise Derivatives` + nota metodologia |
 | `src/pages/DerivativesAdvanced.jsx` | 443 | CarryCalculator mode badge: `IS_LIVE ? 'live' : 'mock'` → `(liveBasis?.length > 0) ? 'live' : 'mock'` |
 | `src/pages/DerivativesAdvanced.jsx` | 603 | TermStructurePanel fallback mode badge: `IS_LIVE ? 'live' : 'mock'` → `'mock'` |
+
+---
+
+### SmartAlerts — Auditoria detalhada
+
+**Status antes:** B — tab e card expandido com label "AI" para análise rule-based
+**Status depois:** A
+
+**Classificação de dados:**
+| Dado | Classificação |
+|------|--------------|
+| Funding Rate (RiskGauge) | `LIVE_REAL` — Binance Futures via `useBtcTicker` |
+| Long Flush score | `CALCULADO` — ratio longs/total via `useLiquidations` + riskScore blend |
+| Short Squeeze score | `CALCULADO` — ratio shorts BUY / total via `useLiquidations` |
+| Funding cross-venue | `LIVE_REAL` — média Binance/Bybit/OKX via `useMultiVenueSnapshot` |
+| Basis Deviation (RiskGauge) | `MOCK` — `riskDashboard.basis_deviation` de `mockDataAlerts` |
+| Sentimento (RiskGauge) | `LIVE_REAL` — Fear & Greed via `useFearGreed`; fallback mock |
+| Cluster BTC (RiskGauge) | `CALCULADO` — cluster mais próximo via `useLiquidations`; fallback mock |
+| Sugestões (tab Sinais) | `CALCULADO` — `computeRuleBasedAnalysis` when live; `AI_SUGGESTIONS` hardcoded when mock |
+| Histórico (tab Histórico) | `LIVE_REAL` — Supabase `alertEvents` quando disponível; `alertHistory` mock como seed |
+| Regras configuradas | `LIVE_REAL` — Supabase `savedRules`; `defaultAlertRulesMock` como seed |
+
+**Pontos positivos pré-existentes:**
+- `DataQualityBadge` em cada RiskGauge com `source='MOCK'` quando fallback ✅
+- Badge "● LIVE · Rule-based" vs "demo · aguardando dados" na tab de sugestões ✅
+- Aviso "não constituem recomendação de investimento" no rodapé ✅
+- Histórico: nota "demo · histórico real acumula com o uso" quando Supabase vazio ✅
+- `ModeBadge` no header condicionado a `IS_LIVE && ticker` ✅
+
+**Alterações feitas:**
+| Arquivo | Linha | Alteração |
+|---|---|---|
+| `src/pages/SmartAlerts.jsx` | 433 | Tab label `🤖 AI & Sugestões` → `Sinais & Sugestões` |
+| `src/pages/SmartAlerts.jsx` | 223 | `🤖 Raciocínio da AI` → `Raciocínio` (card expandido) |
 
 ---
 
