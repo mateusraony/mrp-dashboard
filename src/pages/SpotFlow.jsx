@@ -381,7 +381,8 @@ export default function SpotFlow() {
 
       {/* AI Analysis */}
       <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 10 }}>🤖 AI Analysis — Spot Flow</div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>Análise Spot Flow</div>
+        <div style={{ fontSize: 9, color: '#475569', marginBottom: 10 }}>Sinal calculado por regras de threshold (CVD · volume · retorno) — não por modelo de linguagem. Claude Haiku exibido abaixo quando configurado.</div>
         <AIModuleCard module={aiAnalysis.modules.spot} title="Spot Flow" icon="⟴" />
         <ClaudeInsight text={spotInsight} loading={spotAiLoading} />
       </div>

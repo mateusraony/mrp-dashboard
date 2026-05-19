@@ -1,6 +1,6 @@
 # CHECKPOINT.md — MRP Dashboard
 > Memória técnica viva do projeto. Atualizar ao final de cada bloco importante.
-> Última atualização: 2026-05-19 (Fase de confiança de dados iniciada | Página 1/21: DataSources ✅)
+> Última atualização: 2026-05-19 (Fase de confiança de dados | Páginas 1-5 concluídas)
 
 ---
 
@@ -17,9 +17,9 @@
 |---|---|---|---|---|---|
 | 1 | **DataSources** | ✅ CONCLUÍDA | A | Sim, com confiança | PR #130 mergeado |
 | 2 | **Settings** | ✅ CONCLUÍDA | B→A | Sim, com confiança | PR #131 mergeado |
-| 3 | NewsIntelligence | ⏳ Aguarda | — | — | — |
-| 4 | Altcoins | ⏳ Aguarda | — | — | — |
-| 5 | SpotFlow | ⏳ Aguarda | — | — | — |
+| 3 | **NewsIntelligence** | ✅ CONCLUÍDA | A | Sim | PR #132 mergeado |
+| 4 | **Altcoins** | ✅ CONCLUÍDA | A | Sim | PR #134 mergeado |
+| 5 | **SpotFlow** | ✅ CONCLUÍDA | A | Sim | PR #135 (em revisão) |
 | 6 | Portfolio | ⏳ Aguarda | — | — | — |
 | 7 | Derivatives | ⏳ Aguarda | — | — | — |
 | 8 | SmartAlerts | ⏳ Aguarda | — | — | — |
@@ -78,7 +78,91 @@
 | `npx tsc -p ./jsconfig.json` | ✅ 0 erros |
 
 **Classificação final:** A — Pode usar com confiança como central de auditoria do sistema
-**Próxima página:** Settings (aguarda confirmação do usuário)
+
+---
+
+### Settings — Auditoria detalhada
+
+**Status antes:** B — Labels Base44 fantasmas, segurança enganosa
+**Status depois:** A
+
+**Alterações feitas:**
+- Removido badge `POST /admin/settings` (resíduo Base44 — rota não existe)
+- Removido bloco "Security: X-TICK-TOKEN" (token fictício não implementado)
+- Banner de autenticação agora mostra status real do Supabase (verde/amarelo)
+- Seção Alert Thresholds: banner "ℹ️ não persistido" — claro que é localStorage
+- Seção FRED Series: banner "ℹ️ não persistido" — claro que é localStorage
+- CRYPTO_SYMBOLS SettingRow substituído por display read-only de "BTCUSDT"
+- Source Health panel: nota TCP-only adicionada
+
+---
+
+### NewsIntelligence — Auditoria detalhada
+
+**Status antes:** B — Labels "AI" para análise por palavras-chave
+**Status depois:** A
+
+**Classificação de dados:**
+| Dado | Classificação |
+|------|--------------|
+| Artigos Feed Geral | `LIVE_REAL` — GDELT DOC 2.0 |
+| Artigos Institucionais | `LIVE_REAL` — GDELT query institucional |
+| Sentimento (bullish/bearish) | `CALCULADO` — 14 pos / 15 neg keywords em `gdelt.ts` |
+| Score por artigo (SentimentGauge) | `CALCULADO` — lista local 14/14 keywords |
+| Narrativa de Mercado | `CALCULADO` — ratio + categoria dominante |
+| Sinal de Mercado (signalMap) | `HARDCODED` — lookup estático por categoria |
+| Histórico 7d | `LIVE_REAL` — Supabase `gdelt_articles` |
+
+**Alterações:**
+- Tab "Inteligência AI" → "Análise Institucional"
+- h1 "Inteligência AI" → "Análise Institucional"
+- "Narrativa de Mercado AI" → "Narrativa de Mercado"
+- "Sinal de Mercado" + qualificador "(por categoria)"
+- Banner de metodologia: "14 pos / 15 neg em gdelt.ts — não por modelo de linguagem"
+- Bug fix: estado vazio agora distingue `!IS_LIVE` (mock) de `IS_LIVE` (API indisponível)
+- Bug fix: `useGdelt.ts` select propaga erro quando data===null, ativando isError no TanStack Query
+
+---
+
+### Altcoins — Auditoria detalhada
+
+**Status antes:** B — isFallback ignorado, sem fonte visível, condição de badge errada
+**Status depois:** A
+
+**Classificação de dados:**
+| Dado | Classificação |
+|------|--------------|
+| Preços, retornos 7/30/90d, mcap | `LIVE_REAL` — CoinGecko `/coins/markets` |
+| BTC/ETH Dominance | `LIVE_REAL` — CoinGecko global |
+| Alt Season Index | `CALCULADO` — % alts > BTC em 90d |
+| Rotação Setorial | `CALCULADO` — média ponderada por mcap |
+| Setor por ativo | `HARDCODED` — SECTOR_MAP estático |
+
+**Alterações:**
+- Expõe `isFallback` + `lastUpdated` do hook select → indicador `⚠ Cache · data`
+- Badge "CoinGecko · top 50" em live mode
+- DataTrustBadge condition: `!data` → `!alts.length` (select nunca retorna null)
+- Nota "setores: classificação manual" no rodapé da tabela
+
+---
+
+### SpotFlow — Auditoria detalhada
+
+**Status antes:** B — "AI Analysis" para análise rule-based
+**Status depois:** A
+
+**Classificação de dados:**
+| Dado | Classificação |
+|------|--------------|
+| Klines 1h/15m/1d | `LIVE_REAL` — Binance `/klines` |
+| CVD, retornos multi-período | `CALCULADO` — derivado dos klines |
+| Sessões Ásia/Europa/EUA | `CALCULADO` — computeSessionStats |
+| Sinal/score do AIModuleCard | `CALCULADO` por regras — computeRuleBasedAnalysis (if/else) |
+| AI_SPOT_FALLBACK (sem klines) | `HARDCODED` — neutral estático |
+| Claude Haiku insight | `LIVE_REAL` — quando useAiInsight configurado |
+
+**Alteração:**
+- "🤖 AI Analysis — Spot Flow" → "Análise Spot Flow" + nota "(sinal por regras · Claude Haiku quando configurado)"
 
 ---
 
