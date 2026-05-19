@@ -1,6 +1,6 @@
 # CHECKPOINT.md — MRP Dashboard
 > Memória técnica viva do projeto. Atualizar ao final de cada bloco importante.
-> Última atualização: 2026-05-19 (Fase de confiança de dados | Páginas 1-13 concluídas — aguarda PR #143)
+> Última atualização: 2026-05-19 (Fase de confiança de dados | Páginas 1-14 concluídas)
 
 ---
 
@@ -28,7 +28,7 @@
 | 11 | **GlobalMarkets** | ✅ CONCLUÍDA | A | Sim | PR #141 |
 | 12 | **Dashboard** | ✅ CONCLUÍDA | A | Sim | PR #142 |
 | 13 | **ExecutiveReport** | ✅ CONCLUÍDA | A | Sim | PR #143 |
-| 14 | MarketRegime | ⏳ Aguarda | — | — | — |
+| 14 | **MarketRegime** | ✅ CONCLUÍDA | A | Sim | PR #144 |
 | 15 | PredictivePanel | ⏳ Aguarda | — | — | — |
 | 16 | OnChain | ⏳ Aguarda | — | — | — |
 | 17 | Options | ⏳ Aguarda | — | — | — |
@@ -460,6 +460,51 @@
 | `npm run build` | ✅ 0 erros |
 
 **Classificação final:** A — Labels honestos. Claude Haiku identificado quando presente. Seções mock não mascaradas são limitações de dados (APIs pagas/indisponíveis), não engano visual.
+
+---
+
+### MarketRegime — Auditoria detalhada
+
+**Status antes:** B — Tab e hero card com labels "AI" para sugestões hardcoded; robô emoji na aba de conteúdo estático
+**Status depois:** A
+
+**Classificação de dados:**
+| Dado | Classificação |
+|------|--------------|
+| Score de Regime (score, label, color) | `CALCULADO` — `useMarketRegime` (soma ponderada: VIX 22% · Yield Curve 20% · DXY 18% · NUPL 13% · S&P500 15% · Funding 12%) |
+| VIX, DXY, S&P500, Yield Curve | `LIVE_REAL` — FRED via `useMacroBoard` |
+| Funding Rate | `LIVE_REAL` — Binance Futures via `useBtcTicker` |
+| NUPL (componente) | `LIVE_PARCIAL` — CoinMetrics Community proxy |
+| radarData (por componente) | `CALCULADO` — derivado de dados FRED + Binance |
+| Histórico 90D | `LIVE_REAL` quando Supabase tem ≥7 registros (`useRegimeHistory`); `ESTIMADO` (seed determinístico) caso contrário |
+| Transições de regime | `CALCULADO` — detectadas do histórico (`buildTransitions`) |
+| Trigger das transições | `HARDCODED` — `'Score cruzou threshold'` estático |
+| EXPOSURE_SUGGESTIONS | `HARDCODED` — sugestões editoriais fixas por regime (Risk-On / Neutral / Risk-Off) |
+| TRANSITION_TRIGGERS | `HARDCODED` — gatilhos editoriais típicos por par de regimes |
+
+**Pontos positivos pré-existentes:**
+- `ModeBadge` no header (condição correta: `IS_LIVE ? 'live' : 'mock'`) ✅
+- Histórico: badge "● Supabase · Nd reais" vs "Estimado — acumula com uso" + `ModeBadge mode="estimated"` ✅
+- Disclaimer `⚠️ Sugestões baseadas em modelo quantitativo... Não constituem recomendação de investimento` ✅
+- `enabled: IS_LIVE` no hook — sem execução em mock mode ✅
+
+**Problema:**
+- Tab `'Sugestões AI'`, label `💡 AI Suggestion` e emoji `🤖` no header da aba — todo o conteúdo vem de `EXPOSURE_SUGGESTIONS` (const hardcoded com sugestões editoriais), sem nenhum LLM envolvido.
+
+**Alterações feitas:**
+| Arquivo | Linha | Alteração |
+|---|---|---|
+| `src/pages/MarketRegime.jsx` | 185 | Tab `'Sugestões AI'` → `'Sugestões'` |
+| `src/pages/MarketRegime.jsx` | 276 | `💡 AI Suggestion` → `💡 Sugestão de Exposição` |
+| `src/pages/MarketRegime.jsx` | 278 | `"aba Sugestões AI"` → `"aba Sugestões"` |
+| `src/pages/MarketRegime.jsx` | 434 | Emoji `🤖` → `📊` no header da aba de sugestões |
+
+**Testes executados:**
+| Comando | Resultado |
+|---------|----------|
+| `npm run build` | ✅ 0 erros |
+
+**Classificação final:** A — Score de regime é live e bem rotulado. Sugestões de exposição são editoriais hardcoded — agora claramente nomeadas sem referência a AI.
 
 ---
 
