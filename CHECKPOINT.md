@@ -1,6 +1,6 @@
 # CHECKPOINT.md — MRP Dashboard
 > Memória técnica viva do projeto. Atualizar ao final de cada bloco importante.
-> Última atualização: 2026-05-19 (Fase de confiança de dados | Páginas 1-15 concluídas)
+> Última atualização: 2026-05-19 (Fase de confiança de dados | Páginas 1-16 concluídas)
 
 ---
 
@@ -30,7 +30,7 @@
 | 13 | **ExecutiveReport** | ✅ CONCLUÍDA | A | Sim | PR #143 |
 | 14 | **MarketRegime** | ✅ CONCLUÍDA | A | Sim | PR #144 |
 | 15 | **PredictivePanel** | ✅ CONCLUÍDA | A | Sim | PR #145 |
-| 16 | OnChain | ⏳ Aguarda | — | — | — |
+| 16 | **OnChain** | ✅ CONCLUÍDA | A | Sim | sem PR — já conforme |
 | 17 | Options | ⏳ Aguarda | — | — | — |
 | 18 | MarketSentiment | ⏳ Aguarda | — | — | — |
 | 19 | InstitutionalFlows | ⏳ Aguarda | — | — | — |
@@ -555,6 +555,45 @@
 | `npm run build` | ✅ 0 erros |
 
 **Classificação final:** A — Labels honestos. Preços-alvo via ATR são live. Probabilidades de cenários são referência estática — agora claramente indicadas.
+
+---
+
+### OnChain — Auditoria detalhada
+
+**Status antes:** A — já conforme
+**Status depois:** A — sem alterações necessárias
+
+**Classificação de dados:**
+| Dado | Classificação |
+|------|--------------|
+| NUPL valor atual | `LIVE_PARCIAL` — CoinMetrics Community proxy `(MCap−RCap)/MCap` |
+| NUPL zona, cor | `CALCULADO` — derivado do valor CoinMetrics |
+| NUPL history chart, deltas 7d/30d | `MOCK` — `btcNUPL` mock (CoinMetrics Community não fornece série histórica facilmente) |
+| SOPR (em IS_LIVE) | `PAGO_INDISPONIVEL` — `PaidRequiredCard` com Glassnode |
+| Exchange Netflow (em IS_LIVE) | `PAGO_INDISPONIVEL` — `PaidRequiredCard` com Glassnode |
+| Whale Activity (em IS_LIVE) | `PAGO_INDISPONIVEL` — `PaidRequiredCard` com Glassnode |
+| MVRV ratio, Realized Price | `LIVE_PARCIAL` — CoinMetrics Community via `useOnChainCycle` |
+| CDD, MA30, Z-Score | `LIVE_REAL` — CoinMetrics Community via `useOnChainExtended` |
+| HODL Wave 1yr+, Dormancy proxy | `LIVE_REAL` — CoinMetrics Community via `useOnChainExtended` |
+| Hash Rate, Dificuldade | `LIVE_REAL` — Mempool.space via `useHashrate` |
+| Mempool tx count, fees | `LIVE_REAL` — Mempool.space via `useMempoolState` |
+| LthSthCard | `LIVE_PARCIAL` — CoinMetrics Community (próprio componente) |
+
+**Pontos positivos pré-existentes (exemplar):**
+- Header banner lista fontes e qualidade explicitamente ✅
+- Quality banner colorido: AO VIVO (verde) / ESTIMADO (amarelo) / DEMO (amarelo) ✅
+- `DataTrustBadge mode="estimated"` no NUPL com nota "proxy — não é Glassnode" ✅
+- `PaidRequiredCard` (🔒) para SOPR/Netflow/Whale quando IS_LIVE ✅
+- `DataTrustBadge mode="paid_required"` na Pressão Institucional ✅
+- `DataQualityBadge` no MvrvCard ✅
+- `GradeBadge` por card (A/B/D) ✅
+- `ModeBadge` condicionado a `IS_LIVE && hasLiveData` ✅
+- Badge "CoinMetrics Community · Grátis · Qualidade A" em cada card quando live ✅
+- Nenhum label "AI" ou "🤖" em nenhuma seção ✅
+
+**Alterações feitas:** Nenhuma — página já conforme.
+
+**Classificação final:** A — Melhor página de transparência de dados do projeto. Nenhuma alteração necessária.
 
 ---
 
