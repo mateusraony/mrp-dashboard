@@ -1,5 +1,5 @@
 // ─── NEWS INTELLIGENCE PAGE ───────────────────────────────────────────────────
-// Notícias institucionais (GDELT live) + Feed Geral com AI Sentiment Score
+// Notícias institucionais (GDELT live) + Feed Geral com Keyword Sentiment Score
 import { useState, useMemo } from 'react';
 import { ModeBadge } from '../components/ui/DataBadge';
 import { RefreshButton } from '../components/ui/RefreshButton';
@@ -91,7 +91,7 @@ function MarketNarrative({ articles }) {
   return (
     <div style={{ background: `linear-gradient(135deg,${sc}08,#111827)`, border: `1px solid ${sc}25`, borderLeft: `3px solid ${sc}`, borderRadius: 12, padding: 18, marginBottom: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-        <span style={{ fontSize: 9, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700 }}>🤖 Narrativa de Mercado AI</span>
+        <span style={{ fontSize: 9, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700 }}>Narrativa de Mercado</span>
         <span style={{ fontSize: 14, fontWeight: 900, color: sc, fontFamily: 'JetBrains Mono, monospace' }}>{signal}</span>
         <span style={{ fontSize: 10, color: '#334155', marginLeft: 'auto' }}>{articles.length} artigos GDELT</span>
       </div>
@@ -148,7 +148,7 @@ function GdeltAICard({ article }) {
       {expanded && (
         <div style={{ marginTop: 12, borderTop: '1px solid #1a2535', paddingTop: 12 }}>
           <div style={{ background: `${cfg.color}0c`, border: `1px solid ${cfg.color}22`, borderRadius: 8, padding: '8px 12px', marginBottom: 10 }}>
-            <div style={{ fontSize: 9, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 3 }}>🎯 Sinal de Mercado</div>
+            <div style={{ fontSize: 9, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 3 }}>🎯 Sinal de Mercado <span style={{ textTransform: 'none', fontWeight: 400, letterSpacing: 0 }}>(por categoria)</span></div>
             <div style={{ fontSize: 12, color: '#e2e8f0', fontWeight: 600 }}>{signalMap[cat]}</div>
           </div>
           {(posKw.length > 0 || negKw.length > 0) && (
@@ -211,7 +211,7 @@ export default function NewsIntelligence() {
   return (
     <div style={{ maxWidth: 1400, margin: '0 auto' }} data-source="gdelt,alternative_me" data-page="news-intelligence">
       <div style={{ display: 'flex', gap: 2, marginBottom: 20, background: '#0d1421', padding: 4, borderRadius: 8, border: '1px solid #1a2535', width: 'fit-content' }}>
-        {[{ id: 'intelligence', label: '🧠 Inteligência AI' }, { id: 'feed', label: '📰 Feed Geral' }].map(t => (
+        {[{ id: 'intelligence', label: '🧠 Análise Institucional' }, { id: 'feed', label: '📰 Feed Geral' }].map(t => (
           <button key={t.id} onClick={() => setMainTab(t.id)} style={{ padding: '7px 18px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: mainTab === t.id ? 800 : 500, background: mainTab === t.id ? 'rgba(59,130,246,0.18)' : 'transparent', color: mainTab === t.id ? '#60a5fa' : '#475569' }}>{t.label}</button>
         ))}
       </div>
@@ -254,10 +254,10 @@ export default function NewsIntelligence() {
       {mainTab === 'intelligence' && (
         <div style={{ maxWidth: 1200 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
-            <h1 style={{ fontSize: 20, fontWeight: 900, color: '#f1f5f9', margin: 0, letterSpacing: '-0.03em' }}>Inteligência AI</h1>
+            <h1 style={{ fontSize: 20, fontWeight: 900, color: '#f1f5f9', margin: 0, letterSpacing: '-0.03em' }}>Análise Institucional</h1>
             <ModeBadge mode={IS_LIVE ? 'live' : 'mock'} />
             <span style={{ fontSize: 10, color: '#a78bfa', background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.2)', borderRadius: 4, padding: '2px 8px', fontWeight: 700 }}>🤖 GDELT Institucional</span>
-            <div style={{ marginLeft: 'auto' }}><RefreshButton onRefresh={() => { instRefetch(); }} isLoading={instFetching} lastUpdated={instUpdatedAt} label="Atualizar Inteligência AI" /></div>
+            <div style={{ marginLeft: 'auto' }}><RefreshButton onRefresh={() => { instRefetch(); }} isLoading={instFetching} lastUpdated={instUpdatedAt} label="Atualizar Feed Institucional" /></div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10, marginBottom: 16 }}>
             {[
@@ -276,6 +276,12 @@ export default function NewsIntelligence() {
             ))}
           </div>
           {instArticles.length > 0 && <MarketNarrative articles={instArticles} />}
+          {instArticles.length > 0 && (
+            <div style={{ marginBottom: 12, padding: '6px 12px', background: 'rgba(71,85,105,0.08)', border: '1px solid #1e2d45', borderRadius: 6, fontSize: 10, color: '#475569', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span>ℹ️</span>
+              <span>Sentimento calculado por correspondência de palavras-chave (14 positivas / 14 negativas) — não por modelo de linguagem. Categorias detectadas por regex. Fonte dos artigos: <strong style={{ color: '#64748b' }}>GDELT DOC 2.0</strong>.</span>
+            </div>
+          )}
           {instArticles.length > 0 && (
             <div style={{ background: 'linear-gradient(135deg,#131e2e,#111827)', border: '1px solid #1e2d45', borderRadius: 14, padding: 18, marginBottom: 16 }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 12 }}>Distribuição de Sentimento — Batch Atual ({instArticles.length} artigos institucionais)</div>
