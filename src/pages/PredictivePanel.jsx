@@ -11,15 +11,14 @@ import { useAiInsight } from '@/hooks/useAiInsight';
 import { computeRuleBasedAnalysis } from '@/utils/ruleBasedAnalysis';
 import { IS_LIVE } from '@/lib/env';
 
-const SPOT_FALLBACK = 84_000;
-
 // Fallbacks — dados preditivos requerem APIs pagas (Glassnode, Bloomberg) ou cálculo histórico
+// target_price é null quando spot não disponível; componente exibe apenas o %
 const SCENARIOS_24H_FALLBACK = [
-  { id: 'bull_strong', label: 'Rally Institucional', prob: 28, direction: 'bull',    color: '#10b981', target_price: SPOT_FALLBACK * 1.048, target_pct:  4.8, trigger: '—', drivers: [], risk: '—', confidence: 0.61 },
-  { id: 'bull_mild',   label: 'Alta Moderada',       prob: 34, direction: 'bull',    color: '#60a5fa', target_price: SPOT_FALLBACK * 1.021, target_pct:  2.1, trigger: '—', drivers: [], risk: '—', confidence: 0.70 },
-  { id: 'neutral',     label: 'Lateral',             prob: 18, direction: 'neutral', color: '#f59e0b', target_price: SPOT_FALLBACK,         target_pct:  0,   trigger: '—', drivers: [], risk: '—', confidence: 0.52 },
-  { id: 'bear_mild',   label: 'Correção Suave',      prob: 14, direction: 'bear',    color: '#f97316', target_price: SPOT_FALLBACK * 0.975, target_pct: -2.5, trigger: '—', drivers: [], risk: '—', confidence: 0.64 },
-  { id: 'bear_strong', label: 'Liquidação',          prob:  6, direction: 'bear',    color: '#ef4444', target_price: SPOT_FALLBACK * 0.930, target_pct: -7.0, trigger: '—', drivers: [], risk: '—', confidence: 0.45 },
+  { id: 'bull_strong', label: 'Rally Institucional', prob: 28, direction: 'bull',    color: '#10b981', target_price: null, target_pct:  4.8, trigger: '—', drivers: [], risk: '—', confidence: 0.61 },
+  { id: 'bull_mild',   label: 'Alta Moderada',       prob: 34, direction: 'bull',    color: '#60a5fa', target_price: null, target_pct:  2.1, trigger: '—', drivers: [], risk: '—', confidence: 0.70 },
+  { id: 'neutral',     label: 'Lateral',             prob: 18, direction: 'neutral', color: '#f59e0b', target_price: null, target_pct:  0,   trigger: '—', drivers: [], risk: '—', confidence: 0.52 },
+  { id: 'bear_mild',   label: 'Correção Suave',      prob: 14, direction: 'bear',    color: '#f97316', target_price: null, target_pct: -2.5, trigger: '—', drivers: [], risk: '—', confidence: 0.64 },
+  { id: 'bear_strong', label: 'Liquidação',          prob:  6, direction: 'bear',    color: '#ef4444', target_price: null, target_pct: -7.0, trigger: '—', drivers: [], risk: '—', confidence: 0.45 },
 ];
 const BREAKOUT_TABLE_FALLBACK = [];
 const INSTITUTIONAL_PRESSURE_FALLBACK = {
@@ -62,7 +61,7 @@ function ScenarioCard({ s, selected, onSelect }) {
           <div style={{ fontSize: 14, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: s.color }}>
             {isBull ? '↑' : isBear ? '↓' : '→'} {s.target_pct > 0 ? '+' : ''}{s.target_pct.toFixed(1)}%
           </div>
-          <div style={{ fontSize: 10, fontFamily: 'JetBrains Mono, monospace', color: '#475569' }}>{fmtK(s.target_price)}</div>
+          {s.target_price != null && <div style={{ fontSize: 10, fontFamily: 'JetBrains Mono, monospace', color: '#475569' }}>{fmtK(s.target_price)}</div>}
         </div>
         <div style={{ textAlign: 'right' }}>
           <div style={{ fontSize: 8, color: '#334155', marginBottom: 2 }}>PROBABILIDADE</div>
@@ -282,17 +281,25 @@ export default function PredictivePanel() {
 
   // ── Cenários com preços mesclados (live quando disponível) ─────────────
   const scenarios = useMemo(() => {
-    if (!liveScenarioPrices) return SCENARIOS_24H_FALLBACK;
-    const SPOT = spotPrice;
-    return SCENARIOS_24H_FALLBACK.map(s => {
-      const liveTarget = liveScenarioPrices[s.id];
-      if (liveTarget === undefined || liveTarget === null) return s;
-      const target_pct = parseFloat(((liveTarget - SPOT) / SPOT * 100).toFixed(1));
-      return { ...s, target_price: liveTarget, target_pct };
-    });
+    if (liveScenarioPrices && spotPrice) {
+      return SCENARIOS_24H_FALLBACK.map(s => {
+        const liveTarget = liveScenarioPrices[s.id];
+        if (liveTarget == null) return s;
+        const target_pct = parseFloat(((liveTarget - spotPrice) / spotPrice * 100).toFixed(1));
+        return { ...s, target_price: liveTarget, target_pct };
+      });
+    }
+    // sem live: calcula target_price a partir do spot (pode ser null se ticker ainda carregando)
+    if (spotPrice) {
+      return SCENARIOS_24H_FALLBACK.map(s => ({
+        ...s,
+        target_price: spotPrice * (1 + s.target_pct / 100),
+      }));
+    }
+    return SCENARIOS_24H_FALLBACK;
   }, [liveScenarioPrices, spotPrice]);
 
-  const SPOT = spotPrice ?? SPOT_FALLBACK;
+  const SPOT = spotPrice ?? 0;
   const selectedScenario = scenarios.find(s => s.id === selected);
 
   return (
@@ -323,7 +330,11 @@ export default function PredictivePanel() {
           })()}
         </div>
         <p style={{ fontSize: 11, color: '#475569', margin: 0 }}>
-          Projeção baseada em correlações históricas, fluxo de stablecoin, pressão institucional e VIX · Spot: <span style={{ fontFamily: 'JetBrains Mono, monospace', color: '#f59e0b', fontWeight: 700 }}>${SPOT.toLocaleString()}</span>
+          Projeção baseada em correlações históricas, fluxo de stablecoin, pressão institucional e VIX · Spot:{' '}
+          {SPOT > 0
+            ? <span style={{ fontFamily: 'JetBrains Mono, monospace', color: ticker?.isFallback ? '#f59e0b' : '#f59e0b', fontWeight: 700 }}>${SPOT.toLocaleString()}{ticker?.isFallback && ' ⚠'}</span>
+            : <span style={{ fontFamily: 'JetBrains Mono, monospace', color: '#334155' }}>carregando…</span>
+          }
           {atr14 && <span style={{ marginLeft: 8, color: '#334155' }}>· ATR(14): <span style={{ fontFamily: 'JetBrains Mono, monospace', color: '#64748b' }}>${Math.round(atr14).toLocaleString()}</span></span>}
         </p>
       </div>
@@ -362,7 +373,7 @@ export default function PredictivePanel() {
                 <div style={{ marginBottom: 10 }}>
                   <div style={{ fontSize: 8, color: '#334155', marginBottom: 3 }}>TARGET</div>
                   <div style={{ fontSize: 28, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: selectedScenario.color, lineHeight: 1 }}>
-                    {fmtK(selectedScenario.target_price)}
+                    {selectedScenario.target_price != null ? fmtK(selectedScenario.target_price) : '—'}
                   </div>
                   <div style={{ fontSize: 11, color: '#475569', marginTop: 2 }}>
                     {selectedScenario.target_pct > 0 ? '+' : ''}{selectedScenario.target_pct.toFixed(1)}% vs spot

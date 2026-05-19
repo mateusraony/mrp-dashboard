@@ -18,7 +18,7 @@ import {
   ReferenceLine, Cell, ComposedChart, Line,
 } from 'recharts';
 
-const SPOT = 84298.70;
+const SPOT = 0;
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 function fmtM(v) {
@@ -123,7 +123,7 @@ function LiqHeatmapFull() {
     <div>
       <SectionTitle
         title="Liquidation Cluster Heatmap"
-        sub={`Spot atual: $${SPOT_LIVE.toLocaleString()} · Barras VERMELHAS = longs que serão liquidados se preço CAIR · VERDES = shorts se preço SUBIR`}
+        sub={`Spot atual: ${SPOT_LIVE > 0 ? `$${SPOT_LIVE.toLocaleString()}` : '—'} · Barras VERMELHAS = longs que serão liquidados se preço CAIR · VERDES = shorts se preço SUBIR`}
         badge={d.quality}
         mode={IS_LIVE ? 'live' : 'mock'}
       />
@@ -438,7 +438,7 @@ function CarryCalculator() {
     <div>
       <SectionTitle
         title="Carry Calculator — Custo de Basis por Vencimento"
-        sub={`Basis anualizado vs US10Y (${US10Y}%) · Spot: $${SPOT_LIVE.toLocaleString()}`}
+        sub={`Basis anualizado vs US10Y (${US10Y}%) · Spot: ${SPOT_LIVE > 0 ? `$${SPOT_LIVE.toLocaleString()}` : '—'}`}
         badge={(liveBasis && liveBasis.length > 0) ? 'A' : futuresBasis.quality}
         mode={(liveBasis && liveBasis.length > 0) ? 'live' : (IS_LIVE ? 'live' : 'mock')}
       />
