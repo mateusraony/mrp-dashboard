@@ -279,7 +279,7 @@ export default function NewsIntelligence() {
           {instArticles.length > 0 && (
             <div style={{ marginBottom: 12, padding: '6px 12px', background: 'rgba(71,85,105,0.08)', border: '1px solid #1e2d45', borderRadius: 6, fontSize: 10, color: '#475569', display: 'flex', alignItems: 'center', gap: 6 }}>
               <span>ℹ️</span>
-              <span>Sentimento calculado por correspondência de palavras-chave (14 positivas / 14 negativas) — não por modelo de linguagem. Categorias detectadas por regex. Fonte dos artigos: <strong style={{ color: '#64748b' }}>GDELT DOC 2.0</strong>.</span>
+              <span>Sentimento dos artigos calculado por palavras-chave fixas (14 positivas / 15 negativas em <code style={{ fontSize: 9, color: '#64748b' }}>gdelt.ts</code>) — não por modelo de linguagem. Score por artigo usa lista local ligeiramente diferente. Categorias detectadas por regex. Fonte: <strong style={{ color: '#64748b' }}>GDELT DOC 2.0</strong>.</span>
             </div>
           )}
           {instArticles.length > 0 && (
