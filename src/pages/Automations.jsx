@@ -348,9 +348,12 @@ function MetricsMonitor({ liveMetrics }) {
   const liveValues = { ...staticFallback, ...liveMetrics };
   return (
     <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '14px 16px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-        <span style={{ fontSize: 11, fontWeight: 700, color: '#e2e8f0' }}>📡 Métricas Monitoradas em Tempo Real</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: '#e2e8f0' }}>📡 Métricas Monitoradas</span>
         <ModeBadge />
+      </div>
+      <div style={{ marginBottom: 10, fontSize: 9, color: '#334155' }}>
+        Valores com feed live (BTC price, funding, riskScore, VIX, DXY, yield spread, NUPL, stablecoin net) substituem o fallback estático. Métricas sem fonte gratuita disponível (OI delta, basis, netflow, stablecoin dev) exibem referências estáticas iniciais.
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
         {CATEGORIES.map(cat => (
