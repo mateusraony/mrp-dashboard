@@ -261,7 +261,7 @@ function StrategyDetail({ strategy }) {
 
         {/* Explanation */}
         <div style={{ background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.18)', borderRadius: 9, padding: '12px 14px', marginBottom: 16 }}>
-          <div style={{ fontSize: 10, color: '#60a5fa', fontWeight: 700, marginBottom: 6 }}>🤖 Racional Quantitativo</div>
+          <div style={{ fontSize: 10, color: '#60a5fa', fontWeight: 700, marginBottom: 6 }}>📐 Racional Quantitativo</div>
           <div style={{ fontSize: 11, color: '#64748b', lineHeight: 1.7 }}>{strategy.explanation}</div>
         </div>
 
