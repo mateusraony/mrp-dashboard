@@ -204,7 +204,7 @@ export function StablecoinContent() {
       {/* Top stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8, marginBottom: 14 }}>
         <StatCard label="Supply Total" value={`$${snap.total_supply_b.toFixed(1)}B`} icon="💰" sub="USDT + USDC" />
-        <StatCard label="Net 24h" value={`+$${snap.total_net_24h_m.toFixed(0)}M`} color="#10b981" icon="🪙" sub={`Avg 7d: +$${snap.avg7d_net_m.toFixed(0)}M`} />
+        <StatCard label="Net 24h" value={`+$${snap.total_net_24h_m.toFixed(0)}M`} color="#10b981" icon="🪙" sub={snap.avg7d_net_m !== 0 ? `Avg 7d: +$${snap.avg7d_net_m.toFixed(0)}M` : 'Avg 7d: N/D'} />
         <StatCard label="Desvio vs 7D" value={`${snap.sigma_vs_7d > 0 ? '+' : ''}${snap.sigma_vs_7d.toFixed(0)}%`} color={snap.sigma_vs_7d > 50 ? '#ef4444' : '#f59e0b'} icon="📐" sub={snap.sigma_vs_7d > 50 ? '⚠ Anomalia' : 'Normal'} />
         <StatCard label="USDT Mint 24h" value={`+$${snap.usdt.mint_24h_m.toFixed(0)}M`} color="#10b981" icon="🟢" sub={`Net: +$${snap.usdt.net_24h_m.toFixed(0)}M`} />
         <StatCard label="USDC Mint 24h" value={`+$${snap.usdc.mint_24h_m.toFixed(0)}M`} color="#3b82f6" icon="🔵" sub={`Net: +$${snap.usdc.net_24h_m.toFixed(0)}M`} />
@@ -395,6 +395,9 @@ export function StablecoinContent() {
       {tab === 3 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           {/* Corr stats */}
+          <div style={{ marginBottom: 4, padding: '6px 10px', borderRadius: 6, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.18)', fontSize: 9, color: '#78716c' }}>
+            ⚠️ Valores de correlação abaixo são zeros de fallback — não correlação calculada. Histórico de mint/burn requer Glassnode (~$29/mês) ou Nansen.
+          </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 8 }}>
             {[
               { label: 'Pearson 30D', value: MINT_VS_BTC_CORR_FALLBACK.pearson_30d.toFixed(2), color: '#a78bfa', sub: 'Mint líquido × BTC price' },

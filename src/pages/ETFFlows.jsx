@@ -348,6 +348,9 @@ export function ETFContent() {
       }}>
         <span style={{ color: '#10b981', fontWeight: 700 }}>📡 Sinal ETF: </span>
         {d.signal}
+        {!sosoAvailable && (
+          <span style={{ fontSize: 9, color: '#475569', marginLeft: 6 }}>(simulado — configure VITE_SOSOVALUE_KEY para dados reais)</span>
+        )}
       </div>
 
       {/* Reddit Pulse — discussões recentes sobre BTC ETF */}
