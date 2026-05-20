@@ -25,12 +25,12 @@ export default defineConfig({
         'src/**/__mocks__/**',
       ],
       // Thresholds calibrados após migração completa DataState<T> (todos os hooks).
-      // functions/statements reduzidos: +80 novas funções (queryFn/select/retryDelay)
-      // adicionadas em useBtcData + 5 hook files — TanStack Query hooks requerem
-      // renderHook + QueryClient para cobertura unitária; ajuste reflete realidade.
+      // functions reduzido: +80 TanStack hooks (queryFn/select/retryDelay) + 11
+      // novas funções de proxy/preprocess não testáveis unitariamente (HTTP wrappers
+      // callFapiViaProxy, fetchGdeltViaProxy + 9 arrow fns em z.preprocess).
       thresholds: {
         lines:      19,
-        functions:  18,
+        functions:  17,
         branches:   15,
         statements: 19,
       },

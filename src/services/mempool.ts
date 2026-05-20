@@ -63,13 +63,13 @@ const DifficultyAdjSchema = z.object({
 
 const HashrateSchema = z.object({
   hashrates: z.array(z.object({
-    timestamp:   z.coerce.number(),
-    avgHashrate: z.coerce.number(),
+    timestamp:   z.preprocess(v => (v == null || Number.isNaN(Number(v)) ? 0 : Number(v)), z.number()),
+    avgHashrate: z.preprocess(v => (v == null || Number.isNaN(Number(v)) ? 0 : Number(v)), z.number()),
     difficulty:  z.coerce.number().optional(),
   })),
   difficulty: z.array(z.object({
-    timestamp:  z.coerce.number(),
-    difficulty: z.coerce.number(),
+    timestamp:  z.preprocess(v => (v == null || Number.isNaN(Number(v)) ? 0 : Number(v)), z.number()),
+    difficulty: z.preprocess(v => (v == null || Number.isNaN(Number(v)) ? 0 : Number(v)), z.number()),
     height:     z.coerce.number().optional(),
   })).optional(),
   currentHashrate: z.coerce.number().optional(),
@@ -265,11 +265,11 @@ function mockOnChainAdvanced(): OnChainAdvancedData {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-async function safeFetch<T>(url: string, schema: z.ZodType<T>): Promise<T> {
+async function safeFetch<S extends z.ZodTypeAny>(url: string, schema: S): Promise<z.infer<S>> {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Mempool.space API error ${res.status}: ${url}`);
   const data = await res.json();
-  return schema.parse(data);
+  return schema.parse(data) as z.infer<S>;
 }
 
 // ─── Fetchers ─────────────────────────────────────────────────────────────────

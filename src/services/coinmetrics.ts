@@ -318,15 +318,18 @@ export async function fetchOnChainExtended(): Promise<OnChainExtendedData> {
 
   const metrics = 'CoinDaysDestroyed,SplyAdr1yrPlus,SplyAct1yr,AdrActCnt,VelCur1yr';
   const params  = new URLSearchParams({
-    assets:    ASSET,
+    assets:     ASSET,
     metrics,
-    frequency: '1d',
-    limit:     '90',
-    sort:      'time',
+    frequency:  '1d',
+    page_size:  '90',
+    paging_from: 'end',
   });
 
   const res = await fetch(`${BASE}/timeseries/asset-metrics?${params}`);
-  if (!res.ok) throw new Error(`CoinMetrics Extended API error ${res.status}: ${res.statusText}`);
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`CoinMetrics Extended API error ${res.status}: ${res.statusText} — ${body.slice(0, 200)}`);
+  }
 
   const raw    = await res.json();
   const parsed = CmExtResponseSchema.parse(raw);
@@ -410,15 +413,18 @@ export async function fetchOnChainCycle(): Promise<OnChainCycleData> {
 
   const metrics = 'CapMVRVCur,CapRealUSD,PriceUSD,NVTAdj,SplyCur';
   const params = new URLSearchParams({
-    assets:    ASSET,
+    assets:      ASSET,
     metrics,
-    frequency: '1d',
-    limit:     '365',
-    sort:      'time',
+    frequency:   '1d',
+    page_size:   '365',
+    paging_from: 'end',
   });
 
   const res = await fetch(`${BASE}/timeseries/asset-metrics?${params}`);
-  if (!res.ok) throw new Error(`CoinMetrics API error ${res.status}: ${res.statusText}`);
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`CoinMetrics API error ${res.status}: ${res.statusText} — ${body.slice(0, 200)}`);
+  }
 
   const raw = await res.json();
   const parsed = CmResponseSchema.parse(raw);

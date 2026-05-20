@@ -1,5 +1,6 @@
 /**
- * fred-proxy — Edge Function que faz proxy das chamadas ao FRED API e Yahoo Finance.
+ * fred-proxy — Edge Function que faz proxy das chamadas ao FRED API, Yahoo Finance,
+ * Binance Futures API e GDELT.
  * Resolve o CORS: o browser chama esta função, que chama as APIs no servidor.
  * FRED_API_KEY fica como secret do Supabase (não exposta no bundle frontend).
  *
@@ -7,10 +8,14 @@
  *   observations   — FRED series/observations (requer FRED_API_KEY)
  *   release_dates  — FRED release/dates (requer FRED_API_KEY)
  *   yahoo_chart    — Yahoo Finance v8/finance/chart (sem API key, evita CORS)
+ *   binance_fapi   — Binance Futures API (fapi.binance.com) — sem API key, evita CORS
+ *   gdelt          — GDELT DOC 2.0 API — sem API key, evita CORS
  */
 
-const FRED_BASE = 'https://api.stlouisfed.org/fred';
-const YAHOO_BASE = 'https://query1.finance.yahoo.com/v8/finance/chart';
+const FRED_BASE    = 'https://api.stlouisfed.org/fred';
+const YAHOO_BASE   = 'https://query1.finance.yahoo.com/v8/finance/chart';
+const BINANCE_FAPI = 'https://fapi.binance.com';
+const GDELT_BASE   = 'https://api.gdeltproject.org/api/v2/doc/doc';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin':  '*',
@@ -51,12 +56,65 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    // ── Binance Futures API — sem API key, evita CORS do browser ────────────
+    if (type === 'binance_fapi') {
+      const { endpoint } = params;
+      if (!endpoint || !endpoint.startsWith('/')) {
+        return new Response(
+          JSON.stringify({ error: 'param endpoint obrigatório para binance_fapi (ex: /fapi/v1/globalLongShortAccountRatio?symbol=BTCUSDT&period=5m&limit=1)' }),
+          { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } },
+        );
+      }
+      const url = `${BINANCE_FAPI}${endpoint}`;
+      const binRes = await fetch(url, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; mrp-dashboard/1.0)' },
+        signal: AbortSignal.timeout(10_000),
+      });
+      const data = await binRes.json();
+      if (!binRes.ok) {
+        console.error(`[fred-proxy] Binance ${binRes.status} | endpoint=${endpoint}`);
+      }
+      return new Response(JSON.stringify(data), {
+        status:  binRes.ok ? 200 : binRes.status,
+        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // ── GDELT DOC 2.0 API — sem API key, evita CORS do browser ─────────────
+    if (type === 'gdelt') {
+      const queryParams = new URLSearchParams(params);
+      const url = `${GDELT_BASE}?${queryParams.toString()}`;
+      const gdeltRes = await fetch(url, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; mrp-dashboard/1.0)' },
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (!gdeltRes.ok) {
+        console.error(`[fred-proxy] GDELT ${gdeltRes.status}`);
+        return new Response(
+          JSON.stringify({ error: `GDELT API error ${gdeltRes.status}` }),
+          { status: gdeltRes.status, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } },
+        );
+      }
+      // GDELT retorna JSON mas o Content-Type pode ser text/plain — forçar parse
+      const text = await gdeltRes.text();
+      let data: unknown;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        data = { articles: [] };
+      }
+      return new Response(JSON.stringify(data), {
+        status:  200,
+        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+      });
+    }
+
     // ── FRED — requer API key ────────────────────────────────────────────────
     const fredApiKey = Deno.env.get('FRED_API_KEY');
     if (!fredApiKey) {
       return new Response(
         JSON.stringify({ error: 'FRED_API_KEY secret not configured' }),
-        { status: 500, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } },
+        { status: 503, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } },
       );
     }
 

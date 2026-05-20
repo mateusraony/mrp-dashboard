@@ -16,6 +16,23 @@ import { logInfo, logError } from '@/lib/debugLog';
 const _supUrl = env.VITE_SUPABASE_URL ?? '';
 const _supKey = env.VITE_SUPABASE_ANON_KEY ?? '';
 
+// ─── Proxy helper (GDELT não tem CORS — chama via fred-proxy) ─────────────────
+
+async function fetchGdeltViaProxy(params: Record<string, string>): Promise<unknown> {
+  if (!_supUrl || !_supKey) throw new Error('Supabase não configurado — proxy GDELT indisponível');
+  const res = await fetch(`${_supUrl.replace(/\/$/, '')}/functions/v1/fred-proxy`, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${_supKey}` },
+    body:    JSON.stringify({ type: 'gdelt', params }),
+    signal:  AbortSignal.timeout(15_000),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({} as Record<string, unknown>));
+    throw new Error(`gdelt proxy error ${res.status}: ${(err.error as string) ?? res.statusText}`);
+  }
+  return res.json();
+}
+
 /**
  * Persiste artigos GDELT no Supabase (upsert por URL, ignora duplicatas).
  * Fire-and-forget — não bloqueia o retorno do hook.
@@ -163,29 +180,20 @@ export async function fetchGdeltNews(
     return [];
   }
 
-  const params = new URLSearchParams({
-    query:      query,
+  const params: Record<string, string> = {
+    query,
     mode:       'artlist',
     format:     'json',
     maxrecords: '25',
     sort:       'DateDesc',
-  });
-
-  const url = `${BASE}?${params.toString()}`;
-
-  const res = await fetch(url);
-  if (!res.ok) {
-    const err = new Error(`GDELT API error ${res.status}: ${res.statusText}`);
-    logError('GDELT fetch failed', err, 'gdelt');
-    throw err;
-  }
+  };
 
   let raw: unknown;
   try {
-    raw = await res.json();
-  } catch {
-    const err = new Error('GDELT retornou resposta inválida (não-JSON). API pode estar indisponível.');
-    logError('GDELT parse error', err, 'gdelt');
+    raw = await fetchGdeltViaProxy(params);
+  } catch (proxyErr) {
+    const err = new Error(`GDELT fetch failed via proxy: ${proxyErr instanceof Error ? proxyErr.message : String(proxyErr)}`);
+    logError('GDELT fetch failed', err, 'gdelt-news');
     throw err;
   }
   const parsed = GdeltResponseSchema.parse(raw);
@@ -223,16 +231,15 @@ export interface GdeltTimelinePoint {
 export async function fetchGdeltMentionsTimeline(): Promise<GdeltTimelinePoint[]> {
   if (DATA_MODE === 'mock') return [];
   try {
-    const params = new URLSearchParams({
+    const params: Record<string, string> = {
       query:    'bitcoin',
       mode:     'timelinevolraw',
       format:   'json',
       timespan: '24h',
-    });
-    const res = await fetch(`${BASE}?${params}`, { signal: AbortSignal.timeout(8000) });
-    if (!res.ok) return [];
-    const json = await res.json();
-    const points: Array<{ date: string; value: number; normvalue: number }> = json?.timeline ?? [];
+    };
+    const json = await fetchGdeltViaProxy(params).catch(() => null) as Record<string, unknown> | null;
+    if (!json) return [];
+    const points: Array<{ date: string; value: number; normvalue: number }> = (json?.['timeline'] as Array<{ date: string; value: number; normvalue: number }>) ?? [];
     if (points.length === 0) return [];
 
     const hourMap = new Map<number, number>();
