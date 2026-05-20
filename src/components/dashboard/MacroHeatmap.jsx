@@ -6,50 +6,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine,
 } from 'recharts';
-
-// ─── DADOS ESTENDIDOS: correlações por janela 1M / 3M / 6M ───────────────────
-function seed(n) { return (Math.sin(n * 9301 + 49297) % 1 + 1) / 2; }
-
-function genCorrSeries(base, vol, points, offset = 0) {
-  return Array.from({ length: points }, (_, i) => {
-    const s = seed(i + offset);
-    const v = base + (s - 0.5) * vol * 2;
-    return parseFloat(Math.min(0.99, Math.max(-0.99, v)).toFixed(2));
-  });
-}
-
-const PAIRS = [
-  { key: 'SPX',  label: 'S&P 500',   color: '#60a5fa', icon: '📈',
-    corr: { '1m': 0.65, '3m': 0.58, '6m': 0.51 },
-    series: { '1m': genCorrSeries(0.65, 0.18, 30, 1), '3m': genCorrSeries(0.58, 0.22, 90, 2), '6m': genCorrSeries(0.51, 0.26, 180, 3) },
-    desc: 'Correlação positiva forte — BTC se move com o apetite de risco do equity americano.',
-  },
-  { key: 'DXY',  label: 'DXY',       color: '#ef4444', icon: '💵',
-    corr: { '1m': -0.51, '3m': -0.47, '6m': -0.43 },
-    series: { '1m': genCorrSeries(-0.51, 0.16, 30, 4), '3m': genCorrSeries(-0.47, 0.19, 90, 5), '6m': genCorrSeries(-0.43, 0.22, 180, 6) },
-    desc: 'Correlação negativa — dólar forte = pressão sobre BTC e ativos de risco.',
-  },
-  { key: 'GOLD', label: 'Gold',      color: '#f59e0b', icon: '🥇',
-    corr: { '1m': 0.24, '3m': 0.19, '6m': 0.22 },
-    series: { '1m': genCorrSeries(0.24, 0.22, 30, 7), '3m': genCorrSeries(0.19, 0.25, 90, 8), '6m': genCorrSeries(0.22, 0.28, 180, 9) },
-    desc: 'Correlação fraca/moderada — ambos são "stores of value" mas divergem em regime de risco.',
-  },
-  { key: 'US10Y',label: 'US 10Y',   color: '#a78bfa', icon: '📊',
-    corr: { '1m': -0.38, '3m': -0.31, '6m': -0.29 },
-    series: { '1m': genCorrSeries(-0.38, 0.19, 30, 10), '3m': genCorrSeries(-0.31, 0.22, 90, 11), '6m': genCorrSeries(-0.29, 0.24, 180, 12) },
-    desc: 'Yields altos = custo de capital sobe = pressão em ativos especulativos como BTC.',
-  },
-  { key: 'VIX',  label: 'VIX',       color: '#f97316', icon: '🌡️',
-    corr: { '1m': -0.58, '3m': -0.53, '6m': -0.49 },
-    series: { '1m': genCorrSeries(-0.58, 0.17, 30, 13), '3m': genCorrSeries(-0.53, 0.20, 90, 14), '6m': genCorrSeries(-0.49, 0.23, 180, 15) },
-    desc: 'VIX alto = pânico no mercado = BTC geralmente vende junto com equities em risk-off.',
-  },
-  { key: 'HY',   label: 'HY Bonds',  color: '#10b981', icon: '🔗',
-    corr: { '1m': 0.41, '3m': 0.36, '6m': 0.33 },
-    series: { '1m': genCorrSeries(0.41, 0.18, 30, 16), '3m': genCorrSeries(0.36, 0.21, 90, 17), '6m': genCorrSeries(0.33, 0.24, 180, 18) },
-    desc: 'Títulos High Yield se movem com apetite a risco — correlação moderada com BTC.',
-  },
-];
+import { useBtcCorrelations } from '@/hooks/useBtcCorrelations';
 
 // Períodos históricos de stress
 const STRESS_EVENTS = [
@@ -104,16 +61,19 @@ export default function MacroHeatmap() {
   const [stressEvent, setStressEvent] = useState(null);
   const [tab, setTab] = useState('heatmap'); // 'heatmap' | 'chart' | 'stress'
 
+  const { data: corrState, isLoading: corrLoading } = useBtcCorrelations();
+  const PAIRS = corrState?.data?.pairs ?? [];
+
   const tfCfg = TIMEFRAMES.find(t => t.key === tf);
 
   const chartData = useMemo(() => {
     const pairs = selectedPair ? PAIRS.filter(p => p.key === selectedPair) : PAIRS;
     return Array.from({ length: tfCfg.points }, (_, i) => {
       const pt = { t: i, label: tfCfg.xLabel(i) };
-      pairs.forEach(p => { pt[p.key] = p.series[tf][i]; });
+      pairs.forEach(p => { pt[p.key] = p.series[tf]?.[i] ?? 0; });
       return pt;
     });
-  }, [tf, selectedPair]);
+  }, [tf, selectedPair, PAIRS]);
 
   const displayPairs = selectedPair ? PAIRS.filter(p => p.key === selectedPair) : PAIRS;
 
@@ -128,7 +88,12 @@ export default function MacroHeatmap() {
           <span style={{ width: 28, height: 28, borderRadius: 7, background: 'rgba(167,139,250,0.12)', border: '1px solid rgba(167,139,250,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>🗺️</span>
           <div>
             <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>Macro Heatmap — Correlações BTC</div>
-            <div style={{ fontSize: 9, color: '#334155' }}>Pearson rolling · BTC × Ativos Globais · Períodos de stress incluídos</div>
+            <div style={{ fontSize: 9, color: '#334155' }}>
+              Pearson rolling · BTC × Ativos Globais · Períodos de stress incluídos
+              {corrState?.isFallback && <span style={{ color: '#f59e0b', marginLeft: 6 }}>⚠ Cache</span>}
+              {corrLoading && <span style={{ color: '#3b82f6', marginLeft: 6 }}>↻ Calculando…</span>}
+              {!corrLoading && !corrState?.isFallback && corrState?.data && <span style={{ color: '#10b981', marginLeft: 6 }}>● Live · FRED + Binance</span>}
+            </div>
           </div>
         </div>
         {/* TF selector */}
@@ -164,6 +129,12 @@ export default function MacroHeatmap() {
       <div style={{ padding: '16px 18px' }}>
 
         {/* ── HEATMAP TAB ── */}
+        {corrLoading && PAIRS.length === 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 120, color: '#3b82f6', fontSize: 12, gap: 8 }}>
+            <span>↻</span> Calculando correlações ao vivo (FRED + Binance)…
+          </div>
+        )}
+
         {tab === 'heatmap' && (
           <>
             {/* Correlation grid */}
