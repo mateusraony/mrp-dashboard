@@ -21,7 +21,7 @@ import { futuresBasis as mockFuturesBasis } from '@/components/data/mockDataExte
 
 // ─── Proxy helper (fapi endpoints têm CORS bloqueado no browser) ──────────────
 
-async function callFapiViaProxy(endpoint: string): Promise<unknown> {
+async function callFapiViaProxy(endpoint: string): Promise<{ status: number; data: unknown }> {
   const baseUrl = env.VITE_SUPABASE_URL?.replace(/\/$/, '');
   const key     = env.VITE_SUPABASE_ANON_KEY;
   if (!baseUrl || !key) throw new Error('Supabase não configurado — proxy indisponível');
@@ -31,11 +31,11 @@ async function callFapiViaProxy(endpoint: string): Promise<unknown> {
     body:    JSON.stringify({ type: 'binance_fapi', params: { endpoint } }),
     signal:  AbortSignal.timeout(10_000),
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({} as Record<string, unknown>));
-    throw new Error(`binance_fapi proxy error ${res.status}: ${(err.error as string) ?? res.statusText}`);
+  const data = await res.json().catch(() => ({} as Record<string, unknown>));
+  if (!res.ok && res.status !== 401 && res.status !== 403) {
+    throw new Error(`binance_fapi proxy error ${res.status}: ${(data as Record<string, unknown>).error ?? res.statusText}`);
   }
-  return res.json();
+  return { status: res.status, data };
 }
 
 // ─── Schemas ──────────────────────────────────────────────────────────────────
@@ -359,10 +359,11 @@ export async function fetchLongShortRatio(
 ): Promise<LongShortRatioData | null> {
   if (DATA_MODE === 'mock') return mockLongShortRatio();
 
-  const raw = await callFapiViaProxy(
+  const { status, data } = await callFapiViaProxy(
     `/fapi/v1/globalLongShortAccountRatio?symbol=${symbol}&period=${period}&limit=1`,
-  ) as unknown[];
-  const items = z.array(LongShortRatioItemSchema).parse(raw);
+  );
+  if (status === 401 || status === 403) return null;
+  const items = z.array(LongShortRatioItemSchema).parse(data as unknown[]);
   const item  = items[0];
   if (!item) return null;
 
@@ -384,10 +385,11 @@ export async function fetchLongShortRatio(
 export async function fetchLiquidations(symbol = 'BTCUSDT', limit = 200): Promise<LiquidationEntry[]> {
   if (DATA_MODE === 'mock') return mockLiquidations();
 
-  const raw = await callFapiViaProxy(
+  const { status, data } = await callFapiViaProxy(
     `/fapi/v1/allForceOrders?symbol=${symbol}&limit=${limit}`,
   );
-  const parsed = LiquidationsResponseSchema.parse(raw);
+  if (status === 401 || status === 403) return [];
+  const parsed = LiquidationsResponseSchema.parse(data);
 
   return parsed.map(item => {
     const qty   = item.executedQty ?? item.origQty;
