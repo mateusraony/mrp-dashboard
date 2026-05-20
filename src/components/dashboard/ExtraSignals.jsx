@@ -5,7 +5,7 @@ import { HelpIcon } from '../ui/Tooltip';
 import MiniTimeChart from './MiniTimeChart';
 import CorrelationChart from './CorrelationChart';
 import { IS_LIVE } from '@/lib/env';
-import { DataTrustBadge } from '../ui/DataTrustBadge';
+
 import { useDominance, useLiquidations } from '@/hooks/useBtcData';
 import { useStablecoinData } from '@/hooks/useStablecoin';
 import { useYieldCurve, useCreditSpread } from '@/hooks/useFred';
