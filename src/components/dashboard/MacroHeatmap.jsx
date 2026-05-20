@@ -243,6 +243,7 @@ export default function MacroHeatmap() {
             {/* Selected pair detail */}
             {selectedPair && (() => {
               const p = PAIRS.find(x => x.key === selectedPair);
+              if (!p) return null;
               return (
                 <div style={{ marginTop: 12, padding: '10px 13px', background: `${p.color}08`, border: `1px solid ${p.color}20`, borderRadius: 9, fontSize: 10, color: '#64748b', lineHeight: 1.7 }}>
                   <span style={{ fontSize: 11, fontWeight: 700, color: p.color }}>{p.icon} {p.label}</span><br />{p.desc}

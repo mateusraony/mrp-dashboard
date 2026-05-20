@@ -95,6 +95,8 @@ function corrWindow(
 }
 
 // Série de correlações rolling para gráfico (comprimento = window)
+// Quando dados alinhados são menores que window (ex: 6M com ~130 dias úteis vs 180),
+// usa effectiveWindow = n disponível para evitar série flat de zeros.
 function rollingSeries(
   btcByDate: Map<string, number>,
   macroHistory: Array<{ date: string; value: number }>,
@@ -102,9 +104,14 @@ function rollingSeries(
   negate: boolean,
 ): number[] {
   const { btcRet, macroRet } = alignedReturns(btcByDate, macroHistory, negate);
+  const n = Math.min(btcRet.length, macroRet.length);
+  if (n < 5) return Array(window).fill(0);
+
+  // Se dados disponíveis são menores que window, usar todos os dados como janela
+  const effectiveWindow = Math.min(window, n);
   const result: number[] = [];
-  for (let i = window; i <= btcRet.length; i++) {
-    const r = pearson(btcRet.slice(i - window, i), macroRet.slice(i - window, i));
+  for (let i = effectiveWindow; i <= n; i++) {
+    const r = pearson(btcRet.slice(i - effectiveWindow, i), macroRet.slice(i - effectiveWindow, i));
     result.push(parseFloat(r.toFixed(2)));
   }
   // Pad início com primeiro valor para manter comprimento = window
