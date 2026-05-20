@@ -193,8 +193,17 @@ function mockData(): BtcCorrelationsData {
       corr:  { '1m': p.corr_1m, '3m': p.corr_1m * 0.92, '6m': p.corr_1m * 0.84 },
       series: {
         '1m': p.history_1m.map((v: number) => v),
-        '3m': Array.from({ length: 90 }, (_, i) => p.history_1m[i % p.history_1m.length]),
-        '6m': Array.from({ length: 180 }, (_, i) => p.history_1m[i % p.history_1m.length]),
+        // 3M/6M: varia em torno do corr base com amplitude maior (janela mais longa = mais variação)
+        '3m': Array.from({ length: 90 }, (_, i) => {
+          const base = p.corr_1m * 0.92;
+          const s = (Math.sin(i * 0.21 + p.corr_1m * 10) * 0.5 + 1) / 2;
+          return parseFloat(Math.min(0.99, Math.max(-0.99, base + (s - 0.5) * 0.28)).toFixed(2));
+        }),
+        '6m': Array.from({ length: 180 }, (_, i) => {
+          const base = p.corr_1m * 0.84;
+          const s = (Math.sin(i * 0.11 + p.corr_1m * 10) * 0.5 + 1) / 2;
+          return parseFloat(Math.min(0.99, Math.max(-0.99, base + (s - 0.5) * 0.36)).toFixed(2));
+        }),
       },
     })),
     updated_at: Date.now(),
@@ -207,8 +216,9 @@ function mockData(): BtcCorrelationsData {
 export async function fetchBtcCorrelations(): Promise<BtcCorrelationsData> {
   if (DATA_MODE === 'mock') return mockData();
 
-  // 185 dias cobre 6M com margem (dias úteis ≈ 130 em 6M)
-  const DAYS = 185;
+  // 365 dias → ~252 dias úteis → 73 pontos rolling para janela 6M (window=180)
+  // 185 era insuficiente: 132 dias úteis - window 180 = 0 pontos (série flat)
+  const DAYS = 365;
 
   // BTC preços diários (spot Binance — endpoint público, sem CORS issues)
   const klines = await fetchKlines('BTCUSDT', '1d', DAYS);

@@ -72,6 +72,19 @@ export interface YieldCurveData {
   updated_at:   number;
 }
 
+export interface CreditSpreadData {
+  hy_spread_bp:  number;   // ICE BofA HY OAS em basis points
+  ig_spread_bp:  number;   // ICE BofA IG OAS em basis points
+  prev_7d_hy:    number;
+  prev_30d_hy:   number;
+  delta_7d_bp:   number;
+  delta_30d_bp:  number;
+  regime:        'widening' | 'tightening' | 'stable';
+  history:       Array<{ date: string; hy: number; ig: number }>;
+  quality:       'A' | 'B' | 'C';
+  updated_at:    number;
+}
+
 // ─── Config das séries ──────────────────────────────────────────────────────────────────────────
 
 interface SeriesConfig {
@@ -537,5 +550,58 @@ export async function fetchYieldCurve(): Promise<YieldCurveData> {
     history_10y:  hist10y.slice(-30),
     history_2y:   hist2y.slice(-30),
     updated_at:   Date.now(),
+  };
+}
+
+/**
+ * fetchCreditSpread — HY e IG OAS via FRED (ICE BofA indices)
+ *
+ * Séries:
+ *   BAMLH0A0HYM2 — ICE BofA US High Yield Index OAS (%)
+ *   BAMLC0A0CM   — ICE BofA US Corporate Master OAS (Investment Grade, %)
+ *
+ * Valores em % → converter para basis points (× 100).
+ * Cache recomendado: 3600s — atualiza diariamente.
+ */
+export async function fetchCreditSpread(): Promise<CreditSpreadData> {
+  const [hyHist, igHist] = await Promise.all([
+    fetchSeries('BAMLH0A0HYM2', 35),
+    fetchSeries('BAMLC0A0CM',   35),
+  ]);
+
+  const toB = (v: number) => Math.round(v * 100); // % → bp
+
+  const hyLast    = hyHist[hyHist.length - 1]?.value ?? 0;
+  const hyPrev7d  = hyHist[Math.max(0, hyHist.length - 6)]?.value ?? hyLast;
+  const hyPrev30d = hyHist[0]?.value ?? hyLast;
+  const igLast    = igHist[igHist.length - 1]?.value ?? 0;
+
+  const delta7d  = toB(hyLast) - toB(hyPrev7d);
+  const delta30d = toB(hyLast) - toB(hyPrev30d);
+
+  const regime: CreditSpreadData['regime'] =
+    delta30d > 20  ? 'widening' :
+    delta30d < -20 ? 'tightening' :
+    'stable';
+
+  // Alinha HY e IG por data
+  const igByDate = new Map(igHist.map(p => [p.date, p.value]));
+  const history = hyHist.slice(-30).map(h => ({
+    date: h.date,
+    hy:   toB(h.value),
+    ig:   toB(igByDate.get(h.date) ?? igLast),
+  }));
+
+  return {
+    hy_spread_bp: toB(hyLast),
+    ig_spread_bp: toB(igLast),
+    prev_7d_hy:   toB(hyPrev7d),
+    prev_30d_hy:  toB(hyPrev30d),
+    delta_7d_bp:  delta7d,
+    delta_30d_bp: delta30d,
+    regime,
+    history,
+    quality:    'A',
+    updated_at: Date.now(),
   };
 }

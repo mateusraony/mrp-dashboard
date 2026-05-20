@@ -7,8 +7,8 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { IS_LIVE } from '@/lib/env';
-import { fetchMacroBoard, fetchYieldCurve, fetchGlobalLiquidity } from '@/services/fred';
-import type { MacroBoardData, YieldCurveData, GlobalLiquidityData } from '@/services/fred';
+import { fetchMacroBoard, fetchYieldCurve, fetchGlobalLiquidity, fetchCreditSpread } from '@/services/fred';
+import type { MacroBoardData, YieldCurveData, GlobalLiquidityData, CreditSpreadData } from '@/services/fred';
 import { withCache, getStaleCache } from '@/services/marketCache';
 import { logError } from '@/lib/debugLog';
 import { reportApiFailure, reportApiRecovery } from '@/lib/apiHealthMonitor';
@@ -142,5 +142,35 @@ export function useGlobalLiquidity() {
       const data = state.data ?? EMPTY_GLOBAL_LIQUIDITY;
       return { ...data, isFallback: state.isFallback, lastUpdated: state.lastUpdated };
     },
+  });
+}
+
+/**
+ * useCreditSpread — HY e IG Credit Spread (OAS) via FRED
+ * BAMLH0A0HYM2 (HY) + BAMLC0A0CM (IG) — gratuito com FRED_API_KEY.
+ * Atualiza diariamente — poll 1h.
+ */
+export function useCreditSpread() {
+  return useQuery({
+    queryKey: ['macro', 'credit-spread'],
+    queryFn: async (): Promise<DataState<CreditSpreadData>> => {
+      try {
+        const data = await withCache('fred:credit-spread', 3600, 'fred', fetchCreditSpread);
+        reportApiRecovery('fred');
+        return { data, lastUpdated: new Date().toISOString(), isFallback: false, debugError: null };
+      } catch (err) {
+        logError('CreditSpread fetch failed', { error: String(err) }, 'credit-spread');
+        reportApiFailure('fred');
+        const stale = await getStaleCache<CreditSpreadData>('fred:credit-spread');
+        if (stale) {
+          return { data: stale.value, lastUpdated: stale.updatedAt.toISOString(), isFallback: true, debugError: String(err) };
+        }
+        return { data: null, lastUpdated: null, isFallback: true, debugError: String(err) };
+      }
+    },
+    staleTime: 3_500_000,
+    refetchInterval: MACRO_INTERVAL,
+    retry: 2,
+    retryDelay: (attempt: number) => Math.min(1000 * 2 ** attempt, 10_000),
   });
 }

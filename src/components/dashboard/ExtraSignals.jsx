@@ -5,25 +5,10 @@ import { HelpIcon } from '../ui/Tooltip';
 import MiniTimeChart from './MiniTimeChart';
 import CorrelationChart from './CorrelationChart';
 import { IS_LIVE } from '@/lib/env';
-import { DataTrustBadge } from '../ui/DataTrustBadge';
+
 import { useDominance, useLiquidations } from '@/hooks/useBtcData';
 import { useStablecoinData } from '@/hooks/useStablecoin';
-import { useYieldCurve } from '@/hooks/useFred';
-
-// ─── Demo data (HY Credit Spread — sem API gratuita) ─────────────────────────
-
-const CREDIT_SPREAD_DEMO = {
-  hy_spread_bp:  342,
-  ig_spread_bp:  98,
-  delta_7d_bp:   24,
-  delta_30d_bp:  57,
-  regime: 'widening',
-  history: {
-    '1d': Array.from({ length: 24 }, (_, i) => ({ t: i, v: 318 + i * 1.0 })),
-    '1w': Array.from({ length: 7  }, (_, i) => ({ t: i, v: 318 + i * 3.4 })),
-    '1m': Array.from({ length: 30 }, (_, i) => ({ t: i, v: 285 + i * 1.9 })),
-  },
-};
+import { useYieldCurve, useCreditSpread } from '@/hooks/useFred';
 
 // ─── Glossário ────────────────────────────────────────────────────────────────
 
@@ -303,54 +288,74 @@ function YieldCurveCard() {
   );
 }
 
-// ─── HY Credit Spread (DEMO — sem API gratuita) ───────────────────────────────
+// ─── HY Credit Spread (LIVE via FRED BAMLH0A0HYM2 + BAMLC0A0CM) ─────────────
 
 function CreditSpreadCard() {
-  const d = CREDIT_SPREAD_DEMO;
-  const isWidening = d.regime === 'widening';
-  const color = isWidening ? '#ef4444' : d.regime === 'tightening' ? '#10b981' : '#f59e0b';
+  const { data: state, isLoading } = useCreditSpread();
+  const d = state?.data;
+  const regime = d?.regime ?? 'stable';
+  const isWidening = regime === 'widening';
+  const color = isWidening ? '#ef4444' : regime === 'tightening' ? '#10b981' : '#f59e0b';
+
+  if (isLoading && !d) {
+    return (
+      <SignalCard title="HY Credit Spread" glossKey="creditSpread" accent={color}>
+        <SkeletonLine w="60%" h={28} mb={8} />
+        <SkeletonLine h={70} mb={8} />
+        <SkeletonLine w="80%" h={14} />
+      </SignalCard>
+    );
+  }
+
+  // Converte histórico [{date, hy, ig}] para formato MiniTimeChart {1m: [{t,v}]}
+  const chartData = d?.history
+    ? { '1m': d.history.map((h, i) => ({ t: i, v: h.hy })) }
+    : null;
 
   return (
     <SignalCard title="HY Credit Spread" glossKey="creditSpread" accent={color}>
-      <div style={{ display: 'flex', gap: 16, marginBottom: 6 }}>
+      <div style={{ display: 'flex', gap: 16, marginBottom: 6, alignItems: 'flex-end' }}>
         <div>
           <div style={{ fontSize: 9, color: '#475569', marginBottom: 2, textTransform: 'uppercase', letterSpacing: '0.06em' }}>High Yield (OAS)</div>
           <span style={{ fontSize: 22, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color }}>
-            {d.hy_spread_bp}<span style={{ fontSize: 11, color: '#64748b' }}>bp</span>
+            {d?.hy_spread_bp ?? '—'}<span style={{ fontSize: 11, color: '#64748b' }}>bp</span>
           </span>
         </div>
         <div>
           <div style={{ fontSize: 9, color: '#475569', marginBottom: 2, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Inv. Grade</div>
           <span style={{ fontSize: 22, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: '#64748b' }}>
-            {d.ig_spread_bp}<span style={{ fontSize: 11, color: '#334155' }}>bp</span>
+            {d?.ig_spread_bp ?? '—'}<span style={{ fontSize: 11, color: '#334155' }}>bp</span>
           </span>
         </div>
+        <div style={{ marginLeft: 'auto' }}>
+          {state?.isFallback
+            ? <span style={{ fontSize: 9, color: '#f59e0b' }}>⚠ Cache</span>
+            : d ? <LiveBadge /> : null}
+        </div>
       </div>
-      <MiniTimeChart
-        data={d.history}
-        color={color}
-        height={70}
-        inverted={true}
-        formatter={(v) => `${v}bp`}
-      />
-      <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-        <DeltaBadge val={d.delta_7d_bp} suffix="bp" label="7d" decimals={0} />
-        <DeltaBadge val={d.delta_30d_bp} suffix="bp" label="30d" decimals={0} />
-        <span style={{ fontSize: 10, background: `${color}12`, color, border: `1px solid ${color}25`, borderRadius: 4, padding: '2px 6px', fontWeight: 700 }}>
-          {isWidening ? '↑ Widening' : d.regime === 'tightening' ? '↓ Tightening' : '→ Stable'}
-        </span>
-        <DataTrustBadge
-          mode="paid_required"
-          confidence="D"
-          source="FRED / Bloomberg"
-          sourceUrl="https://fred.stlouisfed.org/series/BAMLH0A0HYM2"
-          reason="HY Credit Spread (OAS) — série BAMLH0A0HYM2. Disponível via FRED API Key (gratuita) ou Bloomberg Terminal."
+      {chartData && (
+        <MiniTimeChart
+          data={chartData}
+          color={color}
+          height={70}
+          inverted={true}
+          formatter={(v) => `${v}bp`}
         />
+      )}
+      <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+        {d && <DeltaBadge val={d.delta_7d_bp} suffix="bp" label="7d" decimals={0} />}
+        {d && <DeltaBadge val={d.delta_30d_bp} suffix="bp" label="30d" decimals={0} />}
+        {d && (
+          <span style={{ fontSize: 10, background: `${color}12`, color, border: `1px solid ${color}25`, borderRadius: 4, padding: '2px 6px', fontWeight: 700 }}>
+            {isWidening ? '↑ Widening' : regime === 'tightening' ? '↓ Tightening' : '→ Stable'}
+          </span>
+        )}
       </div>
-      <div style={{ marginTop: 10, padding: '6px 10px', borderRadius: 6, background: 'rgba(249,115,22,0.06)', border: '1px solid rgba(249,115,22,0.18)', fontSize: 10, color: '#78716c', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-        <span>🔒 Dados simulados — HY Credit Spread requer FRED API Key ou Bloomberg</span>
-        <a href="https://fred.stlouisfed.org/series/BAMLH0A0HYM2" target="_blank" rel="noopener noreferrer" style={{ color: '#f97316', textDecoration: 'none', fontWeight: 700, whiteSpace: 'nowrap' }}>Ver no FRED →</a>
-      </div>
+      {!d && !isLoading && (
+        <div style={{ fontSize: 10, color: '#475569', marginTop: 8 }}>
+          Sem dados disponíveis — verifique FRED_API_KEY no Supabase.
+        </div>
+      )}
     </SignalCard>
   );
 }
@@ -362,10 +367,7 @@ export default function ExtraSignals() {
     <div>
       <div style={{ marginBottom: 8, padding: '5px 10px', background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.18)', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: '#64748b' }}>
         <span style={{ color: '#10b981', fontWeight: 700 }}>● LIVE</span>
-        <span>BTC Dominância (CoinGecko) · Stablecoins (DeFiLlama) · Yield Curve (FRED)</span>
-        <span style={{ color: '#475569', marginLeft: 4 }}>·</span>
-        <span style={{ color: '#f97316', fontWeight: 700 }}>🔒</span>
-        <span>HY Credit Spread</span>
+        <span>BTC Dominância (CoinGecko) · Stablecoins (DeFiLlama) · Yield Curve (FRED) · HY Credit Spread (FRED BAMLH0A0HYM2)</span>
       </div>
       <div style={{
         display: 'grid',
