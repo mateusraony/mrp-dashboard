@@ -11,13 +11,32 @@
  */
 
 import { z } from 'zod';
-import { DATA_MODE } from '@/lib/env';
+import { DATA_MODE, env } from '@/lib/env';
 import {
   btcFutures,
   btcSpotFlow,
   oiByExchange,
 } from '@/components/data/mockData';
 import { futuresBasis as mockFuturesBasis } from '@/components/data/mockDataExtended';
+
+// ─── Proxy helper (fapi endpoints têm CORS bloqueado no browser) ──────────────
+
+async function callFapiViaProxy(endpoint: string): Promise<unknown> {
+  const baseUrl = env.VITE_SUPABASE_URL?.replace(/\/$/, '');
+  const key     = env.VITE_SUPABASE_ANON_KEY;
+  if (!baseUrl || !key) throw new Error('Supabase não configurado — proxy indisponível');
+  const res = await fetch(`${baseUrl}/functions/v1/fred-proxy`, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+    body:    JSON.stringify({ type: 'binance_fapi', params: { endpoint } }),
+    signal:  AbortSignal.timeout(10_000),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({} as Record<string, unknown>));
+    throw new Error(`binance_fapi proxy error ${res.status}: ${(err.error as string) ?? res.statusText}`);
+  }
+  return res.json();
+}
 
 // ─── Schemas ──────────────────────────────────────────────────────────────────
 
@@ -340,13 +359,9 @@ export async function fetchLongShortRatio(
 ): Promise<LongShortRatioData | null> {
   if (DATA_MODE === 'mock') return mockLongShortRatio();
 
-  const url = `${FUTURES_BASE}/fapi/v1/globalLongShortAccountRatio?symbol=${symbol}&period=${period}&limit=1`;
-  const res = await fetch(url);
-
-  if (res.status === 401 || res.status === 403) return null;
-  if (!res.ok) throw new Error(`Binance L/S Ratio error ${res.status}`);
-
-  const raw = await res.json() as unknown[];
+  const raw = await callFapiViaProxy(
+    `/fapi/v1/globalLongShortAccountRatio?symbol=${symbol}&period=${period}&limit=1`,
+  ) as unknown[];
   const items = z.array(LongShortRatioItemSchema).parse(raw);
   const item  = items[0];
   if (!item) return null;
@@ -369,15 +384,9 @@ export async function fetchLongShortRatio(
 export async function fetchLiquidations(symbol = 'BTCUSDT', limit = 200): Promise<LiquidationEntry[]> {
   if (DATA_MODE === 'mock') return mockLiquidations();
 
-  const url = `${FUTURES_BASE}/fapi/v1/allForceOrders?symbol=${symbol}&limit=${limit}`;
-  const res = await fetch(url);
-
-  // Guard mantido por segurança, mas /fapi/v1/allForceOrders é totalmente público (sem auth).
-  // Retorna [] sem lançar erro para evitar retry loop.
-  if (res.status === 401 || res.status === 403) return [];
-  if (!res.ok) throw new Error(`Binance Liquidations error ${res.status}`);
-
-  const raw = await res.json();
+  const raw = await callFapiViaProxy(
+    `/fapi/v1/allForceOrders?symbol=${symbol}&limit=${limit}`,
+  );
   const parsed = LiquidationsResponseSchema.parse(raw);
 
   return parsed.map(item => {
