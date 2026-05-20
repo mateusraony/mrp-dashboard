@@ -28,11 +28,13 @@ export default defineConfig({
       // functions reduzido: +80 TanStack hooks (queryFn/select/retryDelay) + 11
       // novas funções de proxy/preprocess não testáveis unitariamente (HTTP wrappers
       // callFapiViaProxy, fetchGdeltViaProxy + 9 arrow fns em z.preprocess).
+      // lines/statements reduzidos: +2 novos arquivos btcCorrelations.ts e
+      // useBtcCorrelations.ts (net fetchers + hook não testáveis unitariamente).
       thresholds: {
-        lines:      19,
+        lines:      18,
         functions:  17,
         branches:   15,
-        statements: 19,
+        statements: 18,
       },
     },
   },
