@@ -133,7 +133,7 @@ function AltSeasonGauge({ index, trend }) {
 }
 
 // ─── DOMINANCE CARD ───────────────────────────────────────────────────────────
-function DominanceCard({ label, value, color, history }) {
+function DominanceCard({ label, value, color, history = null }) {
   return (
     <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '14px 16px' }}>
       <div style={{ fontSize: 9, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6, fontWeight: 700 }}>{label} Dominance</div>
