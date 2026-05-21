@@ -44,8 +44,9 @@ const AI_ANALYSIS_FALLBACK = {
 };
 import { DATA_MODE, IS_LIVE } from '@/lib/env';
 import { DataTrustBadge } from '../components/ui/DataTrustBadge';
-import { useBtcTicker, useFearGreed as useFearGreedHook } from '@/hooks/useBtcData';
+import { useBtcTicker, useFearGreed as useFearGreedHook, useKlines } from '@/hooks/useBtcData';
 import { useRiskScore } from '@/hooks/useRiskScore';
+import { getFailedCount, getFailedSources } from '@/lib/apiHealthMonitor';
 import { useMacroBoard } from '@/hooks/useFred';
 import { useMempoolState } from '@/hooks/useMempool';
 import { computeRuleBasedAnalysis } from '@/utils/ruleBasedAnalysis';
@@ -129,9 +130,13 @@ function SectionTitle({ icon, label, sub = '', action = null }) {
 }
 
 // ─── FEAR & GREED ─────────────────────────────────────────────────────────────
-function FearGreedGauge({ liveValue, fngError }) {
+function FearGreedGauge({ liveValue, fngError, liveHistory }) {
   const hasError = fngError && DATA_MODE === 'live';
   const v = (!hasError && liveValue != null) ? liveValue : FEAR_GREED_FALLBACK.value;
+  // Usa histórico live se disponível; fallback para array vazio (barra não renderiza)
+  const historyData = (!hasError && liveHistory && liveHistory.length > 0)
+    ? liveHistory.slice(-8).map(h => h.value)
+    : FEAR_GREED_FALLBACK.history;
   const zones = [
     { label: 'Extreme Fear', max: 25, color: '#60a5fa' },
     { label: 'Fear',         max: 45, color: '#10b981' },
@@ -362,8 +367,21 @@ function AlertRow({ alert }) {
 // ─── DATA QUALITY STRIP ───────────────────────────────────────────────────────
 function DataQualityStrip() {
   const [open, setOpen] = useState(false);
-  const ok = SOURCE_HEALTH_FALLBACK.filter(s => s.grade === 'A').length;
-  const warn = SOURCE_HEALTH_FALLBACK.filter(s => s.grade !== 'A').length;
+  // Usa apiHealthMonitor para contar fontes em falha em tempo real
+  const [failedCount, setFailedCount] = useState(getFailedCount);
+  const [failedSources, setFailedSources] = useState(getFailedSources);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setFailedCount(getFailedCount());
+      setFailedSources(getFailedSources());
+    }, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // fontes conhecidas do sistema (todas as integradas)
+  const KNOWN_SOURCES = ['binance_futures', 'alternative_me', 'coingecko', 'mempool', 'fred', 'deribit'];
+  const failed = failedCount;
+  const ok = Math.max(0, KNOWN_SOURCES.length - failed);
 
   return (
     <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, overflow: 'hidden' }}>
@@ -374,11 +392,22 @@ function DataQualityStrip() {
         <span style={{ fontSize: 12 }}>🛰️</span>
         <span style={{ fontSize: 12, fontWeight: 700, color: '#64748b', flex: 1, textAlign: 'left' }}>Saúde das Fontes de Dados</span>
         <span style={{ fontSize: 10, color: '#10b981', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 4, padding: '1px 6px', fontWeight: 700 }}>{ok} OK</span>
-        {warn > 0 && <span style={{ fontSize: 10, color: '#f59e0b', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 4, padding: '1px 6px', fontWeight: 700 }}>{warn} ⚠</span>}
+        {failed > 0 && <span style={{ fontSize: 10, color: '#f59e0b', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 4, padding: '1px 6px', fontWeight: 700 }}>{failed} ⚠</span>}
         <ModeBadge />
         <span style={{ fontSize: 10, color: '#334155' }}>{open ? '▲' : '▼'}</span>
       </button>
-      {open && <div style={{ borderTop: '1px solid #1a2535' }}>{SOURCE_HEALTH_FALLBACK.map(s => <SourceRow key={s.source} source={s} />)}</div>}
+      {open && failedSources.length > 0 && (
+        <div style={{ borderTop: '1px solid #1a2535', padding: '10px 16px' }}>
+          {failedSources.map(s => (
+            <SourceRow key={s} source={{ source: s, grade: 'D', label: s }} />
+          ))}
+        </div>
+      )}
+      {open && failedSources.length === 0 && (
+        <div style={{ borderTop: '1px solid #1a2535', padding: '10px 16px', fontSize: 11, color: '#10b981' }}>
+          Todas as fontes operacionais
+        </div>
+      )}
     </div>
   );
 }
@@ -589,6 +618,8 @@ export default function Dashboard() {
     ? (liveRiskScore.regime === 'RISCO ELEVADO' ? 'RISK-OFF' : liveRiskScore.regime === 'SAUDÁVEL' ? 'RISK-ON' : 'NEUTRAL')
     : GLOBAL_RISK_FALLBACK.regime;
   const regimeColor = activeRegime === 'RISK-ON' ? '#10b981' : activeRegime === 'RISK-OFF' ? '#ef4444' : '#f59e0b';
+  // Prob. de evento de risco: derivada do score (score/100 como proxy linear)
+  const activeProb = Math.round(activeScore);
 
   // Análise em linguagem natural via Claude Haiku (AI Etapa 4) — 15min cache
   const aiInsightPayload = (IS_LIVE && liveTicker)
@@ -624,7 +655,7 @@ export default function Dashboard() {
           Risk Score: <span style={{ fontFamily: 'JetBrains Mono, monospace', color: regimeColor, fontWeight: 700 }}>{activeScore}/100</span>
         </div>
         <div style={{ fontSize: 11, color: '#475569' }}>
-          Prob. Evento: <span style={{ fontFamily: 'JetBrains Mono, monospace', color: '#f1f5f9', fontWeight: 700 }}>{GLOBAL_RISK_FALLBACK.prob}%</span>
+          Prob. Evento: <span style={{ fontFamily: 'JetBrains Mono, monospace', color: '#f1f5f9', fontWeight: 700 }}>{activeProb}%</span>
         </div>
         <div style={{ flex: 1 }} />
         {/* Resumo rápido de qualidade de dados — visível no topo para novos usuários */}
@@ -646,7 +677,7 @@ export default function Dashboard() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px,1fr))', gap: 14, marginBottom: 20 }}>
         <RiskMeter
           score={activeScore}
-          prob={GLOBAL_RISK_FALLBACK.prob}
+          prob={activeProb}
           regime={activeRegime}
           moduleScores={liveRiskScore?.module_scores ?? GLOBAL_RISK_FALLBACK.module_scores}
         />

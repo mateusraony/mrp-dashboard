@@ -397,7 +397,8 @@ export default function SmartAlerts() {
 
   const activeSuggestions = liveSuggestions ?? AI_SUGGESTIONS;
 
-  const [rules, setRules] = useState(defaultAlertRulesMock);
+  // Iniciar com lista vazia; o useEffect abaixo popula do Supabase ou semeia com mock
+  const [rules, setRules] = useState([]);
   const _seededRef = useRef(false);
   useEffect(() => {
     if (savedRules === undefined) return;
@@ -501,7 +502,7 @@ export default function SmartAlerts() {
             <div style={{ marginLeft: 'auto' }}>
               {liveSuggestions
                 ? <span style={{ fontSize: 9, color: '#10b981', background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 4, padding: '2px 7px', fontWeight: 700 }}>● LIVE · Rule-based</span>
-                : <span style={{ fontSize: 9, color: '#f59e0b', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 4, padding: '2px 7px', fontWeight: 600 }}>demo · aguardando dados</span>
+                : <span style={{ fontSize: 9, color: '#f59e0b', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 4, padding: '2px 7px', fontWeight: 600 }}>🔒 DEMO · sugestões estáticas</span>
               }
             </div>
           </div>
@@ -513,6 +514,12 @@ export default function SmartAlerts() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {filteredSuggestions.map(s => <AISuggestionCard key={s.id} item={s} prefs={prefs} />)}
           </div>
+          )}
+          {/* Banner de dados simulados: exibe quando análise rule-based não está disponível */}
+          {!liveSuggestions && (
+            <div style={{ marginTop: 10, padding: '6px 10px', borderRadius: 6, background: 'rgba(249,115,22,0.06)', border: '1px solid rgba(249,115,22,0.18)', fontSize: 10, color: '#78716c', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span>🔒 Dados simulados — sugestões estáticas exibidas até que ticker, Fear &amp; Greed e Risk Score estejam disponíveis</span>
+            </div>
           )}
           <div style={{ marginTop: 14, padding: '10px 13px', background: 'rgba(30,45,69,0.3)', border: '1px solid #1a2535', borderRadius: 9, fontSize: 10, color: '#334155', lineHeight: 1.7 }}>⚠️ <strong style={{ color: '#475569' }}>Aviso:</strong> Todas as sugestões da AI são baseadas em dados quantitativos históricos e não constituem recomendação de investimento.</div>
         </>
@@ -583,6 +590,12 @@ export default function SmartAlerts() {
               </span>
             )}
           </div>
+          {/* Banner de dados simulados: exibe quando não há histórico real do Supabase */}
+          {(!alertEvents || alertEvents.length === 0) && (
+            <div style={{ marginBottom: 12, padding: '6px 10px', borderRadius: 6, background: 'rgba(249,115,22,0.06)', border: '1px solid rgba(249,115,22,0.18)', fontSize: 10, color: '#78716c', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+              <span>🔒 Dados simulados — histórico de alertas requer persistência Supabase</span>
+            </div>
+          )}
           {history.map(a => {
             const type = ALERT_TYPES[a.type];
             const sc = a.severity === 'HIGH' ? '#ef4444' : '#f59e0b';
