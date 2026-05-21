@@ -493,7 +493,7 @@ function groupEventsByBrtDate(eventList) {
   const groups = {};
   for (const e of eventList) {
     const brt = utcToBrtWall(new Date(e.datetime_utc));
-    const key = `${brt.getUTCFullYear()}-${String(brt.getUTCMonth()).padStart(2,'0')}-${String(brt.getUTCDate()).padStart(2,'0')}`;
+    const key = `${brt.getUTCFullYear()}-${String(brt.getUTCMonth() + 1).padStart(2,'0')}-${String(brt.getUTCDate()).padStart(2,'0')}`;
     if (!groups[key]) groups[key] = { label: formatDateGroupHeader(brt), sortKey: key, events: [] };
     groups[key].events.push(e);
   }
@@ -726,12 +726,17 @@ function InvestingCalendarSection() {
               ))}
             </div>
           ) : (
-            <div style={{ padding: '12px 14px', borderRadius: 8, background: '#0a1018', border: '1px solid #0f1d2e', fontSize: 10, color: '#475569', marginBottom: 12 }}>
+            <div style={{ padding: '12px 14px', borderRadius: 8, background: '#0a1018', border: '1px solid #0f1d2e', fontSize: 10, color: '#475569', marginBottom: 12, lineHeight: 1.7 }}>
               {currencyFilter !== 'ALL'
                 ? `Nenhum evento (${currencyFilter}) próximo. Tente "🌐 Todos" para ver outras moedas.`
                 : pastReleased.length > 0
-                  ? '⬇ Sem eventos futuros agendados — veja os resultados recentes abaixo.'
-                  : 'Nenhum evento próximo no período. O cron atualiza a cada 30 min nos dias úteis.'}
+                  ? <>
+                      ⬇ Nenhum evento High Impact agendado para os próximos dias.<br/>
+                      <span style={{ fontSize: 9, color: '#334155' }}>
+                        O ForexFactory não possui eventos ★★★ listados para a próxima semana neste momento. Próximos grandes eventos macro (CPI, NFP, FOMC) geralmente ocorrem na 1ª–2ª semana do mês.
+                      </span>
+                    </>
+                  : 'Nenhum evento High Impact no período. O cron atualiza a cada 30 min nos dias úteis.'}
             </div>
           )}
 

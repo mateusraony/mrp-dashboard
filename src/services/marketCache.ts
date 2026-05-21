@@ -93,7 +93,6 @@ function setCached(cacheKey: string, value: unknown, source: string): void {
       value_json: value,
       source,
       updated_at: new Date().toISOString(),
-      fetched_at: new Date().toISOString(),
     }),
   }).catch(() => {});
 }
