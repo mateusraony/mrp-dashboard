@@ -62,7 +62,7 @@ export interface SectorRotation {
 export interface AltSeasonTrendPoint {
   window: '7d' | '30d' | '90d';
   label:  string;
-  value:  number;  // % alts above BTC in that window
+  value:  number | null;  // % alts above BTC in that window; null when BTC ref or coin data unavailable
 }
 
 export interface AltcoinsExtendedData {
@@ -70,9 +70,9 @@ export interface AltcoinsExtendedData {
   altSeasonIndex:  AltSeasonResult;
   altSeasonTrend:  AltSeasonTrendPoint[];
   sectorRotation:  SectorRotation[];
-  btcRet7d:        number;
-  btcRet30d:       number;
-  btcRet90d:       number;
+  btcRet7d:        number | null;
+  btcRet30d:       number | null;
+  btcRet90d:       number | null;
   dataSource:      'coingecko' | 'cryptocompare';
   updated_at:      number;
 }
@@ -85,19 +85,23 @@ export interface AltcoinsExtendedData {
  */
 export function computeAltSeasonTrend(
   alts:      AltcoinMarketData[],
-  btcRet7d:  number,
-  btcRet30d: number,
-  btcRet90d: number,
+  btcRet7d:  number | null,
+  btcRet30d: number | null,
+  btcRet90d: number | null,
 ): AltSeasonTrendPoint[] {
   const eligible = alts.filter(
     a => a.symbol !== 'BTC' && !STABLECOINS.has(a.symbol),
   );
   if (eligible.length === 0) return [];
 
-  const pct = (field: keyof AltcoinMarketData, ref: number) =>
-    Math.round(
-      (eligible.filter(a => (a[field] as number) > ref).length / eligible.length) * 100,
+  const pct = (field: keyof AltcoinMarketData, ref: number | null): number | null => {
+    if (ref === null) return null;
+    const valid = eligible.filter(a => (a[field] as number | null) !== null);
+    if (valid.length === 0) return null;
+    return Math.round(
+      (valid.filter(a => (a[field] as number) > ref).length / valid.length) * 100,
     );
+  };
 
   return [
     { window: '7d',  label: '7d',  value: pct('price_change_percentage_7d',  btcRet7d)  },
@@ -113,10 +117,11 @@ export function computeAltSeasonTrend(
  */
 export function computeAltSeasonIndex(
   alts:      AltcoinMarketData[],
-  btcRet90d: number,
+  btcRet90d: number | null,
 ): AltSeasonResult {
+  // Only count alts that have 90d return data AND whose 90d value is not null
   const eligible = alts.filter(
-    a => a.symbol !== 'BTC' && !STABLECOINS.has(a.symbol),
+    a => a.symbol !== 'BTC' && !STABLECOINS.has(a.symbol) && a.price_change_percentage_90d !== null,
   );
 
   if (eligible.length === 0) {
@@ -127,7 +132,8 @@ export function computeAltSeasonIndex(
     };
   }
 
-  const above = eligible.filter(a => a.price_change_percentage_90d > btcRet90d);
+  const ref = btcRet90d ?? 0;
+  const above = eligible.filter(a => (a.price_change_percentage_90d as number) > ref);
   const value = Math.round((above.length / eligible.length) * 100);
 
   const phase: AltSeasonResult['phase'] =
@@ -162,10 +168,13 @@ export function computeSectorRotation(alts: AltcoinMarketData[]): SectorRotation
   return Object.entries(groups)
     .map(([sector, coins]) => {
       const totalMcap = coins.reduce((s, c) => s + c.market_cap, 0);
-      const wRet = (field: keyof AltcoinMarketData) =>
-        totalMcap > 0
-          ? coins.reduce((s, c) => s + (c[field] as number) * c.market_cap, 0) / totalMcap
+      const wRet = (field: keyof AltcoinMarketData) => {
+        const valid = coins.filter(c => (c[field] as number | null) !== null);
+        const validMcap = valid.reduce((s, c) => s + c.market_cap, 0);
+        return validMcap > 0
+          ? valid.reduce((s, c) => s + (c[field] as number) * c.market_cap, 0) / validMcap
           : 0;
+      };
 
       const top = [...coins].sort((a, b) => b.market_cap - a.market_cap)[0];
 
@@ -216,9 +225,9 @@ export async function fetchAltcoinsExtended(limit = 50): Promise<AltcoinsExtende
   const alts = await fetchTopAltcoins(limit);
 
   const btcEntry = alts.find(a => a.symbol === 'BTC');
-  const btcRet7d  = btcEntry?.price_change_percentage_7d  ?? 0;
-  const btcRet30d = btcEntry?.price_change_percentage_30d ?? 0;
-  const btcRet90d = btcEntry?.price_change_percentage_90d ?? 0;
+  const btcRet7d  = btcEntry?.price_change_percentage_7d  ?? null;
+  const btcRet30d = btcEntry?.price_change_percentage_30d ?? null;
+  const btcRet90d = btcEntry?.price_change_percentage_90d ?? null;
 
   // Heuristic: if all non-BTC alts have 0% 30d return, data came from CryptoCompare fallback
   const allZero30d = alts.filter(a => a.symbol !== 'BTC').every(a => a.price_change_percentage_30d === 0);

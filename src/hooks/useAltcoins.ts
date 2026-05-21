@@ -27,9 +27,9 @@ const EMPTY_ALTCOINS: AltcoinsExtendedData = {
   },
   altSeasonTrend: [],
   sectorRotation: [],
-  btcRet7d:       0,
-  btcRet30d:      0,
-  btcRet90d:      0,
+  btcRet7d:       null,
+  btcRet30d:      null,
+  btcRet90d:      null,
   dataSource:     'coingecko',
   updated_at:     0,
 };
