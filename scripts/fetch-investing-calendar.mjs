@@ -16,37 +16,40 @@ const FEEDS = [
 // ─── Parsing de data/hora ─────────────────────────────────────────────────────
 
 /**
- * Converte hora no formato 12h "8:30am"/"2:00pm" para "HH:MM:SS".
- * O feed faireconomy.media usa formato 12h em UTC.
- */
-function parse12hTime(timeStr) {
-  if (!timeStr || timeStr === 'Tentative' || timeStr === 'All Day') return '00:00:00';
-  const m = String(timeStr).trim().match(/^(\d{1,2}):(\d{2})\s*(am|pm)$/i);
-  if (!m) return '00:00:00';
-  let h = parseInt(m[1], 10);
-  const min = m[2];
-  const mer = m[3].toLowerCase();
-  if (mer === 'am') { if (h === 12) h = 0; }
-  else              { if (h !== 12) h += 12; }
-  return `${String(h).padStart(2, '0')}:${min}:00`;
-}
-
-/**
- * Converte data + hora para Date UTC. Sempre retorna um Date válido.
- * Suporta: "YYYY-MM-DD", "MM/DD/YYYY"; hora: "8:30am", "13:30:00", vazio.
+ * Converte data para Date UTC. Sempre retorna um Date válido.
+ * O feed faireconomy.media retorna ISO com timezone: "2026-05-19T02:00:00-04:00"
+ * Suporta também: "YYYY-MM-DD", "MM/DD/YYYY" com hora opcional.
  */
 function parseToUtc(dateStr, timeStr) {
   try {
     if (!dateStr) return new Date(0);
-    // Normaliza separadores e formato MM/DD/YYYY → YYYY-MM-DD
-    let d = String(dateStr).trim();
-    const mdy = d.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-    if (mdy) d = `${mdy[3]}-${mdy[1].padStart(2, '0')}-${mdy[2].padStart(2, '0')}`;
-    const time = parse12hTime(timeStr);
-    const dt = new Date(`${d}T${time}Z`);
+    const s = String(dateStr).trim();
+    // Caso 1: já é ISO completo com timezone (ex: "2026-05-19T02:00:00-04:00")
+    if (s.includes('T') || s.includes('+') || (s.includes('-') && s.length > 10)) {
+      const d = new Date(s);
+      if (!isNaN(d.getTime())) return d;
+    }
+    // Caso 2: apenas data "YYYY-MM-DD" ou "MM/DD/YYYY"
+    let dateOnly = s;
+    const mdy = dateOnly.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (mdy) dateOnly = `${mdy[3]}-${mdy[1].padStart(2,'0')}-${mdy[2].padStart(2,'0')}`;
+    // Hora opcional em formato 12h "8:30am" ou 24h "13:30"
+    let time = '00:00:00';
+    if (timeStr && timeStr !== 'Tentative' && timeStr !== 'All Day') {
+      const m12 = String(timeStr).match(/^(\d{1,2}):(\d{2})\s*(am|pm)$/i);
+      if (m12) {
+        let h = parseInt(m12[1], 10);
+        const mer = m12[3].toLowerCase();
+        if (mer === 'am') { if (h === 12) h = 0; }
+        else              { if (h !== 12) h += 12; }
+        time = `${String(h).padStart(2,'0')}:${m12[2]}:00`;
+      } else {
+        const m24 = String(timeStr).match(/^(\d{1,2}):(\d{2})(:\d{2})?$/);
+        if (m24) time = `${m24[1].padStart(2,'0')}:${m24[2]}:00`;
+      }
+    }
+    const dt = new Date(`${dateOnly}T${time}Z`);
     if (!isNaN(dt.getTime())) return dt;
-    const dt2 = new Date(`${d}T00:00:00Z`);
-    if (!isNaN(dt2.getTime())) return dt2;
     return new Date(0);
   } catch {
     return new Date(0);
