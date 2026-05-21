@@ -21,7 +21,7 @@ const FEEDS = [
  */
 function parse12hTime(timeStr) {
   if (!timeStr || timeStr === 'Tentative' || timeStr === 'All Day') return '00:00:00';
-  const m = timeStr.match(/^(\d{1,2}):(\d{2})(am|pm)$/i);
+  const m = String(timeStr).trim().match(/^(\d{1,2}):(\d{2})\s*(am|pm)$/i);
   if (!m) return '00:00:00';
   let h = parseInt(m[1], 10);
   const min = m[2];
@@ -32,18 +32,34 @@ function parse12hTime(timeStr) {
 }
 
 /**
- * Converte data "2026-05-21" + hora "8:30am" (UTC) para Date UTC.
+ * Converte data + hora para Date UTC. Sempre retorna um Date válido.
+ * Suporta: "YYYY-MM-DD", "MM/DD/YYYY"; hora: "8:30am", "13:30:00", vazio.
  */
 function parseToUtc(dateStr, timeStr) {
-  const time = parse12hTime(timeStr);
-  const d = new Date(`${dateStr}T${time}Z`);
-  if (isNaN(d.getTime())) return new Date(`${dateStr}T00:00:00Z`);
-  return d;
+  try {
+    if (!dateStr) return new Date(0);
+    // Normaliza separadores e formato MM/DD/YYYY → YYYY-MM-DD
+    let d = String(dateStr).trim();
+    const mdy = d.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (mdy) d = `${mdy[3]}-${mdy[1].padStart(2, '0')}-${mdy[2].padStart(2, '0')}`;
+    const time = parse12hTime(timeStr);
+    const dt = new Date(`${d}T${time}Z`);
+    if (!isNaN(dt.getTime())) return dt;
+    const dt2 = new Date(`${d}T00:00:00Z`);
+    if (!isNaN(dt2.getTime())) return dt2;
+    return new Date(0);
+  } catch {
+    return new Date(0);
+  }
 }
 
 function toBrtIso(utcDate) {
-  const brtMs = utcDate.getTime() - 3 * 60 * 60 * 1000;
-  return new Date(brtMs).toISOString().replace('Z', '-03:00');
+  try {
+    const brtMs = utcDate.getTime() - 3 * 60 * 60 * 1000;
+    return new Date(brtMs).toISOString().replace('Z', '-03:00');
+  } catch {
+    return '1970-01-01T00:00:00-03:00';
+  }
 }
 
 // ─── Geração de ID estável ────────────────────────────────────────────────────
@@ -223,15 +239,28 @@ async function main() {
   const totalReceived = allEvents.length;
   console.log(`  Total recebido (todas importâncias): ${totalReceived}`);
 
+  // Log dos primeiros 3 eventos para diagnóstico de formato
+  if (allEvents.length > 0) {
+    console.log('  [debug] Amostra de eventos (primeiros 3):');
+    allEvents.slice(0, 3).forEach(e =>
+      console.log(`    date="${e.date}" time="${e.time}" impact="${e.impact}" title="${e.title}"`)
+    );
+  }
+
   // Deduplicar por ID (feeds podem sobrepor dias)
   const seen = new Set();
-  const highImpact = allEvents.filter(e => {
-    if (e.impact !== 'High') return false;
-    const id = generateEventId(e);
-    if (seen.has(id)) return false;
-    seen.add(id);
-    return true;
-  });
+  const highImpact = [];
+  for (const e of allEvents) {
+    if (e.impact !== 'High') continue;
+    try {
+      const id = generateEventId(e);
+      if (seen.has(id)) continue;
+      seen.add(id);
+      highImpact.push(e);
+    } catch (err) {
+      console.warn(`  [ff] ID geração falhou para "${e.title}" @ "${e.date}" "${e.time}": ${err.message}`);
+    }
+  }
 
   console.log(`  High impact (únicos):                ${highImpact.length}`);
 
@@ -239,18 +268,20 @@ async function main() {
     console.warn('  Aviso: nenhum evento High impact no período.');
   }
 
-  const rows = highImpact.map(e => {
-    const utcDate   = parseToUtc(e.date, e.time);
-    const ai        = generateAiAnalysis(e);
-    const hasActual = e.actual != null && String(e.actual).trim() !== '';
-    const status    = hasActual ? 'released' : 'scheduled';
+  const rows = [];
+  for (const e of highImpact) {
+    try {
+      const utcDate   = parseToUtc(e.date, e.time);
+      const ai        = generateAiAnalysis(e);
+      const hasActual = e.actual != null && String(e.actual).trim() !== '';
+      const status    = hasActual ? 'released' : 'scheduled';
 
-    return {
+      rows.push({
       id:             generateEventId(e),
       source:         'forexfactory.com',
       event_id:       null,
       country:        e.country ?? null,
-      currency:       e.country ?? null,  // FF usa o código da moeda no campo country
+      currency:       e.country ?? null,
       title:          e.title   ?? 'Evento desconhecido',
       datetime_utc:   utcDate.toISOString(),
       datetime_brt:   toBrtIso(utcDate),
@@ -267,8 +298,11 @@ async function main() {
       raw_payload:    e,
       fetched_at:     new Date().toISOString(),
       source_url:     'https://www.forexfactory.com/calendar',
-    };
-  });
+      });
+    } catch (parseErr) {
+      console.warn(`  [ff] Evento ignorado: "${e.title}" @ "${e.date}" "${e.time}" — ${parseErr.message}`);
+    }
+  }
 
   const totalUpserted = await upsertToSupabase(rows);
   const durationMs    = Date.now() - startTime;
