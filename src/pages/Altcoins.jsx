@@ -5,6 +5,7 @@ import { SECTOR_MAP } from '../services/altcoins';
 import { IS_LIVE } from '../lib/env';
 import { ModeBadge } from '../components/ui/DataBadge';
 import { DataTrustBadge } from '../components/ui/DataTrustBadge';
+import MacroHeatmap from '../components/dashboard/MacroHeatmap';
 import {
   BarChart, Bar, XAxis, YAxis,
   Tooltip, ResponsiveContainer, ReferenceLine, Cell,
@@ -148,6 +149,12 @@ export default function Altcoins() {
           <ModeBadge mode={IS_LIVE ? 'live' : 'mock'} />
           {(!IS_LIVE || !alts.length) && <DataTrustBadge mode="mock" confidence="D" source="Demo" reason="Alt Season Index simulado — dados estáticos de exemplo" />}
           {IS_LIVE && !!alts.length && <span style={{ fontSize: 9, color: '#475569', background: 'rgba(71,85,105,0.1)', border: '1px solid #1e2d45', borderRadius: 4, padding: '2px 7px' }}>CoinGecko · top 50</span>}
+          {dominance?.isFallback && dominance?.lastUpdated && (
+            <div title={`Dominância — última atualização: ${new Date(dominance.lastUpdated).toLocaleString('pt-BR')}`}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 9, color: '#f59e0b', cursor: 'help' }}>
+              ⚠ Dominância cache · {new Date(dominance.lastUpdated).toLocaleDateString('pt-BR')}
+            </div>
+          )}
           {isFallback && lastUpdated && (
             <div title={`Última atualização: ${new Date(lastUpdated).toLocaleString('pt-BR')}`}
               style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 9, color: '#f59e0b', cursor: 'help' }}>
@@ -208,6 +215,11 @@ export default function Altcoins() {
             </BarChart>
           </ResponsiveContainer>
         </div>
+      </div>
+
+      {/* BTC Macro Correlations */}
+      <div style={{ marginBottom: 16 }}>
+        <MacroHeatmap />
       </div>
 
       {/* Top Alts Table */}
