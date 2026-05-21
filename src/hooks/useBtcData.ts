@@ -13,7 +13,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useState, useEffect } from 'react';
 import { IS_LIVE } from '@/lib/env';
 import { fetchBtcTicker, fetchOiByExchange, fetchKlines, fetchLiquidations, fetchLongShortRatio, fetchFuturesBasis, fetchOiHistory, fetchFundingAverages, fetchTopTraderLsPosition, fetchPerpVsDatedOi, type BtcTickerData, type OiByExchangeEntry, type Kline, type LiquidationEntry, type LongShortRatioData, type FuturesBasisEntry, type FundingAverages, type TopTraderLsData, type PerpVsDatedOiData } from '@/services/binance';
-import { fetchDominance, fetchTopAltcoins, type DominanceData, type AltcoinMarketData } from '@/services/coingecko';
+import { fetchDominance, fetchTopAltcoins, fetchDominanceHistory, type DominanceData, type AltcoinMarketData, type DominanceHistoryData } from '@/services/coingecko';
 import { fetchFearGreed, type FearGreedData } from '@/services/alternative';
 import { subscribeBtcPrice, subscribeStatus } from '@/services/binanceWs';
 import { readModuleFlag } from '@/lib/moduleFlags';
@@ -185,6 +185,42 @@ export function useDominance() {
     retryDelay: (attempt: number) => Math.min(1000 * 2 ** attempt, 10_000),
     select: (state: DataState<DominanceData>) => {
       const data = state.data ?? EMPTY_DOMINANCE;
+      return { ...data, isFallback: state.isFallback, lastUpdated: state.lastUpdated };
+    },
+  });
+}
+
+/**
+ * useDominanceHistory — histórico 30d de dominância BTC via CoinGecko market_chart
+ * Útil para sparkline de tendência no card de dominância.
+ */
+export function useDominanceHistory(days = 30) {
+  return useQuery({
+    queryKey: ['market', 'dominance-history', days],
+    queryFn: async (): Promise<DataState<DominanceHistoryData>> => {
+      try {
+        const data = await withCache(
+          `coingecko:dom-history:${days}`,
+          3600,
+          'coingecko',
+          () => fetchDominanceHistory(days),
+        );
+        reportApiRecovery('coingecko');
+        return { data, lastUpdated: new Date().toISOString(), isFallback: false, debugError: null };
+      } catch (err) {
+        logError('DominanceHistory fetch failed', { error: String(err) }, 'dominance-history');
+        reportApiFailure('coingecko');
+        const stale = await getStaleCache<DominanceHistoryData>(`coingecko:dom-history:${days}`);
+        if (stale) return { data: stale.value, lastUpdated: stale.updatedAt.toISOString(), isFallback: true, debugError: String(err) };
+        return { data: null, lastUpdated: null, isFallback: true, debugError: String(err) };
+      }
+    },
+    staleTime:       3_500_000,
+    refetchInterval: IS_LIVE ? 3_600_000 : false,
+    retry:           1,
+    retryDelay:      5_000,
+    select: (state: DataState<DominanceHistoryData>) => {
+      const data = state.data ?? { history: [], days, source: 'global' as const };
       return { ...data, isFallback: state.isFallback, lastUpdated: state.lastUpdated };
     },
   });

@@ -82,6 +82,73 @@ const AltcoinSchema = z.object({
 });
 export const AltcoinsSchema = z.array(AltcoinSchema);
 
+// ─── Dominance history ────────────────────────────────────────────────────────
+
+export interface DominanceHistoryPoint {
+  date:    string;
+  btc_pct: number;
+}
+
+export interface DominanceHistoryData {
+  history: DominanceHistoryPoint[];
+  days:    number;
+  source:  'global' | 'approx';  // 'approx' = /global/market_cap_chart unavailable
+}
+
+function mockDominanceHistory(days: number): DominanceHistoryData {
+  let btc = 63.4;
+  const history: DominanceHistoryPoint[] = Array.from({ length: days + 1 }, (_, i) => {
+    const date = new Date(Date.now() - (days - i) * 86_400_000).toISOString().slice(0, 10);
+    btc = Math.max(55, Math.min(72, btc + (i % 3 === 0 ? 0.3 : -0.15)));
+    return { date, btc_pct: parseFloat(btc.toFixed(2)) };
+  });
+  return { history, days, source: 'global' };
+}
+
+export async function fetchDominanceHistory(days = 30): Promise<DominanceHistoryData> {
+  if (DATA_MODE === 'mock') return mockDominanceHistory(days);
+
+  const [btcRes, totalRes] = await Promise.allSettled([
+    apiFetch(`${BASE}/coins/bitcoin/market_chart?vs_currency=usd&days=${days}&interval=daily`),
+    apiFetch(`${BASE}/global/market_cap_chart?days=${days}&vs_currency=usd`),
+  ]);
+
+  if (btcRes.status === 'rejected' || !btcRes.value.ok) {
+    throw new Error('BTC market_chart fetch failed');
+  }
+
+  const btcData = await btcRes.value.json();
+  const btcMcaps: [number, number][] = btcData.market_caps ?? [];
+
+  // /global/market_cap_chart may be pro-only — fall back to ratio approximation
+  if (totalRes.status === 'rejected' || !totalRes.value.ok) {
+    const currentDom = await fetchDominance();
+    const lastBtcMcap = btcMcaps.at(-1)?.[1] ?? 1;
+    const history: DominanceHistoryPoint[] = btcMcaps.map(([ts, btcMcap]) => ({
+      date:    new Date(ts).toISOString().slice(0, 10),
+      btc_pct: parseFloat(((btcMcap / lastBtcMcap) * currentDom.btc_dominance).toFixed(2)),
+    }));
+    return { history, days, source: 'approx' };
+  }
+
+  const totalData = await totalRes.value.json();
+  const totalMcaps: [number, number][] = totalData.market_cap_chart?.market_cap ?? [];
+  const totalByDate = new Map(
+    totalMcaps.map(([ts, val]) => [new Date(ts).toISOString().slice(0, 10), val]),
+  );
+
+  const history: DominanceHistoryPoint[] = btcMcaps
+    .map(([ts, btcMcap]): DominanceHistoryPoint | null => {
+      const date  = new Date(ts).toISOString().slice(0, 10);
+      const total = totalByDate.get(date);
+      if (!total || total === 0) return null;
+      return { date, btc_pct: parseFloat(((btcMcap / total) * 100).toFixed(2)) };
+    })
+    .filter((v): v is DominanceHistoryPoint => v !== null);
+
+  return { history, days, source: 'global' };
+}
+
 function mockAltcoins(): AltcoinMarketData[] {
   return topAltcoins.map(a => ({
     id:            a.symbol.toLowerCase(),

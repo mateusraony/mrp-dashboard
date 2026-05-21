@@ -59,17 +59,53 @@ export interface SectorRotation {
   mcap_total_b: number;
 }
 
+export interface AltSeasonTrendPoint {
+  window: '7d' | '30d' | '90d';
+  label:  string;
+  value:  number;  // % alts above BTC in that window
+}
+
 export interface AltcoinsExtendedData {
-  alts:           AltcoinMarketData[];
-  altSeasonIndex: AltSeasonResult;
-  sectorRotation: SectorRotation[];
-  btcRet7d:       number;
-  btcRet30d:      number;
-  btcRet90d:      number;
-  updated_at:     number;
+  alts:            AltcoinMarketData[];
+  altSeasonIndex:  AltSeasonResult;
+  altSeasonTrend:  AltSeasonTrendPoint[];
+  sectorRotation:  SectorRotation[];
+  btcRet7d:        number;
+  btcRet30d:       number;
+  btcRet90d:       number;
+  dataSource:      'coingecko' | 'cryptocompare';
+  updated_at:      number;
 }
 
 // ─── Funções puras ────────────────────────────────────────────────────────────
+
+/**
+ * computeAltSeasonTrend — % alts acima do BTC nas janelas 7d / 30d / 90d.
+ * Retorna 3 pontos que mostram se o momentum está crescendo (7d > 30d > 90d) ou revertendo.
+ */
+export function computeAltSeasonTrend(
+  alts:      AltcoinMarketData[],
+  btcRet7d:  number,
+  btcRet30d: number,
+  btcRet90d: number,
+): AltSeasonTrendPoint[] {
+  const eligible = alts.filter(
+    a => a.symbol !== 'BTC' && !STABLECOINS.has(a.symbol),
+  );
+  if (eligible.length === 0) return [];
+
+  const pct = (field: keyof AltcoinMarketData, ref: number) =>
+    Math.round(
+      (eligible.filter(a => (a[field] as number) > ref).length / eligible.length) * 100,
+    );
+
+  return [
+    { window: '7d',  label: '7d',  value: pct('price_change_percentage_7d',  btcRet7d)  },
+    { window: '30d', label: '30d', value: pct('price_change_percentage_30d', btcRet30d) },
+    { window: '90d', label: '90d', value: pct('price_change_percentage_90d', btcRet90d) },
+  ];
+}
+
 
 /**
  * computeAltSeasonIndex — % das top N alts (ex-BTC, ex-stablecoins) acima do BTC em 90d.
@@ -160,8 +196,10 @@ function mockAltcoinsExtended(): AltcoinsExtendedData {
   return {
     alts,
     altSeasonIndex: computeAltSeasonIndex(alts, btcRet90d),
+    altSeasonTrend: computeAltSeasonTrend(alts, btcRet7d, btcRet30d, btcRet90d),
     sectorRotation: computeSectorRotation(alts),
     btcRet7d, btcRet30d, btcRet90d,
+    dataSource: 'coingecko' as const,
     updated_at: Date.now(),
   };
 }
@@ -182,13 +220,18 @@ export async function fetchAltcoinsExtended(limit = 50): Promise<AltcoinsExtende
   const btcRet30d = btcEntry?.price_change_percentage_30d ?? 0;
   const btcRet90d = btcEntry?.price_change_percentage_90d ?? 0;
 
+  // Heuristic: if all non-BTC alts have 0% 30d return, data came from CryptoCompare fallback
+  const allZero30d = alts.filter(a => a.symbol !== 'BTC').every(a => a.price_change_percentage_30d === 0);
+
   return {
     alts,
     altSeasonIndex: computeAltSeasonIndex(alts, btcRet90d),
+    altSeasonTrend: computeAltSeasonTrend(alts, btcRet7d, btcRet30d, btcRet90d),
     sectorRotation: computeSectorRotation(alts),
     btcRet7d,
     btcRet30d,
     btcRet90d,
+    dataSource: (allZero30d ? 'cryptocompare' : 'coingecko') as 'coingecko' | 'cryptocompare',
     updated_at: Date.now(),
   };
 }

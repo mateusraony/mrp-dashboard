@@ -1,13 +1,14 @@
 // ─── ALTCOINS — Dominância · Rotação · Alt Season ─────────────────────────────
 import { useAltcoinsData } from '../hooks/useAltcoins';
-import { useDominance } from '../hooks/useBtcData';
+import { useDominance, useDominanceHistory } from '../hooks/useBtcData';
 import { SECTOR_MAP } from '../services/altcoins';
 import { IS_LIVE } from '../lib/env';
 import { ModeBadge } from '../components/ui/DataBadge';
 import { DataTrustBadge } from '../components/ui/DataTrustBadge';
 import MacroHeatmap from '../components/dashboard/MacroHeatmap';
 import {
-  BarChart, Bar, XAxis, YAxis,
+  BarChart, Bar, LineChart, Line,
+  XAxis, YAxis,
   Tooltip, ResponsiveContainer, ReferenceLine, Cell,
 } from 'recharts';
 
@@ -31,7 +32,7 @@ function retColor(v) { return v > 0 ? '#10b981' : v < 0 ? '#ef4444' : '#64748b';
 function retFmt(v)   { return `${v > 0 ? '+' : ''}${v.toFixed(1)}%`; }
 
 // ─── ALT SEASON GAUGE ─────────────────────────────────────────────────────────
-function AltSeasonGauge({ index }) {
+function AltSeasonGauge({ index, trend }) {
   const { value, phase, signal, alts_above_btc, total_alts } = index;
   const cfg = value >= 75 ? SEASON_PHASES[0] : value >= 25 ? SEASON_PHASES[1] : SEASON_PHASES[2];
 
@@ -91,18 +92,66 @@ function AltSeasonGauge({ index }) {
       <div style={{ marginTop: 12, padding: '7px 10px', borderRadius: 6, background: `${cfg.color}08`, border: `1px solid ${cfg.color}20`, fontSize: 10, color: cfg.color }}>
         {signal}
       </div>
+
+      {trend && trend.length === 3 && (
+        <div style={{ marginTop: 12 }}>
+          <div style={{ fontSize: 9, color: '#334155', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+            Alts &gt; BTC por janela
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {trend.map(t => {
+              const tc = t.value >= 75 ? '#10b981' : t.value >= 25 ? '#f59e0b' : '#3b82f6';
+              const isHighest = t.value === Math.max(...trend.map(x => x.value));
+              return (
+                <div key={t.window} style={{
+                  flex: 1, background: isHighest ? `${tc}12` : '#0a1018',
+                  border: `1px solid ${isHighest ? tc + '35' : '#0f1d2e'}`,
+                  borderRadius: 7, padding: '7px 10px', textAlign: 'center',
+                }}>
+                  <div style={{ fontSize: 9, color: '#475569', marginBottom: 3, fontWeight: 700 }}>{t.label}</div>
+                  <div style={{ fontSize: 17, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: tc }}>{t.value}%</div>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ fontSize: 9, color: '#334155', marginTop: 6 }}>
+            {(() => {
+              const v7 = trend.find(t => t.window === '7d')?.value ?? 0;
+              const v30 = trend.find(t => t.window === '30d')?.value ?? 0;
+              const v90 = trend.find(t => t.window === '90d')?.value ?? 0;
+              if (v7 > v30 && v30 > v90) return '↑ Momentum crescente — alts acelerando vs BTC';
+              if (v7 < v30 && v30 < v90) return '↓ Momentum decrescente — alts perdendo força vs BTC';
+              if (v7 > v90) return '↗ Tendência recente positiva';
+              if (v7 < v90) return '↘ Tendência recente negativa';
+              return '→ Sem tendência clara entre janelas';
+            })()}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 // ─── DOMINANCE CARD ───────────────────────────────────────────────────────────
-function DominanceCard({ label, value, color }) {
+function DominanceCard({ label, value, color, history }) {
   return (
     <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '14px 16px' }}>
       <div style={{ fontSize: 9, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6, fontWeight: 700 }}>{label} Dominance</div>
       <div style={{ fontSize: 28, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color, lineHeight: 1 }}>
         {(value ?? 0).toFixed(1)}%
       </div>
+      {history && history.length > 5 && (
+        <ResponsiveContainer width="100%" height={32} style={{ marginTop: 6 }}>
+          <LineChart data={history} margin={{ top: 2, right: 0, bottom: 0, left: 0 }}>
+            <Line type="monotone" dataKey="btc_pct" stroke={color} strokeWidth={1.5} dot={false} />
+            <Tooltip
+              contentStyle={{ background: '#0d1421', border: '1px solid #1a2535', fontSize: 9, borderRadius: 4, padding: '3px 7px' }}
+              formatter={v => [`${Number(v).toFixed(1)}%`, '30d']}
+              labelFormatter={l => l}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      )}
     </div>
   );
 }
@@ -111,12 +160,13 @@ function DominanceCard({ label, value, color }) {
 export default function Altcoins() {
   const { data, isLoading } = useAltcoinsData(50);
   const { data: dominance } = useDominance();
+  const { data: domHistory } = useDominanceHistory(30);
 
   if (isLoading || !data) {
     return <div style={{ color: '#475569', fontSize: 12, padding: 24 }}>Carregando dados de altcoins...</div>;
   }
 
-  const { altSeasonIndex, sectorRotation, alts, btcRet7d, btcRet30d, isFallback, lastUpdated } = data;
+  const { altSeasonIndex, altSeasonTrend, sectorRotation, alts, btcRet7d, btcRet30d, isFallback, lastUpdated, dataSource } = data;
 
   const tableAlts = alts
     .filter(a => a.symbol !== 'BTC')
@@ -167,11 +217,18 @@ export default function Altcoins() {
         </p>
       </div>
 
+      {IS_LIVE && dataSource === 'cryptocompare' && (
+        <div style={{ marginBottom: 14, padding: '8px 12px', borderRadius: 7, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.2)', fontSize: 10, color: '#92400e', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span>⚠</span>
+          <span>CoinGecko com rate limit — dados via CryptoCompare (sem retornos 30d/90d). Alt Season Index e Rotação Setorial estão imprecisos neste momento.</span>
+        </div>
+      )}
+
       {/* Row 1: Gauge + Dominance cards */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 220px', gap: 14, marginBottom: 16 }}>
-        <AltSeasonGauge index={altSeasonIndex} />
+        <AltSeasonGauge index={altSeasonIndex} trend={altSeasonTrend} />
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <DominanceCard label="BTC" value={dominance?.btc_dominance} color="#f59e0b" />
+          <DominanceCard label="BTC" value={dominance?.btc_dominance} color="#f59e0b" history={domHistory?.history} />
           <DominanceCard label="ETH" value={dominance?.eth_dominance} color="#627eea" />
           <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '14px 16px', flex: 1 }}>
             <div style={{ fontSize: 9, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6, fontWeight: 700 }}>Outperformers</div>
