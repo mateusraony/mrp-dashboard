@@ -1,4 +1,4 @@
-name: Fetch Investing.com Calendar
+name: Fetch Economic Calendar (FMP)
 
 on:
   schedule:
@@ -23,11 +23,12 @@ jobs:
           node-version: '20'
           cache: 'npm'
       - run: npm ci
-      - name: Fetch Investing.com Calendar
+      - name: Fetch Economic Calendar via FMP API
         run: node scripts/fetch-investing-calendar.mjs
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
           DATE_OVERRIDE: ${{ inputs.date_override }}
 
   notify:
