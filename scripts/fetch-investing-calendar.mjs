@@ -277,7 +277,8 @@ async function main() {
       const utcDate   = parseToUtc(e.date, e.time);
       const ai        = generateAiAnalysis(e);
       const hasActual = e.actual != null && String(e.actual).trim() !== '';
-      const status    = hasActual ? 'released' : 'scheduled';
+      // ForexFactory não inclui 'actual' — usar tempo como proxy para status
+      const status    = hasActual ? 'released' : utcDate < new Date() ? 'released' : 'scheduled';
 
       rows.push({
       id:             generateEventId(e),

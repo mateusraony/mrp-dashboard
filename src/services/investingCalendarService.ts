@@ -107,7 +107,7 @@ export async function fetchInvestingCalendarEvents(): Promise<InvestingCalendarE
   const url = `${supabaseUrl}/rest/v1/economic_calendar_events`
     + `?datetime_utc=gte.${encodeURIComponent(cutoff)}`
     + `&order=datetime_utc.asc`
-    + `&limit=50`;
+    + `&limit=100`;
 
   const res = await apiFetch(url, { headers: buildHeaders() });
 
