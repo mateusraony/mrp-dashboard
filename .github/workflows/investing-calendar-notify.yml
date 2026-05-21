@@ -1,0 +1,28 @@
+name: Investing.com Event Notifications
+
+on:
+  schedule:
+    # A cada 10 min nos dias úteis no horário de mercado (11:00-22:00 UTC)
+    - cron: '*/10 11-22 * * 1-5'
+  workflow_dispatch:
+
+jobs:
+  notify:
+    name: Send Pre/Post Event Notifications
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - name: Send Pre/Post Event Notifications
+        run: node scripts/notify-investing-calendar.mjs
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}

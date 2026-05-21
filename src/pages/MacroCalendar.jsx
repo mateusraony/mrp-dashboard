@@ -14,6 +14,7 @@ import { sendNotificationEmail } from '@/lib/notificationClient';
 import { useMacroCalendar, useMacroAlertPreferences, useToggleMacroAlert } from '@/hooks/useMacroCalendar';
 import { useEventVolatility } from '@/hooks/useEventVolatility';
 import { IS_LIVE } from '@/lib/env';
+import { useInvestingCalendar, useInvestingCalendarState } from '@/hooks/useInvestingCalendar';
 
 const AGENCY_COLOR = {
   BLS: '#3b82f6', Fed: '#a78bfa', BEA: '#10b981', ISM: '#f59e0b', default: '#64748b',
@@ -346,8 +347,303 @@ function AlertPanel({ events, onToggleAlert, onSendTestAlert }) {
   );
 }
 
+// ─── EMOJI DE BANDEIRA POR MOEDA ──────────────────────────────────────────────
+const CURRENCY_FLAG = {
+  USD: '🇺🇸', EUR: '🇪🇺', GBP: '🇬🇧', JPY: '🇯🇵',
+  CAD: '🇨🇦', AUD: '🇦🇺', CHF: '🇨🇭', CNY: '🇨🇳',
+  NZD: '🇳🇿', SEK: '🇸🇪', NOK: '🇳🇴', MXN: '🇲🇽',
+  BRL: '🇧🇷',
+};
+
+// ─── INVESTING.COM EVENT CARD ─────────────────────────────────────────────────
+function InvestingEventCard({ event }) {
+  const now       = new Date();
+  const eventTime = new Date(event.datetime_utc);
+  const isPast    = eventTime < now;
+  const hasActual = event.actual !== null && event.actual !== '';
+
+  // Cor da borda: liberado com actual=verde; no futuro=azul
+  const borderColor = hasActual
+    ? '#10b981'
+    : isPast
+      ? '#334155'
+      : '#3b82f6';
+
+  // AI direction
+  const dirColor = event.ai_direction === 'up' ? '#10b981' : event.ai_direction === 'down' ? '#ef4444' : '#f59e0b';
+  const dirArrow = event.ai_direction === 'up' ? '↑' : event.ai_direction === 'down' ? '↓' : '↔';
+  const prob     = event.ai_probability != null ? `${Math.round(event.ai_probability * 100)}%` : '';
+
+  // Formata horário BRT para exibição
+  const brtDisplay = (() => {
+    try {
+      const brtMs  = eventTime.getTime() - 3 * 60 * 60 * 1000;
+      const brt    = new Date(brtMs);
+      const pad    = (n) => String(n).padStart(2, '0');
+      return `${pad(brt.getUTCHours())}:${pad(brt.getUTCMinutes())} BRT`;
+    } catch {
+      return '';
+    }
+  })();
+
+  // Comparação actual vs forecast para exibição
+  const comparisonColor = (() => {
+    if (!hasActual || !event.forecast) return '#94a3b8';
+    const a = parseFloat(event.actual);
+    const f = parseFloat(event.forecast);
+    if (isNaN(a) || isNaN(f)) return '#94a3b8';
+    return a > f ? '#ef4444' : a < f ? '#10b981' : '#f59e0b';
+  })();
+
+  const flag = CURRENCY_FLAG[event.currency ?? ''] ?? '🌐';
+
+  return (
+    <div style={{
+      background:   '#0d1421',
+      border:       `1px solid ${borderColor}40`,
+      borderLeft:   `3px solid ${borderColor}`,
+      borderRadius: 10,
+      padding:      '12px 14px',
+      marginBottom: 8,
+    }}>
+      {/* Header linha */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 8 }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 4, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 13 }}>{flag}</span>
+            <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 3, background: 'rgba(59,130,246,0.1)', color: '#60a5fa', border: '1px solid rgba(59,130,246,0.2)', fontWeight: 700 }}>
+              {event.currency ?? '—'} ★★★
+            </span>
+            {hasActual ? (
+              <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 3, background: 'rgba(16,185,129,0.1)', color: '#10b981', border: '1px solid rgba(16,185,129,0.2)', fontWeight: 700 }}>
+                ✓ Liberado
+              </span>
+            ) : isPast ? (
+              <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 3, background: '#0a1018', color: '#334155', border: '1px solid #1a2535', fontWeight: 700 }}>
+                Aguardando
+              </span>
+            ) : (
+              <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 3, background: 'rgba(59,130,246,0.08)', color: '#3b82f6', border: '1px solid rgba(59,130,246,0.2)', fontWeight: 700 }}>
+                Agendado
+              </span>
+            )}
+          </div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 2 }}>{event.title}</div>
+          <div style={{ fontSize: 9, color: '#475569', fontFamily: 'JetBrains Mono, monospace' }}>{brtDisplay}</div>
+        </div>
+      </div>
+
+      {/* Dados: actual / forecast / previous */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginBottom: 8 }}>
+        <div style={{ background: '#070B14', borderRadius: 5, padding: '5px 8px' }}>
+          <div style={{ fontSize: 8, color: '#334155', marginBottom: 1 }}>Atual</div>
+          <div style={{ fontSize: 11, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', color: hasActual ? comparisonColor : '#334155' }}>
+            {event.actual ?? '—'}
+          </div>
+        </div>
+        <div style={{ background: '#070B14', borderRadius: 5, padding: '5px 8px' }}>
+          <div style={{ fontSize: 8, color: '#334155', marginBottom: 1 }}>Previsão</div>
+          <div style={{ fontSize: 11, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', color: '#94a3b8' }}>
+            {event.forecast ?? '—'}
+          </div>
+        </div>
+        <div style={{ background: '#070B14', borderRadius: 5, padding: '5px 8px' }}>
+          <div style={{ fontSize: 8, color: '#334155', marginBottom: 1 }}>Anterior</div>
+          <div style={{ fontSize: 11, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', color: '#64748b' }}>
+            {event.previous ?? '—'}
+          </div>
+        </div>
+      </div>
+
+      {/* AI Analysis */}
+      {event.ai_analysis && (
+        <div style={{ fontSize: 9, color: '#475569', padding: '5px 8px', borderRadius: 5, background: '#070B14', border: '1px solid #0f1d2e', lineHeight: 1.5 }}>
+          <span style={{ color: dirColor, fontWeight: 800, marginRight: 4 }}>{dirArrow} {prob}</span>
+          {event.ai_analysis}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── INVESTING CALENDAR SECTION ───────────────────────────────────────────────
+function InvestingCalendarSection() {
+  const [currencyFilter, setCurrencyFilter] = useState('USD');
+  const [showPast, setShowPast] = useState(false);
+
+  const { data: events = [], isLoading, isError } = useInvestingCalendar();
+  const { data: calState } = useInvestingCalendarState();
+
+  const isFallback  = calState?.isFallback  ?? false;
+  const lastUpdated = calState?.lastUpdated ?? null;
+  const debugError  = calState?.debugError  ?? null;
+
+  const now     = new Date();
+  const noData  = !isLoading && !isError && events.length === 0;
+
+  // Filtragem por moeda e partição upcoming/past
+  const filtered  = currencyFilter === 'ALL'
+    ? events
+    : events.filter(e => (e.currency ?? 'USD') === currencyFilter);
+
+  const upcoming = filtered
+    .filter(e => new Date(e.datetime_utc) >= now)
+    .sort((a, b) => a.datetime_utc.localeCompare(b.datetime_utc));
+
+  const pastReleased = filtered
+    .filter(e => new Date(e.datetime_utc) < now && e.actual !== null)
+    .sort((a, b) => b.datetime_utc.localeCompare(a.datetime_utc))
+    .slice(0, 10);
+
+  // Próximo evento em countdown
+  const nextEvent = upcoming[0] ?? null;
+  const minsUntilNext = nextEvent
+    ? Math.max(0, Math.round((new Date(nextEvent.datetime_utc).getTime() - now.getTime()) / 60_000))
+    : null;
+
+  // Formata lastUpdated em BRT
+  const lastUpdatedBrt = lastUpdated
+    ? (() => {
+        try {
+          const d    = new Date(lastUpdated);
+          const brt  = new Date(d.getTime() - 3 * 60 * 60 * 1000);
+          const pad  = (n) => String(n).padStart(2, '0');
+          return `${pad(brt.getUTCDate())}/${pad(brt.getUTCMonth() + 1)} ${pad(brt.getUTCHours())}:${pad(brt.getUTCMinutes())} BRT`;
+        } catch { return ''; }
+      })()
+    : null;
+
+  return (
+    <div>
+      {/* Cabeçalho com status LIVE / fallback */}
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 12, flexWrap: 'wrap' }}>
+        {isFallback ? (
+          <div style={{ fontSize: 9, padding: '3px 9px', borderRadius: 4, background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.25)', color: '#f59e0b', fontWeight: 700 }}>
+            ⚠ Cache — última coleta falhou
+          </div>
+        ) : !isLoading && !noData ? (
+          <div style={{ fontSize: 9, padding: '3px 9px', borderRadius: 4, background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', color: '#10b981', fontWeight: 700 }}>
+            ● LIVE: Investing.com
+          </div>
+        ) : null}
+        {lastUpdatedBrt && (
+          <span style={{ fontSize: 9, color: '#334155' }}>Atualizado: {lastUpdatedBrt}</span>
+        )}
+        {debugError && (
+          <span style={{ fontSize: 9, color: '#ef444460' }} title={debugError}>⚠ erro: {debugError.slice(0, 60)}</span>
+        )}
+      </div>
+
+      {/* Loading */}
+      {isLoading && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px', background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.15)', borderRadius: 10 }}>
+          <div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid #1e2d45', borderTopColor: '#3b82f6', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
+          <span style={{ fontSize: 12, color: '#475569' }}>Buscando eventos do Investing.com…</span>
+        </div>
+      )}
+
+      {/* Sem dados — GitHub Action ainda não executou */}
+      {noData && !isError && (
+        <div style={{ padding: '20px 18px', borderRadius: 10, background: 'rgba(59,130,246,0.04)', border: '1px solid rgba(59,130,246,0.12)', fontSize: 11, color: '#475569', lineHeight: 1.8 }}>
+          <div style={{ fontWeight: 700, color: '#60a5fa', marginBottom: 8 }}>📅 Dados do Investing.com não disponíveis</div>
+          <div>O GitHub Action <code style={{ color: '#94a3b8', background: '#0a1018', padding: '1px 5px', borderRadius: 3 }}>fetch-investing-calendar</code> ainda não executou ou não encontrou eventos de alta importância no período.</div>
+          <div style={{ marginTop: 8, fontSize: 9, color: '#334155' }}>
+            O job roda automaticamente a cada 30 min nos dias úteis (08:00–19:00 ET). Para executar agora, acesse Actions → "Fetch Investing.com Calendar" → Run workflow.
+          </div>
+        </div>
+      )}
+
+      {/* Erro */}
+      {isError && !isLoading && (
+        <div style={{ padding: '12px 14px', borderRadius: 8, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)', fontSize: 11, color: '#ef4444' }}>
+          ⚠ Falha ao buscar eventos. Tente novamente em instantes.
+        </div>
+      )}
+
+      {events.length > 0 && (
+        <>
+          {/* Stats resumo */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 14 }}>
+            {[
+              { label: 'Próximos', value: upcoming.length, color: '#3b82f6' },
+              { label: 'Liberados hoje', value: pastReleased.length, color: '#10b981' },
+              { label: 'Próximo em', value: minsUntilNext !== null ? `${minsUntilNext}min` : '—', color: minsUntilNext !== null && minsUntilNext <= 30 ? '#ef4444' : '#f59e0b' },
+            ].map((s, i) => (
+              <div key={i} style={{ background: '#0d1421', border: '1px solid #162032', borderRadius: 8, padding: '10px 12px' }}>
+                <div style={{ fontSize: 8, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>{s.label}</div>
+                <div style={{ fontSize: 22, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: s.color }}>{s.value}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Filtros por moeda */}
+          <div style={{ display: 'flex', gap: 4, marginBottom: 14, flexWrap: 'wrap' }}>
+            {['USD', 'EUR', 'GBP', 'ALL'].map(cur => (
+              <button
+                key={cur}
+                onClick={() => setCurrencyFilter(cur)}
+                style={{
+                  padding:     '4px 12px',
+                  borderRadius: 5,
+                  border:      `1px solid ${currencyFilter === cur ? 'rgba(59,130,246,0.4)' : '#162032'}`,
+                  background:  currencyFilter === cur ? 'rgba(59,130,246,0.12)' : '#0d1421',
+                  color:       currencyFilter === cur ? '#60a5fa' : '#475569',
+                  fontSize:    10,
+                  fontWeight:  currencyFilter === cur ? 700 : 500,
+                  cursor:      'pointer',
+                }}
+              >
+                {cur === 'ALL' ? 'Todas as moedas' : `${CURRENCY_FLAG[cur] ?? ''} ${cur}`}
+              </button>
+            ))}
+          </div>
+
+          {/* Próximos eventos */}
+          {upcoming.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 9, color: '#3b82f6', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>
+                ⏰ Próximos ({upcoming.length})
+              </div>
+              {upcoming.map(e => <InvestingEventCard key={e.id} event={e} />)}
+            </div>
+          )}
+
+          {upcoming.length === 0 && !isLoading && (
+            <div style={{ padding: '12px 14px', borderRadius: 8, background: '#0a1018', border: '1px solid #0f1d2e', fontSize: 10, color: '#334155', marginBottom: 12 }}>
+              Nenhum evento {currencyFilter !== 'ALL' ? `(${currencyFilter}) ` : ''}próximo no calendário.
+            </div>
+          )}
+
+          {/* Eventos passados com actual */}
+          {pastReleased.length > 0 && (
+            <div style={{ marginTop: 4 }}>
+              <button
+                onClick={() => setShowPast(p => !p)}
+                style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 0', marginBottom: showPast ? 8 : 0 }}
+              >
+                <span style={{ fontSize: 9, color: '#334155', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                  📋 Liberados recentemente ({pastReleased.length})
+                </span>
+                <span style={{ fontSize: 9, color: '#334155', marginLeft: 'auto' }}>
+                  {showPast ? '▲ recolher' : '▼ expandir'}
+                </span>
+              </button>
+              {showPast && pastReleased.map(e => <InvestingEventCard key={e.id} event={e} />)}
+            </div>
+          )}
+
+          {/* Rodapé informativo */}
+          <div style={{ marginTop: 14, padding: '8px 12px', borderRadius: 6, background: 'rgba(59,130,246,0.04)', border: '1px solid rgba(59,130,246,0.1)', fontSize: 9, color: '#334155' }}>
+            Fonte: Investing.com · Apenas eventos ★★★ (alta importância) · Coleta automática via GitHub Actions a cada 30min
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
-const TABS = ['Agenda', 'Surpresa', 'Volatilidade', 'Alertas'];
+const TABS = ['Agenda', 'Investing.com ★★★', 'Surpresa', 'Volatilidade', 'Alertas'];
 
 export default function MacroCalendar() {
   const [tab, setTab] = useState('Agenda');
@@ -541,6 +837,29 @@ export default function MacroCalendar() {
               <AvgVolatilityChart data={avgVolData} />
             </div>
             <GoldenRule compact />
+          </div>
+        </div>
+      )}
+
+      {/* TAB: Investing.com */}
+      {tab === 'Investing.com ★★★' && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 16 }}>
+          <InvestingCalendarSection />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ background: '#0d1421', border: '1px solid #162032', borderRadius: 12, padding: '14px 16px' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#e2e8f0', marginBottom: 8 }}>ℹ️ Sobre esta seção</div>
+              <div style={{ fontSize: 9, color: '#64748b', lineHeight: 1.8 }}>
+                <div style={{ marginBottom: 6 }}>Exibe eventos macroeconômicos de <strong style={{ color: '#94a3b8' }}>alta importância (★★★)</strong> coletados do Investing.com.</div>
+                <div style={{ marginBottom: 6 }}>O GitHub Action roda a cada <strong style={{ color: '#94a3b8' }}>30 minutos</strong> nos dias úteis durante o horário de mercado US.</div>
+                <div>A análise AI é gerada automaticamente com base no tipo de evento e na comparação previsão vs anterior.</div>
+              </div>
+            </div>
+            <div style={{ background: 'rgba(245,158,11,0.04)', border: '1px solid rgba(245,158,11,0.12)', borderRadius: 10, padding: '12px 14px' }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: '#f59e0b', marginBottom: 6 }}>⚠️ Aviso de uso</div>
+              <div style={{ fontSize: 9, color: '#64748b', lineHeight: 1.7 }}>
+                A análise AI é rule-based e não substitui análise profissional. Probabilidades são estimativas baseadas em padrões históricos, não previsões garantidas.
+              </div>
+            </div>
           </div>
         </div>
       )}
