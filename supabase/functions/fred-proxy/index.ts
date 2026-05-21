@@ -46,7 +46,17 @@ Deno.serve(async (req: Request) => {
         headers: { 'User-Agent': 'Mozilla/5.0 (compatible; mrp-dashboard/1.0)' },
         signal: AbortSignal.timeout(15_000),
       });
-      const data = await yahooRes.json();
+      const yahooText = await yahooRes.text();
+      let data: unknown;
+      try {
+        data = JSON.parse(yahooText);
+      } catch {
+        console.error(`[fred-proxy] Yahoo non-JSON ${yahooRes.status} | ticker=${ticker} | body=${yahooText.slice(0, 100)}`);
+        return new Response(
+          JSON.stringify({ error: `Yahoo Finance error ${yahooRes.status}: resposta não é JSON válido` }),
+          { status: yahooRes.status >= 400 ? yahooRes.status : 502, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } },
+        );
+      }
       if (!yahooRes.ok) {
         console.error(`[fred-proxy] Yahoo ${yahooRes.status} | ticker=${ticker}`);
       }
@@ -70,7 +80,17 @@ Deno.serve(async (req: Request) => {
         headers: { 'User-Agent': 'Mozilla/5.0 (compatible; mrp-dashboard/1.0)' },
         signal: AbortSignal.timeout(10_000),
       });
-      const data = await binRes.json();
+      const binText = await binRes.text();
+      let data: unknown;
+      try {
+        data = JSON.parse(binText);
+      } catch {
+        console.error(`[fred-proxy] Binance non-JSON ${binRes.status} | endpoint=${endpoint} | body=${binText.slice(0, 100)}`);
+        return new Response(
+          JSON.stringify({ error: `Binance FAPI error ${binRes.status}: resposta não é JSON válido` }),
+          { status: binRes.status >= 400 ? binRes.status : 502, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } },
+        );
+      }
       if (!binRes.ok) {
         console.error(`[fred-proxy] Binance ${binRes.status} | endpoint=${endpoint}`);
       }
@@ -137,7 +157,17 @@ Deno.serve(async (req: Request) => {
     }
 
     const fredRes  = await fetch(endpoint, { signal: AbortSignal.timeout(15_000) });
-    const data     = await fredRes.json();
+    const fredText = await fredRes.text();
+    let data: unknown;
+    try {
+      data = JSON.parse(fredText);
+    } catch {
+      console.error(`[fred-proxy] FRED non-JSON ${fredRes.status} | type=${type} | body=${fredText.slice(0, 100)}`);
+      return new Response(
+        JSON.stringify({ error: `FRED error ${fredRes.status}: resposta não é JSON válido` }),
+        { status: fredRes.status >= 400 ? fredRes.status : 502, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } },
+      );
+    }
 
     if (!fredRes.ok) {
       const preview = JSON.stringify(data).slice(0, 400);
