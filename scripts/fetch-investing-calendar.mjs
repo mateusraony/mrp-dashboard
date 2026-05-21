@@ -9,21 +9,36 @@ const SUPABASE_URL              = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 const FEEDS = [
-  'https://nfs.faireconomy.media/ff_calendar_thisweek.json?version=2',
-  'https://nfs.faireconomy.media/ff_calendar_nextweek.json?version=2',
+  'https://nfs.faireconomy.media/ff_calendar_thisweek.json',
+  'https://nfs.faireconomy.media/ff_calendar_nextweek.json',
 ];
 
 // ─── Parsing de data/hora ─────────────────────────────────────────────────────
 
 /**
- * Converte data "2026-05-21" + hora "13:30:00" para Date UTC.
- * O feed faireconomy.media usa UTC.
+ * Converte hora no formato 12h "8:30am"/"2:00pm" para "HH:MM:SS".
+ * O feed faireconomy.media usa formato 12h em UTC.
+ */
+function parse12hTime(timeStr) {
+  if (!timeStr || timeStr === 'Tentative' || timeStr === 'All Day') return '00:00:00';
+  const m = timeStr.match(/^(\d{1,2}):(\d{2})(am|pm)$/i);
+  if (!m) return '00:00:00';
+  let h = parseInt(m[1], 10);
+  const min = m[2];
+  const mer = m[3].toLowerCase();
+  if (mer === 'am') { if (h === 12) h = 0; }
+  else              { if (h !== 12) h += 12; }
+  return `${String(h).padStart(2, '0')}:${min}:00`;
+}
+
+/**
+ * Converte data "2026-05-21" + hora "8:30am" (UTC) para Date UTC.
  */
 function parseToUtc(dateStr, timeStr) {
-  const time = (timeStr && timeStr !== 'Tentative' && timeStr !== 'All Day')
-    ? timeStr
-    : '00:00:00';
-  return new Date(`${dateStr}T${time}Z`);
+  const time = parse12hTime(timeStr);
+  const d = new Date(`${dateStr}T${time}Z`);
+  if (isNaN(d.getTime())) return new Date(`${dateStr}T00:00:00Z`);
+  return d;
 }
 
 function toBrtIso(utcDate) {
