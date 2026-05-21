@@ -44,8 +44,9 @@ const AI_ANALYSIS_FALLBACK = {
 };
 import { DATA_MODE, IS_LIVE } from '@/lib/env';
 import { DataTrustBadge } from '../components/ui/DataTrustBadge';
-import { useBtcTicker, useFearGreed as useFearGreedHook } from '@/hooks/useBtcData';
+import { useBtcTicker, useFearGreed as useFearGreedHook, useKlines } from '@/hooks/useBtcData';
 import { useRiskScore } from '@/hooks/useRiskScore';
+import { getFailedCount, getFailedSources } from '@/lib/apiHealthMonitor';
 import { useMacroBoard } from '@/hooks/useFred';
 import { useMempoolState } from '@/hooks/useMempool';
 import { computeRuleBasedAnalysis } from '@/utils/ruleBasedAnalysis';
@@ -59,12 +60,16 @@ import { isSupabaseConfigured } from '@/services/supabase';
 // ─── DATA LAYER (live > mock fallback) ───────────────────────────────────────
 function useDashboardLiveData() {
   const { data: ticker,    isError: tickerError } = useBtcTicker();
-  const { data: fng,       isError: fngError }    = useFearGreedHook();
+  // Fetch 9 days to have ≥8 history bars (current day + 8 previous)
+  const { data: fng,       isError: fngError }    = useFearGreedHook(9);
   const { data: riskScore, isError: riskError }   = useRiskScore();
+  // Klines diárias — 8 candles para calcular retorno 1W e CVD
+  const { data: klines7d } = useKlines('1d', 8);
   return {
     ticker:     ticker ?? null,
     fng:        fng    ?? null,
     riskScore:  riskScore ?? null,
+    klines7d:   klines7d ?? [],
     btcFutures: ticker ? { ...BTC_FUTURES_FALLBACK, mark_price: ticker.mark_price, index_price: ticker.mark_price, funding_rate: ticker.last_funding_rate, oi_delta_pct: ticker.oi_delta_pct, open_interest: ticker.open_interest, open_interest_usdt: ticker.open_interest * ticker.mark_price } : BTC_FUTURES_FALLBACK,
     fearGreed:  fng    ? { ...FEAR_GREED_FALLBACK, value: fng.value, label: fng.label, classification: fng.label } : FEAR_GREED_FALLBACK,
     errors: { ticker: tickerError, fng: fngError, risk: riskError },
@@ -129,9 +134,13 @@ function SectionTitle({ icon, label, sub = '', action = null }) {
 }
 
 // ─── FEAR & GREED ─────────────────────────────────────────────────────────────
-function FearGreedGauge({ liveValue, fngError }) {
+function FearGreedGauge({ liveValue, fngError, liveHistory }) {
   const hasError = fngError && DATA_MODE === 'live';
   const v = (!hasError && liveValue != null) ? liveValue : FEAR_GREED_FALLBACK.value;
+  // Usa histórico live se disponível; fallback para array vazio (barra não renderiza)
+  const historyData = (!hasError && liveHistory && liveHistory.length > 0)
+    ? liveHistory.slice(-8).map(h => h.value)
+    : FEAR_GREED_FALLBACK.history;
   const zones = [
     { label: 'Extreme Fear', max: 25, color: '#60a5fa' },
     { label: 'Fear',         max: 45, color: '#10b981' },
@@ -186,18 +195,21 @@ function FearGreedGauge({ liveValue, fngError }) {
       </div>
       {/* 7d bars */}
       <div style={{ display: 'flex', gap: 3, alignItems: 'flex-end', height: 32 }}>
-        {FEAR_GREED_FALLBACK.history.map((hv, i) => {
-          const hz = zones.find(z => hv <= z.max) || zones[zones.length-1];
-          const isLast = i === FEAR_GREED_FALLBACK.history.length - 1;
-          return (
-            <div key={i} title={`${hv}`} style={{
-              flex: 1, height: `${(hv / 100) * 32}px`,
-              borderRadius: '2px 2px 0 0',
-              background: isLast ? hz.color : `${hz.color}50`,
-              border: isLast ? `1px solid ${hz.color}` : 'none',
-            }} />
-          );
-        })}
+        {historyData.length > 0
+          ? historyData.map((hv, i) => {
+              const hz = zones.find(z => hv <= z.max) || zones[zones.length-1];
+              const isLast = i === historyData.length - 1;
+              return (
+                <div key={i} title={`${hv}`} style={{
+                  flex: 1, height: `${(hv / 100) * 32}px`,
+                  borderRadius: '2px 2px 0 0',
+                  background: isLast ? hz.color : `${hz.color}50`,
+                  border: isLast ? `1px solid ${hz.color}` : 'none',
+                }} />
+              );
+            })
+          : <div style={{ flex: 1, fontSize: 9, color: '#334155', alignSelf: 'center' }}>histórico indisponível</div>
+        }
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 8, color: '#2d3d52', marginTop: 3 }}>
         <span>7d atrás</span><span>hoje</span>
@@ -207,9 +219,12 @@ function FearGreedGauge({ liveValue, fngError }) {
 }
 
 // ─── BTC SNAPSHOT ─────────────────────────────────────────────────────────────
-function BTCSnapshot({ liveData, tickerError }) {
+function BTCSnapshot({ liveData, tickerError, spotFlow = null }) {
   const err = tickerError && DATA_MODE === 'live';
   const fr = liveData ?? BTC_FUTURES_FALLBACK;
+  const ret1d = spotFlow?.ret_1d ?? null;
+  const ret1w = spotFlow?.ret_1w ?? null;
+  const cvd   = spotFlow?.cvd   ?? null;
   const fundingColor = err ? '#4a5568' : (fr.funding_rate > 0.0005 ? '#ef4444' : fr.funding_rate > 0 ? '#f59e0b' : '#10b981');
   const oiColor = err ? '#4a5568' : '#f59e0b';
   const priceStr   = err ? '***' : `$${fmtNum(fr.mark_price, 0)}`;
@@ -239,8 +254,14 @@ function BTCSnapshot({ liveData, tickerError }) {
           <span style={{ fontSize: 26, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: err ? '#4a5568' : '#f1f5f9', letterSpacing: '-0.03em' }}>
             {priceStr}
           </span>
-          <DeltaPill value={BTC_SPOT_FLOW_FALLBACK.ret_1d * 100} suffix="% 1D" />
-          <DeltaPill value={BTC_SPOT_FLOW_FALLBACK.ret_1w * 100} suffix="% 1W" compact />
+          {ret1d !== null
+            ? <DeltaPill value={ret1d * 100} suffix="% 1D" />
+            : <span style={{ fontSize: 9, color: '#334155', fontFamily: 'JetBrains Mono, monospace' }}>1D —</span>
+          }
+          {ret1w !== null
+            ? <DeltaPill value={ret1w * 100} suffix="% 1W" compact />
+            : <span style={{ fontSize: 9, color: '#334155', fontFamily: 'JetBrains Mono, monospace' }}>1W —</span>
+          }
         </div>
       </div>
 
@@ -258,9 +279,14 @@ function BTCSnapshot({ liveData, tickerError }) {
         <Stat label="Long/Short Ratio" value={fr.long_short_ratio.toFixed(2)} color="#60a5fa" big
           sub={`Top traders: ${fr.top_trader_ls.toFixed(2)}`}
           help={{ title: 'L/S Ratio', content: 'Proporção de posições longas vs curtas. >1.5 com funding alto = posicionamento perigoso.' }} />
-        <Stat label="CVD Intraday" value={`+${(BTC_SPOT_FLOW_FALLBACK.cvd/1000).toFixed(1)}K`} color="#10b981" big
-          sub="Taker Buy > Sell"
-          help={{ title: 'CVD', content: 'Diferença acumulada entre volume comprador e vendedor. Positivo = agressores compradores dominando.' }} />
+        <Stat
+          label="CVD 7d"
+          value={cvd !== null ? `${cvd >= 0 ? '+' : ''}${(cvd / 1000).toFixed(1)}K` : '—'}
+          color={cvd !== null ? (cvd >= 0 ? '#10b981' : '#ef4444') : '#4a5568'}
+          big
+          sub={cvd !== null ? (cvd >= 0 ? 'Taker Buy > Sell' : 'Taker Sell > Buy') : 'klines indisponíveis'}
+          help={{ title: 'CVD 7d', content: 'Diferença acumulada entre volume comprador e vendedor nos últimos 7 candles diários. Positivo = agressores compradores dominando.' }}
+        />
       </div>
     </div>
   );
@@ -362,8 +388,21 @@ function AlertRow({ alert }) {
 // ─── DATA QUALITY STRIP ───────────────────────────────────────────────────────
 function DataQualityStrip() {
   const [open, setOpen] = useState(false);
-  const ok = SOURCE_HEALTH_FALLBACK.filter(s => s.grade === 'A').length;
-  const warn = SOURCE_HEALTH_FALLBACK.filter(s => s.grade !== 'A').length;
+  // Usa apiHealthMonitor para contar fontes em falha em tempo real
+  const [failedCount, setFailedCount] = useState(getFailedCount);
+  const [failedSources, setFailedSources] = useState(getFailedSources);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setFailedCount(getFailedCount());
+      setFailedSources(getFailedSources());
+    }, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // fontes conhecidas do sistema (todas as integradas)
+  const KNOWN_SOURCES = ['binance_futures', 'alternative_me', 'coingecko', 'mempool', 'fred', 'deribit'];
+  const failed = failedCount;
+  const ok = Math.max(0, KNOWN_SOURCES.length - failed);
 
   return (
     <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, overflow: 'hidden' }}>
@@ -374,11 +413,22 @@ function DataQualityStrip() {
         <span style={{ fontSize: 12 }}>🛰️</span>
         <span style={{ fontSize: 12, fontWeight: 700, color: '#64748b', flex: 1, textAlign: 'left' }}>Saúde das Fontes de Dados</span>
         <span style={{ fontSize: 10, color: '#10b981', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 4, padding: '1px 6px', fontWeight: 700 }}>{ok} OK</span>
-        {warn > 0 && <span style={{ fontSize: 10, color: '#f59e0b', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 4, padding: '1px 6px', fontWeight: 700 }}>{warn} ⚠</span>}
+        {failed > 0 && <span style={{ fontSize: 10, color: '#f59e0b', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 4, padding: '1px 6px', fontWeight: 700 }}>{failed} ⚠</span>}
         <ModeBadge />
         <span style={{ fontSize: 10, color: '#334155' }}>{open ? '▲' : '▼'}</span>
       </button>
-      {open && <div style={{ borderTop: '1px solid #1a2535' }}>{SOURCE_HEALTH_FALLBACK.map(s => <SourceRow key={s.source} source={s} />)}</div>}
+      {open && failedSources.length > 0 && (
+        <div style={{ borderTop: '1px solid #1a2535', padding: '10px 16px' }}>
+          {failedSources.map(s => (
+            <SourceRow key={s} source={{ source: s, grade: 'D', label: s }} />
+          ))}
+        </div>
+      )}
+      {open && failedSources.length === 0 && (
+        <div style={{ borderTop: '1px solid #1a2535', padding: '10px 16px', fontSize: 11, color: '#10b981' }}>
+          Todas as fontes operacionais
+        </div>
+      )}
     </div>
   );
 }
@@ -524,7 +574,7 @@ function AITrackRecord({ predictions = [], isConfigured = false }) {
 
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
 export default function Dashboard() {
-  const { ticker: liveTicker, fng: liveFng, riskScore: liveRiskScore, btcFutures: _btcLive, fearGreed: _fngLive, errors: liveErrors } = useDashboardLiveData();
+  const { ticker: liveTicker, fng: liveFng, riskScore: liveRiskScore, klines7d, btcFutures: _btcLive, fearGreed: _fngLive, errors: liveErrors } = useDashboardLiveData();
 
   // Pesos calibrados por histórico de previsões (fallback: equiponderado)
   const { data: calibration } = useAiCalibration();
@@ -578,10 +628,37 @@ export default function Dashboard() {
   }, [liveAnalysis, liveTicker]);
 
   const [lastUpdate, setLastUpdate] = useState(new Date());
+  // Acompanha saúde das fontes de dados em tempo real (polling 5s)
+  const [liveFailedCount, setLiveFailedCount] = useState(() => getFailedCount());
   useEffect(() => {
-    const t = setInterval(() => setLastUpdate(new Date()), 5000);
+    const t = setInterval(() => {
+      setLastUpdate(new Date());
+      setLiveFailedCount(getFailedCount());
+    }, 5000);
     return () => clearInterval(t);
   }, []);
+
+  // Contagem de fontes live/falhas para o banner de status
+  const KNOWN_SOURCES_COUNT = 6; // binance_futures, alternative_me, coingecko, mempool, fred, deribit
+  const liveOkCount = Math.max(0, KNOWN_SOURCES_COUNT - liveFailedCount);
+
+  // Calcula retorno 1W e CVD a partir das klines diárias (quando disponíveis)
+  const spotFlowLive = (() => {
+    if (!liveTicker) return null;
+    const ret1d = (liveTicker.price_change_pct ?? 0) / 100;
+    if (!klines7d || klines7d.length < 2) {
+      return { ret_1d: ret1d, ret_1w: null, cvd: null };
+    }
+    const oldest = klines7d[0];
+    const newest = klines7d[klines7d.length - 1];
+    const ret1w = oldest.close > 0 ? (newest.close - oldest.close) / oldest.close : null;
+    // CVD: soma de (takerBuy - takerSell) em cada candle
+    const cvd = klines7d.reduce((acc, k) => {
+      const takerSell = k.volume - k.taker_buy;
+      return acc + (k.taker_buy - takerSell);
+    }, 0);
+    return { ret_1d: ret1d, ret_1w: ret1w, cvd };
+  })();
 
   // Usa Risk Score live se disponível; fallback para globalRisk do mock
   const activeScore  = liveRiskScore?.score  ?? GLOBAL_RISK_FALLBACK.score;
@@ -589,6 +666,8 @@ export default function Dashboard() {
     ? (liveRiskScore.regime === 'RISCO ELEVADO' ? 'RISK-OFF' : liveRiskScore.regime === 'SAUDÁVEL' ? 'RISK-ON' : 'NEUTRAL')
     : GLOBAL_RISK_FALLBACK.regime;
   const regimeColor = activeRegime === 'RISK-ON' ? '#10b981' : activeRegime === 'RISK-OFF' ? '#ef4444' : '#f59e0b';
+  // Prob. de evento de risco: derivada do score (score/100 como proxy linear)
+  const activeProb = Math.round(activeScore);
 
   // Análise em linguagem natural via Claude Haiku (AI Etapa 4) — 15min cache
   const aiInsightPayload = (IS_LIVE && liveTicker)
@@ -624,13 +703,13 @@ export default function Dashboard() {
           Risk Score: <span style={{ fontFamily: 'JetBrains Mono, monospace', color: regimeColor, fontWeight: 700 }}>{activeScore}/100</span>
         </div>
         <div style={{ fontSize: 11, color: '#475569' }}>
-          Prob. Evento: <span style={{ fontFamily: 'JetBrains Mono, monospace', color: '#f1f5f9', fontWeight: 700 }}>{GLOBAL_RISK_FALLBACK.prob}%</span>
+          Prob. Evento: <span style={{ fontFamily: 'JetBrains Mono, monospace', color: '#f1f5f9', fontWeight: 700 }}>{activeProb}%</span>
         </div>
         <div style={{ flex: 1 }} />
         {/* Resumo rápido de qualidade de dados — visível no topo para novos usuários */}
         {IS_LIVE
-          ? <span style={{ fontSize: 10, color: '#10b981', background: 'rgba(16,185,129,0.10)', border: '1px solid rgba(16,185,129,0.22)', borderRadius: 5, padding: '2px 8px', fontWeight: 700, letterSpacing: '0.02em' }}>
-              {SOURCE_HEALTH_FALLBACK.filter(s => s.grade === 'A').length} fontes ao vivo · {SOURCE_HEALTH_FALLBACK.filter(s => s.grade === 'B').length} estimadas · {SOURCE_HEALTH_FALLBACK.filter(s => ['C','D'].includes(s.grade)).length} mock
+          ? <span style={{ fontSize: 10, color: liveFailedCount > 0 ? '#f59e0b' : '#10b981', background: liveFailedCount > 0 ? 'rgba(245,158,11,0.10)' : 'rgba(16,185,129,0.10)', border: `1px solid ${liveFailedCount > 0 ? 'rgba(245,158,11,0.22)' : 'rgba(16,185,129,0.22)'}`, borderRadius: 5, padding: '2px 8px', fontWeight: 700, letterSpacing: '0.02em' }}>
+              {liveOkCount} fontes ao vivo{liveFailedCount > 0 ? ` · ${liveFailedCount} em fallback` : ''}
             </span>
           : <span style={{ fontSize: 10, color: '#f59e0b', background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.22)', borderRadius: 5, padding: '2px 8px', fontWeight: 700, letterSpacing: '0.02em' }}>
               DEMO — todos os dados são simulados
@@ -646,12 +725,12 @@ export default function Dashboard() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px,1fr))', gap: 14, marginBottom: 20 }}>
         <RiskMeter
           score={activeScore}
-          prob={GLOBAL_RISK_FALLBACK.prob}
+          prob={activeProb}
           regime={activeRegime}
           moduleScores={liveRiskScore?.module_scores ?? GLOBAL_RISK_FALLBACK.module_scores}
         />
-        <FearGreedGauge liveValue={_fngLive?.value} fngError={liveErrors.fng} />
-        <BTCSnapshot liveData={_btcLive} tickerError={liveErrors.ticker} />
+        <FearGreedGauge liveValue={_fngLive?.value} fngError={liveErrors.fng} liveHistory={liveFng?.history ?? []} />
+        <BTCSnapshot liveData={_btcLive} tickerError={liveErrors.ticker} spotFlow={spotFlowLive} />
       </div>
 
       {/* ── Regra de Ouro ── */}

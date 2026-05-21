@@ -8,6 +8,7 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { logError } from '@/lib/debugLog';
 import {
   fetchAlertRules,
   upsertAlertRule,
@@ -113,7 +114,7 @@ export function useUpdateSettings() {
   return useMutation({
     mutationFn: (settings: Partial<UserSettings>) => upsertUserSettings(settings),
     onSuccess:  () => qc.invalidateQueries({ queryKey: ['supabase', 'settings'] }),
-    onError:    (err) => console.error('[useUpdateSettings] Falha ao salvar configurações:', err),
+    onError:    (err) => logError('[useUpdateSettings] Falha ao salvar configurações', { error: String(err) }, 'settings'),
   });
 }
 
