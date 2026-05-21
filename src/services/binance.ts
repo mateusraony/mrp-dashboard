@@ -523,3 +523,158 @@ export async function fetchOiHistory(): Promise<Array<{ t: number; oi: number }>
   const raw: Array<{ timestamp: number; sumOpenInterestValue: string }> = await res.json();
   return raw.map(r => ({ t: r.timestamp, oi: parseFloat((parseFloat(r.sumOpenInterestValue) / 1e9).toFixed(2)) }));
 }
+
+// ─── Funding Rate History ─────────────────────────────────────────────────────
+
+export interface FundingRateEntry {
+  symbol:      string;
+  fundingTime: number;
+  fundingRate: number;
+}
+
+const FundingRateItemSchema = z.object({
+  symbol:      z.string(),
+  fundingTime: z.coerce.number(),
+  fundingRate: z.coerce.number(),
+});
+
+/**
+ * fetchFundingRateHistory — últimas N sessões de funding 8h (Binance Futures)
+ * Endpoint: /fapi/v1/fundingRate — requer proxy (CORS bloqueado)
+ */
+export async function fetchFundingRateHistory(limit = 100): Promise<FundingRateEntry[]> {
+  if (DATA_MODE === 'mock') return [];
+  const { status, data } = await callFapiViaProxy(
+    `/fapi/v1/fundingRate?symbol=BTCUSDT&limit=${limit}`,
+  );
+  if (status === 401 || status === 403) return [];
+  const items = z.array(FundingRateItemSchema).parse(data as unknown[]);
+  return items.map(i => ({ symbol: i.symbol, fundingTime: i.fundingTime, fundingRate: i.fundingRate }));
+}
+
+export interface FundingAverages {
+  avg_7d:  number;
+  avg_30d: number;
+}
+
+/**
+ * fetchFundingAverages — médias de funding 7d e 30d calculadas do histórico
+ * 7d = 21 períodos de 8h · 30d = 90 períodos de 8h
+ */
+export async function fetchFundingAverages(): Promise<FundingAverages> {
+  const history = await fetchFundingRateHistory(100);
+  if (history.length === 0) return { avg_7d: 0, avg_30d: 0 };
+  const sorted = [...history].sort((a, b) => b.fundingTime - a.fundingTime);
+  const avg = (arr: FundingRateEntry[]) =>
+    arr.length > 0 ? arr.reduce((s, x) => s + x.fundingRate, 0) / arr.length : 0;
+  return {
+    avg_7d:  parseFloat(avg(sorted.slice(0, 21)).toFixed(8)),
+    avg_30d: parseFloat(avg(sorted.slice(0, 90)).toFixed(8)),
+  };
+}
+
+// ─── Top Trader Long/Short Position Ratio ─────────────────────────────────────
+
+export interface TopTraderLsData {
+  longPosition:  number;
+  shortPosition: number;
+  ls_ratio:      number;
+  timestamp:     number;
+}
+
+const TopTraderPositionItemSchema = z.object({
+  symbol:         z.string(),
+  longAccount:    z.coerce.number(),
+  shortAccount:   z.coerce.number(),
+  longShortRatio: z.coerce.number(),
+  timestamp:      z.coerce.number(),
+});
+
+/**
+ * fetchTopTraderLsPosition — posição L/S dos top traders (Binance futures data)
+ * Endpoint: /futures/data/topLongShortPositionRatio — requer proxy
+ */
+export async function fetchTopTraderLsPosition(symbol = 'BTCUSDT'): Promise<TopTraderLsData | null> {
+  if (DATA_MODE === 'mock') return null;
+  const { status, data } = await callFapiViaProxy(
+    `/futures/data/topLongShortPositionRatio?symbol=${symbol}&period=5m&limit=1`,
+  );
+  if (status === 401 || status === 403) return null;
+  const items = z.array(TopTraderPositionItemSchema).safeParse(data);
+  if (!items.success || !items.data[0]) return null;
+  const item = items.data[0];
+  return {
+    longPosition:  item.longAccount,
+    shortPosition: item.shortAccount,
+    ls_ratio:      parseFloat(item.longShortRatio.toFixed(4)),
+    timestamp:     item.timestamp,
+  };
+}
+
+// ─── Perp vs Dated OI ────────────────────────────────────────────────────────
+
+export interface PerpVsDatedOiData {
+  perp_oi_b:         number;
+  perp_pct:          number;
+  dated_oi_b:        number;
+  dated_pct:         number;
+  total_oi_b:        number;
+  quarterly_symbols: string[];
+  signal:            string;
+}
+
+/**
+ * fetchPerpVsDatedOi — split de OI entre perp e contratos datados (Binance USDⓈ-M)
+ * Usa premiumIndex (CORS-safe) + openInterest direto por símbolo.
+ */
+export async function fetchPerpVsDatedOi(): Promise<PerpVsDatedOiData> {
+  if (DATA_MODE === 'mock') {
+    return { perp_oi_b: 0, perp_pct: 50, dated_oi_b: 0, dated_pct: 50, total_oi_b: 0, quarterly_symbols: [], signal: '' };
+  }
+
+  // premiumIndex retorna todos os símbolos com markPrice (CORS-safe)
+  const pmRes = await fetch(`${FUTURES_BASE}/fapi/v1/premiumIndex`);
+  if (!pmRes.ok) throw new Error(`premiumIndex error ${pmRes.status}`);
+  const items = z.array(PremiumIndexArrayItemSchema).parse(await pmRes.json());
+
+  const perp = items.find(i => i.symbol === 'BTCUSDT');
+  if (!perp) throw new Error('BTCUSDT perp not found');
+
+  const perpOiContracts = await fetchOpenInterest('BTCUSDT');
+  const perpOiUsd = perpOiContracts.openInterest * perp.markPrice;
+
+  const quarterlyPattern = /^BTCUSDT_(\d{6})$/;
+  const now = Date.now();
+  const quarterlyItems = items.filter(qi => {
+    const match = qi.symbol.match(quarterlyPattern);
+    if (!match) return false;
+    const expiry = parseExpiryFromSymbol(match[1]);
+    return expiry && expiry.getTime() > now;
+  });
+
+  const qOiResults = await Promise.allSettled(
+    quarterlyItems.map(qi =>
+      safeFetch(`${FUTURES_BASE}/fapi/v1/openInterest?symbol=${qi.symbol}`, OpenInterestSchema)
+        .then(oi => oi.openInterest * qi.markPrice),
+    ),
+  );
+
+  let datedOiUsd = 0;
+  for (const r of qOiResults) {
+    if (r.status === 'fulfilled') datedOiUsd += r.value;
+  }
+
+  const totalOiUsd = perpOiUsd + datedOiUsd;
+  const perpPct  = totalOiUsd > 0 ? (perpOiUsd / totalOiUsd) * 100 : 50;
+  const datedPct = 100 - perpPct;
+
+  return {
+    perp_oi_b:         parseFloat((perpOiUsd / 1e9).toFixed(2)),
+    perp_pct:          parseFloat(perpPct.toFixed(1)),
+    dated_oi_b:        parseFloat((datedOiUsd / 1e9).toFixed(2)),
+    dated_pct:         parseFloat(datedPct.toFixed(1)),
+    total_oi_b:        parseFloat((totalOiUsd / 1e9).toFixed(2)),
+    quarterly_symbols: quarterlyItems.map(i => i.symbol),
+    signal:            `Perp: ${perpPct.toFixed(1)}% · Datados: ${datedPct.toFixed(1)}% (Binance USDⓈ-M only)`,
+  };
+}

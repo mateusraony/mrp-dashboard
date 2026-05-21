@@ -12,7 +12,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState, useEffect } from 'react';
 import { IS_LIVE } from '@/lib/env';
-import { fetchBtcTicker, fetchOiByExchange, fetchKlines, fetchLiquidations, fetchLongShortRatio, fetchFuturesBasis, fetchOiHistory, type BtcTickerData, type OiByExchangeEntry, type Kline, type LiquidationEntry, type LongShortRatioData, type FuturesBasisEntry } from '@/services/binance';
+import { fetchBtcTicker, fetchOiByExchange, fetchKlines, fetchLiquidations, fetchLongShortRatio, fetchFuturesBasis, fetchOiHistory, fetchFundingAverages, fetchTopTraderLsPosition, fetchPerpVsDatedOi, type BtcTickerData, type OiByExchangeEntry, type Kline, type LiquidationEntry, type LongShortRatioData, type FuturesBasisEntry, type FundingAverages, type TopTraderLsData, type PerpVsDatedOiData } from '@/services/binance';
 import { fetchDominance, fetchTopAltcoins, type DominanceData, type AltcoinMarketData } from '@/services/coingecko';
 import { fetchFearGreed, type FearGreedData } from '@/services/alternative';
 import { subscribeBtcPrice, subscribeStatus } from '@/services/binanceWs';
@@ -398,5 +398,85 @@ export function useBtcOiHistory() {
     retry:           1,
     enabled:         IS_LIVE,
     select: (state: DataState<Array<{ t: number; oi: number }>>) => state.data ?? [],
+  });
+}
+
+/**
+ * useFundingAverages — médias de funding rate 7d e 30d (Binance)
+ * Padrão DataState: withCache(300s) → fallback getStaleCache.
+ */
+export function useFundingAverages() {
+  return useQuery({
+    queryKey:        ['btc', 'funding-averages'],
+    queryFn: async (): Promise<DataState<FundingAverages>> => {
+      try {
+        const data = await withCache('binance:funding-averages', 300, 'binance_futures', fetchFundingAverages);
+        reportApiRecovery('binance_futures');
+        return { data, lastUpdated: new Date().toISOString(), isFallback: false, debugError: null };
+      } catch (err) {
+        logError('Funding averages fetch failed', { error: String(err) }, 'funding-averages');
+        reportApiFailure('binance_futures');
+        const stale = await getStaleCache<FundingAverages>('binance:funding-averages');
+        if (stale) return { data: stale.value, lastUpdated: stale.updatedAt.toISOString(), isFallback: true, debugError: String(err) };
+        return { data: null, lastUpdated: null, isFallback: true, debugError: String(err) };
+      }
+    },
+    staleTime:       290_000,
+    refetchInterval: IS_LIVE ? 300_000 : false,
+    retry:           1,
+    select: (state: DataState<FundingAverages>) => state.data ?? { avg_7d: 0, avg_30d: 0 },
+  });
+}
+
+/**
+ * useTopTraderLs — posição L/S dos top traders na Binance Futures
+ * Padrão DataState: withCache(60s) → fallback getStaleCache. Retorna null se indisponível.
+ */
+export function useTopTraderLs(symbol = 'BTCUSDT') {
+  return useQuery({
+    queryKey:        ['btc', 'top-trader-ls', symbol],
+    queryFn: async (): Promise<DataState<TopTraderLsData | null>> => {
+      try {
+        const data = await withCache(`binance:top-trader-ls:${symbol}`, 60, 'binance_futures', () => fetchTopTraderLsPosition(symbol));
+        reportApiRecovery('binance_futures');
+        return { data, lastUpdated: new Date().toISOString(), isFallback: false, debugError: null };
+      } catch (err) {
+        logError('TopTraderLs fetch failed', { error: String(err), symbol }, 'top-trader-ls');
+        const stale = await getStaleCache<TopTraderLsData>(`binance:top-trader-ls:${symbol}`);
+        if (stale) return { data: stale.value, lastUpdated: stale.updatedAt.toISOString(), isFallback: true, debugError: String(err) };
+        return { data: null, lastUpdated: null, isFallback: true, debugError: String(err) };
+      }
+    },
+    staleTime:       55_000,
+    refetchInterval: IS_LIVE ? 60_000 : false,
+    retry:           1,
+    select: (state: DataState<TopTraderLsData | null>) => state.data,
+  });
+}
+
+/**
+ * usePerpVsDatedOi — split de OI perp vs datados (Binance USDⓈ-M)
+ * Padrão DataState: withCache(120s) → fallback getStaleCache.
+ */
+export function usePerpVsDatedOi() {
+  return useQuery({
+    queryKey:        ['btc', 'perp-vs-dated-oi'],
+    queryFn: async (): Promise<DataState<PerpVsDatedOiData>> => {
+      try {
+        const data = await withCache('binance:perp-vs-dated-oi', 120, 'binance_futures', fetchPerpVsDatedOi);
+        reportApiRecovery('binance_futures');
+        return { data, lastUpdated: new Date().toISOString(), isFallback: false, debugError: null };
+      } catch (err) {
+        logError('PerpVsDatedOi fetch failed', { error: String(err) }, 'perp-vs-dated-oi');
+        reportApiFailure('binance_futures');
+        const stale = await getStaleCache<PerpVsDatedOiData>('binance:perp-vs-dated-oi');
+        if (stale) return { data: stale.value, lastUpdated: stale.updatedAt.toISOString(), isFallback: true, debugError: String(err) };
+        return { data: null, lastUpdated: null, isFallback: true, debugError: String(err) };
+      }
+    },
+    staleTime:       115_000,
+    refetchInterval: IS_LIVE ? 120_000 : false,
+    retry:           1,
+    select: (state: DataState<PerpVsDatedOiData>) => state.data ?? null,
   });
 }

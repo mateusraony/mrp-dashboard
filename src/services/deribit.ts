@@ -342,3 +342,39 @@ export async function fetchDvolHistory(days = 30): Promise<Array<{ timestamp: nu
     value:     close, // DVOL em pontos (0–100+)
   }));
 }
+
+// ─── BTC-PERPETUAL Funding Rate ───────────────────────────────────────────────
+
+const DeribitFundingSchema = z.object({
+  result: z.object({
+    funding_8h:      z.coerce.number().optional(),
+    current_funding: z.coerce.number().optional(),
+    interest_value:  z.coerce.number().optional(),
+  }),
+});
+
+export interface DeribitFundingData {
+  funding_8h:      number;
+  current_funding: number;
+}
+
+/**
+ * fetchDeribitFunding — funding rate atual do BTC-PERPETUAL na Deribit
+ * CORS-safe: Deribit permite requisições diretas do browser.
+ */
+export async function fetchDeribitFunding(): Promise<DeribitFundingData | null> {
+  if (DATA_MODE === 'mock') return null;
+  try {
+    const res = await fetch(`${BASE}/ticker?instrument_name=BTC-PERPETUAL`);
+    if (!res.ok) return null;
+    const parsed = DeribitFundingSchema.safeParse(await res.json());
+    if (!parsed.success) return null;
+    const r = parsed.data.result;
+    return {
+      funding_8h:      r.funding_8h      ?? r.interest_value ?? 0,
+      current_funding: r.current_funding ?? r.funding_8h     ?? 0,
+    };
+  } catch {
+    return null;
+  }
+}

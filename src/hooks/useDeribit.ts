@@ -7,7 +7,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { IS_LIVE } from '@/lib/env';
-import { fetchOptionsData, fetchDvolHistory, OptionsData } from '@/services/deribit';
+import { fetchOptionsData, fetchDvolHistory, fetchDeribitFunding, OptionsData, DeribitFundingData } from '@/services/deribit';
 import { readModuleFlag } from '@/lib/moduleFlags';
 import { withCache, getStaleCache } from '@/services/marketCache';
 import { logError } from '@/lib/debugLog';
@@ -108,5 +108,33 @@ export function useDvolHistory(days = 30) {
     retryDelay: (attempt: number) => Math.min(1000 * 2 ** attempt, 10_000),
     enabled: readModuleFlag('ENABLE_OPTIONS'),
     select: (state: DataState<Array<{ timestamp: number; value: number }>>) => state.data ?? [],
+  });
+}
+
+/**
+ * useDeribitFunding — funding rate atual do BTC-PERPETUAL na Deribit
+ * Deribit é CORS-safe (permite requisições diretas do browser).
+ * Retorna null graciosamente se indisponível.
+ */
+export function useDeribitFunding() {
+  return useQuery({
+    queryKey:        ['deribit', 'funding'],
+    queryFn: async (): Promise<DataState<DeribitFundingData | null>> => {
+      try {
+        const data = await withCache('deribit:funding', 30, 'deribit', fetchDeribitFunding);
+        reportApiRecovery('deribit');
+        return { data, lastUpdated: new Date().toISOString(), isFallback: false, debugError: null };
+      } catch (err) {
+        logError('Deribit funding fetch failed', { error: String(err) }, 'deribit-funding');
+        reportApiFailure('deribit');
+        const stale = await getStaleCache<DeribitFundingData>('deribit:funding');
+        if (stale) return { data: stale.value, lastUpdated: stale.updatedAt.toISOString(), isFallback: true, debugError: String(err) };
+        return { data: null, lastUpdated: null, isFallback: true, debugError: String(err) };
+      }
+    },
+    staleTime:       25_000,
+    refetchInterval: IS_LIVE ? 30_000 : false,
+    retry:           1,
+    select: (state: DataState<DeribitFundingData | null>) => state.data,
   });
 }
