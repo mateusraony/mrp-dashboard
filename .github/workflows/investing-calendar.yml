@@ -1,4 +1,4 @@
-name: Fetch Economic Calendar (FMP)
+name: Fetch Economic Calendar (ForexFactory)
 
 on:
   schedule:
@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       date_override:
-        description: 'Override do período (formato YYYY-MM-DD)'
+        description: 'Não utilizado (mantido para compatibilidade)'
         required: false
 
 jobs:
@@ -23,13 +23,11 @@ jobs:
           node-version: '20'
           cache: 'npm'
       - run: npm ci
-      - name: Fetch Economic Calendar via FMP API
+      - name: Fetch Economic Calendar via ForexFactory
         run: node scripts/fetch-investing-calendar.mjs
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
-          DATE_OVERRIDE: ${{ inputs.date_override }}
 
   notify:
     name: Send Event Notifications
