@@ -4,6 +4,7 @@ import { futuresBasis as mockFuturesBasis, fundingByExchange } from '../../compo
 import { ModeBadge, GradeBadge } from '../ui/DataBadge';
 import { useBtcTicker, useFuturesBasis } from '@/hooks/useBtcData';
 import { useBybitTicker, useOkxTicker } from '@/hooks/useMultiVenue';
+import { useDeribitFunding } from '@/hooks/useDeribit';
 import { useMacroBoard } from '@/hooks/useFred';
 import { IS_LIVE } from '@/lib/env';
 import {
@@ -22,6 +23,7 @@ export default function BasisPanel() {
   const { data: bybit }  = useBybitTicker();
   const { data: okx }    = useOkxTicker();
   const { data: liveBasis } = useFuturesBasis();
+  const { data: deribitFunding } = useDeribitFunding();
 
   // Usar basis live quando disponível, fallback para mock
   const futures = (liveBasis && liveBasis.length > 0)
@@ -52,9 +54,10 @@ export default function BasisPanel() {
     { exchange: 'Binance', rate: ticker?.last_funding_rate ?? fundingByExchange[0].rate, color: '#f59e0b' },
     { exchange: 'Bybit',   rate: bybit?.funding_rate       ?? fundingByExchange[1].rate, color: '#10b981' },
     { exchange: 'OKX',     rate: okx?.funding_rate         ?? fundingByExchange[2].rate, color: '#3b82f6' },
-    ...fundingByExchange.slice(3), // Deribit, Bitget, Gate.io — sem hook gratuito
+    { exchange: 'Deribit', rate: deribitFunding?.funding_8h ?? fundingByExchange[3].rate, color: '#a78bfa' },
+    ...fundingByExchange.slice(4), // Bitget, Gate.io — sem API pública confiável
   ];
-  const isLive = IS_LIVE && (ticker != null || bybit != null || okx != null);
+  const isLive = IS_LIVE && (ticker != null || bybit != null || okx != null || deribitFunding != null);
 
   // Spot: usar mark_price live quando disponível
   const spotPrice = ticker?.mark_price ?? d.spot;
