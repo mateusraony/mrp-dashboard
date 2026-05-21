@@ -577,7 +577,7 @@ function InvestingEventCardV2({ event }) {
 
 // ─── INVESTING CALENDAR SECTION ───────────────────────────────────────────────
 function InvestingCalendarSection() {
-  const [currencyFilter, setCurrencyFilter] = useState('USD');
+  const [currencyFilter, setCurrencyFilter] = useState('ALL');
   const [showPast, setShowPast]             = useState(false);
 
   const { data: events = [], isLoading, isError } = useInvestingCalendar();
@@ -603,7 +603,7 @@ function InvestingCalendarSection() {
   );
 
   const pastReleased = useMemo(() =>
-    filtered.filter(e => new Date(e.datetime_utc) < now && e.actual != null)
+    filtered.filter(e => new Date(e.datetime_utc) < now)
              .sort((a, b) => b.datetime_utc.localeCompare(a.datetime_utc))
              .slice(0, 15),
     [filtered],
