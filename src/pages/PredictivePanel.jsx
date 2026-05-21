@@ -114,12 +114,12 @@ function BreakoutRow({ b, spotPrice: rowSpot = 0 }) {
 }
 
 // ─── PATH CHART ───────────────────────────────────────────────────────────────
-function PathChart({ selected, spotPrice: chartSpot = 0 }) {
-  const data = PRICE_PATHS_FALLBACK.timestamps.map((t, i) => ({
+function PathChart({ selected, spotPrice: chartSpot = 0, paths = PRICE_PATHS_FALLBACK }) {
+  const data = paths.timestamps.map((t, i) => ({
     t,
-    bull:    PRICE_PATHS_FALLBACK.bull[i],
-    neutral: PRICE_PATHS_FALLBACK.neutral[i],
-    bear:    PRICE_PATHS_FALLBACK.bear[i],
+    bull:    paths.bull[i],
+    neutral: paths.neutral[i],
+    bear:    paths.bear[i],
     spot:    chartSpot,
   }));
 
@@ -246,6 +246,57 @@ export default function PredictivePanel() {
     };
   }, [spotPrice, atr14]);
 
+  // ── Probabilidades de cenário ajustadas por Fear&Greed e funding ──────────
+  const liveScenarioProbs = useMemo(() => {
+    if (!IS_LIVE || !fng || !ticker) return null;
+    const fg = fng.value;
+    const funding = ticker.last_funding_rate;
+    const fgBias   = (fg - 50) / 50;
+    const fundBias = funding > 0.0005 ? -0.3 : funding < 0 ? 0.2 : 0;
+    const bias     = Math.max(-1, Math.min(1, fgBias + fundBias));
+    const shift    = bias * 12;
+    const base = [28, 34, 18, 14, 6];
+    const adj  = [shift * 0.5, shift * 0.3, 0, -shift * 0.3, -shift * 0.5];
+    const raw  = base.map((b, i) => Math.max(2, b + adj[i]));
+    const total = raw.reduce((a, b) => a + b, 0);
+    const norm  = raw.map(v => Math.round((v / total) * 100));
+    norm[2] += 100 - norm.reduce((a, b) => a + b, 0);
+    const ids = ['bull_strong', 'bull_mild', 'neutral', 'bear_mild', 'bear_strong'];
+    return Object.fromEntries(ids.map((id, i) => [id, norm[i]]));
+  }, [fng, ticker]);
+
+  // ── Trajetórias de preço live geradas a partir do spot + cenários ─────────
+  const livePricePaths = useMemo(() => {
+    if (!spotPrice || !liveScenarioPrices) return null;
+    const steps      = 25;
+    const timestamps = Array.from({ length: steps }, (_, i) => `${String(i).padStart(2, '0')}:00`);
+    const bullEnd    = liveScenarioPrices.bull_mild;
+    const bearEnd    = liveScenarioPrices.bear_mild;
+    const makePath   = (end) => timestamps.map((_, i) =>
+      Math.round(spotPrice + (end - spotPrice) * (i / (steps - 1)))
+    );
+    return { timestamps, bull: makePath(bullEnd), neutral: makePath(spotPrice), bear: makePath(bearEnd) };
+  }, [spotPrice, liveScenarioPrices]);
+
+  // ── Tabela de rompimento calculada de klines (suporte/resistência) ─────────
+  const liveBreakoutTable = useMemo(() => {
+    if (!klines || klines.length < 14 || !spotPrice || !atr14) return null;
+    const recent20   = klines.slice(-20);
+    const recentHigh = Math.max(...recent20.map(k => k.high));
+    const recentLow  = Math.min(...recent20.map(k => k.low));
+    const touchProb  = (price) => Math.max(5, Math.round(Math.exp(-Math.abs(price - spotPrice) / atr14 * 1.2) * 85));
+    const rows = [
+      { price: spotPrice,           label: `Spot ${(spotPrice/1000).toFixed(1)}K`,     side: 'now',  prob_touch: 100, prob_close: 100, color: '#f59e0b', drivers: '' },
+      { price: recentHigh,          label: `Topo recente (20d)`,                        side: 'up',   prob_touch: touchProb(recentHigh),          prob_close: Math.round(touchProb(recentHigh) * 0.55),          color: '#10b981', drivers: 'Resistência de topo dos últimos 20 candles diários · pressão vendedora esperada' },
+      { price: spotPrice + atr14,   label: `ATR +1.0× (${((atr14/spotPrice)*100).toFixed(1)}%)`, side: 'up',  prob_touch: touchProb(spotPrice + atr14),   prob_close: Math.round(touchProb(spotPrice + atr14) * 0.55),   color: '#60a5fa', drivers: 'Nível baseado em volatilidade média 14d' },
+      { price: spotPrice + atr14*2, label: `ATR +2.0× (${((atr14*2/spotPrice)*100).toFixed(1)}%)`, side: 'up', prob_touch: touchProb(spotPrice + atr14*2), prob_close: Math.round(touchProb(spotPrice + atr14*2) * 0.55), color: '#a78bfa', drivers: 'Extensão bull · estatisticamente difícil em 24h' },
+      { price: recentLow,           label: `Fundo recente (20d)`,                       side: 'down', prob_touch: touchProb(recentLow),           prob_close: Math.round(touchProb(recentLow) * 0.55),           color: '#ef4444', drivers: 'Suporte de fundo dos últimos 20 candles diários · zona de compras' },
+      { price: spotPrice - atr14,   label: `ATR -1.0× (-${((atr14/spotPrice)*100).toFixed(1)}%)`, side: 'down', prob_touch: touchProb(spotPrice - atr14),   prob_close: Math.round(touchProb(spotPrice - atr14) * 0.55),   color: '#f97316', drivers: 'Suporte baseado em volatilidade média 14d' },
+      { price: spotPrice - atr14*2, label: `ATR -2.0× (-${((atr14*2/spotPrice)*100).toFixed(1)}%)`, side: 'down', prob_touch: touchProb(spotPrice - atr14*2), prob_close: Math.round(touchProb(spotPrice - atr14*2) * 0.55), color: '#ef4444', drivers: 'Alvo bear · requer venda agressiva sustentada' },
+    ].filter(r => r.price > 0).sort((a, b) => b.price - a.price);
+    return rows;
+  }, [klines, spotPrice, atr14]);
+
   // ── Análise direcional baseada em regras ────────────────────────────────
   const liveAnalysis = useMemo(() => {
     if (!IS_LIVE || !ticker || !fng) return null;
@@ -281,23 +332,26 @@ export default function PredictivePanel() {
 
   // ── Cenários com preços mesclados (live quando disponível) ─────────────
   const scenarios = useMemo(() => {
-    if (liveScenarioPrices && spotPrice) {
-      return SCENARIOS_24H_FALLBACK.map(s => {
-        const liveTarget = liveScenarioPrices[s.id];
-        if (liveTarget == null) return s;
-        const target_pct = parseFloat(((liveTarget - spotPrice) / spotPrice * 100).toFixed(1));
-        return { ...s, target_price: liveTarget, target_pct };
-      });
-    }
-    // sem live: calcula target_price a partir do spot (pode ser null se ticker ainda carregando)
-    if (spotPrice) {
-      return SCENARIOS_24H_FALLBACK.map(s => ({
-        ...s,
-        target_price: spotPrice * (1 + s.target_pct / 100),
-      }));
-    }
-    return SCENARIOS_24H_FALLBACK;
-  }, [liveScenarioPrices, spotPrice]);
+    const withPrices = (() => {
+      if (liveScenarioPrices && spotPrice) {
+        return SCENARIOS_24H_FALLBACK.map(s => {
+          const liveTarget = liveScenarioPrices[s.id];
+          if (liveTarget == null) return s;
+          const target_pct = parseFloat(((liveTarget - spotPrice) / spotPrice * 100).toFixed(1));
+          return { ...s, target_price: liveTarget, target_pct };
+        });
+      }
+      if (spotPrice) {
+        return SCENARIOS_24H_FALLBACK.map(s => ({
+          ...s,
+          target_price: spotPrice * (1 + s.target_pct / 100),
+        }));
+      }
+      return SCENARIOS_24H_FALLBACK;
+    })();
+    if (!liveScenarioProbs) return withPrices;
+    return withPrices.map(s => ({ ...s, prob: liveScenarioProbs[s.id] ?? s.prob }));
+  }, [liveScenarioPrices, spotPrice, liveScenarioProbs]);
 
   const SPOT = spotPrice ?? 0;
   const selectedScenario = scenarios.find(s => s.id === selected);
@@ -403,7 +457,7 @@ export default function PredictivePanel() {
                 <div style={{ fontSize: 10, fontWeight: 700, color: '#e2e8f0', marginBottom: 8 }}>Confiança do Modelo</div>
                 <ProbBar value={Math.round(selectedScenario.confidence * 100)} color={selectedScenario.color} />
                 <div style={{ fontSize: 9, color: '#334155', marginTop: 6 }}>
-                  Preços-alvo calculados via ATR(14) dos últimos 30 klines diários (Binance). Probabilidades de cenários são referência estática — não derivadas de modelo preditivo em tempo real.
+                  Preços-alvo calculados via ATR(14) · 30 klines diários Binance. {liveScenarioProbs ? 'Probabilidades ajustadas por Fear&Greed + Funding rate em tempo real.' : 'Probabilidades são referência estática — não derivadas de modelo preditivo.'}
                 </div>
               </div>
             </div>
@@ -429,7 +483,7 @@ export default function PredictivePanel() {
                 }}>{s.label} ({s.prob}%)</button>
               ))}
             </div>
-            <PathChart selected={selected} spotPrice={SPOT} />
+            <PathChart selected={selected} spotPrice={SPOT} paths={livePricePaths ?? PRICE_PATHS_FALLBACK} />
             <div style={{ display: 'flex', gap: 16, marginTop: 8, flexWrap: 'wrap' }}>
               {[
                 { color: '#10b981', label: 'Bull (alta)' },
@@ -491,10 +545,12 @@ export default function PredictivePanel() {
       {/* ── PROB. ROMPIMENTO ── */}
       {tab === 2 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div style={{ padding: '10px 14px', background: 'rgba(167,139,250,0.06)', border: '1px solid rgba(167,139,250,0.2)', borderRadius: 9 }}>
-            <span style={{ fontSize: 10, color: '#a78bfa', fontWeight: 700 }}>🎯 Metodologia: </span>
+          <div style={{ padding: '10px 14px', background: liveBreakoutTable ? 'rgba(16,185,129,0.06)' : 'rgba(167,139,250,0.06)', border: `1px solid ${liveBreakoutTable ? 'rgba(16,185,129,0.2)' : 'rgba(167,139,250,0.2)'}`, borderRadius: 9 }}>
+            <span style={{ fontSize: 10, color: liveBreakoutTable ? '#10b981' : '#a78bfa', fontWeight: 700 }}>{liveBreakoutTable ? '● Dados Live: ' : '🎯 Metodologia: '}</span>
             <span style={{ fontSize: 10, color: '#64748b' }}>
-              Tabela requer clusters de liquidação via API paga (Glassnode). Quando disponível: prob. de toque por distância ATR + correlação SPX + lag stablecoin ~12h.
+              {liveBreakoutTable
+                ? 'Níveis calculados de klines Binance (20d high/low + ATR ×1, ×2). Prob. de toque via decaimento exponencial pela distância ATR. Clusters de liquidação precisos requerem Glassnode.'
+                : 'Tabela requer clusters de liquidação via API paga (Glassnode). Quando disponível: prob. de toque por distância ATR + correlação SPX + lag stablecoin ~12h.'}
             </span>
           </div>
           <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, overflow: 'hidden' }}>
@@ -516,7 +572,7 @@ export default function PredictivePanel() {
                 </tr>
               </thead>
               <tbody>
-                {BREAKOUT_TABLE_FALLBACK.map(b => <BreakoutRow key={b.price} b={b} spotPrice={SPOT} />)}
+                {(liveBreakoutTable ?? BREAKOUT_TABLE_FALLBACK).map(b => <BreakoutRow key={b.price} b={b} spotPrice={SPOT} />)}
               </tbody>
             </table>
           </div>
