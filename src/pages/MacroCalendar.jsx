@@ -543,7 +543,7 @@ function InvestingEventCardV2({ event }) {
             {hasActual
               ? <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: 'rgba(16,185,129,0.1)', color: '#10b981', border: '1px solid rgba(16,185,129,0.2)', fontWeight: 700 }}>✓ Real</span>
               : isPast
-                ? <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: '#0a1018', color: '#334155', border: '1px solid #1a2535', fontWeight: 700 }}>Aguard.</span>
+                ? <span title="Valor final não disponível na fonte (ForexFactory)" style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: '#0a1018', color: '#475569', border: '1px solid #1a2535', fontWeight: 700 }}>Encerrado</span>
                 : <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: 'rgba(59,130,246,0.06)', color: '#3b82f6', border: '1px solid rgba(59,130,246,0.15)', fontWeight: 700 }}>Agend.</span>
             }
           </div>
@@ -578,7 +578,7 @@ function InvestingEventCardV2({ event }) {
 // ─── INVESTING CALENDAR SECTION ───────────────────────────────────────────────
 function InvestingCalendarSection() {
   const [currencyFilter, setCurrencyFilter] = useState('ALL');
-  const [showPast, setShowPast]             = useState(false);
+  const [showPast, setShowPast]             = useState(true);
 
   const { data: events = [], isLoading, isError } = useInvestingCalendar();
   const { data: calState }                        = useInvestingCalendarState();
@@ -638,7 +638,7 @@ function InvestingCalendarSection() {
           </span>
         ) : !isLoading && !noData ? (
           <span style={{ fontSize: 9, padding: '3px 9px', borderRadius: 4, background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', color: '#10b981', fontWeight: 700 }}>
-            ● LIVE: Investing.com
+            ● LIVE: ForexFactory
           </span>
         ) : null}
         {lastUpdatedBrt && <span style={{ fontSize: 9, color: '#334155' }}>Atualizado: {lastUpdatedBrt}</span>}
@@ -726,8 +726,12 @@ function InvestingCalendarSection() {
               ))}
             </div>
           ) : (
-            <div style={{ padding: '12px 14px', borderRadius: 8, background: '#0a1018', border: '1px solid #0f1d2e', fontSize: 10, color: '#334155', marginBottom: 12 }}>
-              Nenhum evento {currencyFilter !== 'ALL' ? `(${currencyFilter}) ` : ''}próximo no período.
+            <div style={{ padding: '12px 14px', borderRadius: 8, background: '#0a1018', border: '1px solid #0f1d2e', fontSize: 10, color: '#475569', marginBottom: 12 }}>
+              {currencyFilter !== 'ALL'
+                ? `Nenhum evento (${currencyFilter}) próximo. Tente "🌐 Todos" para ver outras moedas.`
+                : pastReleased.length > 0
+                  ? '⬇ Sem eventos futuros agendados — veja os resultados recentes abaixo.'
+                  : 'Nenhum evento próximo no período. O cron atualiza a cada 30 min nos dias úteis.'}
             </div>
           )}
 
@@ -735,8 +739,8 @@ function InvestingCalendarSection() {
           {pastGroups.length > 0 && (
             <div style={{ marginTop: 4 }}>
               <button onClick={() => setShowPast(p => !p)} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 0', marginBottom: showPast ? 10 : 0 }}>
-                <span style={{ fontSize: 9, color: '#334155', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-                  📋 Resultados recentes ({pastReleased.length})
+                <span style={{ fontSize: 9, color: '#475569', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                  📋 Eventos desta semana ({pastReleased.length})
                 </span>
                 <span style={{ fontSize: 9, color: '#334155', marginLeft: 'auto' }}>{showPast ? '▲ recolher' : '▼ expandir'}</span>
               </button>
@@ -757,7 +761,7 @@ function InvestingCalendarSection() {
 
           {/* Rodapé */}
           <div style={{ marginTop: 14, padding: '8px 12px', borderRadius: 6, background: 'rgba(59,130,246,0.04)', border: '1px solid rgba(59,130,246,0.1)', fontSize: 9, color: '#334155' }}>
-            Fonte: Investing.com · Apenas eventos ★★★ (alta importância) · Horários em BRT (UTC-3) · Coleta automática a cada 30min
+            Fonte: ForexFactory (faireconomy.media) · Apenas eventos High Impact · Horários em BRT (UTC-3) · Coleta automática a cada 30min
           </div>
         </>
       )}
