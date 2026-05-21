@@ -105,7 +105,7 @@ function CountdownBanner({ events }) {
   );
 }
 
-// ─── EVENT CARD ───────────────────────────────────────────────────────────────
+// ─── EVENT CARD (upcoming) ────────────────────────────────────────────────────
 function EventCard({ event, onToggleAlert }) {
   const color = AGENCY_COLOR[event.agency] || AGENCY_COLOR.default;
   const { label: timeLabel, color: timeColor } = timeUntil(new Date(event.datetime_brt));
@@ -168,6 +168,67 @@ function EventCard({ event, onToggleAlert }) {
       {event.description && (
         <div style={{ marginTop: 8, fontSize: 9, color: '#475569', lineHeight: 1.6, padding: '6px 8px', borderRadius: 5, background: '#0a1018', border: '1px solid #0f1d2e' }}>
           {event.description}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── PAST EVENT ROW (compact) ─────────────────────────────────────────────────
+function PastEventRow({ event }) {
+  const color  = AGENCY_COLOR[event.agency] || AGENCY_COLOR.default;
+  const actual = event.actual;
+  const prev   = event.previous;
+  // Direction: if actual and previous are numeric strings, compare
+  const actualNum = parseFloat(actual);
+  const prevNum   = parseFloat(prev);
+  const moved  = !isNaN(actualNum) && !isNaN(prevNum) ? actualNum - prevNum : null;
+  const moveColor = moved === null ? '#475569' : moved > 0 ? '#ef4444' : moved < 0 ? '#10b981' : '#f59e0b';
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 12px', borderRadius: 7, background: '#0a1018', border: '1px solid #0f1d2e', fontSize: 10 }}>
+      <div style={{ width: 3, height: 28, borderRadius: 2, background: color, flexShrink: 0 }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontWeight: 700, color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{event.title}</div>
+        <div style={{ fontSize: 8, color: '#334155', fontFamily: 'JetBrains Mono, monospace' }}>
+          {format(new Date(event.datetime_brt), "dd/MM HH:mm", { locale: ptBR })} BRT
+        </div>
+      </div>
+      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+        <div style={{ fontSize: 9, color: '#334155' }}>Ant: <span style={{ color: '#475569', fontFamily: 'JetBrains Mono, monospace' }}>{prev ?? '—'}</span></div>
+        <div style={{ fontSize: 9, color: '#334155' }}>Real: <span style={{ fontWeight: 700, color: actual ? '#94a3b8' : '#334155', fontFamily: 'JetBrains Mono, monospace' }}>{actual ?? '—'}</span></div>
+      </div>
+      {moved !== null && (
+        <div style={{ fontSize: 10, fontWeight: 800, color: moveColor, fontFamily: 'JetBrains Mono, monospace', flexShrink: 0 }}>
+          {moved > 0 ? '▲' : '▼'}
+        </div>
+      )}
+      <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: event.tier === 1 ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.06)', color: event.tier === 1 ? '#ef444470' : '#f59e0b60', border: `1px solid ${event.tier === 1 ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.12)'}`, flexShrink: 0 }}>
+        T{event.tier}
+      </span>
+    </div>
+  );
+}
+
+// ─── PAST EVENTS SECTION (collapsible) ───────────────────────────────────────
+function PastEventsSection({ events }) {
+  const [open, setOpen] = useState(events.length <= 3);
+  if (events.length === 0) return null;
+
+  return (
+    <div style={{ marginTop: 20 }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 0', marginBottom: open ? 8 : 0 }}
+      >
+        <span style={{ fontSize: 9, color: '#334155', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+          📋 Eventos Passados ({events.length})
+        </span>
+        <span style={{ fontSize: 9, color: '#334155', marginLeft: 'auto' }}>{open ? '▲ recolher' : '▼ expandir'}</span>
+      </button>
+      {open && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {events.map(e => <PastEventRow key={e.id} event={e} />)}
         </div>
       )}
     </div>
@@ -245,13 +306,23 @@ function AvgVolatilityChart({ data }) {
 
 // ─── ALERT SETTINGS ───────────────────────────────────────────────────────────
 function AlertPanel({ events, onToggleAlert, onSendTestAlert }) {
-  const active = events.filter(e => e.alert_enabled);
+  // Only upcoming events can be alerted — past events are irrelevant
+  const upcoming = useMemo(() => {
+    const now = new Date();
+    return events.filter(e => new Date(e.datetime_utc) >= now);
+  }, [events]);
+  const active = upcoming.filter(e => e.alert_enabled);
   return (
     <div>
       <div style={{ fontSize: 10, color: '#475569', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>
-        🔔 Alertas Push Configurados — {active.length} de {events.length}
+        🔔 Alertas Push Configurados — {active.length} de {upcoming.length}
       </div>
-      {events.map(e => (
+      {upcoming.length === 0 && (
+        <div style={{ padding: '12px 14px', borderRadius: 8, background: '#0d1421', border: '1px solid #1a2535', fontSize: 10, color: '#334155' }}>
+          Nenhum evento futuro disponível no momento.
+        </div>
+      )}
+      {upcoming.map(e => (
         <div key={e.id} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '9px 12px', background: '#0d1421', border: `1px solid ${e.alert_enabled ? 'rgba(16,185,129,0.2)' : '#1a2535'}`, borderRadius: 8, marginBottom: 6 }}>
           <button onClick={() => onToggleAlert(e.id)} style={{ width: 32, height: 18, borderRadius: 9, border: 'none', cursor: 'pointer', background: e.alert_enabled ? '#10b981' : '#1a2535', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}>
             <div style={{ width: 12, height: 12, borderRadius: 6, background: '#fff', position: 'absolute', top: 3, left: e.alert_enabled ? 17 : 3, transition: 'left 0.2s' }} />
@@ -353,8 +424,11 @@ export default function MacroCalendar() {
     showToast(`✅ Alerta de teste enviado!`, '#10b981');
   };
 
-  const tier1 = events.filter(e => e.tier === 1);
-  const tier2 = events.filter(e => e.tier === 2);
+  const upcoming = useMemo(() => { const t = new Date(); return events.filter(e => new Date(e.datetime_utc) >= t).sort((a, b) => a.datetime_utc.localeCompare(b.datetime_utc)); }, [events]);
+  const past     = useMemo(() => { const t = new Date(); return events.filter(e => new Date(e.datetime_utc) < t).sort((a, b) => b.datetime_utc.localeCompare(a.datetime_utc)); }, [events]);
+
+  const upcomingTier1 = upcoming.filter(e => e.tier === 1);
+  const upcomingTier2 = upcoming.filter(e => e.tier === 2);
 
   return (
     <div style={{ maxWidth: 1280, margin: '0 auto' }}>
@@ -407,10 +481,10 @@ export default function MacroCalendar() {
       {/* Summary stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 14 }}>
         {[
-          { label: 'Eventos Tier-1', value: tier1.length, color: '#ef4444' },
-          { label: 'Eventos Tier-2', value: tier2.length, color: '#f59e0b' },
-          { label: 'Alertas Ativos', value: events.filter(e => e.alert_enabled).length, color: '#10b981' },
-          { label: 'Próximos 30d', value: events.length, color: '#60a5fa' },
+          { label: 'Tier-1 Próximos', value: upcomingTier1.length, color: '#ef4444' },
+          { label: 'Tier-2 Próximos', value: upcomingTier2.length, color: '#f59e0b' },
+          { label: 'Alertas Ativos', value: upcoming.filter(e => e.alert_enabled).length, color: '#10b981' },
+          { label: 'Eventos Passados', value: past.length, color: '#475569' },
         ].map((s, i) => (
           <div key={i} style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 9, padding: '12px 14px' }}>
             <div style={{ fontSize: 8, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>{s.label}</div>
@@ -432,14 +506,26 @@ export default function MacroCalendar() {
       {tab === 'Agenda' && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 16 }}>
           <div>
+            {/* Upcoming Tier-1 */}
             <div style={{ fontSize: 10, color: '#ef4444', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>🔴 TIER-1 — Alta Relevância</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
-              {tier1.map(e => <EventCard key={e.id} event={e} onToggleAlert={toggleAlert} />)}
+              {upcomingTier1.length > 0
+                ? upcomingTier1.map(e => <EventCard key={e.id} event={e} onToggleAlert={toggleAlert} />)
+                : <div style={{ padding: '12px 14px', borderRadius: 8, background: '#0a1018', border: '1px solid #0f1d2e', fontSize: 10, color: '#334155' }}>Nenhum evento Tier-1 próximo no calendário.</div>
+              }
             </div>
+
+            {/* Upcoming Tier-2 */}
             <div style={{ fontSize: 10, color: '#f59e0b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>🟡 TIER-2 — Relevância Moderada</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {tier2.map(e => <EventCard key={e.id} event={e} onToggleAlert={toggleAlert} />)}
+              {upcomingTier2.length > 0
+                ? upcomingTier2.map(e => <EventCard key={e.id} event={e} onToggleAlert={toggleAlert} />)
+                : <div style={{ padding: '12px 14px', borderRadius: 8, background: '#0a1018', border: '1px solid #0f1d2e', fontSize: 10, color: '#334155' }}>Nenhum evento Tier-2 próximo no calendário.</div>
+              }
             </div>
+
+            {/* Past events — collapsible compact rows */}
+            <PastEventsSection events={past} />
           </div>
 
           {/* Sidebar */}
