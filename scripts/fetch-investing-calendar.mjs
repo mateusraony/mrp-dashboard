@@ -382,10 +382,14 @@ async function logJobToSupabase(jobData) {
         'Prefer':       'return=minimal',
       },
       body: JSON.stringify({
-        job_name:    'fetch-investing-calendar',
-        status:      jobData.status,
-        details:     jobData,
-        executed_at: new Date().toISOString(),
+        job_name:       'fetch-investing-calendar',
+        status:         jobData.status,
+        events_found:   jobData.total_received ?? 0,
+        events_updated: jobData.total_upserted ?? 0,
+        alerts_sent:    0,
+        duration_ms:    jobData.duration_ms ?? 0,
+        error_message:  jobData.message ?? null,
+        metadata:       jobData,
       }),
     });
   } catch {
