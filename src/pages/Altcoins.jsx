@@ -28,8 +28,8 @@ const COIN_COLORS = {
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-function retColor(v) { return v > 0 ? '#10b981' : v < 0 ? '#ef4444' : '#64748b'; }
-function retFmt(v)   { return `${v > 0 ? '+' : ''}${v.toFixed(1)}%`; }
+function retColor(v) { return v == null ? '#64748b' : v > 0 ? '#10b981' : v < 0 ? '#ef4444' : '#64748b'; }
+function retFmt(v)   { return v == null ? '—' : `${v > 0 ? '+' : ''}${v.toFixed(1)}%`; }
 
 // ─── ALT SEASON GAUGE ─────────────────────────────────────────────────────────
 function AltSeasonGauge({ index, trend }) {
@@ -100,8 +100,9 @@ function AltSeasonGauge({ index, trend }) {
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             {trend.map(t => {
-              const tc = t.value >= 75 ? '#10b981' : t.value >= 25 ? '#f59e0b' : '#3b82f6';
-              const isHighest = t.value === Math.max(...trend.map(x => x.value));
+              const tc = (t.value ?? 0) >= 75 ? '#10b981' : (t.value ?? 0) >= 25 ? '#f59e0b' : '#3b82f6';
+              const validValues = trend.filter(x => x.value !== null).map(x => x.value);
+              const isHighest = t.value !== null && validValues.length > 0 && t.value === Math.max(...validValues);
               return (
                 <div key={t.window} style={{
                   flex: 1, background: isHighest ? `${tc}12` : '#0a1018',
@@ -109,16 +110,19 @@ function AltSeasonGauge({ index, trend }) {
                   borderRadius: 7, padding: '7px 10px', textAlign: 'center',
                 }}>
                   <div style={{ fontSize: 9, color: '#475569', marginBottom: 3, fontWeight: 700 }}>{t.label}</div>
-                  <div style={{ fontSize: 17, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: tc }}>{t.value}%</div>
+                  <div style={{ fontSize: 17, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: t.value !== null ? tc : '#334155' }}>
+                    {t.value !== null ? `${t.value}%` : '—'}
+                  </div>
                 </div>
               );
             })}
           </div>
           <div style={{ fontSize: 9, color: '#334155', marginTop: 6 }}>
             {(() => {
-              const v7 = trend.find(t => t.window === '7d')?.value ?? 0;
-              const v30 = trend.find(t => t.window === '30d')?.value ?? 0;
-              const v90 = trend.find(t => t.window === '90d')?.value ?? 0;
+              const v7  = trend.find(t => t.window === '7d')?.value  ?? null;
+              const v30 = trend.find(t => t.window === '30d')?.value ?? null;
+              const v90 = trend.find(t => t.window === '90d')?.value ?? null;
+              if (v7 === null || v30 === null || v90 === null) return '→ Dados parciais — algumas janelas sem retorno';
               if (v7 > v30 && v30 > v90) return '↑ Momentum crescente — alts acelerando vs BTC';
               if (v7 < v30 && v30 < v90) return '↓ Momentum decrescente — alts perdendo força vs BTC';
               if (v7 > v90) return '↗ Tendência recente positiva';
@@ -181,8 +185,8 @@ export default function Altcoins() {
       ret_7d:     a.price_change_percentage_7d,
       ret_30d:    a.price_change_percentage_30d,
       ret_90d:    a.price_change_percentage_90d,
-      vs_btc_7d:  a.price_change_percentage_7d  - btcRet7d,
-      vs_btc_30d: a.price_change_percentage_30d - btcRet30d,
+      vs_btc_7d:  a.price_change_percentage_7d  != null && btcRet7d  != null ? a.price_change_percentage_7d  - btcRet7d  : null,
+      vs_btc_30d: a.price_change_percentage_30d != null && btcRet30d != null ? a.price_change_percentage_30d - btcRet30d : null,
     }));
 
   const domData = [

@@ -63,9 +63,9 @@ export interface AltcoinMarketData {
   name:          string;
   current_price: number;
   market_cap:    number;
-  price_change_percentage_7d:  number;
-  price_change_percentage_30d: number;
-  price_change_percentage_90d: number;
+  price_change_percentage_7d:  number | null;
+  price_change_percentage_30d: number | null;
+  price_change_percentage_90d: number | null;
   price_change_percentage_24h: number;
 }
 
@@ -75,9 +75,10 @@ const AltcoinSchema = z.object({
   name:          z.string(),
   current_price: z.coerce.number(),
   market_cap:    z.coerce.number(),
-  price_change_percentage_7d_in_currency:  z.coerce.number().optional().default(0),
-  price_change_percentage_30d_in_currency: z.coerce.number().optional().default(0),
-  price_change_percentage_90d_in_currency: z.coerce.number().optional().default(0),
+  // null = CoinGecko did not return this window (coin too new, or API omitted it)
+  price_change_percentage_7d_in_currency:  z.coerce.number().nullable().optional().default(null),
+  price_change_percentage_30d_in_currency: z.coerce.number().nullable().optional().default(null),
+  price_change_percentage_90d_in_currency: z.coerce.number().nullable().optional().default(null),
   price_change_percentage_24h: z.coerce.number().optional().default(0),
 });
 export const AltcoinsSchema = z.array(AltcoinSchema);
