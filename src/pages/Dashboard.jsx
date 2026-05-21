@@ -219,9 +219,12 @@ function FearGreedGauge({ liveValue, fngError, liveHistory }) {
 }
 
 // ─── BTC SNAPSHOT ─────────────────────────────────────────────────────────────
-function BTCSnapshot({ liveData, tickerError }) {
+function BTCSnapshot({ liveData, tickerError, spotFlow = null }) {
   const err = tickerError && DATA_MODE === 'live';
   const fr = liveData ?? BTC_FUTURES_FALLBACK;
+  const ret1d = spotFlow?.ret_1d ?? null;
+  const ret1w = spotFlow?.ret_1w ?? null;
+  const cvd   = spotFlow?.cvd   ?? null;
   const fundingColor = err ? '#4a5568' : (fr.funding_rate > 0.0005 ? '#ef4444' : fr.funding_rate > 0 ? '#f59e0b' : '#10b981');
   const oiColor = err ? '#4a5568' : '#f59e0b';
   const priceStr   = err ? '***' : `$${fmtNum(fr.mark_price, 0)}`;
@@ -251,8 +254,14 @@ function BTCSnapshot({ liveData, tickerError }) {
           <span style={{ fontSize: 26, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: err ? '#4a5568' : '#f1f5f9', letterSpacing: '-0.03em' }}>
             {priceStr}
           </span>
-          <DeltaPill value={BTC_SPOT_FLOW_FALLBACK.ret_1d * 100} suffix="% 1D" />
-          <DeltaPill value={BTC_SPOT_FLOW_FALLBACK.ret_1w * 100} suffix="% 1W" compact />
+          {ret1d !== null
+            ? <DeltaPill value={ret1d * 100} suffix="% 1D" />
+            : <span style={{ fontSize: 9, color: '#334155', fontFamily: 'JetBrains Mono, monospace' }}>1D —</span>
+          }
+          {ret1w !== null
+            ? <DeltaPill value={ret1w * 100} suffix="% 1W" compact />
+            : <span style={{ fontSize: 9, color: '#334155', fontFamily: 'JetBrains Mono, monospace' }}>1W —</span>
+          }
         </div>
       </div>
 
@@ -270,9 +279,14 @@ function BTCSnapshot({ liveData, tickerError }) {
         <Stat label="Long/Short Ratio" value={fr.long_short_ratio.toFixed(2)} color="#60a5fa" big
           sub={`Top traders: ${fr.top_trader_ls.toFixed(2)}`}
           help={{ title: 'L/S Ratio', content: 'Proporção de posições longas vs curtas. >1.5 com funding alto = posicionamento perigoso.' }} />
-        <Stat label="CVD Intraday" value={`+${(BTC_SPOT_FLOW_FALLBACK.cvd/1000).toFixed(1)}K`} color="#10b981" big
-          sub="Taker Buy > Sell"
-          help={{ title: 'CVD', content: 'Diferença acumulada entre volume comprador e vendedor. Positivo = agressores compradores dominando.' }} />
+        <Stat
+          label="CVD 7d"
+          value={cvd !== null ? `${cvd >= 0 ? '+' : ''}${(cvd / 1000).toFixed(1)}K` : '—'}
+          color={cvd !== null ? (cvd >= 0 ? '#10b981' : '#ef4444') : '#4a5568'}
+          big
+          sub={cvd !== null ? (cvd >= 0 ? 'Taker Buy > Sell' : 'Taker Sell > Buy') : 'klines indisponíveis'}
+          help={{ title: 'CVD 7d', content: 'Diferença acumulada entre volume comprador e vendedor nos últimos 7 candles diários. Positivo = agressores compradores dominando.' }}
+        />
       </div>
     </div>
   );
