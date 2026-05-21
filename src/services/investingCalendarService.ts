@@ -10,6 +10,7 @@
 import { z } from 'zod';
 import { apiFetch } from '@/lib/apiClient';
 import { env } from '@/lib/env';
+import { logWarn } from '@/lib/debugLog';
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 
@@ -112,6 +113,12 @@ export async function fetchInvestingCalendarEvents(): Promise<InvestingCalendarE
 
   if (!res.ok) {
     const text = await res.text().catch(() => '');
+    // 404 = tabela ainda não criada (migração pendente ou GitHub Action ainda não rodou)
+    // Retornar [] em vez de lançar erro para mostrar estado informativo ao usuário
+    if (res.status === 404) {
+      logWarn('economic_calendar_events: tabela não encontrada (404) — migração pendente', null, 'investing-calendar');
+      return [];
+    }
     throw new Error(`Supabase economic_calendar_events falhou: ${res.status} — ${text}`);
   }
 
