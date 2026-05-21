@@ -1,27 +1,29 @@
 #!/usr/bin/env node
 /**
- * fetch-investing-calendar.mjs — Coleta eventos de alto impacto via Financial Modeling Prep API
- * Env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, FMP_API_KEY
- * Uso: node scripts/fetch-investing-calendar.mjs
- * Docs FMP: https://site.financialmodelingprep.com/developer/docs/economic-calendar-api
+ * fetch-investing-calendar.mjs — Coleta eventos High Impact via ForexFactory (faireconomy.media)
+ * Sem API key. Feed JSON público, sem bloqueio de IP.
+ * Env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
  */
 
-const SUPABASE_URL               = process.env.SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE_KEY  = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const FMP_API_KEY                = process.env.FMP_API_KEY;
-const DATE_OVERRIDE              = process.env.DATE_OVERRIDE;
+const SUPABASE_URL              = process.env.SUPABASE_URL;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-// ─── Utilitários de data ──────────────────────────────────────────────────────
+const FEEDS = [
+  'https://nfs.faireconomy.media/ff_calendar_thisweek.json?version=2',
+  'https://nfs.faireconomy.media/ff_calendar_nextweek.json?version=2',
+];
 
-function formatDate(date) {
-  return date.toISOString().slice(0, 10);
-}
+// ─── Parsing de data/hora ─────────────────────────────────────────────────────
 
 /**
- * FMP retorna datas em UTC: "2026-05-21 13:30:00"
+ * Converte data "2026-05-21" + hora "13:30:00" para Date UTC.
+ * O feed faireconomy.media usa UTC.
  */
-function parseFmpDateToUtc(dateStr) {
-  return new Date(dateStr.replace(' ', 'T') + 'Z');
+function parseToUtc(dateStr, timeStr) {
+  const time = (timeStr && timeStr !== 'Tentative' && timeStr !== 'All Day')
+    ? timeStr
+    : '00:00:00';
+  return new Date(`${dateStr}T${time}Z`);
 }
 
 function toBrtIso(utcDate) {
@@ -36,20 +38,19 @@ function slugify(str) {
 }
 
 function generateEventId(event) {
-  const d    = parseFmpDateToUtc(event.date);
-  const dt   = d.toISOString().slice(0, 16).replace(/[-:T]/g, ''); // YYYYMMDDHHmm
-  const slug = slugify(event.event ?? 'unknown');
-  const cur  = (event.currency ?? event.country ?? 'XX').toUpperCase();
-  return `fmp_${cur}_${slug}_${dt}`;
+  const utc  = parseToUtc(event.date, event.time);
+  const dt   = utc.toISOString().slice(0, 16).replace(/[-:T]/g, '');
+  const slug = slugify(event.title ?? 'unknown');
+  const cur  = (event.country ?? 'XX').toUpperCase();
+  return `ff_${cur}_${slug}_${dt}`;
 }
 
 // ─── AI Analysis (rule-based) ─────────────────────────────────────────────────
 
 function generateAiAnalysis(event) {
-  const t   = (event.event    ?? '').toLowerCase();
-  const frc = event.estimate  ?? '';
-  const prv = event.previous  ?? '';
-
+  const t   = (event.title ?? '').toLowerCase();
+  const frc = event.forecast ?? '';
+  const prv = event.previous ?? '';
   const fNum = parseFloat(frc);
   const pNum = parseFloat(prv);
   const canCompare = !isNaN(fNum) && !isNaN(pNum);
@@ -57,24 +58,30 @@ function generateAiAnalysis(event) {
   if (/fomc|federal open|interest rate decision|fed rate/.test(t)) {
     return { analysis: 'Decisão do Fed. Volatilidade extrema esperada. Manutenção: neutro. Alta: bearish BTC. Corte: bullish.', direction: 'neutral', probability: 0.60 };
   }
-  if (/\bcpi\b|consumer price|pce|inflation|infla/.test(t)) {
+  if (/\bcpi\b|consumer price|pce|inflation/.test(t)) {
     if (canCompare) {
       if (fNum > pNum) return { analysis: 'CPI/PCE acima do anterior → pressão inflacionária → Fed hawkish → BTC cai.', direction: 'down', probability: 0.63 };
-      if (fNum < pNum) return { analysis: 'CPI/PCE abaixo do anterior → desaceleração inflacionária → Fed dovish → BTC favorável.', direction: 'up', probability: 0.59 };
+      if (fNum < pNum) return { analysis: 'CPI/PCE abaixo do anterior → desinflação → Fed dovish → BTC favorável.', direction: 'up', probability: 0.59 };
     }
-    return { analysis: 'Dado de inflação. Monitorar resultado vs consenso: acima=bearish BTC, abaixo=bullish.', direction: 'neutral', probability: 0.50 };
+    return { analysis: 'Dado de inflação. Acima do previsto=bearish BTC; abaixo=bullish.', direction: 'neutral', probability: 0.50 };
   }
   if (/nfp|nonfarm|non-farm|payroll|non farm/.test(t)) {
     return { analysis: 'NFP acima do esperado = hawkish → BTC cai. Abaixo = dovish → BTC sobe.', direction: 'neutral', probability: 0.55 };
   }
-  if (/\bgdp\b|gross domestic|pib|produto interno/.test(t)) {
-    return { analysis: 'Crescimento forte = Fed hawkish. Crescimento fraco = Fed dovish, favorável BTC.', direction: 'up', probability: 0.52 };
+  if (/\bgdp\b|gross domestic/.test(t)) {
+    return { analysis: 'Crescimento forte = Fed hawkish. Crescimento fraco = Fed dovish, favorável BTC.', direction: 'neutral', probability: 0.52 };
   }
   if (/initial claims|jobless claims|unemployment claims/.test(t)) {
     return { analysis: 'Aumento de pedidos = fraqueza do emprego → Fed dovish → BTC favorável.', direction: 'up', probability: 0.51 };
   }
-  if (/jolts|job openings|vagas/.test(t)) {
+  if (/jolts|job openings/.test(t)) {
     return { analysis: 'Vagas de emprego. Queda = mercado esfriando → possivelmente dovish.', direction: 'neutral', probability: 0.50 };
+  }
+  if (/retail sales/.test(t)) {
+    return { analysis: 'Vendas no varejo. Forte = hawkish = bearish BTC. Fraco = dovish = bullish.', direction: 'neutral', probability: 0.52 };
+  }
+  if (/\bpmi\b|purchasing managers/.test(t)) {
+    return { analysis: 'PMI acima de 50 = expansão. Abaixo = contração → risco de recessão.', direction: 'neutral', probability: 0.52 };
   }
   return { analysis: 'Evento macro de alta importância. Monitorar resultado vs consenso.', direction: 'neutral', probability: 0.50 };
 }
@@ -92,11 +99,10 @@ async function fetchWithRetry(url, options = {}, maxRetries = 3) {
     try {
       const res = await fetch(url, { ...options, signal: controller.signal });
       clearTimeout(tid);
-
-      if (res.status === 429) throw new Error('Rate limit (429) — abortando sem retry');
+      if (res.status === 429) throw new Error('Rate limit (429)');
       if (res.status >= 500) {
         if (attempt < maxRetries) {
-          console.warn(`[fmp] Status ${res.status} na tentativa ${attempt + 1}. Aguardando ${delays[attempt]}ms...`);
+          console.warn(`[ff] Status ${res.status} tentativa ${attempt + 1}. Aguardando ${delays[attempt]}ms...`);
           await new Promise(r => setTimeout(r, delays[attempt]));
           lastError = new Error(`HTTP ${res.status}`);
           continue;
@@ -109,7 +115,7 @@ async function fetchWithRetry(url, options = {}, maxRetries = 3) {
       if (String(err).includes('429')) throw err;
       lastError = err;
       if (attempt < maxRetries) {
-        console.warn(`[fmp] Erro na tentativa ${attempt + 1}: ${String(err)}. Aguardando ${delays[attempt] ?? 4000}ms...`);
+        console.warn(`[ff] Erro tentativa ${attempt + 1}: ${String(err)}. Aguardando ${delays[attempt] ?? 4000}ms...`);
         await new Promise(r => setTimeout(r, delays[attempt] ?? 4000));
       }
     }
@@ -129,8 +135,7 @@ function supabaseHeaders() {
 
 async function upsertToSupabase(rows) {
   if (rows.length === 0) return 0;
-  const url = `${SUPABASE_URL}/rest/v1/economic_calendar_events`;
-  const res = await fetch(url, {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/economic_calendar_events`, {
     method:  'POST',
     headers: { ...supabaseHeaders(), 'Prefer': 'resolution=merge-duplicates,return=minimal' },
     body:    JSON.stringify(rows),
@@ -144,8 +149,7 @@ async function upsertToSupabase(rows) {
 
 async function logJobToSupabase(jobData) {
   try {
-    const url = `${SUPABASE_URL}/rest/v1/system_job_log`;
-    await fetch(url, {
+    await fetch(`${SUPABASE_URL}/rest/v1/system_job_log`, {
       method:  'POST',
       headers: { ...supabaseHeaders(), 'Prefer': 'return=minimal' },
       body: JSON.stringify({
@@ -170,79 +174,76 @@ async function main() {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     throw new Error('SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY são obrigatórios');
   }
-  if (!FMP_API_KEY) {
-    throw new Error('FMP_API_KEY é obrigatório — obtenha grátis em financialmodelingprep.com');
-  }
 
-  const now = new Date();
-  let dateFromObj, dateToObj;
-
-  if (DATE_OVERRIDE) {
-    dateFromObj = new Date(DATE_OVERRIDE);
-    dateToObj   = new Date(DATE_OVERRIDE);
-    dateToObj.setDate(dateToObj.getDate() + 7);
-  } else {
-    dateFromObj = new Date(now);
-    dateFromObj.setDate(dateFromObj.getDate() - 2);
-    dateToObj = new Date(now);
-    dateToObj.setDate(dateToObj.getDate() + 7);
-  }
-
-  const dateFrom  = formatDate(dateFromObj);
-  const dateTo    = formatDate(dateToObj);
   const startTime = Date.now();
+  const now = new Date();
 
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  console.log('  fetch-investing-calendar.mjs (via FMP API)');
-  console.log(`  Período: ${dateFrom} → ${dateTo}`);
-  console.log(`  Início:  ${now.toISOString()}`);
+  console.log('  fetch-investing-calendar.mjs (via ForexFactory/faireconomy.media)');
+  console.log(`  Início: ${now.toISOString()}`);
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
-  const fmpUrl = `https://financialmodelingprep.com/api/v3/economic_calendar`
-    + `?from=${dateFrom}&to=${dateTo}&apikey=${FMP_API_KEY}`;
+  // Busca esta semana + próxima semana em paralelo
+  const results = await Promise.allSettled(
+    FEEDS.map(url => fetchWithRetry(url).then(r => {
+      if (!r.ok) throw new Error(`HTTP ${r.status} em ${url}`);
+      return r.json();
+    }))
+  );
 
-  const res = await fetchWithRetry(fmpUrl);
-
-  if (!res.ok) {
-    throw new Error(`FMP API falhou: ${res.status} — ${await res.text().catch(() => '')}`);
+  const allEvents = [];
+  for (const [i, result] of results.entries()) {
+    if (result.status === 'fulfilled' && Array.isArray(result.value)) {
+      allEvents.push(...result.value);
+      console.log(`  Feed ${i + 1}: ${result.value.length} eventos`);
+    } else {
+      console.warn(`  Feed ${i + 1}: falhou — ${result.reason}`);
+    }
   }
 
-  const raw = await res.json();
-
-  if (!Array.isArray(raw)) {
-    throw new Error(`FMP retornou formato inesperado: ${JSON.stringify(raw).slice(0, 200)}`);
+  if (allEvents.length === 0) {
+    throw new Error('Nenhum feed retornou dados válidos');
   }
 
-  const totalReceived = raw.length;
-  console.log(`  Eventos recebidos (todas importâncias): ${totalReceived}`);
+  const totalReceived = allEvents.length;
+  console.log(`  Total recebido (todas importâncias): ${totalReceived}`);
 
-  const highImpact = raw.filter(e => e.impact === 'High');
-  console.log(`  Eventos filtrados (High impact):        ${highImpact.length}`);
+  // Deduplicar por ID (feeds podem sobrepor dias)
+  const seen = new Set();
+  const highImpact = allEvents.filter(e => {
+    if (e.impact !== 'High') return false;
+    const id = generateEventId(e);
+    if (seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+
+  console.log(`  High impact (únicos):                ${highImpact.length}`);
 
   if (highImpact.length === 0) {
     console.warn('  Aviso: nenhum evento High impact no período.');
   }
 
   const rows = highImpact.map(e => {
-    const utcDate   = parseFmpDateToUtc(e.date);
+    const utcDate   = parseToUtc(e.date, e.time);
     const ai        = generateAiAnalysis(e);
     const hasActual = e.actual != null && String(e.actual).trim() !== '';
     const status    = hasActual ? 'released' : 'scheduled';
 
     return {
       id:             generateEventId(e),
-      source:         'financialmodelingprep.com',
+      source:         'forexfactory.com',
       event_id:       null,
-      country:        e.country  ?? null,
-      currency:       e.currency ?? null,
-      title:          e.event    ?? 'Evento desconhecido',
+      country:        e.country ?? null,
+      currency:       e.country ?? null,  // FF usa o código da moeda no campo country
+      title:          e.title   ?? 'Evento desconhecido',
       datetime_utc:   utcDate.toISOString(),
       datetime_brt:   toBrtIso(utcDate),
       importance:     3,
       actual:         hasActual ? String(e.actual) : null,
-      forecast:       e.estimate != null ? String(e.estimate) : null,
-      previous:       e.previous != null ? String(e.previous) : null,
-      unit:           e.unit     ?? null,
+      forecast:       e.forecast ? String(e.forecast) : null,
+      previous:       e.previous ? String(e.previous) : null,
+      unit:           null,
       status,
       ai_analysis:    ai.analysis,
       ai_probability: ai.probability,
@@ -250,7 +251,7 @@ async function main() {
       notify_state:   null,
       raw_payload:    e,
       fetched_at:     new Date().toISOString(),
-      source_url:     'https://financialmodelingprep.com/financial-statements/economic-calendar',
+      source_url:     'https://www.forexfactory.com/calendar',
     };
   });
 
@@ -259,7 +260,7 @@ async function main() {
 
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log(`  Recebidos:  ${totalReceived}`);
-  console.log(`  Filtrados:  ${highImpact.length}`);
+  console.log(`  High impact: ${highImpact.length}`);
   console.log(`  Upsertados: ${totalUpserted}`);
   console.log(`  Duração:    ${durationMs}ms`);
   console.log(`  Status:     ✅ Sucesso`);
@@ -267,8 +268,7 @@ async function main() {
 
   await logJobToSupabase({
     status:         'success',
-    date_from:      dateFrom,
-    date_to:        dateTo,
+    source:         'forexfactory',
     total_received: totalReceived,
     total_filtered: highImpact.length,
     total_upserted: totalUpserted,
