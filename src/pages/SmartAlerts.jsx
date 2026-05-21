@@ -411,11 +411,12 @@ export default function SmartAlerts() {
     }
   }, [savedRules]); // eslint-disable-line react-hooks/exhaustive-deps
   const [prefs, setPrefs] = useState(DEFAULT_PREFS);
-  // history: estado local com dados do mock como base; Supabase sobrescreve quando disponível
-  const [history, setHistory] = useState(alertHistory);
+  // history: em modo live começa vazio (Supabase popula); em mock usa dados de exemplo locais
+  const [history, setHistory] = useState(() => IS_LIVE ? [] : alertHistory);
   useEffect(() => {
     // @ts-ignore — AlertEvent do Supabase tem shape diferente do mock; ambos são válidos em runtime
     if (alertEvents && alertEvents.length > 0) setHistory(alertEvents);
+    else if (!IS_LIVE) setHistory(alertHistory);
   }, [alertEvents]);
   const [tab, setTab] = useState('ai');
   const [categoryFilter, setCategoryFilter] = useState('all');
