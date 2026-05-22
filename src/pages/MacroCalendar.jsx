@@ -507,7 +507,7 @@ function InvestingEventCardV2({ event }) {
   const isPast    = eventTime < now;
   const hasActual = event.actual != null && event.actual !== '';
 
-  const borderColor = hasActual ? '#10b981' : isPast ? '#1e2d45' : '#3b82f6';
+  const borderColor = hasActual ? '#10b981' : isPast ? '#1e2d45' : event.importance === 3 ? '#3b82f6' : '#f59e0b';
   const dirColor    = event.ai_direction === 'up' ? '#10b981' : event.ai_direction === 'down' ? '#ef4444' : '#f59e0b';
   const dirArrow    = event.ai_direction === 'up' ? '↑' : event.ai_direction === 'down' ? '↓' : '↔';
   const prob        = event.ai_probability != null ? `${Math.round(event.ai_probability * 100)}%` : '';
@@ -537,8 +537,8 @@ function InvestingEventCardV2({ event }) {
         <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start', marginBottom: 6, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 12, fontWeight: 700, color: isPast ? '#64748b' : '#e2e8f0', flex: 1, minWidth: 0 }}>{event.title}</span>
           <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-            <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: 'rgba(59,130,246,0.1)', color: '#60a5fa', border: '1px solid rgba(59,130,246,0.2)', fontWeight: 700, whiteSpace: 'nowrap' }}>
-              {event.currency ?? '—'} ★★★
+            <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: event.importance === 3 ? 'rgba(59,130,246,0.1)' : 'rgba(245,158,11,0.08)', color: event.importance === 3 ? '#60a5fa' : '#f59e0b', border: `1px solid ${event.importance === 3 ? 'rgba(59,130,246,0.2)' : 'rgba(245,158,11,0.2)'}`, fontWeight: 700, whiteSpace: 'nowrap' }}>
+              {event.currency ?? '—'} {event.importance === 3 ? '★★★' : '★★'}
             </span>
             {hasActual
               ? <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: 'rgba(16,185,129,0.1)', color: '#10b981', border: '1px solid rgba(16,185,129,0.2)', fontWeight: 700 }}>✓ Real</span>
@@ -766,7 +766,7 @@ function InvestingCalendarSection() {
 
           {/* Rodapé */}
           <div style={{ marginTop: 14, padding: '8px 12px', borderRadius: 6, background: 'rgba(59,130,246,0.04)', border: '1px solid rgba(59,130,246,0.1)', fontSize: 9, color: '#334155' }}>
-            Fonte: ForexFactory (faireconomy.media) · Apenas eventos High Impact · Horários em BRT (UTC-3) · Coleta automática a cada 30min
+            Fonte: ForexFactory (faireconomy.media) · <span style={{ color: '#60a5fa' }}>★★★ High</span> e <span style={{ color: '#f59e0b' }}>★★ Medium</span> Impact · Horários em BRT (UTC-3) · Coleta automática a cada 30min
           </div>
         </>
       )}
@@ -981,7 +981,7 @@ export default function MacroCalendar() {
             <div style={{ background: '#0d1421', border: '1px solid #162032', borderRadius: 12, padding: '14px 16px' }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: '#e2e8f0', marginBottom: 8 }}>ℹ️ Sobre esta seção</div>
               <div style={{ fontSize: 9, color: '#64748b', lineHeight: 1.8 }}>
-                <div style={{ marginBottom: 6 }}>Exibe eventos macroeconômicos de <strong style={{ color: '#94a3b8' }}>alta importância (★★★)</strong> coletados do Investing.com.</div>
+                <div style={{ marginBottom: 6 }}>Exibe eventos macroeconômicos de <strong style={{ color: '#60a5fa' }}>alta (★★★)</strong> e <strong style={{ color: '#f59e0b' }}>média (★★)</strong> importância via ForexFactory.</div>
                 <div style={{ marginBottom: 6 }}>O GitHub Action roda a cada <strong style={{ color: '#94a3b8' }}>30 minutos</strong> nos dias úteis durante o horário de mercado US.</div>
                 <div>A análise AI é gerada automaticamente com base no tipo de evento e na comparação previsão vs anterior.</div>
               </div>

@@ -23,7 +23,7 @@ export interface InvestingCalendarEvent {
   title:        string;
   datetime_utc: string;
   datetime_brt: string | null;
-  importance:   3;
+  importance:   2 | 3;
   actual:       string | null;
   forecast:     string | null;
   previous:     string | null;
@@ -58,7 +58,7 @@ const InvestingEventSchema = z.object({
   title:          z.string(),
   datetime_utc:   z.string(),
   datetime_brt:   z.string().nullable().optional().transform(v => v ?? null),
-  importance:     z.literal(3).default(3),
+  importance:     z.union([z.literal(2), z.literal(3)]).default(3),
   actual:         z.string().nullable().optional().transform(v => v ?? null),
   forecast:       z.string().nullable().optional().transform(v => v ?? null),
   previous:       z.string().nullable().optional().transform(v => v ?? null),
