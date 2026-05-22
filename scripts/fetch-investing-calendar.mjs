@@ -250,35 +250,42 @@ async function main() {
     );
   }
 
-  // Deduplicar por ID (feeds podem sobrepor dias)
+  // Deduplicar por ID — incluir High (★★★) e Medium (★★) para cobertura diária
+  // Low impact é excluído pois gera ruído sem relevância para BTC
   const seen = new Set();
-  const highImpact = [];
+  const filteredEvents = [];
   for (const e of allEvents) {
-    if (e.impact !== 'High') continue;
+    if (e.impact !== 'High' && e.impact !== 'Medium') continue;
     try {
       const id = generateEventId(e);
       if (seen.has(id)) continue;
       seen.add(id);
-      highImpact.push(e);
+      filteredEvents.push(e);
     } catch (err) {
       console.warn(`  [ff] ID geração falhou para "${e.title}" @ "${e.date}" "${e.time}": ${err.message}`);
     }
   }
 
-  console.log(`  High impact (únicos):                ${highImpact.length}`);
+  const highCount   = filteredEvents.filter(e => e.impact === 'High').length;
+  const mediumCount = filteredEvents.filter(e => e.impact === 'Medium').length;
+  console.log(`  High impact (únicos):                ${highCount}`);
+  console.log(`  Medium impact (únicos):              ${mediumCount}`);
+  console.log(`  Total filtrados (High+Medium):       ${filteredEvents.length}`);
 
-  if (highImpact.length === 0) {
-    console.warn('  Aviso: nenhum evento High impact no período.');
+  if (filteredEvents.length === 0) {
+    console.warn('  Aviso: nenhum evento High ou Medium impact no período.');
   }
 
   const rows = [];
-  for (const e of highImpact) {
+  for (const e of filteredEvents) {
     try {
       const utcDate   = parseToUtc(e.date, e.time);
       const ai        = generateAiAnalysis(e);
       const hasActual = e.actual != null && String(e.actual).trim() !== '';
       // ForexFactory não inclui 'actual' — usar tempo como proxy para status
       const status    = hasActual ? 'released' : utcDate < new Date() ? 'released' : 'scheduled';
+      // High=3 (★★★), Medium=2 (★★)
+      const importance = e.impact === 'High' ? 3 : 2;
 
       rows.push({
       id:             generateEventId(e),
@@ -289,7 +296,7 @@ async function main() {
       title:          e.title   ?? 'Evento desconhecido',
       datetime_utc:   utcDate.toISOString(),
       datetime_brt:   toBrtIso(utcDate),
-      importance:     3,
+      importance,
       actual:         hasActual ? String(e.actual) : null,
       forecast:       e.forecast ? String(e.forecast) : null,
       previous:       e.previous ? String(e.previous) : null,
@@ -313,7 +320,7 @@ async function main() {
 
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log(`  Recebidos:  ${totalReceived}`);
-  console.log(`  High impact: ${highImpact.length}`);
+  console.log(`  High+Medium: ${filteredEvents.length}`);
   console.log(`  Upsertados: ${totalUpserted}`);
   console.log(`  Duração:    ${durationMs}ms`);
   console.log(`  Status:     ✅ Sucesso`);
@@ -323,7 +330,7 @@ async function main() {
     status:         'success',
     source:         'forexfactory',
     total_received: totalReceived,
-    total_filtered: highImpact.length,
+    total_filtered: filteredEvents.length,
     total_upserted: totalUpserted,
     duration_ms:    durationMs,
   });
