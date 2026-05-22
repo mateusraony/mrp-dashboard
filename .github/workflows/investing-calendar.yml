@@ -2,8 +2,10 @@ name: Fetch Economic Calendar (ForexFactory)
 
 on:
   schedule:
-    # A cada 30 min nos dias úteis no horário de mercado US (11:00-22:00 UTC = 08:00-19:00 ET)
-    - cron: '*/30 11-21 * * 1-5'
+    # A cada 30 min nos dias úteis no horário de mercado US/EU (08:00-22:00 UTC)
+    - cron: '*/30 8-21 * * 1-5'
+    # Checks noturnos: 00:00 e 03:00 UTC (21:00 e 00:00 BRT) para usuários fora do horário de mercado
+    - cron: '0 0,3 * * 1-6'
   workflow_dispatch:
     inputs:
       date_override:
