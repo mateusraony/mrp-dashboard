@@ -1,14 +1,14 @@
-name: Investing.com Event Notifications
+name: Notify Economic Calendar Events
 
 on:
   schedule:
-    # A cada 10 min nos dias úteis no horário de mercado (11:00-22:00 UTC)
-    - cron: '*/10 11-22 * * 1-5'
-  workflow_dispatch:
+    # A cada 5 min no horário de mercado (08:00-22:00 UTC) para notificações pré/pós evento
+    - cron: '*/5 8-21 * * 1-5'
+  workflow_dispatch: {}
 
 jobs:
   notify:
-    name: Send Pre/Post Event Notifications
+    name: Send Event Notifications
     runs-on: ubuntu-latest
     timeout-minutes: 5
 
@@ -16,7 +16,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
       - run: npm ci
       - name: Send Pre/Post Event Notifications
