@@ -129,7 +129,7 @@ export async function fetchInvestingCalendarEvents(): Promise<InvestingCalendarE
     throw new Error(`Schema inválido em economic_calendar_events: ${parsed.error.message}`);
   }
 
-  return (parsed.data as InvestingCalendarEvent[]).filter(e => e.importance >= 2);
+  return (parsed.data as InvestingCalendarEvent[]).filter(e => e.importance === 3);
 }
 
 // ─── fetchInvestingCalendarMeta ───────────────────────────────────────────────
