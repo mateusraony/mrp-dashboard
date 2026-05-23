@@ -1,0 +1,28 @@
+name: Fetch Actual Values (FRED)
+
+on:
+  schedule:
+    # A cada hora nos dias úteis, das 08:00 às 22:00 UTC
+    - cron: '0 8-22 * * 1-5'
+  workflow_dispatch: {}
+
+jobs:
+  fetch:
+    name: Fill Actual Values from FRED
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - name: Fetch Actual Values from FRED API
+        run: node scripts/fetch-actual-values.mjs
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
