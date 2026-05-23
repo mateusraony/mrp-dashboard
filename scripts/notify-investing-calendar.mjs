@@ -59,6 +59,7 @@ function buildPreEventMessage(event) {
     ``,
     `🤖 AI: ${direction} (${prob}) — ${event.ai_analysis ?? ''}`,
     `━━━━━━━━━━━━━━━━━━━━`,
+    `🔗 https://www.forexfactory.com/calendar`,
     `CryptoWatch Intelligence`,
   ].join('\n');
 }
@@ -77,6 +78,7 @@ function buildPostEventMessage(event) {
     ``,
     `🤖 Análise AI: ${event.ai_analysis ?? ''}`,
     `━━━━━━━━━━━━━━━━━━━━`,
+    `🔗 https://www.forexfactory.com/calendar`,
     `CryptoWatch`,
   ].join('\n');
 }
@@ -112,15 +114,15 @@ function supabaseHeaders() {
 }
 
 /**
- * Busca eventos próximos (±20 min da janela atual) e recém-liberados (com actual, últimas 2h).
+ * Busca eventos próximos (±40 min da janela atual) e recém-liberados (com actual, últimas 2h).
  */
 async function fetchUpcomingEvents() {
   const now    = new Date();
   const from   = new Date(now.getTime() - 10 * 60 * 1000).toISOString();  // -10 min
-  const to     = new Date(now.getTime() + 20 * 60 * 1000).toISOString();  // +20 min
+  const to     = new Date(now.getTime() + 40 * 60 * 1000).toISOString();  // +40 min
   const from2h = new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString(); // -2h para pós-evento
 
-  // Pré-eventos: próximos 20 min, sem notify_state (ou pending)
+  // Pré-eventos: próximos 40 min, sem notify_state (ou pending)
   const preUrl = `${SUPABASE_URL}/rest/v1/economic_calendar_events`
     + `?datetime_utc=gte.${from}&datetime_utc=lte.${to}`
     + `&notify_state=is.null`
@@ -133,15 +135,24 @@ async function fetchUpcomingEvents() {
     + `&notify_state=in.(pre_sent,pending)`
     + `&order=datetime_utc.asc`;
 
-  const [preRes, postRes] = await Promise.all([
-    fetch(preUrl, { headers: supabaseHeaders() }),
-    fetch(postUrl, { headers: supabaseHeaders() }),
+  // Pós-eventos "perdidos": past events with actual, notify_state IS NULL
+  const postMissedUrl = `${SUPABASE_URL}/rest/v1/economic_calendar_events`
+    + `?datetime_utc=gte.${from2h}&datetime_utc=lt.${now.toISOString()}`
+    + `&actual=not.is.null`
+    + `&notify_state=is.null`
+    + `&order=datetime_utc.asc`;
+
+  const [preRes, postRes, postMissedRes] = await Promise.all([
+    fetch(preUrl,        { headers: supabaseHeaders() }),
+    fetch(postUrl,       { headers: supabaseHeaders() }),
+    fetch(postMissedUrl, { headers: supabaseHeaders() }),
   ]);
 
-  const preEvents  = preRes.ok  ? await preRes.json()  : [];
-  const postEvents = postRes.ok ? await postRes.json() : [];
+  const preEvents        = preRes.ok        ? await preRes.json()        : [];
+  const postEvents       = postRes.ok       ? await postRes.json()       : [];
+  const postMissedEvents = postMissedRes.ok ? await postMissedRes.json() : [];
 
-  return { preEvents, postEvents };
+  return { preEvents, postEvents: [...postEvents, ...postMissedEvents] };
 }
 
 /**
@@ -188,8 +199,8 @@ async function main() {
   for (const event of preEvents) {
     const minutesUntil = (new Date(event.datetime_utc).getTime() - Date.now()) / 60_000;
 
-    // Só notifica se estiver entre 5 e 16 min do evento
-    if (minutesUntil < 5 || minutesUntil > 16) continue;
+    // Só notifica se estiver entre 5 e 35 min do evento
+    if (minutesUntil < 5 || minutesUntil > 35) continue;
 
     console.log(`  [PRÉ] ${event.title} — em ${minutesUntil.toFixed(1)}min`);
 
