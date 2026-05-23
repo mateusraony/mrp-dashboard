@@ -250,12 +250,28 @@ async function main() {
   }, {});
   console.log('  [debug] Eventos por impacto:', JSON.stringify(byImpact));
 
-  // Deduplicar por ID — High Impact (★★★) e Medium Impact (★★)
-  // O feed JSON usa 'High' e 'Medium'; o site oficial pode mostrar alguns Medium como relevantes
+  // Eventos que são sempre críticos independente do que o feed classifica.
+  // O feed ForexFactory usa escala mais restrita que Investing.com:
+  // PMI Flash, Retail Sales, Consumer Sentiment chegam como 'Medium' no JSON
+  // mas são considerados High Impact pelos mercados e pelo Investing.com.
+  const FORCE_HIGH = [
+    /pmi.*flash|flash.*pmi|manufacturing.*pmi|services.*pmi|composite.*pmi/i,
+    /s[&e]?p global.*pmi|markit.*pmi/i,
+    /retail.?sales/i,
+    /consumer.?sentiment|michigan.*sentiment|umich/i,
+    /new.?home.?sales|existing.?home.?sales|pending.?home/i,
+    /consumer.?confidence/i,
+  ];
+
+  const isForceHigh = (e) =>
+    e.impact === 'High' ||
+    (e.impact === 'Medium' && FORCE_HIGH.some(re => re.test(e.title ?? '')));
+
+  // Deduplicar por ID — High Impact + eventos críticos que o feed classifica como Medium
   const seen = new Set();
   const filteredEvents = [];
   for (const e of allEvents) {
-    if (e.impact !== 'High' && e.impact !== 'Medium') continue;
+    if (!isForceHigh(e)) continue;
     try {
       const id = generateEventId(e);
       if (seen.has(id)) continue;
@@ -270,11 +286,11 @@ async function main() {
   const mediumImpact = filteredEvents.filter(e => e.impact === 'Medium');
 
   console.log(`  High impact (únicos):                ${highImpact.length}`);
-  console.log(`  Medium impact (únicos):              ${mediumImpact.length}`);
+  console.log(`  Críticos com impact=Medium (únicos): ${mediumImpact.length}`);
 
   // Log de todos os eventos para verificação
   if (filteredEvents.length > 0) {
-    console.log('  [verify] Eventos High + Medium encontrados:');
+    console.log('  [verify] Eventos críticos encontrados:');
     filteredEvents.forEach(e => {
       const utc = parseToUtc(e.date, e.time);
       const tag = e.impact === 'High' ? 'HIGH  ' : 'MEDIUM';
@@ -293,7 +309,9 @@ async function main() {
       const ai        = generateAiAnalysis(e);
       const hasActual = e.actual != null && String(e.actual).trim() !== '';
       const status    = hasActual ? 'released' : utcDate < new Date() ? 'released' : 'scheduled';
-      const importance = e.impact === 'High' ? 3 : 2;
+      // Todos os eventos filtrados são tratados como importance=3 (críticos)
+      // pois os Medium incluídos foram selecionados pela lista FORCE_HIGH
+      const importance = 3;
 
       rows.push({
       id:             generateEventId(e),
