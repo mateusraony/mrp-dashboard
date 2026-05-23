@@ -551,8 +551,16 @@ function InvestingEventCardV2({ event }) {
 
         {/* Actual / Previsão / Anterior */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 5, marginBottom: 6 }}>
+          <div style={{ background: '#070B14', borderRadius: 4, padding: '4px 7px' }}>
+            <div style={{ fontSize: 7, color: '#334155', marginBottom: 1, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Real</div>
+            {hasActual
+              ? <div style={{ fontSize: 11, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', color: compColor }}>{event.actual}</div>
+              : isPast
+                ? <div title="ForexFactory (fonte gratuita) não disponibiliza valores reais no feed JSON. Clique em ForexFactory ↗ para ver." style={{ fontSize: 10, fontWeight: 700, color: '#475569', cursor: 'help', letterSpacing: '-0.02em' }}>ver ↗</div>
+                : <div style={{ fontSize: 11, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', color: '#334155' }}>—</div>
+            }
+          </div>
           {[
-            { label: 'Real',     value: event.actual,   color: hasActual ? compColor : '#334155' },
             { label: 'Previsão', value: event.forecast, color: '#94a3b8' },
             { label: 'Anterior', value: event.previous, color: '#64748b' },
           ].map(({ label, value, color }) => (
@@ -617,7 +625,7 @@ function InvestingCalendarSection() {
   const pastReleased = useMemo(() =>
     filtered.filter(e => new Date(e.datetime_utc) < now)
              .sort((a, b) => b.datetime_utc.localeCompare(a.datetime_utc))
-             .slice(0, 15),
+             .slice(0, 50),
     [filtered],
   );
 
@@ -777,8 +785,9 @@ function InvestingCalendarSection() {
           )}
 
           {/* Rodapé */}
-          <div style={{ marginTop: 14, padding: '8px 12px', borderRadius: 6, background: 'rgba(59,130,246,0.04)', border: '1px solid rgba(59,130,246,0.1)', fontSize: 9, color: '#334155' }}>
-            Fonte: ForexFactory (faireconomy.media) · Apenas eventos High Impact ★★★ · Horários em BRT (UTC-3) · Coleta automática a cada 30min
+          <div style={{ marginTop: 14, padding: '8px 12px', borderRadius: 6, background: 'rgba(59,130,246,0.04)', border: '1px solid rgba(59,130,246,0.1)', fontSize: 9, color: '#334155', lineHeight: 1.7 }}>
+            Fonte: ForexFactory (faireconomy.media) · Apenas eventos High Impact ★★★ · Horários em BRT (UTC-3) · Coleta automática a cada 30min<br/>
+            <span style={{ color: '#3b82f660' }}>⚠ A fonte gratuita não disponibiliza valores reais (actual) no feed JSON — clique em "ForexFactory ↗" em cada card para ver o resultado publicado.</span>
           </div>
         </>
       )}
