@@ -625,7 +625,7 @@ function InvestingCalendarSection() {
   const pastReleased = useMemo(() =>
     filtered.filter(e => new Date(e.datetime_utc) < now)
              .sort((a, b) => b.datetime_utc.localeCompare(a.datetime_utc))
-             .slice(0, 50),
+             .slice(0, 100),
     [filtered],
   );
 
@@ -765,7 +765,7 @@ function InvestingCalendarSection() {
             <div style={{ marginTop: 4 }}>
               <button onClick={() => setShowPast(p => !p)} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 0', marginBottom: showPast ? 10 : 0 }}>
                 <span style={{ fontSize: 9, color: '#475569', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-                  📋 Eventos desta semana ({pastReleased.length})
+                  📋 Eventos das últimas 2 semanas ({pastReleased.length})
                 </span>
                 <span style={{ fontSize: 9, color: '#334155', marginLeft: 'auto' }}>{showPast ? '▲ recolher' : '▼ expandir'}</span>
               </button>

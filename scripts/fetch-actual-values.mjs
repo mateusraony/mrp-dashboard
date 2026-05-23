@@ -28,6 +28,9 @@ const SERIES_MAP = [
   { currency: 'USD', title: /unemployment.?claims/i,
     series: 'ICSA', transform: 'raw_k' },                    // initial claims
 
+  { currency: 'USD', title: /unemployment.?rate/i,
+    series: 'UNRATE', transform: 'direct_pct' },             // US unemployment rate %
+
   { currency: 'USD', title: /nonfarm.?payroll|non.?farm|^nfp/i,
     series: 'PAYEMS', transform: 'mom_abs_k' },              // NFP net change
 
@@ -49,17 +52,27 @@ const SERIES_MAP = [
   { currency: 'USD', title: /\bgdp\b.*q\/q/i,
     series: 'A191RL1Q225SBEA', transform: 'direct_pct' },    // GDP q/q %
 
-  { currency: 'USD', title: /\bpce\b.*price.*m\/m/i,
-    series: 'CPALTT01USM657N', transform: 'direct_pct' },    // PCE proxy via CPI m/m
+  { currency: 'USD', title: /\bpce\b.*m\/m/i,
+    series: 'PCEPI', transform: 'mom_pct' },                 // PCE Price Index nível → m/m
 
   { currency: 'USD', title: /jolts|job.?opening/i,
     series: 'JTSJOL', transform: 'raw_k' },                  // JOLTS em milhares
 
   { currency: 'USD', title: /ism.?manufacturing|manufacturing.?pmi/i,
-    series: 'NAPM', transform: 'direct' },                   // ISM Manufacturing
+    series: 'NAPM', transform: 'direct' },                   // ISM Manufacturing PMI
 
-  { currency: 'USD', title: /ism.?services|services.?pmi|non.?manufacturing/i,
-    series: 'NMFCI', transform: 'direct' },                  // ISM Services
+  { currency: 'USD', title: /durable.?goods/i,
+    series: 'DGORDER', transform: 'mom_pct' },               // Durable Goods Orders m/m
+
+  // ── EUR ────────────────────────────────────────────────────────────────────
+  { currency: 'EUR', title: /\bcpi\b.*y\/y/i,
+    series: 'CPALTT01EZM659N', transform: 'direct_pct' },    // Eurozone CPI y/y %
+
+  { currency: 'EUR', title: /\bcpi\b.*m\/m/i,
+    series: 'CPALTT01EZM657N', transform: 'direct_pct' },    // Eurozone CPI m/m %
+
+  { currency: 'EUR', title: /gdp.*q\/q/i,
+    series: 'CLVMNACSCAB1GQEZ', transform: 'mom_pct' },      // Eurozone GDP q/q
 
   // ── GBP ────────────────────────────────────────────────────────────────────
   { currency: 'GBP', title: /\bcpi\b.*y\/y/i,
@@ -67,6 +80,9 @@ const SERIES_MAP = [
 
   { currency: 'GBP', title: /\bcpi\b.*m\/m/i,
     series: 'CPALTT01GBM657N', transform: 'direct_pct' },    // UK CPI m/m %
+
+  { currency: 'GBP', title: /unemployment.?rate/i,
+    series: 'LRHUTTTTGBM156S', transform: 'direct_pct' },    // UK unemployment rate %
 
   { currency: 'GBP', title: /claimant.?count/i,
     series: 'ICCLAIMGBRNSA', transform: 'mom_abs_k' },       // UK claimant count change

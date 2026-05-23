@@ -4,8 +4,10 @@ on:
   schedule:
     # A cada 30 min nos dias úteis no horário de mercado US/EU (08:00-22:00 UTC)
     - cron: '*/30 8-21 * * 1-5'
-    # Checks noturnos: 00:00 e 03:00 UTC (21:00 e 00:00 BRT) para usuários fora do horário de mercado
-    - cron: '0 0,3 * * 1-6'
+    # Checks noturnos: 00:00 e 03:00 UTC (21:00 e 00:00 BRT)
+    - cron: '0 0,3 * * 1-7'
+    # Fim de semana: a cada 3h para capturar próxima semana conforme o feed atualiza
+    - cron: '0 6,9,12,15,18,21 * * 0,6'
   workflow_dispatch:
     inputs:
       date_override:
