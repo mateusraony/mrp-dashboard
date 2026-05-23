@@ -242,16 +242,14 @@ async function main() {
   const totalReceived = allEvents.length;
   console.log(`  Total recebido (todas importâncias): ${totalReceived}`);
 
-  // Log dos primeiros 3 eventos para diagnóstico de formato
-  if (allEvents.length > 0) {
-    console.log('  [debug] Amostra de eventos (primeiros 3):');
-    allEvents.slice(0, 3).forEach(e =>
-      console.log(`    date="${e.date}" time="${e.time}" impact="${e.impact}" title="${e.title}"`)
-    );
-  }
+  // Log breakdown de impacto para verificação com site oficial
+  const byImpact = allEvents.reduce((acc, e) => {
+    acc[e.impact ?? 'Unknown'] = (acc[e.impact ?? 'Unknown'] || 0) + 1;
+    return acc;
+  }, {});
+  console.log('  [debug] Eventos por impacto:', JSON.stringify(byImpact));
 
   // Deduplicar por ID — apenas High Impact (★★★)
-  // Medium e Low são excluídos pois geram ruído sem relevância para BTC
   const seen = new Set();
   const highImpact = [];
   for (const e of allEvents) {
@@ -267,6 +265,15 @@ async function main() {
   }
 
   console.log(`  High impact (únicos):                ${highImpact.length}`);
+
+  // Log completo de todos os eventos High para verificação de dados
+  if (highImpact.length > 0) {
+    console.log('  [verify] Eventos High Impact encontrados:');
+    highImpact.forEach(e => {
+      const utc = parseToUtc(e.date, e.time);
+      console.log(`    [HIGH] ${utc.toISOString().slice(0,16)}Z ${(e.country??'??').padEnd(3)} | ${e.title.padEnd(45)} | prev="${e.previous??'-'}" fcst="${e.forecast??'-'}" actual="${e.actual??'-'}"`);
+    });
+  }
 
   if (highImpact.length === 0) {
     console.warn('  Aviso: nenhum evento High impact no período.');
