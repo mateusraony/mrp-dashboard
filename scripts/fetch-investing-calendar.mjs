@@ -250,44 +250,50 @@ async function main() {
   }, {});
   console.log('  [debug] Eventos por impacto:', JSON.stringify(byImpact));
 
-  // Deduplicar por ID — apenas High Impact (★★★)
+  // Deduplicar por ID — High Impact (★★★) e Medium Impact (★★)
+  // O feed JSON usa 'High' e 'Medium'; o site oficial pode mostrar alguns Medium como relevantes
   const seen = new Set();
-  const highImpact = [];
+  const filteredEvents = [];
   for (const e of allEvents) {
-    if (e.impact !== 'High') continue;
+    if (e.impact !== 'High' && e.impact !== 'Medium') continue;
     try {
       const id = generateEventId(e);
       if (seen.has(id)) continue;
       seen.add(id);
-      highImpact.push(e);
+      filteredEvents.push(e);
     } catch (err) {
       console.warn(`  [ff] ID geração falhou para "${e.title}" @ "${e.date}" "${e.time}": ${err.message}`);
     }
   }
 
-  console.log(`  High impact (únicos):                ${highImpact.length}`);
+  const highImpact   = filteredEvents.filter(e => e.impact === 'High');
+  const mediumImpact = filteredEvents.filter(e => e.impact === 'Medium');
 
-  // Log completo de todos os eventos High para verificação de dados
-  if (highImpact.length > 0) {
-    console.log('  [verify] Eventos High Impact encontrados:');
-    highImpact.forEach(e => {
+  console.log(`  High impact (únicos):                ${highImpact.length}`);
+  console.log(`  Medium impact (únicos):              ${mediumImpact.length}`);
+
+  // Log de todos os eventos para verificação
+  if (filteredEvents.length > 0) {
+    console.log('  [verify] Eventos High + Medium encontrados:');
+    filteredEvents.forEach(e => {
       const utc = parseToUtc(e.date, e.time);
-      console.log(`    [HIGH] ${utc.toISOString().slice(0,16)}Z ${(e.country??'??').padEnd(3)} | ${e.title.padEnd(45)} | prev="${e.previous??'-'}" fcst="${e.forecast??'-'}" actual="${e.actual??'-'}"`);
+      const tag = e.impact === 'High' ? 'HIGH  ' : 'MEDIUM';
+      console.log(`    [${tag}] ${utc.toISOString().slice(0,16)}Z ${(e.country??'??').padEnd(3)} | ${e.title.padEnd(45)} | prev="${e.previous??'-'}" fcst="${e.forecast??'-'}" actual="${e.actual??'-'}"`);
     });
   }
 
-  if (highImpact.length === 0) {
-    console.warn('  Aviso: nenhum evento High impact no período.');
+  if (filteredEvents.length === 0) {
+    console.warn('  Aviso: nenhum evento High ou Medium no período.');
   }
 
   const rows = [];
-  for (const e of highImpact) {
+  for (const e of filteredEvents) {
     try {
       const utcDate   = parseToUtc(e.date, e.time);
       const ai        = generateAiAnalysis(e);
       const hasActual = e.actual != null && String(e.actual).trim() !== '';
-      // ForexFactory não inclui 'actual' — usar tempo como proxy para status
       const status    = hasActual ? 'released' : utcDate < new Date() ? 'released' : 'scheduled';
+      const importance = e.impact === 'High' ? 3 : 2;
 
       rows.push({
       id:             generateEventId(e),
@@ -298,7 +304,7 @@ async function main() {
       title:          e.title   ?? 'Evento desconhecido',
       datetime_utc:   utcDate.toISOString(),
       datetime_brt:   toBrtIso(utcDate),
-      importance:     3,
+      importance,
       actual:         hasActual ? String(e.actual) : null,
       forecast:       e.forecast ? String(e.forecast) : null,
       previous:       e.previous ? String(e.previous) : null,
@@ -321,9 +327,10 @@ async function main() {
   const durationMs    = Date.now() - startTime;
 
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  console.log(`  Recebidos:  ${totalReceived}`);
-  console.log(`  High impact: ${highImpact.length}`);
-  console.log(`  Upsertados: ${totalUpserted}`);
+  console.log(`  Recebidos:   ${totalReceived}`);
+  console.log(`  High:        ${highImpact.length}`);
+  console.log(`  Medium:      ${mediumImpact.length}`);
+  console.log(`  Upsertados:  ${totalUpserted}`);
   console.log(`  Duração:    ${durationMs}ms`);
   console.log(`  Status:     ✅ Sucesso`);
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
@@ -332,7 +339,9 @@ async function main() {
     status:         'success',
     source:         'forexfactory',
     total_received: totalReceived,
-    total_filtered: highImpact.length,
+    total_high:     highImpact.length,
+    total_medium:   mediumImpact.length,
+    total_filtered: filteredEvents.length,
     total_upserted: totalUpserted,
     duration_ms:    durationMs,
   });

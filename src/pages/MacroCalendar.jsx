@@ -411,8 +411,8 @@ function InvestingEventCard({ event }) {
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 4, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 13 }}>{flag}</span>
-            <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 3, background: 'rgba(59,130,246,0.1)', color: '#60a5fa', border: '1px solid rgba(59,130,246,0.2)', fontWeight: 700 }}>
-              {event.currency ?? '—'} ★★★
+            <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 3, background: event.importance === 3 ? 'rgba(59,130,246,0.1)' : 'rgba(245,158,11,0.08)', color: event.importance === 3 ? '#60a5fa' : '#f59e0b', border: `1px solid ${event.importance === 3 ? 'rgba(59,130,246,0.2)' : 'rgba(245,158,11,0.2)'}`, fontWeight: 700 }}>
+              {event.currency ?? '—'} {event.importance === 3 ? '★★★' : '★★'}
             </span>
             {hasActual ? (
               <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 3, background: 'rgba(16,185,129,0.1)', color: '#10b981', border: '1px solid rgba(16,185,129,0.2)', fontWeight: 700 }}>
@@ -537,8 +537,8 @@ function InvestingEventCardV2({ event }) {
         <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start', marginBottom: 6, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 12, fontWeight: 700, color: isPast ? '#64748b' : '#e2e8f0', flex: 1, minWidth: 0 }}>{event.title}</span>
           <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-            <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: 'rgba(59,130,246,0.1)', color: '#60a5fa', border: '1px solid rgba(59,130,246,0.2)', fontWeight: 700, whiteSpace: 'nowrap' }}>
-              {event.currency ?? '—'} ★★★
+            <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: event.importance === 3 ? 'rgba(59,130,246,0.1)' : 'rgba(245,158,11,0.08)', color: event.importance === 3 ? '#60a5fa' : '#f59e0b', border: `1px solid ${event.importance === 3 ? 'rgba(59,130,246,0.2)' : 'rgba(245,158,11,0.2)'}`, fontWeight: 700, whiteSpace: 'nowrap' }}>
+              {event.currency ?? '—'} {event.importance === 3 ? '★★★' : '★★'}
             </span>
             {hasActual
               ? <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: 'rgba(16,185,129,0.1)', color: '#10b981', border: '1px solid rgba(16,185,129,0.2)', fontWeight: 700 }}>✓ Real</span>
@@ -753,7 +753,7 @@ function InvestingCalendarSection() {
                   ? <>
                       ⬇ Nenhum evento High Impact agendado para os próximos dias.<br/>
                       <span style={{ fontSize: 9, color: '#334155' }}>
-                        O ForexFactory não possui eventos ★★★ listados para a próxima semana neste momento. Próximos grandes eventos macro (CPI, NFP, FOMC) geralmente ocorrem na 1ª–2ª semana do mês.
+                        O ForexFactory não possui eventos ★★+ listados para a próxima semana neste momento. Próximos grandes eventos macro (CPI, NFP, FOMC) geralmente ocorrem na 1ª–2ª semana do mês.
                       </span>
                     </>
                   : 'Nenhum evento High Impact no período. O cron atualiza a cada 30 min nos dias úteis.'}
@@ -786,7 +786,7 @@ function InvestingCalendarSection() {
 
           {/* Rodapé */}
           <div style={{ marginTop: 14, padding: '8px 12px', borderRadius: 6, background: 'rgba(59,130,246,0.04)', border: '1px solid rgba(59,130,246,0.1)', fontSize: 9, color: '#334155', lineHeight: 1.7 }}>
-            Fonte: ForexFactory (faireconomy.media) · Apenas eventos High Impact ★★★ · Horários em BRT (UTC-3) · Coleta automática a cada 30min<br/>
+            Fonte: ForexFactory (faireconomy.media) · Eventos High ★★★ e Medium ★★ Impact · Horários em BRT (UTC-3) · Coleta automática a cada 30min<br/>
             <span style={{ color: '#3b82f660' }}>⚠ A fonte gratuita não disponibiliza valores reais (actual) no feed JSON — clique em "ForexFactory ↗" em cada card para ver o resultado publicado.</span>
           </div>
         </>
@@ -796,7 +796,7 @@ function InvestingCalendarSection() {
 }
 
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
-const TABS = ['Agenda', 'Investing.com ★★★', 'Surpresa', 'Volatilidade', 'Alertas'];
+const TABS = ['Agenda', 'Investing.com ★★+', 'Surpresa', 'Volatilidade', 'Alertas'];
 
 export default function MacroCalendar() {
   const [tab, setTab] = useState('Agenda');
@@ -995,14 +995,14 @@ export default function MacroCalendar() {
       )}
 
       {/* TAB: Investing.com */}
-      {tab === 'Investing.com ★★★' && (
+      {tab === 'Investing.com ★★+' && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 16 }}>
           <InvestingCalendarSection />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ background: '#0d1421', border: '1px solid #162032', borderRadius: 12, padding: '14px 16px' }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: '#e2e8f0', marginBottom: 8 }}>ℹ️ Sobre esta seção</div>
               <div style={{ fontSize: 9, color: '#64748b', lineHeight: 1.8 }}>
-                <div style={{ marginBottom: 6 }}>Exibe eventos macroeconômicos de <strong style={{ color: '#60a5fa' }}>alta importância (★★★)</strong> via ForexFactory. Notificação automática via Telegram pré e pós evento.</div>
+                <div style={{ marginBottom: 6 }}>Exibe eventos macroeconômicos de <strong style={{ color: '#60a5fa' }}>alta importância ★★★</strong> e <strong style={{ color: '#f59e0b' }}>média importância ★★</strong> via ForexFactory. Notificação automática via Telegram pré e pós evento.</div>
                 <div style={{ marginBottom: 6 }}>O GitHub Action roda a cada <strong style={{ color: '#94a3b8' }}>30 minutos</strong> nos dias úteis durante o horário de mercado US.</div>
                 <div>A análise AI é gerada automaticamente com base no tipo de evento e na comparação previsão vs anterior.</div>
               </div>
