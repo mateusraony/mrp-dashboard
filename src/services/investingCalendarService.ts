@@ -102,12 +102,12 @@ function getSupabaseUrl(): string {
  */
 export async function fetchInvestingCalendarEvents(): Promise<InvestingCalendarEvent[]> {
   const supabaseUrl = getSupabaseUrl();
-  const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const cutoff = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
 
   const url = `${supabaseUrl}/rest/v1/economic_calendar_events`
     + `?datetime_utc=gte.${encodeURIComponent(cutoff)}`
     + `&order=datetime_utc.asc`
-    + `&limit=100`;
+    + `&limit=200`;
 
   const res = await apiFetch(url, { headers: buildHeaders() });
 
