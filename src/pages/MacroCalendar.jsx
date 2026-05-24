@@ -352,7 +352,7 @@ const CURRENCY_FLAG = {
   USD: '🇺🇸', EUR: '🇪🇺', GBP: '🇬🇧', JPY: '🇯🇵',
   CAD: '🇨🇦', AUD: '🇦🇺', CHF: '🇨🇭', CNY: '🇨🇳',
   NZD: '🇳🇿', SEK: '🇸🇪', NOK: '🇳🇴', MXN: '🇲🇽',
-  BRL: '🇧🇷',
+  BRL: '🇧🇷', KRW: '🇰🇷', SGD: '🇸🇬', HKD: '🇭🇰',
 };
 
 // ─── INVESTING.COM EVENT CARD ─────────────────────────────────────────────────
@@ -600,7 +600,7 @@ function InvestingCalendarSection() {
   const [currencyFilter, setCurrencyFilter] = useState('ALL');
   const [showPast, setShowPast]             = useState(true);
 
-  const { data: events = [], isLoading, isError } = useInvestingCalendar();
+  const { data: events = [], isLoading, isError, refetch, isFetching } = useInvestingCalendar();
   const { data: calState }                        = useInvestingCalendarState();
 
   const isFallback  = calState?.isFallback  ?? false;
@@ -650,7 +650,7 @@ function InvestingCalendarSection() {
 
   return (
     <div>
-      {/* Status LIVE / fallback */}
+      {/* Status LIVE / fallback + Botão de refresh */}
       <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 12, flexWrap: 'wrap' }}>
         {isFallback ? (
           <span style={{ fontSize: 9, padding: '3px 9px', borderRadius: 4, background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.25)', color: '#f59e0b', fontWeight: 700 }}>
@@ -658,11 +658,18 @@ function InvestingCalendarSection() {
           </span>
         ) : !isLoading && !noData ? (
           <span style={{ fontSize: 9, padding: '3px 9px', borderRadius: 4, background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', color: '#10b981', fontWeight: 700 }}>
-            ● LIVE: ForexFactory
+            ● LIVE: ForexFactory + IBGE/BCB
           </span>
         ) : null}
         {lastUpdatedBrt && <span style={{ fontSize: 9, color: '#334155' }}>Atualizado: {lastUpdatedBrt}</span>}
         {debugError && <span style={{ fontSize: 9, color: '#ef444460', cursor: 'help' }} title={debugError}>⚠ {debugError.slice(0, 50)}</span>}
+        <button
+          onClick={() => refetch()}
+          disabled={isFetching}
+          style={{ marginLeft: 'auto', padding: '4px 10px', borderRadius: 5, border: '1px solid rgba(59,130,246,0.3)', background: isFetching ? '#0a1018' : 'rgba(59,130,246,0.08)', color: isFetching ? '#334155' : '#60a5fa', fontSize: 9, fontWeight: 700, cursor: isFetching ? 'default' : 'pointer' }}
+        >
+          {isFetching ? '↻ Atualizando…' : '↻ Atualizar'}
+        </button>
       </div>
 
       {/* Loading */}
@@ -712,7 +719,7 @@ function InvestingCalendarSection() {
 
           {/* Filtros por moeda */}
           <div style={{ display: 'flex', gap: 4, marginBottom: 16, flexWrap: 'wrap' }}>
-            {['USD', 'EUR', 'GBP', 'JPY', 'ALL'].map(cur => (
+            {['USD', 'EUR', 'GBP', 'JPY', 'BRL', 'NZD', 'ALL'].map(cur => (
               <button key={cur} onClick={() => setCurrencyFilter(cur)} style={{
                 padding: '4px 12px', borderRadius: 5, fontSize: 10, cursor: 'pointer',
                 fontWeight: currencyFilter === cur ? 700 : 500,
