@@ -1,0 +1,45 @@
+name: Economic Calendar — Notify
+
+on:
+  # Roda a cada 5 minutos em horário de mercado US/EU (11:00–23:59 UTC = 08:00–20:59 BRT)
+  schedule:
+    - cron: '*/5 11-23 * * 1-5'
+    # Daily summary — cobertura extra nas horas de manhã BRT (10:55 UTC = 07:55 BRT)
+    - cron: '55 10 * * 1-5'
+    # Cobertura pós-mercado até meia-noite UTC
+    - cron: '*/5 0 * * 2-6'
+  # Permite disparo manual para testes
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (não envia Telegram, só loga)'
+        required: false
+        default: 'false'
+        type: choice
+        options: ['false', 'true']
+
+jobs:
+  notify:
+    name: Send Event Notifications
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run notify-economic-calendar
+        env:
+          SUPABASE_URL:               ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY:  ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          TELEGRAM_BOT_TOKEN:         ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID:           ${{ secrets.TELEGRAM_CHAT_ID }}
+          ANTHROPIC_API_KEY:          ${{ secrets.ANTHROPIC_API_KEY }}
+          CLAUDE_MODEL:               ${{ vars.CLAUDE_MODEL || 'claude-haiku-4-5-20251001' }}
+          DRY_RUN:                    ${{ inputs.dry_run || 'false' }}
+        run: node scripts/notify-economic-calendar.mjs
