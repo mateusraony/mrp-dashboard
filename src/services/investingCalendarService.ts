@@ -129,7 +129,24 @@ export async function fetchInvestingCalendarEvents(): Promise<InvestingCalendarE
     throw new Error(`Schema inválido em economic_calendar_events: ${parsed.error.message}`);
   }
 
-  return (parsed.data as InvestingCalendarEvent[]).filter(e => e.importance === 3);
+  const events = (parsed.data as InvestingCalendarEvent[]).filter(e => e.importance === 3);
+
+  // Deduplicar: se houver dois eventos da mesma moeda dentro de 30min com título similar,
+  // manter o que tiver mais dados (actual > forecast > apenas título).
+  const deduped = new Map<string, InvestingCalendarEvent>();
+  for (const e of events) {
+    const bucket = `${e.currency ?? ''}_${new Date(e.datetime_utc).toISOString().slice(0, 13)}`;
+    const existing = deduped.get(bucket);
+    if (!existing) { deduped.set(bucket, e); continue; }
+    // Preferir o evento com mais dados preenchidos
+    const score = (ev: InvestingCalendarEvent) =>
+      (ev.actual ? 4 : 0) + (ev.forecast ? 2 : 0) + (ev.previous ? 1 : 0);
+    if (score(e) > score(existing)) deduped.set(bucket, e);
+  }
+
+  return Array.from(deduped.values()).sort((a, b) =>
+    a.datetime_utc.localeCompare(b.datetime_utc)
+  );
 }
 
 // ─── fetchInvestingCalendarMeta ───────────────────────────────────────────────

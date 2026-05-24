@@ -1,0 +1,32 @@
+name: Fetch Economic Calendar (Finnhub)
+
+on:
+  schedule:
+    # A cada 30 min nos dias úteis no horário de mercado (08:00-22:00 UTC)
+    - cron: '*/30 8-21 * * 1-5'
+    # Checks noturnos e fim de semana
+    - cron: '0 0,3 * * 1-7'
+    # Fim de semana: a cada 3h para capturar próxima semana
+    - cron: '0 6,9,12,15,18,21 * * 0,6'
+  workflow_dispatch: {}
+
+jobs:
+  fetch:
+    name: Fetch & Store Events (Finnhub)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - name: Fetch Economic Calendar via Finnhub
+        run: node scripts/fetch-finnhub-calendar.mjs
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
