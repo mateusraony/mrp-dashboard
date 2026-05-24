@@ -669,19 +669,19 @@ function InvestingCalendarSection() {
       {isLoading && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px', background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.15)', borderRadius: 10 }}>
           <div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid #1e2d45', borderTopColor: '#3b82f6', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
-          <span style={{ fontSize: 12, color: '#475569' }}>Buscando eventos do Investing.com…</span>
+          <span style={{ fontSize: 12, color: '#475569' }}>Buscando calendário econômico…</span>
         </div>
       )}
 
       {/* Sem dados (tabela não criada ou GitHub Action ainda não rodou) */}
       {noData && !isError && (
         <div style={{ padding: '20px 18px', borderRadius: 10, background: 'rgba(59,130,246,0.04)', border: '1px solid rgba(59,130,246,0.12)', fontSize: 11, color: '#475569', lineHeight: 1.8 }}>
-          <div style={{ fontWeight: 700, color: '#60a5fa', marginBottom: 8 }}>📅 Dados do Investing.com não disponíveis ainda</div>
+          <div style={{ fontWeight: 700, color: '#60a5fa', marginBottom: 8 }}>📅 Calendário econômico não disponível ainda</div>
           <div>
             O GitHub Action <code style={{ color: '#94a3b8', background: '#0a1018', padding: '1px 5px', borderRadius: 3 }}>fetch-investing-calendar</code> ainda não executou ou a migração Supabase está pendente.
           </div>
           <div style={{ marginTop: 8, fontSize: 9, color: '#334155' }}>
-            Para ativar: configure os secrets <code style={{ color: '#64748b' }}>SUPABASE_URL</code> e <code style={{ color: '#64748b' }}>SUPABASE_SERVICE_ROLE_KEY</code> no GitHub, depois acesse <strong>Actions → "Fetch Investing.com Calendar" → Run workflow</strong>.
+            Para ativar: configure os secrets <code style={{ color: '#64748b' }}>SUPABASE_URL</code> e <code style={{ color: '#64748b' }}>SUPABASE_SERVICE_ROLE_KEY</code> no GitHub, depois acesse <strong>Actions → "Fetch Economic Calendar" → Run workflow</strong>.
           </div>
         </div>
       )}
@@ -689,7 +689,7 @@ function InvestingCalendarSection() {
       {/* Erro de rede/API */}
       {isError && !isLoading && (
         <div style={{ padding: '12px 14px', borderRadius: 8, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)', fontSize: 11, color: '#ef4444' }}>
-          ⚠ Falha ao buscar eventos do Investing.com. Verifique o Debug Panel para detalhes.
+          ⚠ Falha ao buscar eventos do calendário econômico. Verifique o Debug Panel para detalhes.
         </div>
       )}
 
@@ -796,7 +796,7 @@ function InvestingCalendarSection() {
 }
 
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
-const TABS = ['Agenda', 'Investing.com ★★★', 'Surpresa', 'Volatilidade', 'Alertas'];
+const TABS = ['Agenda', 'Calendário Econômico ★★★', 'Surpresa', 'Volatilidade', 'Alertas'];
 
 export default function MacroCalendar() {
   const [tab, setTab] = useState('Agenda');
@@ -994,17 +994,20 @@ export default function MacroCalendar() {
         </div>
       )}
 
-      {/* TAB: Investing.com */}
-      {tab === 'Investing.com ★★★' && (
+      {/* TAB: Calendário Econômico */}
+      {tab === 'Calendário Econômico ★★★' && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 16 }}>
           <InvestingCalendarSection />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ background: '#0d1421', border: '1px solid #162032', borderRadius: 12, padding: '14px 16px' }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: '#e2e8f0', marginBottom: 8 }}>ℹ️ Sobre esta seção</div>
               <div style={{ fontSize: 9, color: '#64748b', lineHeight: 1.8 }}>
-                <div style={{ marginBottom: 6 }}>Exibe eventos macroeconômicos <strong style={{ color: '#60a5fa' }}>críticos ★★★</strong> via ForexFactory — inclui PMI Flash, Retail Sales e outros eventos que o feed classifica como Medium mas são críticos para os mercados. Notificação automática via Telegram pré e pós evento.</div>
-                <div style={{ marginBottom: 6 }}>O GitHub Action roda a cada <strong style={{ color: '#94a3b8' }}>30 minutos</strong> nos dias úteis durante o horário de mercado US.</div>
-                <div>A análise AI é gerada automaticamente com base no tipo de evento e na comparação previsão vs anterior.</div>
+                <div style={{ marginBottom: 6 }}>Eventos macroeconômicos <strong style={{ color: '#60a5fa' }}>críticos ★★★</strong> coletados via <strong style={{ color: '#94a3b8' }}>ForexFactory</strong> (faireconomy.media) — feed JSON gratuito, sem bloqueio de IP. Inclui PMI Flash, Retail Sales e outros eventos críticos para os mercados.</div>
+                <div style={{ marginBottom: 6 }}>O GitHub Action roda a cada <strong style={{ color: '#94a3b8' }}>30 minutos</strong> nos dias úteis durante o horário de mercado US. Alertas Telegram automáticos pré e pós evento.</div>
+                <div style={{ marginBottom: 4 }}>A análise AI é gerada com <strong style={{ color: '#94a3b8' }}>Claude</strong> (se ANTHROPIC_API_KEY configurada) ou análise rule-based local.</div>
+                <div style={{ fontSize: 8, color: '#334155', marginTop: 6, padding: '4px 6px', background: '#0a1018', borderRadius: 4, border: '1px solid #162032' }}>
+                  ⚠ <em>A fonte gratuita não disponibiliza valores reais (actual) no feed JSON automático. Valores "ver ↗" indicam dado disponível no site mas não no feed.</em>
+                </div>
               </div>
             </div>
             <div style={{ background: 'rgba(245,158,11,0.04)', border: '1px solid rgba(245,158,11,0.12)', borderRadius: 10, padding: '12px 14px' }}>

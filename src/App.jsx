@@ -99,6 +99,17 @@ const AuthenticatedApp = () => {
           }
         />
       ))}
+      {/* Alias para MacroCalendar — permite /MacroCalendario além de /MacroCalendar */}
+      {Pages.MacroCalendar && (
+        <Route
+          path="/MacroCalendario"
+          element={
+            <LayoutWrapper currentPageName="MacroCalendar">
+              <Pages.MacroCalendar />
+            </LayoutWrapper>
+          }
+        />
+      )}
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );

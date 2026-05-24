@@ -1,8 +1,12 @@
 #!/usr/bin/env node
 /**
- * notify-investing-calendar.mjs — Dispara notificações pré/pós eventos do Investing.com
+ * notify-investing-calendar.mjs — Dispara notificações pré/pós eventos via ForexFactory
+ *
+ * LEGADO: Este script foi mantido por compatibilidade com o workflow investing-calendar-notify.yml.
+ * Para novas funcionalidades (daily summary, Claude AI, anti-dup robusto), use:
+ *   scripts/notify-economic-calendar.mjs
+ *
  * Env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, TELEGRAM_BOT_TOKEN (opcional), TELEGRAM_CHAT_ID (opcional)
- * Uso: node scripts/notify-investing-calendar.mjs
  */
 
 const SUPABASE_URL             = process.env.SUPABASE_URL;
