@@ -96,25 +96,28 @@ function getSupabaseUrl(): string {
 // ─── fetchInvestingCalendarEvents ─────────────────────────────────────────────
 
 /**
- * Busca eventos do Investing.com do Supabase (última semana + próximos 7 dias).
- * Apenas importância 3 — o filtro é feito no script de coleta.
- * Ordenado por datetime_utc ASC. Máximo 50 eventos.
+ * Busca eventos econômicos do Supabase (últimas 3 semanas + próximas 3 semanas).
+ * Fontes: ForexFactory (USD/EUR/GBP/JPY/NZD/CNY) + IBGE/BCB (BRL).
+ * Inclui importance 2 e 3 — filtro de importância na query.
+ * Ordenado por datetime_utc ASC. Máximo 300 eventos.
  */
 export async function fetchInvestingCalendarEvents(): Promise<InvestingCalendarEvent[]> {
   const supabaseUrl = getSupabaseUrl();
-  const cutoff = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
+  // 21 dias atrás → 21 dias à frente garante cobertura de 3 semanas passadas + 3 futuras
+  const cutoff = new Date(Date.now() - 21 * 24 * 60 * 60 * 1000).toISOString();
+  const ceiling = new Date(Date.now() + 21 * 24 * 60 * 60 * 1000).toISOString();
 
   const url = `${supabaseUrl}/rest/v1/economic_calendar_events`
     + `?datetime_utc=gte.${encodeURIComponent(cutoff)}`
+    + `&datetime_utc=lte.${encodeURIComponent(ceiling)}`
+    + `&importance=gte.2`
     + `&order=datetime_utc.asc`
-    + `&limit=200`;
+    + `&limit=300`;
 
   const res = await apiFetch(url, { headers: buildHeaders() });
 
   if (!res.ok) {
     const text = await res.text().catch(() => '');
-    // 404 = tabela ainda não criada (migração pendente ou GitHub Action ainda não rodou)
-    // Retornar [] em vez de lançar erro para mostrar estado informativo ao usuário
     if (res.status === 404) {
       logWarn('economic_calendar_events: tabela não encontrada (404) — migração pendente', null, 'investing-calendar');
       return [];
@@ -129,7 +132,8 @@ export async function fetchInvestingCalendarEvents(): Promise<InvestingCalendarE
     throw new Error(`Schema inválido em economic_calendar_events: ${parsed.error.message}`);
   }
 
-  return (parsed.data as InvestingCalendarEvent[]).filter(e => e.importance === 3);
+  // Retorna importance >= 2: inclui eventos ★★ e ★★★ de todas as fontes
+  return (parsed.data as InvestingCalendarEvent[]).filter(e => e.importance >= 2);
 }
 
 // ─── fetchInvestingCalendarMeta ───────────────────────────────────────────────

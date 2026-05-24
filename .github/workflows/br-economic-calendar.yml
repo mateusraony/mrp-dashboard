@@ -1,0 +1,32 @@
+name: Fetch BR Economic Calendar (IBGE · BCB · FGV · MTE)
+
+on:
+  schedule:
+    # Diariamente às 06:00 UTC (03:00 BRT) — antes da abertura do mercado BR
+    - cron: '0 6 * * *'
+    # Segunda-feira extra às 03:00 UTC (00:00 BRT) para atualizar semana nova
+    - cron: '0 3 * * 1'
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Motivo do disparo manual (opcional)'
+        required: false
+
+jobs:
+  fetch-br:
+    name: Fetch & Store Brazilian Events
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Fetch BR Economic Calendar
+        run: node scripts/fetch-br-economic-calendar.mjs
+        env:
+          SUPABASE_URL:              ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
