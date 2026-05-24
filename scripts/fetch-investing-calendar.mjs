@@ -250,24 +250,42 @@ async function main() {
   }, {});
   console.log('  [debug] Eventos por impacto:', JSON.stringify(byImpact));
 
-  // Eventos que são sempre críticos independente do que o feed classifica.
-  // O feed ForexFactory usa escala mais restrita que Investing.com:
-  // PMI Flash, Retail Sales, Consumer Sentiment chegam como 'Medium' no JSON
-  // mas são considerados High Impact pelos mercados e pelo Investing.com.
+  // Eventos sempre críticos independente do rating do feed.
+  // ForexFactory finaliza ratings de impact='High' só perto da semana —
+  // eventos de terça/quarta ainda aparecem como 'Medium' ou 'Low' no feed de sábado.
   const FORCE_HIGH = [
+    // PMI
     /pmi.*flash|flash.*pmi|manufacturing.*pmi|services.*pmi|composite.*pmi/i,
-    /s[&e]?p global.*pmi|markit.*pmi/i,
+    /s[&e]?p global.*pmi|markit.*pmi|caixin.*pmi/i,
+    // Decisões de taxa de juros (qualquer BC)
+    /official.*cash.*rate|cash.*rate|rate.*decision|interest.*rate.*decision/i,
+    /monetary.*policy.*statement|monetary.*policy.*decision/i,
+    /rbnz|reserve.*bank.*nz|reserve.*bank.*australia|rba.*rate/i,
+    // Conferências de imprensa de BCs
+    /press.*conference|conference.*press/i,
+    /ecb|european.*central.*bank/i,
+    // PCE
+    /\bpce\b|personal.*consumption.*expenditure/i,
+    // Dados de consumo
     /retail.?sales/i,
     /consumer.?sentiment|michigan.*sentiment|umich/i,
-    /new.?home.?sales|existing.?home.?sales|pending.?home/i,
     /consumer.?confidence/i,
+    /new.?home.?sales|existing.?home.?sales|pending.?home/i,
+  ];
+
+  // Padrões críticos que devem ser incluídos mesmo com impact='Low'
+  const FORCE_ANY_IMPACT = [
+    /official.*cash.*rate|cash.*rate|rate.*decision|interest.*rate.*decision/i,
+    /press.*conference/i,
+    /\bpce\b/i,
   ];
 
   const isForceHigh = (e) =>
     e.impact === 'High' ||
-    (e.impact === 'Medium' && FORCE_HIGH.some(re => re.test(e.title ?? '')));
+    (e.impact !== 'Low' && FORCE_HIGH.some(re => re.test(e.title ?? ''))) ||
+    FORCE_ANY_IMPACT.some(re => re.test(e.title ?? ''));
 
-  // Deduplicar por ID — High Impact + eventos críticos que o feed classifica como Medium
+  // Deduplicar por ID — High + Medium/Low críticos
   const seen = new Set();
   const filteredEvents = [];
   for (const e of allEvents) {
