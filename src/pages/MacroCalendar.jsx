@@ -15,6 +15,8 @@ import { useMacroCalendar, useMacroAlertPreferences, useToggleMacroAlert } from 
 import { useEventVolatility } from '@/hooks/useEventVolatility';
 import { IS_LIVE } from '@/lib/env';
 import { useInvestingCalendar, useInvestingCalendarState } from '@/hooks/useInvestingCalendar';
+import { fetchBrlPendingEvents, updateBrlEventActual } from '@/services/investingCalendarService';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 const AGENCY_COLOR = {
   BLS: '#3b82f6', Fed: '#a78bfa', BEA: '#10b981', ISM: '#f59e0b', default: '#64748b',
@@ -802,8 +804,116 @@ function InvestingCalendarSection() {
   );
 }
 
+// ─── BRL ACTUAL SECTION ───────────────────────────────────────────────────────
+function BrlActualSection() {
+  const qc = useQueryClient();
+  const [form, setForm]       = useState({});   // { [id]: { actual, forecast, previous } }
+  const [saved, setSaved]     = useState({});   // { [id]: true }
+  const [errMap, setErrMap]   = useState({});
+
+  const { data: events = [], isLoading, refetch, isFetching } = useQuery({
+    queryKey: ['brl-pending-actuals'],
+    queryFn:  fetchBrlPendingEvents,
+    staleTime: 60_000,
+  });
+
+  const mutation = useMutation({
+    mutationFn: ({ id, fields }) => updateBrlEventActual(id, fields),
+    onSuccess: (_, { id }) => {
+      setSaved(s => ({ ...s, [id]: true }));
+      setErrMap(e => { const n = { ...e }; delete n[id]; return n; });
+      setForm(f => { const n = { ...f }; delete n[id]; return n; });
+      qc.invalidateQueries({ queryKey: ['investing-calendar'] });
+      qc.invalidateQueries({ queryKey: ['brl-pending-actuals'] });
+    },
+    onError: (err, { id }) => {
+      setErrMap(e => ({ ...e, [id]: err.message }));
+    },
+  });
+
+  const field = (id, key) => form[id]?.[key] ?? '';
+  const set   = (id, key, val) => setForm(f => ({ ...f, [id]: { ...f[id], [key]: val } }));
+
+  function formatBrt(utc) {
+    const d = new Date(new Date(utc).getTime() - 3 * 60 * 60 * 1000);
+    return d.toISOString().slice(0, 16).replace('T', ' ') + ' BRT';
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>📝 Inserir Resultado BRL</div>
+          <div style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>Eventos BRL passados sem valor real — preencha para disparar alerta Telegram pós-release.</div>
+        </div>
+        <button onClick={() => refetch()} disabled={isFetching}
+          style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid #162032', background: 'transparent', color: '#60a5fa', fontSize: 10, cursor: 'pointer' }}>
+          {isFetching ? '↻ Carregando…' : '↻ Atualizar'}
+        </button>
+      </div>
+
+      {isLoading && <div style={{ color: '#64748b', fontSize: 11, padding: 16, textAlign: 'center' }}>Carregando eventos pendentes…</div>}
+
+      {!isLoading && events.length === 0 && (
+        <div style={{ color: '#10b981', fontSize: 11, padding: 20, textAlign: 'center', background: 'rgba(16,185,129,0.06)', borderRadius: 8, border: '1px solid rgba(16,185,129,0.15)' }}>
+          ✅ Todos os eventos BRL passados têm resultado preenchido.
+        </div>
+      )}
+
+      {events.map(ev => (
+        <div key={ev.id} style={{ background: '#0d1421', border: `1px solid ${saved[ev.id] ? 'rgba(16,185,129,0.3)' : '#162032'}`, borderRadius: 10, padding: '12px 14px' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8, gap: 8 }}>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#e2e8f0' }}>{ev.title}</div>
+              <div style={{ fontSize: 9, color: '#64748b', marginTop: 2 }}>
+                {formatBrt(ev.datetime_utc)} · {ev.source} · {'★'.repeat(ev.importance ?? 2)}
+              </div>
+            </div>
+            <span style={{ fontSize: 9, padding: '2px 7px', borderRadius: 4, background: 'rgba(245,158,11,0.1)', color: '#f59e0b', whiteSpace: 'nowrap' }}>
+              Sem resultado
+            </span>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 8 }}>
+            {[['actual', 'Resultado real *', true], ['forecast', 'Previsão', false], ['previous', 'Anterior', false]].map(([key, label, required]) => (
+              <div key={key}>
+                <div style={{ fontSize: 9, color: '#94a3b8', marginBottom: 3 }}>{label}</div>
+                <input
+                  type="text"
+                  placeholder={key === 'actual' ? 'ex: 0.52%' : 'opcional'}
+                  value={field(ev.id, key)}
+                  onChange={e => set(ev.id, key, e.target.value)}
+                  style={{ width: '100%', padding: '5px 8px', borderRadius: 5, border: `1px solid ${required && !field(ev.id, 'actual') ? '#ef444440' : '#1e3048'}`, background: '#070B14', color: '#e2e8f0', fontSize: 11, boxSizing: 'border-box', outline: 'none', fontFamily: 'JetBrains Mono, monospace' }}
+                />
+              </div>
+            ))}
+          </div>
+
+          {errMap[ev.id] && (
+            <div style={{ fontSize: 9, color: '#ef4444', marginBottom: 6 }}>⚠ {errMap[ev.id]}</div>
+          )}
+          {saved[ev.id] && (
+            <div style={{ fontSize: 9, color: '#10b981', marginBottom: 6 }}>✅ Salvo! Alerta Telegram será disparado no próximo ciclo (5 min).</div>
+          )}
+
+          <button
+            onClick={() => {
+              const actual = field(ev.id, 'actual').trim();
+              if (!actual) { setErrMap(e => ({ ...e, [ev.id]: 'Resultado real é obrigatório.' })); return; }
+              mutation.mutate({ id: ev.id, fields: { actual, forecast: field(ev.id, 'forecast').trim() || undefined, previous: field(ev.id, 'previous').trim() || undefined } });
+            }}
+            disabled={mutation.isPending}
+            style={{ padding: '6px 16px', borderRadius: 6, border: 'none', background: '#3b82f6', color: '#fff', fontSize: 10, fontWeight: 700, cursor: 'pointer', opacity: mutation.isPending ? 0.6 : 1 }}>
+            {mutation.isPending ? 'Salvando…' : '💾 Salvar resultado'}
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
-const TABS = ['Agenda', 'Calendário Econômico ★★★', 'Surpresa', 'Volatilidade', 'Alertas'];
+const TABS = ['Agenda', 'Calendário Econômico ★★★', 'Surpresa', 'Volatilidade', 'Alertas', '📝 Resultado BRL'];
 
 export default function MacroCalendar() {
   const [tab, setTab] = useState('Agenda');
@@ -1201,6 +1311,13 @@ CryptoWatch Intelligence`}
               </pre>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* TAB: Resultado BRL */}
+      {tab === '📝 Resultado BRL' && (
+        <div style={{ maxWidth: 700 }}>
+          <BrlActualSection />
         </div>
       )}
     </div>
