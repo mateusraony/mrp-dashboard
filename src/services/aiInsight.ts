@@ -47,6 +47,20 @@ export interface AiInsightPayload {
     stablecoinDelta7dPct?: number;
     opCount?: number;
     gradeACount?: number;
+    calendarEventsToday?: Array<{
+      title:     string;
+      actual:    string | null;
+      forecast:  string | null;
+      currency:  string;
+      surprise?: string;
+    }>;
+    calendarUpcoming?: Array<{
+      title:        string;
+      datetime_brt: string | null;
+      forecast:     string | null;
+      previous:     string | null;
+      currency:     string;
+    }>;
   };
 }
 
