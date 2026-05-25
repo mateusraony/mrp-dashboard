@@ -24,6 +24,7 @@ const TELEGRAM_BOT_TOKEN        = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID          = process.env.TELEGRAM_CHAT_ID;
 const ANTHROPIC_API_KEY         = process.env.ANTHROPIC_API_KEY;
 const CLAUDE_MODEL              = process.env.CLAUDE_MODEL ?? 'claude-haiku-4-5-20251001';
+const DRY_RUN                   = process.env.DRY_RUN === 'true';
 
 // ─── Utilitários de data BRT ──────────────────────────────────────────────────
 
@@ -517,6 +518,10 @@ async function fetchRecentlyReleasedEvents() {
 // ─── Telegram ─────────────────────────────────────────────────────────────────
 
 async function sendTelegramMessage(text) {
+  if (DRY_RUN) {
+    console.log(`[telegram] DRY_RUN — mensagem não enviada:\n${text.slice(0, 200)}…`);
+    return { message_id: `dry_run_${Date.now()}` };
+  }
   if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
     console.log('[telegram] Não configurado — mensagem não enviada.');
     return null;
