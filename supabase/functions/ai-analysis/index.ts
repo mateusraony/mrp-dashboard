@@ -12,7 +12,7 @@
  * Requer: ANTHROPIC_API_KEY no Supabase Dashboard → Settings → Edge Functions → Secrets
  */
 
-import Anthropic from 'npm:@anthropic-ai/sdk';
+// Sem dependência de npm — chamada direta à API Anthropic via fetch (mais estável no Deno)
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin':  '*',
@@ -228,6 +228,7 @@ Deno.serve(async (req) => {
   }
 
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
+  console.log('[ai-analysis] apiKey present:', !!apiKey, 'length:', apiKey?.length ?? 0);
   if (!apiKey) {
     return new Response(
       JSON.stringify({ error: 'ANTHROPIC_API_KEY não configurada no Supabase Secrets' }),
@@ -253,23 +254,44 @@ Deno.serve(async (req) => {
     );
   }
 
-  const client = new Anthropic({ apiKey });
-
-  const message = await client.messages.create({
-    model: 'claude-haiku-4-5',
-    max_tokens: payload.page === 'macro_calendar' ? 480 : 320,
-    system: [
-      {
-        type: 'text',
-        text: 'Você é um analista de mercado cripto institucional sênior. Gere análises concretas, objetivas e acionáveis em português brasileiro. Máximo 3 frases diretas. Sem disclaimers. Sem prefácio. Sem marcadores. Foco em Bitcoin. Comece diretamente com a análise.',
-        cache_control: { type: 'ephemeral' },
+  console.log('[ai-analysis] calling Anthropic, page:', payload.page, 'model: claude-haiku-4-5-20251001');
+  let anthropicRes: Response;
+  try {
+    anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type':      'application/json',
+        'x-api-key':         apiKey,
+        'anthropic-version': '2023-06-01',
       },
-    ],
-    messages: [{ role: 'user', content: buildUserMessage(payload) }],
-  });
+      body: JSON.stringify({
+        model:      'claude-haiku-4-5-20251001',
+        max_tokens: payload.page === 'macro_calendar' ? 480 : 320,
+        system:     'Você é um analista de mercado cripto institucional sênior. Gere análises concretas, objetivas e acionáveis em português brasileiro. Máximo 3 frases diretas. Sem disclaimers. Sem prefácio. Sem marcadores. Foco em Bitcoin. Comece diretamente com a análise.',
+        messages:   [{ role: 'user', content: buildUserMessage(payload) }],
+      }),
+    });
+  } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    return new Response(
+      JSON.stringify({ error: `Erro de rede ao chamar Anthropic: ${errMsg}` }),
+      { status: 502, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } },
+    );
+  }
 
-  const textBlock = message.content.find(b => b.type === 'text');
-  const insight   = textBlock?.type === 'text' ? textBlock.text.trim() : '';
+  if (!anthropicRes.ok) {
+    const errBody = await anthropicRes.text().catch(() => '');
+    console.error('[ai-analysis] Anthropic error:', anthropicRes.status, errBody);
+    return new Response(
+      JSON.stringify({ error: `Anthropic API ${anthropicRes.status}: ${errBody}` }),
+      { status: 502, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } },
+    );
+  }
+
+  const anthropicData = await anthropicRes.json() as {
+    content: Array<{ type: string; text?: string }>;
+  };
+  const insight = anthropicData.content.find(b => b.type === 'text')?.text?.trim() ?? '';
 
   return new Response(
     JSON.stringify({ insight }),
