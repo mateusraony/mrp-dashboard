@@ -93,6 +93,67 @@ function getSupabaseUrl(): string {
   return url;
 }
 
+// ─── updateBrlEventActual ─────────────────────────────────────────────────────
+
+/**
+ * Atualiza actual/forecast/previous de um evento BRL no Supabase.
+ * Usa anon key — requer RLS policy ecal_update_brl_actual.
+ */
+export async function updateBrlEventActual(
+  id: string,
+  fields: { actual: string; forecast?: string; previous?: string },
+): Promise<void> {
+  const supabaseUrl = getSupabaseUrl();
+  const url = `${supabaseUrl}/rest/v1/economic_calendar_events?id=eq.${encodeURIComponent(id)}`;
+
+  const body: Record<string, string> = {
+    actual: fields.actual,
+    status: 'released',
+  };
+  if (fields.forecast) body.forecast = fields.forecast;
+  if (fields.previous) body.previous = fields.previous;
+
+  const res = await apiFetch(url, {
+    method: 'PATCH',
+    headers: {
+      ...buildHeaders(),
+      'Content-Type': 'application/json',
+      'Prefer': 'return=minimal',
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Falha ao atualizar evento BRL: ${res.status} — ${text}`);
+  }
+}
+
+// ─── fetchBrlPendingEvents ────────────────────────────────────────────────────
+
+/**
+ * Busca eventos BRL passados sem actual — para o painel "Inserir Resultado".
+ */
+export async function fetchBrlPendingEvents(): Promise<InvestingCalendarEvent[]> {
+  const supabaseUrl = getSupabaseUrl();
+  const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  const now    = new Date().toISOString();
+
+  const url = `${supabaseUrl}/rest/v1/economic_calendar_events`
+    + `?currency=eq.BRL`
+    + `&datetime_utc=gte.${encodeURIComponent(cutoff)}`
+    + `&datetime_utc=lte.${encodeURIComponent(now)}`
+    + `&actual=is.null`
+    + `&order=datetime_utc.desc`
+    + `&limit=50`;
+
+  const res = await apiFetch(url, { headers: buildHeaders() });
+  if (!res.ok) return [];
+  const raw: unknown = await res.json().catch(() => []);
+  const parsed = InvestingEventsArraySchema.safeParse(raw);
+  return parsed.success ? (parsed.data as InvestingCalendarEvent[]) : [];
+}
+
 // ─── fetchInvestingCalendarEvents ─────────────────────────────────────────────
 
 /**
