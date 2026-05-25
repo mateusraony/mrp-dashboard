@@ -255,18 +255,27 @@ Deno.serve(async (req) => {
 
   const client = new Anthropic({ apiKey });
 
-  const message = await client.messages.create({
-    model: 'claude-haiku-4-5',
-    max_tokens: payload.page === 'macro_calendar' ? 480 : 320,
-    system: [
-      {
-        type: 'text',
-        text: 'Você é um analista de mercado cripto institucional sênior. Gere análises concretas, objetivas e acionáveis em português brasileiro. Máximo 3 frases diretas. Sem disclaimers. Sem prefácio. Sem marcadores. Foco em Bitcoin. Comece diretamente com a análise.',
-        cache_control: { type: 'ephemeral' },
-      },
-    ],
-    messages: [{ role: 'user', content: buildUserMessage(payload) }],
-  });
+  let message;
+  try {
+    message = await client.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: payload.page === 'macro_calendar' ? 480 : 320,
+      system: [
+        {
+          type: 'text',
+          text: 'Você é um analista de mercado cripto institucional sênior. Gere análises concretas, objetivas e acionáveis em português brasileiro. Máximo 3 frases diretas. Sem disclaimers. Sem prefácio. Sem marcadores. Foco em Bitcoin. Comece diretamente com a análise.',
+          cache_control: { type: 'ephemeral' },
+        },
+      ],
+      messages: [{ role: 'user', content: buildUserMessage(payload) }],
+    });
+  } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    return new Response(
+      JSON.stringify({ error: `Erro ao chamar Claude: ${errMsg}` }),
+      { status: 502, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } },
+    );
+  }
 
   const textBlock = message.content.find(b => b.type === 'text');
   const insight   = textBlock?.type === 'text' ? textBlock.text.trim() : '';
