@@ -818,16 +818,18 @@ function BrlActualSection() {
   });
 
   const mutation = useMutation({
-    mutationFn: ({ id, fields }) => updateBrlEventActual(id, fields),
-    onSuccess: (_, { id }) => {
+    mutationFn: (/** @type {{ id: string; fields: { actual: string; forecast?: string; previous?: string } }} */ vars) =>
+      updateBrlEventActual(vars.id, vars.fields),
+    onSuccess: (_, vars) => {
+      const id = vars.id;
       setSaved(s => ({ ...s, [id]: true }));
       setErrMap(e => { const n = { ...e }; delete n[id]; return n; });
       setForm(f => { const n = { ...f }; delete n[id]; return n; });
       qc.invalidateQueries({ queryKey: ['investing-calendar'] });
       qc.invalidateQueries({ queryKey: ['brl-pending-actuals'] });
     },
-    onError: (err, { id }) => {
-      setErrMap(e => ({ ...e, [id]: err.message }));
+    onError: (err, vars) => {
+      setErrMap(e => ({ ...e, [vars.id]: err.message }));
     },
   });
 
@@ -875,7 +877,8 @@ function BrlActualSection() {
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 8 }}>
-            {[['actual', 'Resultado real *', true], ['forecast', 'Previsão', false], ['previous', 'Anterior', false]].map(([key, label, required]) => (
+            {/** @type {Array<[string, string, boolean]>} */
+            ([['actual', 'Resultado real *', true], ['forecast', 'Previsão', false], ['previous', 'Anterior', false]]).map(([key, label, required]) => (
               <div key={key}>
                 <div style={{ fontSize: 9, color: '#94a3b8', marginBottom: 3 }}>{label}</div>
                 <input
