@@ -17,6 +17,7 @@ import { IS_LIVE } from '@/lib/env';
 import { useInvestingCalendar, useInvestingCalendarState } from '@/hooks/useInvestingCalendar';
 import { fetchBrlPendingEvents, updateBrlEventActual } from '@/services/investingCalendarService';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMacroCalendarSummary } from '@/hooks/useMacroCalendarSummary';
 
 const AGENCY_COLOR = {
   BLS: '#3b82f6', Fed: '#a78bfa', BEA: '#10b981', ISM: '#f59e0b', default: '#64748b',
@@ -597,6 +598,161 @@ function InvestingEventCardV2({ event }) {
   );
 }
 
+// ─── MACRO CALENDAR SUMMARY PANEL (AI) ────────────────────────────────────────
+function MacroCalendarSummaryPanel({ events }) {
+  const [open, setOpen]           = useState(false);
+  const [requested, setRequested] = useState(false);
+
+  const {
+    summary,
+    isLoading,
+    isError,
+    dataUpdatedAt,
+    request:  requestSummary,
+    refresh:  refreshSummary,
+  } = useMacroCalendarSummary(events);
+
+  // Calcula "gerado há Xmin" a partir de dataUpdatedAt
+  const agoLabel = dataUpdatedAt
+    ? (() => {
+        const diffMs  = Date.now() - new Date(dataUpdatedAt).getTime();
+        const diffMin = Math.round(diffMs / 60_000);
+        return diffMin <= 0 ? 'agora' : `há ${diffMin}min`;
+      })()
+    : null;
+
+  function handleToggle() {
+    setOpen(o => !o);
+    if (!requested) {
+      setRequested(true);
+      requestSummary();
+    }
+  }
+
+  // Conteúdo interno do painel
+  let panelBody;
+  if (isLoading) {
+    panelBody = (
+      <span style={{ fontSize: 11, color: '#94a3b8' }}>⟳ Gerando análise com Claude...</span>
+    );
+  } else if (isError) {
+    panelBody = (
+      <span style={{ fontSize: 11, color: '#ef4444' }}>⚠ Erro ao gerar análise. Tente novamente.</span>
+    );
+  } else if (summary) {
+    panelBody = (
+      <div style={{ fontSize: 11, color: '#e2e8f0', lineHeight: 1.8, fontFamily: 'sans-serif', whiteSpace: 'pre-wrap' }}>
+        {summary}
+      </div>
+    );
+  } else if (requested) {
+    panelBody = (
+      <span style={{ fontSize: 11, color: '#94a3b8' }}>⟳ Gerando análise com Claude...</span>
+    );
+  } else {
+    panelBody = (
+      <span style={{ fontSize: 11, color: '#475569' }}>Clique em Resumo AI para gerar análise do calendário atual.</span>
+    );
+  }
+
+  return (
+    <div style={{ marginBottom: open ? 12 : 6 }}>
+      {/* Botão ✦ Resumo AI — alinhado à direita */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: open ? 8 : 0 }}>
+        <button
+          onClick={handleToggle}
+          title="Gera análise macro com Claude — eventos de hoje + próximas 48h"
+          style={{
+            padding: '4px 10px',
+            borderRadius: 5,
+            border: `1px solid ${open ? 'rgba(59,130,246,0.5)' : 'rgba(59,130,246,0.3)'}`,
+            background: open ? 'rgba(59,130,246,0.15)' : 'rgba(59,130,246,0.08)',
+            color: open ? '#93c5fd' : '#60a5fa',
+            fontSize: 9,
+            fontWeight: 700,
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 4,
+            letterSpacing: '0.04em',
+            transition: 'background 0.15s, border-color 0.15s',
+          }}
+        >
+          ✦ Resumo AI
+        </button>
+      </div>
+
+      {/* Painel expansível */}
+      {open && (
+        <div style={{
+          marginTop: 10,
+          background: 'rgba(59,130,246,0.06)',
+          border: '1px solid rgba(59,130,246,0.2)',
+          borderLeft: '4px solid #3b82f6',
+          borderRadius: 10,
+          padding: 14,
+        }}>
+          {/* Header do painel */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: '#60a5fa', letterSpacing: '0.03em' }}>
+              ✦ Análise Macro — Claude
+            </span>
+            {agoLabel && (
+              <span style={{
+                fontSize: 9,
+                color: '#475569',
+                background: 'rgba(59,130,246,0.08)',
+                border: '1px solid rgba(59,130,246,0.15)',
+                borderRadius: 4,
+                padding: '1px 6px',
+              }}>
+                gerado {agoLabel}
+              </span>
+            )}
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+              <button
+                onClick={() => { requestSummary(); refreshSummary(); }}
+                title="Regenerar análise"
+                style={{
+                  padding: '2px 8px',
+                  borderRadius: 4,
+                  border: '1px solid rgba(59,130,246,0.25)',
+                  background: 'rgba(59,130,246,0.07)',
+                  color: '#60a5fa',
+                  fontSize: 9,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                ↻ Regenerar
+              </button>
+              <button
+                onClick={() => setOpen(false)}
+                title="Fechar painel"
+                style={{
+                  padding: '2px 8px',
+                  borderRadius: 4,
+                  border: '1px solid rgba(100,116,139,0.2)',
+                  background: 'rgba(100,116,139,0.07)',
+                  color: '#64748b',
+                  fontSize: 9,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+
+          {/* Conteúdo */}
+          {panelBody}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── INVESTING CALENDAR SECTION ───────────────────────────────────────────────
 function InvestingCalendarSection() {
   const [currencyFilter, setCurrencyFilter] = useState('ALL');
@@ -665,14 +821,18 @@ function InvestingCalendarSection() {
         ) : null}
         {lastUpdatedBrt && <span style={{ fontSize: 9, color: '#334155' }}>Atualizado: {lastUpdatedBrt}</span>}
         {debugError && <span style={{ fontSize: 9, color: '#ef444460', cursor: 'help' }} title={debugError}>⚠ {debugError.slice(0, 50)}</span>}
-        <button
-          onClick={() => refetch()}
-          disabled={isFetching}
-          style={{ marginLeft: 'auto', padding: '4px 10px', borderRadius: 5, border: '1px solid rgba(59,130,246,0.3)', background: isFetching ? '#0a1018' : 'rgba(59,130,246,0.08)', color: isFetching ? '#334155' : '#60a5fa', fontSize: 9, fontWeight: 700, cursor: isFetching ? 'default' : 'pointer' }}
-        >
-          {isFetching ? '↻ Atualizando…' : '↻ Atualizar'}
-        </button>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center' }}>
+          <button
+            onClick={() => refetch()}
+            disabled={isFetching}
+            style={{ padding: '4px 10px', borderRadius: 5, border: '1px solid rgba(59,130,246,0.3)', background: isFetching ? '#0a1018' : 'rgba(59,130,246,0.08)', color: isFetching ? '#334155' : '#60a5fa', fontSize: 9, fontWeight: 700, cursor: isFetching ? 'default' : 'pointer' }}
+          >
+            {isFetching ? '↻ Atualizando…' : '↻ Atualizar'}
+          </button>
+        </div>
       </div>
+      {/* Painel ✦ Resumo AI — ocupa largura total, abaixo da barra de status */}
+      <MacroCalendarSummaryPanel events={events} />
 
       {/* Loading */}
       {isLoading && (

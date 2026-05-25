@@ -26,6 +26,22 @@ interface ZAlert {
   direction: string;
 }
 
+interface CalendarEventToday {
+  title:    string;
+  actual:   string | null;
+  forecast: string | null;
+  currency: string;
+  surprise?: string;
+}
+
+interface CalendarEventUpcoming {
+  title:        string;
+  datetime_brt: string | null;
+  forecast:     string | null;
+  previous:     string | null;
+  currency:     string;
+}
+
 interface AiInsightContext {
   oiDeltaPct?: number;
   probLongFlush?: number;
@@ -51,6 +67,8 @@ interface AiInsightContext {
   stablecoinDelta7dPct?: number;
   opCount?: number;
   gradeACount?: number;
+  calendarEventsToday?: CalendarEventToday[];
+  calendarUpcoming?:   CalendarEventUpcoming[];
 }
 
 interface AiInsightPayload {
@@ -157,6 +175,39 @@ Síntese executiva institucional (máx 3 frases):`;
 
 Análise das oportunidades de trading identificadas (máx 3 frases):`;
 
+    case 'macro_calendar': {
+      const today = (c.calendarEventsToday ?? []);
+      const upcoming = (c.calendarUpcoming ?? []);
+
+      const todayLines = today.length > 0
+        ? today.map(e => {
+            const actualStr = e.actual != null ? e.actual : 'aguardando resultado';
+            const forecastStr = e.forecast != null ? ` (consenso: ${e.forecast})` : '';
+            const surpriseStr = e.surprise ? ` | surpresa: ${e.surprise}` : '';
+            return `  • [${e.currency}] ${e.title}: ${actualStr}${forecastStr}${surpriseStr}`;
+          }).join('\n')
+        : '  (nenhum evento liberado hoje)';
+
+      const upcomingLines = upcoming.length > 0
+        ? upcoming.map(e => {
+            const time = e.datetime_brt ?? 'horário indefinido';
+            const forecastStr = e.forecast != null ? ` | consenso: ${e.forecast}` : '';
+            const prevStr = e.previous != null ? ` | anterior: ${e.previous}` : '';
+            return `  • [${e.currency}] ${e.title} — ${time}${forecastStr}${prevStr}`;
+          }).join('\n')
+        : '  (nenhum evento agendado nas próximas 48h)';
+
+      return `Calendário macroeconômico:
+
+Liberados hoje:
+${todayLines}
+
+Próximos eventos (48h):
+${upcomingLines}
+
+Faça um resumo macro em 4-5 frases em português: o que saiu hoje e como surpreendeu (se houver), o viés macro resultante (hawkish/dovish/neutro), qual o próximo evento mais crítico e em que horário, e qual a orientação para o Bitcoin dado esse contexto. Seja honesto quando actual ainda não foi divulgado.`;
+    }
+
     // "dashboard" e qualquer página desconhecida usam o prompt padrão
     case 'dashboard':
     default:
@@ -206,7 +257,7 @@ Deno.serve(async (req) => {
 
   const message = await client.messages.create({
     model: 'claude-haiku-4-5',
-    max_tokens: 320,
+    max_tokens: payload.page === 'macro_calendar' ? 480 : 320,
     system: [
       {
         type: 'text',
