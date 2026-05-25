@@ -228,6 +228,7 @@ Deno.serve(async (req) => {
   }
 
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
+  console.log('[ai-analysis] apiKey present:', !!apiKey, 'length:', apiKey?.length ?? 0);
   if (!apiKey) {
     return new Response(
       JSON.stringify({ error: 'ANTHROPIC_API_KEY não configurada no Supabase Secrets' }),
@@ -253,6 +254,7 @@ Deno.serve(async (req) => {
     );
   }
 
+  console.log('[ai-analysis] calling Anthropic, page:', payload.page, 'model: claude-haiku-4-5-20251001');
   let anthropicRes: Response;
   try {
     anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
@@ -279,6 +281,7 @@ Deno.serve(async (req) => {
 
   if (!anthropicRes.ok) {
     const errBody = await anthropicRes.text().catch(() => '');
+    console.error('[ai-analysis] Anthropic error:', anthropicRes.status, errBody);
     return new Response(
       JSON.stringify({ error: `Anthropic API ${anthropicRes.status}: ${errBody}` }),
       { status: 502, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } },
