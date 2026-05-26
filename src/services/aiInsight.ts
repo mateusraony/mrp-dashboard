@@ -85,10 +85,14 @@ export async function fetchAiInsight(payload: AiInsightPayload): Promise<string>
   if (!res.ok) {
     const err = await res.json().catch(() => ({} as Record<string, unknown>));
     const detail = (err.error as string | undefined) ?? res.statusText;
-    // Mensagens amigáveis para erros conhecidos
     if (res.status === 401) throw new Error('Chave Anthropic inválida ou expirada. Verifique ANTHROPIC_API_KEY nos Secrets do Supabase.');
     if (res.status === 429) throw new Error('Limite de requisições Anthropic atingido. Tente novamente em alguns segundos.');
     if (res.status === 504) throw new Error('Timeout ao chamar Anthropic. Verifique conectividade da Edge Function.');
+    // Anthropic retorna 400 "credit balance too low" — nossa Edge Function mapeia para 502
+    const detailLower = detail.toLowerCase();
+    if (detailLower.includes('credit balance') || detailLower.includes('too low') || detailLower.includes('purchase credits')) {
+      throw new Error('CREDITS_EXHAUSTED');
+    }
     throw new Error(`AI insight error ${res.status}: ${detail}`);
   }
 
