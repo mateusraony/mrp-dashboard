@@ -9,7 +9,8 @@ import {
   Tooltip, ResponsiveContainer, ComposedChart, Line,
 } from 'recharts';
 import { format } from 'date-fns';
-import { useKlines, useBtcTicker } from '@/hooks/useBtcData';
+import { useKlines, useBtcTicker, useFearGreed } from '@/hooks/useBtcData';
+import { useRiskScore } from '@/hooks/useRiskScore';
 import { readModuleFlag } from '@/lib/moduleFlags';
 import { DisabledModuleBanner } from '@/components/ui/DisabledModuleBanner';
 import { computeSessionStats } from '@/utils/sessionAnalytics';
@@ -90,8 +91,11 @@ export default function SpotFlow() {
   const { data: klines }  = useKlines('1h', 168, spotEnabled);
   const { data: klines15m } = useKlines('15m', 4,  spotEnabled);  // ret_15m
   const { data: klines1d }  = useKlines('1d',  32, spotEnabled);  // ret_1w (7) + ret_1M (30)
-  const { data: ticker }  = useBtcTicker(spotEnabled);
-  const btcPrice          = ticker?.mark_price ?? 0;
+  const { data: ticker }    = useBtcTicker(spotEnabled);
+  const { data: riskData }  = useRiskScore();
+  const { data: fngData }   = useFearGreed();
+  // Fallback secundário: último close de klines quando ticker (proxy) falha
+  const btcPrice = ticker?.mark_price ?? klines?.at(-1)?.close ?? 0;
 
   // Live spot metrics derived from klines; fallback to static zeros for uncovered fields
   const liveSpot = computeSpotMetrics(klines, btcPrice);
@@ -125,13 +129,13 @@ export default function SpotFlow() {
     : null;
   const aiAnalysis = liveAnalysis ?? AI_SPOT_FALLBACK;
 
-  // Claude AI insight
+  // Claude AI insight — contexto real de risco e sentimento
   const spotPayload = liveSpot ? {
     page: 'spot_flow',
-    riskScore: 50,
-    riskRegime: 'MODERADO',
-    fearGreedValue: 50,
-    fearGreedLabel: 'Neutral',
+    riskScore:      riskData?.score ?? 50,
+    riskRegime:     riskData?.regime ?? 'MODERADO',
+    fearGreedValue: fngData?.value ?? 50,
+    fearGreedLabel: fngData?.label ?? 'Neutral',
     fundingRate: ticker?.last_funding_rate ?? 0,
     context: {
       ret1d: liveSpot.ret_1d,
@@ -172,8 +176,16 @@ export default function SpotFlow() {
         <h1 style={{ fontSize: 20, fontWeight: 800, color: '#e2e8f0', margin: 0, letterSpacing: '-0.02em' }}>
           BTC Spot Flow
         </h1>
-        <p style={{ fontSize: 12, color: '#4a5568', marginTop: 3 }}>
-          Binance Spot · BTCUSDT · Taker Flow / CVD · <ModeBadge />
+        <p style={{ fontSize: 12, color: '#4a5568', marginTop: 3, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <span>Binance Spot · BTCUSDT · Taker Flow / CVD · <ModeBadge /></span>
+          {ticker?.isFallback && ticker?.lastUpdated && (
+            <span
+              title={`Última atualização: ${new Date(ticker.lastUpdated).toLocaleString('pt-BR')}`}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 9, color: '#f59e0b', cursor: 'help' }}
+            >
+              ⚠ Cache · {new Date(ticker.lastUpdated).toLocaleDateString('pt-BR')}
+            </span>
+          )}
         </p>
       </div>
 
