@@ -255,34 +255,47 @@ Deno.serve(async (req) => {
   }
 
   const model = 'claude-haiku-4-5-20251001';
-  console.log('[ai-analysis] calling Anthropic, page:', payload.page, 'model:', model);
+  const requestBody = JSON.stringify({
+    model,
+    max_tokens: payload.page === 'macro_calendar' ? 480 : 320,
+    system:     'Você é um analista de mercado cripto institucional sênior. Gere análises concretas, objetivas e acionáveis em português brasileiro. Máximo 3 frases diretas. Sem disclaimers. Sem prefácio. Sem marcadores. Foco em Bitcoin. Comece diretamente com a análise.',
+    messages:   [{ role: 'user', content: buildUserMessage(payload) }],
+  });
 
-  let anthropicRes: Response;
-  try {
-    // Timeout explícito: Deno fetch não tem timeout por padrão.
-    // Supabase mata a function após ~30s com um 502 genérico sem log.
-    // Com AbortSignal de 12s, o erro aparece no log antes disso.
-    anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
-      method:  'POST',
-      signal:  AbortSignal.timeout(12_000),
-      headers: {
-        'Content-Type':      'application/json',
-        'x-api-key':         apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: payload.page === 'macro_calendar' ? 480 : 320,
-        system:     'Você é um analista de mercado cripto institucional sênior. Gere análises concretas, objetivas e acionáveis em português brasileiro. Máximo 3 frases diretas. Sem disclaimers. Sem prefácio. Sem marcadores. Foco em Bitcoin. Comece diretamente com a análise.',
-        messages:   [{ role: 'user', content: buildUserMessage(payload) }],
-      }),
-    });
-  } catch (err) {
-    const isTimeout = err instanceof Error && err.name === 'TimeoutError';
-    const errMsg = isTimeout ? 'timeout de 12s ao chamar Anthropic' : (err instanceof Error ? err.message : String(err));
-    console.error('[ai-analysis] fetch error:', errMsg);
+  // Retry até 3x com backoff curto: conexões ao api.anthropic.com falham
+  // intermitentemente a nível TCP/TLS a partir de IPs compartilhados do Supabase.
+  const MAX_ATTEMPTS = 3;
+  let anthropicRes: Response | null = null;
+  let lastErr = '';
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      console.log(`[ai-analysis] attempt ${attempt}/${MAX_ATTEMPTS}, page:`, payload.page);
+      anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
+        method:  'POST',
+        signal:  AbortSignal.timeout(10_000),
+        headers: {
+          'Content-Type':      'application/json',
+          'x-api-key':         apiKey,
+          'anthropic-version': '2023-06-01',
+        },
+        body: requestBody,
+      });
+      break; // sucesso — sai do loop
+    } catch (err) {
+      const isTimeout = err instanceof Error && err.name === 'TimeoutError';
+      lastErr = isTimeout ? `timeout 10s (attempt ${attempt})` : (err instanceof Error ? err.message : String(err));
+      console.error(`[ai-analysis] fetch error attempt ${attempt}:`, lastErr);
+      if (attempt < MAX_ATTEMPTS) {
+        // Backoff curto: 400ms, 800ms entre tentativas
+        await new Promise(r => setTimeout(r, 400 * attempt));
+      }
+    }
+  }
+
+  if (anthropicRes === null) {
     return new Response(
-      JSON.stringify({ error: `Erro de rede ao chamar Anthropic: ${errMsg}` }),
+      JSON.stringify({ error: `Erro de rede ao chamar Anthropic após ${MAX_ATTEMPTS} tentativas: ${lastErr}` }),
       { status: 504, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } },
     );
   }
