@@ -6,8 +6,8 @@
 import { useState } from 'react';
 import {
   RefreshCw, Package, FileCheck, ShieldAlert,
-  AlertTriangle, CheckCircle, TrendingUp, TrendingDown,
-  ArrowRight, Clock, Truck, Zap, ChevronDown, ChevronUp,
+  AlertTriangle, CheckCircle,
+  ArrowRight, Truck, Zap, ChevronDown, ChevronUp,
 } from 'lucide-react';
 import { useMrpValuation }                               from '@/hooks/useMrpValuation';
 import { useMrpReconciler, useTriggerReconciliation }    from '@/hooks/useMrpReconciler';
@@ -66,7 +66,7 @@ function ErrorBanner({ message }) {
 }
 
 // Caixa de análise do Claude — protagonista da página
-function AiBox({ text, loading }) {
+function AiBox({ text, loading = false }) {
   if (loading) return null;
   if (!text) return null;
   const isErr = text.startsWith('[Erro') || text.startsWith('[ANTHROPIC') || text.startsWith('[Análise');
@@ -189,23 +189,13 @@ function EstoqueTab() {
               </div>
               {/* Quais itens */}
               <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {d.lines.filter(l => l.current_value < l.pessimist_value && l.quantity <= (d.lines.find(x => x.sku === l.sku)?.reorder_point ?? Infinity)).slice(0, 5).map(l => (
+                {d.lines.slice(0, d.items_below_reorder).map(l => (
                   <div key={l.sku} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 10px', background: '#070B14', borderRadius: 6 }}>
                     <ArrowRight size={11} color="#ef4444" />
                     <span style={{ color: '#f1f5f9', fontSize: 12, flex: 1 }}>{l.product_name}</span>
                     <span style={{ color: '#94a3b8', fontSize: 11 }}>{N(l.quantity, 1)} {l.unit} restantes</span>
                   </div>
                 ))}
-                {/* Fallback: lista todos abaixo reorder quando a lógica acima não retorna */}
-                {d.lines.filter(l => l.current_value < l.pessimist_value && l.quantity <= (d.lines.find(x => x.sku === l.sku)?.reorder_point ?? Infinity)).length === 0 &&
-                  d.lines.slice(0, d.items_below_reorder).map(l => (
-                    <div key={l.sku} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 10px', background: '#070B14', borderRadius: 6 }}>
-                      <ArrowRight size={11} color="#ef4444" />
-                      <span style={{ color: '#f1f5f9', fontSize: 12, flex: 1 }}>{l.product_name}</span>
-                      <span style={{ color: '#94a3b8', fontSize: 11 }}>{N(l.quantity, 1)} {l.unit}</span>
-                    </div>
-                  ))
-                }
               </div>
             </Card>
           )}
