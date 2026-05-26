@@ -642,6 +642,42 @@ function MacroCalendarSummaryPanel({ events }) {
     panelBody = (
       <span style={{ fontSize: 11, color: '#94a3b8' }}>⟳ Gerando análise com Claude...</span>
     );
+  } else if (isError && error === 'CREDITS_EXHAUSTED') {
+    panelBody = (
+      <div style={{ fontSize: 11 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+          <span style={{ fontSize: 16 }}>💳</span>
+          <span style={{ fontWeight: 700, color: '#f97316' }}>Créditos Anthropic esgotados</span>
+        </div>
+        <div style={{ color: '#94a3b8', lineHeight: 1.7, marginBottom: 10 }}>
+          O saldo da conta Anthropic chegou a zero. Adicione créditos ou atualize o plano para reativar o Resumo AI.
+        </div>
+        <div style={{ color: '#64748b', fontSize: 10, marginBottom: 10 }}>
+          ℹ️ A data de renovação automática (se houver) não é retornada pela API — consulte diretamente em <strong style={{ color: '#94a3b8' }}>Plans &amp; Billing</strong>.
+        </div>
+        <a
+          href="https://console.anthropic.com/settings/billing"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 5,
+            padding: '5px 12px',
+            borderRadius: 5,
+            background: 'rgba(249,115,22,0.12)',
+            border: '1px solid rgba(249,115,22,0.35)',
+            color: '#f97316',
+            fontWeight: 700,
+            fontSize: 10,
+            textDecoration: 'none',
+            letterSpacing: '0.03em',
+          }}
+        >
+          💳 Abrir Plans &amp; Billing →
+        </a>
+      </div>
+    );
   } else if (isError) {
     panelBody = (
       <div style={{ fontSize: 11, color: '#ef4444' }}>
