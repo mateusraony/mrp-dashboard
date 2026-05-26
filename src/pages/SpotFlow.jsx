@@ -182,6 +182,19 @@ export default function SpotFlow() {
   const isStale   = klinesMeta?.isFallback || ticker?.isFallback;
   const staleDate = klinesMeta?.lastUpdated ?? ticker?.lastUpdated;
 
+  // Sessão ativa agora (UTC)
+  const utcHour = new Date().getUTCHours();
+  const activeSessionLabel = utcHour < 8 ? 'Ásia' : utcHour < 16 ? 'Europa' : 'EUA';
+  const isOverlapEuUsa     = utcHour >= 12 && utcHour < 16;
+
+  // Detecção de divergência CVD × Preço (sinal profissional)
+  const priceSignificant = Math.abs(s.ret_1d) > 0.005;
+  const divergence = priceSignificant
+    ? (s.ret_1d > 0 && s.cvd_1d < 0) ? 'bearish'
+    : (s.ret_1d < 0 && s.cvd_1d > 0) ? 'bullish'
+    : null
+    : null;
+
   // ── Veredicto geral ──────────────────────────────────────────────────────────
   const takerBuyPct = (s.taker_buy / (s.taker_buy + s.taker_sell)) * 100;
   const cvdScore    = s.cvd_1d > 0 ? 1 : s.cvd_1d < 0 ? -1 : 0;
@@ -249,6 +262,30 @@ export default function SpotFlow() {
         <div style={{ marginBottom: 16, padding: '7px 14px', borderRadius: 8, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.2)', fontSize: 10, color: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
           <span>⚠ Dados de cache — números podem estar desatualizados</span>
           <span style={{ fontFamily: 'JetBrains Mono, monospace' }}>Última atualização: {new Date(staleDate).toLocaleString('pt-BR')}</span>
+        </div>
+      )}
+
+      {/* ── ALERTA DE DIVERGÊNCIA CVD × PREÇO ───────────────────────────────────── */}
+      {divergence === 'bearish' && (
+        <div style={{ marginBottom: 16, padding: '10px 14px', borderRadius: 10, background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.3)', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+          <span style={{ fontSize: 18, lineHeight: 1 }}>⚠️</span>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#ef4444', marginBottom: 2 }}>Divergência Bearish Detectada</div>
+            <div style={{ fontSize: 10, color: '#94a3b8', lineHeight: 1.6 }}>
+              O preço subiu <strong style={{ color: '#e2e8f0' }}>{fmtPct(s.ret_1d)}</strong> nas últimas 24h, mas o CVD está <strong style={{ color: '#ef4444' }}>negativo</strong> — os compradores não são agressivos o suficiente para sustentar essa alta. Traders experientes chamam isso de "distribuição disfarçada". Pode indicar reversão.
+            </div>
+          </div>
+        </div>
+      )}
+      {divergence === 'bullish' && (
+        <div style={{ marginBottom: 16, padding: '10px 14px', borderRadius: 10, background: 'rgba(16,185,129,0.07)', border: '1px solid rgba(16,185,129,0.3)', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+          <span style={{ fontSize: 18, lineHeight: 1 }}>🔍</span>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#10b981', marginBottom: 2 }}>Divergência Bullish Detectada — Possível Acumulação</div>
+            <div style={{ fontSize: 10, color: '#94a3b8', lineHeight: 1.6 }}>
+              O preço caiu <strong style={{ color: '#e2e8f0' }}>{fmtPct(s.ret_1d)}</strong> nas últimas 24h, mas o CVD está <strong style={{ color: '#10b981' }}>positivo</strong> — alguém está comprando mesmo enquanto o preço cede. Pode indicar acumulação silenciosa por parte de grandes players. Sinal de possível reversão.
+            </div>
+          </div>
         </div>
       )}
 
@@ -375,7 +412,7 @@ export default function SpotFlow() {
       {/* ── SESSÕES DE MERCADO ───────────────────────────────────────────────────── */}
       <div style={{ marginBottom: 16 }}>
         <div style={{ marginBottom: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>
               <Tip text="O mercado cripto não fecha nunca, mas traders de regiões diferentes operam em horários distintos. Ásia opera à noite no Brasil. Europa abre de manhã. EUA domina à tarde. Saber quem comprou ou vendeu em cada sessão ajuda a entender a força do movimento.">
                 Quem Mandou Hoje? — Sessões de Mercado
@@ -384,6 +421,11 @@ export default function SpotFlow() {
             <span style={{ fontSize: 9, color: '#10b981', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 4, padding: '2px 7px', fontWeight: 700 }}>
               LIVE
             </span>
+            {isOverlapEuUsa && (
+              <span style={{ fontSize: 9, color: '#f59e0b', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 4, padding: '2px 7px', fontWeight: 700 }}>
+                ⚡ OVERLAP EU-EUA — MÁXIMA VOLATILIDADE
+              </span>
+            )}
           </div>
           <div style={{ fontSize: 10, color: '#475569' }}>Análise das últimas 48h dividida por janela geográfica · Binance 1h klines</div>
         </div>
@@ -409,7 +451,14 @@ export default function SpotFlow() {
                   {/* Header */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
                     <div>
-                      <div style={{ fontSize: 15, fontWeight: 800, color: '#e2e8f0' }}>{sess.label}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        <div style={{ fontSize: 15, fontWeight: 800, color: '#e2e8f0' }}>{sess.label}</div>
+                        {sess.label === activeSessionLabel && (
+                          <span style={{ fontSize: 8, color: '#10b981', background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.4)', borderRadius: 4, padding: '1px 6px', fontWeight: 700 }}>
+                            ● ATIVA AGORA
+                          </span>
+                        )}
+                      </div>
                       <div style={{ fontSize: 9, color: '#334155', fontFamily: 'JetBrains Mono, monospace', marginTop: 2 }}>
                         {sess.utc} UTC · {sess.brt} BRT
                       </div>
