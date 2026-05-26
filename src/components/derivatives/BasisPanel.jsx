@@ -62,6 +62,9 @@ export default function BasisPanel() {
   // Spot: usar mark_price live quando disponível
   const spotPrice = ticker?.mark_price ?? d.spot;
 
+  // Exchanges com dados mock (sem API pública confiável)
+  const mockExchanges = fundingChart.slice(3).map(e => e.exchange);
+
   return (
     <div style={{
       background: 'linear-gradient(135deg, #131e2e 0%, #111827 100%)',
@@ -174,6 +177,14 @@ export default function BasisPanel() {
       }}>
         <span style={{ color: '#10b981', fontWeight: 700 }}>Basis Signal: </span>{d.signal}
       </div>
+
+      {/* Nota de exchanges mock */}
+      {mockExchanges.length > 0 && (
+        <div style={{ marginTop: 10, padding: '6px 10px', borderRadius: 6, background: 'rgba(249,115,22,0.06)', border: '1px solid rgba(249,115,22,0.18)', fontSize: 10, color: '#78716c', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <span>🔒 {mockExchanges.join(', ')}: sem API pública confiável — dados simulados, <strong style={{ color: '#f97316' }}>não considerados na análise</strong></span>
+          <a href="https://coinglass.com/pricing" target="_blank" rel="noopener noreferrer" style={{ color: '#f97316', textDecoration: 'none', fontWeight: 700, whiteSpace: 'nowrap' }}>CoinGlass →</a>
+        </div>
+      )}
     </div>
   );
 }
