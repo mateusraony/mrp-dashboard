@@ -5,7 +5,7 @@ import { computeRuleBasedAnalysis } from '@/utils/ruleBasedAnalysis';
 import { useAiInsight } from '@/hooks/useAiInsight';
 import { IS_LIVE } from '@/lib/env';
 import {
-  AreaChart, Area, Bar, XAxis, YAxis, CartesianGrid,
+  Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, ComposedChart, Line,
 } from 'recharts';
 import { format } from 'date-fns';
