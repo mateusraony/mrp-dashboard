@@ -17,7 +17,7 @@ import {
   Newspaper, Brain,
   Zap, Bell, Bot, Briefcase, CandlestickChart,
   Settings, ChevronLeft, ChevronRight, Bitcoin,
-  MoreHorizontal, X, Database,
+  MoreHorizontal, X, Database, Factory,
 } from 'lucide-react';
 import { btcFutures } from '@/components/data/mockData';
 import DebugPanel from '@/components/ui/DebugPanel';
@@ -69,6 +69,12 @@ const NAV_GROUPS = [
       { label: 'Alertas',       icon: Bell,      page: 'SmartAlerts',   desc: 'AI · Config · Ciclo' },
       { label: 'Automações',    icon: Bot,       page: 'Automations',   desc: 'Regras · Bots · Webhooks' },
       { label: 'Portfolio',     icon: Briefcase, page: 'Portfolio',     desc: 'Greeks · VaR · Sharpe' },
+    ],
+  },
+  {
+    label: 'Supply Chain',
+    items: [
+      { label: 'Agentes Financeiros', icon: Factory, page: 'MrpFinanceAgents', desc: 'Valuation · Conciliação · Risco' },
     ],
   },
   {
