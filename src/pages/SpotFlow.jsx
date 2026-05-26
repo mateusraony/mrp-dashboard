@@ -212,6 +212,21 @@ export default function SpotFlow() {
         ))}
       </div>
 
+      {/* Banner de staleness — exibido quando dados vêm do cache Supabase */}
+      {ticker?.isFallback && ticker?.lastUpdated && (
+        <div style={{
+          marginBottom: 12, padding: '7px 12px', borderRadius: 6,
+          background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.2)',
+          fontSize: 10, color: '#f59e0b',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+        }}>
+          <span>⚠ Dados de cache — retornos e volumes podem estar desatualizados</span>
+          <span style={{ fontFamily: 'JetBrains Mono, monospace', whiteSpace: 'nowrap' }}>
+            Última atualização: {new Date(ticker.lastUpdated).toLocaleString('pt-BR')}
+          </span>
+        </div>
+      )}
+
       {/* CVD multi-período */}
       <div style={{
         background: '#111827', border: '1px solid #1e2d45',
@@ -219,7 +234,7 @@ export default function SpotFlow() {
         display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'center',
       }}>
         <div>
-          <div style={{ fontSize: 10, color: '#4a5568', marginBottom: 2 }}>CVD Intraday</div>
+          <div style={{ fontSize: 10, color: '#4a5568', marginBottom: 2 }}>CVD 4h</div>
           <div style={{ fontSize: 18, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', color: s.cvd > 0 ? '#10b981' : '#ef4444' }}>
             {s.cvd > 0 ? '+' : ''}{fmtNum(s.cvd, 0)}
           </div>
