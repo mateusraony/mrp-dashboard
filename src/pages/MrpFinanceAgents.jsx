@@ -493,9 +493,47 @@ export default function MrpFinanceAgents() {
           <Zap size={20} color="#3b82f6" />
           <h1 style={{ fontSize: 20, fontWeight: 800, color: '#f1f5f9', margin: 0 }}>Inteligência de Supply Chain</h1>
         </div>
-        <p style={{ color: '#4a6580', fontSize: 13, margin: '0 0 16px' }}>
-          Agentes AI que monitoram seu estoque, conferem suas compras e avaliam o risco dos seus fornecedores — em tempo real.
+        <p style={{ color: '#94a3b8', fontSize: 13, margin: '0 0 20px' }}>
+          Esta página usa IA para responder 3 perguntas financeiras críticas do seu negócio — automaticamente, sem planilha, sem trabalho manual.
         </p>
+
+        {/* Bloco explicativo — "o que esta página faz" */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10, marginBottom: 20 }}>
+          {[
+            {
+              emoji: '💰',
+              pergunta: 'Meu estoque está valendo o esperado?',
+              resposta: 'Calcula o valor atual do estoque e simula quanto ele valeria se os preços de insumos subissem ou caíssem.',
+              tab: 'estoque',
+            },
+            {
+              emoji: '🧾',
+              pergunta: 'Todas as compras foram pagas corretamente?',
+              resposta: 'Compara cada pedido de compra com os pagamentos realizados e sinaliza cobranças a mais, a menos ou pendentes.',
+              tab: 'compras',
+            },
+            {
+              emoji: '🏭',
+              pergunta: 'Quais fornecedores representam risco?',
+              resposta: 'Avalia cada fornecedor por pontualidade, prazo de entrega e dependência — e dá uma nota de risco 0–100.',
+              tab: 'fornecedores',
+            },
+          ].map(item => (
+            <button
+              key={item.tab}
+              onClick={() => setActiveTab(item.tab)}
+              style={{
+                background: activeTab === item.tab ? 'rgba(59,130,246,0.1)' : 'rgba(13,20,33,0.8)',
+                border: `1px solid ${activeTab === item.tab ? 'rgba(59,130,246,0.35)' : '#162032'}`,
+                borderRadius: 10, padding: '14px 16px', textAlign: 'left', cursor: 'pointer',
+              }}
+            >
+              <span style={{ fontSize: 22 }}>{item.emoji}</span>
+              <p style={{ color: '#f1f5f9', fontSize: 13, fontWeight: 700, margin: '8px 0 6px', lineHeight: 1.4 }}>{item.pergunta}</p>
+              <p style={{ color: '#4a6580', fontSize: 11, margin: 0, lineHeight: 1.5 }}>{item.resposta}</p>
+            </button>
+          ))}
+        </div>
 
         {/* Barra de status geral */}
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
