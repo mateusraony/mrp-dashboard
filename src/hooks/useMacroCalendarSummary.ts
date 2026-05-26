@@ -120,8 +120,9 @@ export function useMacroCalendarSummary(events: InvestingCalendarEvent[]) {
 
   return {
     summary:       query.data ?? null,
-    isLoading:     query.isLoading,
+    isLoading:     query.isLoading || query.isFetching,
     isError:       query.isError,
+    error:         query.error instanceof Error ? query.error.message : null,
     dataUpdatedAt: query.dataUpdatedAt,
     request,
     refresh,

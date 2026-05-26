@@ -603,10 +603,13 @@ function MacroCalendarSummaryPanel({ events }) {
   const [open, setOpen]           = useState(false);
   const [requested, setRequested] = useState(false);
 
+  const hasEvents = Array.isArray(events) && events.length > 0;
+
   const {
     summary,
     isLoading,
     isError,
+    error,
     dataUpdatedAt,
     request:  requestSummary,
     refresh:  refreshSummary,
@@ -625,19 +628,30 @@ function MacroCalendarSummaryPanel({ events }) {
     setOpen(o => !o);
     if (!requested) {
       setRequested(true);
-      requestSummary();
+      if (hasEvents) requestSummary();
     }
   }
 
   // Conteúdo interno do painel
   let panelBody;
-  if (isLoading) {
+  if (requested && !hasEvents) {
+    panelBody = (
+      <span style={{ fontSize: 11, color: '#f59e0b' }}>⚠ Nenhum evento carregado — aguarde o calendário carregar e tente novamente.</span>
+    );
+  } else if (isLoading) {
     panelBody = (
       <span style={{ fontSize: 11, color: '#94a3b8' }}>⟳ Gerando análise com Claude...</span>
     );
   } else if (isError) {
     panelBody = (
-      <span style={{ fontSize: 11, color: '#ef4444' }}>⚠ Erro ao gerar análise. Tente novamente.</span>
+      <div style={{ fontSize: 11, color: '#ef4444' }}>
+        <div>⚠ Erro ao gerar análise.</div>
+        {error && (
+          <div style={{ marginTop: 4, color: '#fca5a5', fontFamily: 'monospace', fontSize: 10, wordBreak: 'break-word' }}>
+            {error}
+          </div>
+        )}
+      </div>
     );
   } else if (summary) {
     panelBody = (
@@ -711,7 +725,7 @@ function MacroCalendarSummaryPanel({ events }) {
             )}
             <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
               <button
-                onClick={() => { requestSummary(); refreshSummary(); }}
+                onClick={() => { if (hasEvents) refreshSummary(); }}
                 title="Regenerar análise"
                 style={{
                   padding: '2px 8px',
