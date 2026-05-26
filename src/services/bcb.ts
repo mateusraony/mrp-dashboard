@@ -5,9 +5,9 @@
  * Autenticação: nenhuma — API pública gratuita
  *
  * Séries usadas:
- *   11  — SELIC overnight rate (% ao ano)
- *   433 — IPCA inflação mensal (% ao mês)
- *   1   — USDBRL taxa de câmbio (R$ por USD)
+ *   4189 — SELIC % ao ano (meta Copom, atualização diária)
+ *   433  — IPCA inflação mensal (% ao mês)
+ *   1    — USDBRL taxa de câmbio (R$ por USD)
  *
  * Regra de mock: mock APENAS quando IS_LIVE = false (DATA_MODE=mock).
  * Falha de série individual não aborta as demais (Promise.allSettled).
@@ -82,7 +82,7 @@ export async function fetchBcbData(): Promise<BcbData> {
   if (!IS_LIVE) return mockBcbData();
 
   const [selicResult, ipcaResult, usdbrlResult] = await Promise.allSettled([
-    fetchSeries(11),   // SELIC overnight
+    fetchSeries(4189), // SELIC % a.a. (meta Copom — série anualizada)
     fetchSeries(433),  // IPCA mensal
     fetchSeries(1),    // USDBRL
   ]);
