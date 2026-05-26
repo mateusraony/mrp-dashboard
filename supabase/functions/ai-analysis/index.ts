@@ -254,37 +254,51 @@ Deno.serve(async (req) => {
     );
   }
 
-  console.log('[ai-analysis] calling Anthropic, page:', payload.page, 'model: claude-haiku-4-5-20251001');
+  const model = 'claude-haiku-4-5-20251001';
+  console.log('[ai-analysis] calling Anthropic, page:', payload.page, 'model:', model);
+
   let anthropicRes: Response;
   try {
+    // Timeout explícito: Deno fetch não tem timeout por padrão.
+    // Supabase mata a function após ~30s com um 502 genérico sem log.
+    // Com AbortSignal de 12s, o erro aparece no log antes disso.
     anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
+      method:  'POST',
+      signal:  AbortSignal.timeout(12_000),
       headers: {
         'Content-Type':      'application/json',
         'x-api-key':         apiKey,
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model:      'claude-haiku-4-5-20251001',
+        model,
         max_tokens: payload.page === 'macro_calendar' ? 480 : 320,
         system:     'Você é um analista de mercado cripto institucional sênior. Gere análises concretas, objetivas e acionáveis em português brasileiro. Máximo 3 frases diretas. Sem disclaimers. Sem prefácio. Sem marcadores. Foco em Bitcoin. Comece diretamente com a análise.',
         messages:   [{ role: 'user', content: buildUserMessage(payload) }],
       }),
     });
   } catch (err) {
-    const errMsg = err instanceof Error ? err.message : String(err);
+    const isTimeout = err instanceof Error && err.name === 'TimeoutError';
+    const errMsg = isTimeout ? 'timeout de 12s ao chamar Anthropic' : (err instanceof Error ? err.message : String(err));
+    console.error('[ai-analysis] fetch error:', errMsg);
     return new Response(
       JSON.stringify({ error: `Erro de rede ao chamar Anthropic: ${errMsg}` }),
-      { status: 502, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } },
+      { status: 504, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } },
     );
   }
 
   if (!anthropicRes.ok) {
     const errBody = await anthropicRes.text().catch(() => '');
-    console.error('[ai-analysis] Anthropic error:', anthropicRes.status, errBody);
+    console.error('[ai-analysis] Anthropic error:', anthropicRes.status, errBody.slice(0, 300));
+    // Repassa o status real da Anthropic para o cliente poder distinguir
+    // 401 (chave inválida), 429 (rate limit), 500 (erro Anthropic).
+    // Mapeia para 502 apenas para erros inesperados.
+    const clientStatus = [401, 429, 500, 529].includes(anthropicRes.status)
+      ? anthropicRes.status
+      : 502;
     return new Response(
-      JSON.stringify({ error: `Anthropic API ${anthropicRes.status}: ${errBody}` }),
-      { status: 502, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } },
+      JSON.stringify({ error: `Anthropic API ${anthropicRes.status}: ${errBody.slice(0, 200)}` }),
+      { status: clientStatus, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } },
     );
   }
 
