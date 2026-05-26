@@ -9,7 +9,7 @@ import {
   Tooltip, ResponsiveContainer, ComposedChart, Line,
 } from 'recharts';
 import { format } from 'date-fns';
-import { useKlines, useBtcTicker, useFearGreed } from '@/hooks/useBtcData';
+import { useKlines, useKlinesMeta, useBtcTicker, useFearGreed } from '@/hooks/useBtcData';
 import { useRiskScore } from '@/hooks/useRiskScore';
 import { readModuleFlag } from '@/lib/moduleFlags';
 import { DisabledModuleBanner } from '@/components/ui/DisabledModuleBanner';
@@ -88,9 +88,10 @@ function computeSpotMetrics(klines, btcPrice) {
 export default function SpotFlow() {
   // ── Sprint 5.4: live session analytics from Binance klines ──────────────────
   const spotEnabled       = readModuleFlag('ENABLE_SPOT_FLOW');
-  const { data: klines }  = useKlines('1h', 168, spotEnabled);
+  const { data: klines, isLoading: klinesLoading } = useKlines('1h', 168, spotEnabled);
   const { data: klines15m } = useKlines('15m', 4,  spotEnabled);  // ret_15m
   const { data: klines1d }  = useKlines('1d',  32, spotEnabled);  // ret_1w (7) + ret_1M (30)
+  const { data: klinesMeta } = useKlinesMeta('1h', 168, spotEnabled);
   const { data: ticker }    = useBtcTicker(spotEnabled);
   const { data: riskData }  = useRiskScore();
   const { data: fngData }   = useFearGreed();
@@ -166,8 +167,35 @@ export default function SpotFlow() {
 
   const retColor = (v) => v > 0 ? '#10b981' : v < 0 ? '#ef4444' : '#4a5568';
 
+  // Staleness: klines ou ticker em cache
+  const isStale = klinesMeta?.isFallback || ticker?.isFallback;
+  const staleDate = klinesMeta?.lastUpdated ?? ticker?.lastUpdated;
+
   if (!spotEnabled) {
     return <DisabledModuleBanner moduleName="ENABLE_SPOT_FLOW" />;
+  }
+
+  // Skeleton de loading — exibido enquanto klines ainda não chegaram pela primeira vez
+  if (klinesLoading) {
+    return (
+      <div style={{ maxWidth: 1400, margin: '0 auto' }}>
+        <div style={{ marginBottom: 20 }}>
+          <h1 style={{ fontSize: 20, fontWeight: 800, color: '#e2e8f0', margin: 0, letterSpacing: '-0.02em' }}>BTC Spot Flow</h1>
+          <p style={{ fontSize: 12, color: '#4a5568', marginTop: 3 }}>Binance Spot · BTCUSDT · Taker Flow / CVD · <ModeBadge /></p>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10, marginBottom: 20 }}>
+          {Array.from({ length: 10 }).map((_, i) => (
+            <div key={i} style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 10, padding: '12px 14px' }}>
+              <div style={{ height: 10, borderRadius: 3, background: '#1e2d45', marginBottom: 8, width: '60%' }} />
+              <div style={{ height: 18, borderRadius: 3, background: '#1e2d45', width: '80%' }} />
+            </div>
+          ))}
+        </div>
+        <div style={{ padding: '16px 20px', borderRadius: 12, background: '#111827', border: '1px solid #1e2d45', fontSize: 11, color: '#4a5568', textAlign: 'center' }}>
+          Carregando dados da Binance…
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -178,12 +206,12 @@ export default function SpotFlow() {
         </h1>
         <p style={{ fontSize: 12, color: '#4a5568', marginTop: 3, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <span>Binance Spot · BTCUSDT · Taker Flow / CVD · <ModeBadge /></span>
-          {ticker?.isFallback && ticker?.lastUpdated && (
+          {isStale && staleDate && (
             <span
-              title={`Última atualização: ${new Date(ticker.lastUpdated).toLocaleString('pt-BR')}`}
+              title={`Última atualização: ${new Date(staleDate).toLocaleString('pt-BR')}`}
               style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 9, color: '#f59e0b', cursor: 'help' }}
             >
-              ⚠ Cache · {new Date(ticker.lastUpdated).toLocaleDateString('pt-BR')}
+              ⚠ Cache · {new Date(staleDate).toLocaleDateString('pt-BR')}
             </span>
           )}
         </p>
@@ -212,8 +240,8 @@ export default function SpotFlow() {
         ))}
       </div>
 
-      {/* Banner de staleness — exibido quando dados vêm do cache Supabase */}
-      {ticker?.isFallback && ticker?.lastUpdated && (
+      {/* Banner de staleness — klines ou ticker em cache Supabase */}
+      {isStale && staleDate && (
         <div style={{
           marginBottom: 12, padding: '7px 12px', borderRadius: 6,
           background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.2)',
@@ -222,7 +250,7 @@ export default function SpotFlow() {
         }}>
           <span>⚠ Dados de cache — retornos e volumes podem estar desatualizados</span>
           <span style={{ fontFamily: 'JetBrains Mono, monospace', whiteSpace: 'nowrap' }}>
-            Última atualização: {new Date(ticker.lastUpdated).toLocaleString('pt-BR')}
+            Última atualização: {new Date(staleDate).toLocaleString('pt-BR')}
           </span>
         </div>
       )}

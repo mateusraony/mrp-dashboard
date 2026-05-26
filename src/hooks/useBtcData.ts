@@ -154,6 +154,36 @@ export function useKlines(interval = '1h', limit = 48, enabled = true) {
   });
 }
 
+/**
+ * useKlinesMeta — retorna apenas { isFallback, lastUpdated } dos klines.
+ * Usa o mesmo queryKey de useKlines → TanStack Query deduplica o fetch.
+ * Útil para exibir indicadores de staleness sem duplicar dados.
+ */
+export function useKlinesMeta(interval = '1h', limit = 48, enabled = true) {
+  return useQuery({
+    queryKey: ['btc', 'klines', interval, limit],
+    queryFn: async (): Promise<DataState<Kline[]>> => {
+      try {
+        const data = await withCache(`binance:klines:${interval}:${limit}`, 60, 'binance_futures', () => fetchKlines('BTCUSDT', interval, limit));
+        return { data, lastUpdated: new Date().toISOString(), isFallback: false, debugError: null };
+      } catch (err) {
+        const stale = await getStaleCache<Kline[]>(`binance:klines:${interval}:${limit}`);
+        if (stale) return { data: stale.value, lastUpdated: stale.updatedAt.toISOString(), isFallback: true, debugError: String(err) };
+        return { data: null, lastUpdated: null, isFallback: true, debugError: String(err) };
+      }
+    },
+    staleTime: 55_000,
+    refetchInterval: KLINES_INTERVAL,
+    enabled,
+    retry: 2,
+    retryDelay: (attempt: number) => Math.min(1000 * 2 ** attempt, 10_000),
+    select: (state: DataState<Kline[]>) => ({
+      isFallback:  state.isFallback,
+      lastUpdated: state.lastUpdated,
+    }),
+  });
+}
+
 const EMPTY_DOMINANCE: DominanceData = {
   btc_dominance: 0, eth_dominance: 0, others_dominance: 0,
   total_mcap_usd: 0, stablecoin_supply_b: 0, updated_at: 0,
