@@ -257,6 +257,33 @@ export default function SpotFlow() {
         </div>
       </div>
 
+      {/* ── O QUE É ESTA PÁGINA ─────────────────────────────────────────────────── */}
+      <div style={{ marginBottom: 20, padding: '16px 20px', borderRadius: 12, background: 'linear-gradient(135deg, rgba(59,130,246,0.07) 0%, rgba(16,185,129,0.05) 100%)', border: '1px solid rgba(59,130,246,0.2)' }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+          <div style={{ fontSize: 28, lineHeight: 1, marginTop: 2 }}>📊</div>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: '#e2e8f0', marginBottom: 6 }}>Para que serve esta página?</div>
+            <div style={{ fontSize: 11, color: '#94a3b8', lineHeight: 1.8, maxWidth: 800 }}>
+              <strong style={{ color: '#cbd5e1' }}>Spot Flow</strong> analisa o fluxo de <strong style={{ color: '#cbd5e1' }}>dinheiro real</strong> entrando e saindo do Bitcoin — diferente de derivativos (contratos futuros), aqui estamos vendo quem está <em>realmente comprando ou vendendo BTC</em> com dinheiro de verdade.{' '}
+              <strong style={{ color: '#3b82f6' }}>Use esta página para responder:</strong>{' '}
+              "A alta (ou queda) do BTC está sendo sustentada por compradores de verdade, ou é uma movimentação sem força?" — Se sim, a tendência tende a continuar. Se não, pode reverter.
+            </div>
+            <div style={{ display: 'flex', gap: 16, marginTop: 10, flexWrap: 'wrap' }}>
+              {[
+                { icon: '✅', text: 'Confirmar se uma alta tem compradores reais por trás' },
+                { icon: '🔍', text: 'Detectar acumulação silenciosa em quedas' },
+                { icon: '⚠️', text: 'Identificar subidas fracas sem suporte de volume' },
+                { icon: '🌍', text: 'Ver qual região do mundo está comprando mais' },
+              ].map((u, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: '#64748b' }}>
+                  <span>{u.icon}</span><span>{u.text}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* ── BANNER CACHE ────────────────────────────────────────────────────────── */}
       {isStale && staleDate && (
         <div style={{ marginBottom: 16, padding: '7px 14px', borderRadius: 8, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.2)', fontSize: 10, color: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
@@ -374,6 +401,27 @@ export default function SpotFlow() {
             {' '}· {fmtNum(s.taker_buy / 1000, 1)}K BTC comprados × {fmtNum(s.taker_sell / 1000, 1)}K vendidos
           </div>
         </div>
+
+        {/* Guia de interpretação do CVD */}
+        <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 8, background: '#0a1220', border: '1px solid #1e2d45' }}>
+          <div style={{ fontSize: 9, color: '#3b82f6', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Como interpretar estes números</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 8 }}>
+            {[
+              { icon: '🟢', cond: 'CVD positivo + preço subindo', result: 'Alta confirmada com compradores reais. Tendência forte.' },
+              { icon: '🔴', cond: 'CVD negativo + preço caindo', result: 'Queda confirmada com vendedores reais. Evite comprar agora.' },
+              { icon: '⚠️', cond: 'CVD negativo + preço subindo', result: 'Alta sem suporte real. Risco de reversão (veja alerta acima).' },
+              { icon: '🔍', cond: 'CVD positivo + preço caindo', result: 'Alguém está comprando a queda. Possível reversão próxima.' },
+            ].map((r, i) => (
+              <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                <span style={{ fontSize: 14, lineHeight: 1.2 }}>{r.icon}</span>
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 600, color: '#cbd5e1', marginBottom: 2 }}>{r.cond}</div>
+                  <div style={{ fontSize: 9, color: '#64748b', lineHeight: 1.5 }}>{r.result}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* ── RETORNOS DE PREÇO ─────────────────────────────────────────────────────── */}
@@ -381,6 +429,9 @@ export default function SpotFlow() {
         <div style={{ marginBottom: 14 }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>Variação de Preço por Período</div>
           <div style={{ fontSize: 10, color: '#475569', marginTop: 2 }}>Verde = BTC subiu · Vermelho = BTC caiu · naquele período de tempo</div>
+          <div style={{ fontSize: 10, color: '#334155', marginTop: 6, padding: '6px 10px', borderRadius: 6, background: '#0a1220', border: '1px solid #1e2d45', display: 'inline-block' }}>
+            📌 <strong style={{ color: '#94a3b8' }}>Para que serve:</strong> Ver se o BTC está em tendência de curto, médio ou longo prazo. Compare os períodos — se todos vermelhos, tendência de baixa generalizada. Se só 15m vermelho e 1D verde, é apenas uma correção pontual.
+          </div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 8 }}>
           {[
@@ -428,6 +479,9 @@ export default function SpotFlow() {
             )}
           </div>
           <div style={{ fontSize: 10, color: '#475569' }}>Análise das últimas 48h dividida por janela geográfica · Binance 1h klines</div>
+          <div style={{ fontSize: 10, color: '#334155', marginTop: 8, padding: '6px 10px', borderRadius: 6, background: '#0a1220', border: '1px solid #1e2d45', display: 'inline-block' }}>
+            📌 <strong style={{ color: '#94a3b8' }}>Para que serve:</strong> Saber de qual país/região veio a pressão de compra ou venda. Se EUA comprou muito mas Ásia vendeu, o mercado pode abrir em queda amanhã de madrugada. Se todas as sessões compraram, é sinal mais forte.
+          </div>
         </div>
 
         {sessionList.length === 0 ? (
@@ -522,6 +576,9 @@ export default function SpotFlow() {
           <div>
             <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>Preço + Volume — Últimas 48h</div>
             <div style={{ fontSize: 10, color: '#475569', marginTop: 2 }}>Candles de 1h · Binance Spot</div>
+            <div style={{ fontSize: 10, color: '#334155', marginTop: 6 }}>
+              📌 <strong style={{ color: '#94a3b8' }}>Para que serve:</strong> Ver se o volume (as barras) confirma o movimento do preço (a linha azul). Barras altas em verde com preço subindo = força real. Barras baixas = mercado sem convicção.
+            </div>
           </div>
           <div style={{ display: 'flex', gap: 16, fontSize: 10, color: '#94a3b8', alignItems: 'center' }}>
             <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: 'rgba(16,185,129,0.5)', display: 'inline-block' }} /> Candle de alta (fechou acima)</span>
@@ -554,6 +611,9 @@ export default function SpotFlow() {
         <div style={{ marginBottom: 12 }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>Análise Inteligente do Fluxo</div>
           <div style={{ fontSize: 10, color: '#475569', marginTop: 2 }}>Sinal calculado por regras quantitativas (CVD · volume · retorno) + interpretação do Claude AI</div>
+          <div style={{ fontSize: 10, color: '#334155', marginTop: 6, padding: '6px 10px', borderRadius: 6, background: '#0a1220', border: '1px solid #1e2d45', display: 'inline-block' }}>
+            📌 <strong style={{ color: '#94a3b8' }}>Para que serve:</strong> Resume tudo o que você viu acima em um único sinal de direção (BULLISH / BEARISH / NEUTRAL) com score de 0–100. O Claude AI traduz os números em uma frase de análise. Use como confirmação final, não como único critério.
+          </div>
         </div>
         <AIModuleCard module={aiAnalysis.modules.spot} title="Spot Flow" icon="⟴" />
         {/* Claude insight */}
