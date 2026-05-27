@@ -1,7 +1,7 @@
 // ─── DERIVATIVES ADVANCED — Liquidation Heatmap · OI by Strike · Carry Calculator
 import { useState } from 'react';
 import {
-  liquidationClusters, futuresBasis, termStructure,
+  liquidationClusters, futuresBasis,
 } from '../components/data/mockDataExtended';
 import { btcOptionsExtended } from '../components/data/mockData';
 import { ModeBadge, GradeBadge } from '../components/ui/DataBadge';
@@ -94,7 +94,7 @@ function TipCard({ emoji, title, body, tag }) {
 }
 
 // ─── Locked placeholder ──────────────────────────────────────────────────────
-function LockedSection({ title, reason, url, urlLabel, minHeight = 130 }) {
+function LockedSection({ title, reason, url = undefined, urlLabel = undefined, minHeight = 130 }) {
   return (
     <div style={{
       minHeight, display: 'flex', flexDirection: 'column', alignItems: 'center',
@@ -150,7 +150,6 @@ function LiqHeatmapFull() {
     ? buildClustersFromLiquidations(liquidationsRaw, SPOT_LIVE)
     : null;
 
-  const mockClusters = liquidationClusters.clusters;
   const usingLive = liveClusters && liveClusters.length >= 3;
   const d = usingLive ? {
     ...liquidationClusters,
