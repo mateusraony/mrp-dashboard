@@ -93,6 +93,31 @@ function TipCard({ emoji, title, body, tag }) {
   );
 }
 
+// ─── Locked placeholder ──────────────────────────────────────────────────────
+function LockedSection({ title, reason, url, urlLabel, minHeight = 130 }) {
+  return (
+    <div style={{
+      minHeight, display: 'flex', flexDirection: 'column', alignItems: 'center',
+      justifyContent: 'center', gap: 10, padding: '28px 20px', textAlign: 'center',
+      background: 'rgba(0,0,0,0.12)', border: '1px dashed rgba(100,116,139,0.2)', borderRadius: 10,
+    }}>
+      <div style={{ fontSize: 32, opacity: 0.4 }}>🔒</div>
+      <div style={{ fontSize: 12, fontWeight: 700, color: '#475569' }}>{title}</div>
+      <div style={{ fontSize: 11, color: '#334155', maxWidth: 380, lineHeight: 1.7 }}>{reason}</div>
+      {url && (
+        <a href={url} target="_blank" rel="noopener noreferrer" style={{
+          fontSize: 10, color: '#3b82f6', textDecoration: 'none', fontWeight: 700,
+          padding: '4px 12px', borderRadius: 5, border: '1px solid rgba(59,130,246,0.25)',
+          background: 'rgba(59,130,246,0.05)',
+        }}>{urlLabel ?? 'Ver como ativar →'}</a>
+      )}
+      <div style={{ fontSize: 9, color: '#475569', padding: '2px 10px', borderRadius: 4, background: 'rgba(249,115,22,0.05)', border: '1px solid rgba(249,115,22,0.12)' }}>
+        Dado <strong style={{ color: '#f97316' }}>não considerado</strong> nas análises de AI
+      </div>
+    </div>
+  );
+}
+
 // ─── LIQ HEATMAP — Gráfico de barras horizontal duplo (longs ← | → shorts) ──
 // Agrupa liquidações reais em clusters de $500
 function buildClustersFromLiquidations(liquidations, spotPrice) {
@@ -148,7 +173,7 @@ function LiqHeatmapFull() {
   const closestLong  = [...sorted].filter(c => c.price < SPOT_LIVE).sort((a, b) => b.price - a.price)[0];
   const closestShort = [...sorted].filter(c => c.price > SPOT_LIVE).sort((a, b) => a.price - b.price)[0];
 
-  const derivAdvPayload = ticker ? {
+  const derivAdvPayload = (ticker && usingLive) ? {
     page: 'derivatives_advanced',
     riskScore: 50,
     riskRegime: probLongFlush > 65 ? 'RISCO ELEVADO' : 'MODERADO',
@@ -178,6 +203,14 @@ function LiqHeatmapFull() {
       <div style={{ fontSize: 10, color: '#334155', marginBottom: 14, padding: '6px 10px', background: '#0a1220', borderRadius: 6, border: '1px solid #1a2535', display: 'inline-block' }}>
         📌 <strong style={{ color: '#94a3b8' }}>Para que serve:</strong> Mostra onde estão concentradas as posições alavancadas que serão liquidadas automaticamente se o preço atingir aquele nível. Clusters grandes = "muralhas" que podem acelerar ou brecar movimentos.
       </div>
+
+      {!usingLive ? (
+        <LockedSection
+          title="Clustering de liquidações aguardando dados"
+          reason="Menos de 3 liquidações recentes detectadas na Binance. O sistema aguarda eventos suficientes para montar clusters confiáveis. Nenhum dado simulado é exibido nesta seção."
+          minHeight={160}
+        />
+      ) : (<>
 
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 16 }}>
@@ -326,12 +359,7 @@ function LiqHeatmapFull() {
         />
       </div>
 
-      {!usingLive && (
-        <div style={{ marginTop: 10, padding: '6px 10px', borderRadius: 6, background: 'rgba(249,115,22,0.06)', border: '1px solid rgba(249,115,22,0.18)', fontSize: 10, color: '#78716c', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-          <span>🔒 Dados simulados — configure uma Binance API Key para clustering real. Este dado <strong style={{ color: '#f97316' }}>não é considerado</strong> nas análises de AI sem chave configurada</span>
-          <a href="https://www.binance.com/en/support/faq/how-to-create-api-keys-on-binance-360002502072" target="_blank" rel="noopener noreferrer" style={{ color: '#f97316', textDecoration: 'none', fontWeight: 700, whiteSpace: 'nowrap' }}>Ver como →</a>
-        </div>
-      )}
+      </>)}
     </div>
   );
 }
@@ -407,6 +435,18 @@ function OIByStrike() {
         📌 <strong style={{ color: '#94a3b8' }}>Para que serve:</strong> Mostra onde estão os maiores contratos de opções em aberto. Concentração de calls = mercado apostando em alta naquele strike. Puts = proteção contra queda. O Max Pain é o preço onde a maioria expira sem valor — atração gravitacional próxima de vencimentos.
       </div>
 
+      {(isEth || !isLiveBtc) ? (
+        <LockedSection
+          title={isEth ? 'ETH Options indisponível' : 'BTC Options indisponível (Deribit inativo)'}
+          reason={isEth
+            ? 'Opções ETH não têm suporte na API gratuita Deribit. Requer conta com acesso à chain ETH.'
+            : 'Chain de opções BTC requer Deribit API ativa. Configure ENABLE_OPTIONS com chave Deribit.'}
+          url="https://www.deribit.com"
+          urlLabel="Deribit →"
+          minHeight={160}
+        />
+      ) : (<>
+
       {/* Summary stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 8, marginBottom: 12 }}>
         {[
@@ -465,12 +505,7 @@ function OIByStrike() {
         <span>■ <span style={{ color: '#22d3ee' }}>ATM atual</span></span>
       </div>
 
-      {(isEth || !isLiveBtc) && (
-        <div style={{ marginTop: 10, padding: '6px 10px', borderRadius: 6, background: 'rgba(249,115,22,0.06)', border: '1px solid rgba(249,115,22,0.18)', fontSize: 10, color: '#78716c', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-          <span>🔒 {isEth ? 'ETH: dados simulados' : 'BTC: chain de opções simulada'} — {isEth ? 'sem suporte ETH na API gratuita' : 'ative ENABLE_OPTIONS com chave Deribit'}. Dados <strong style={{ color: '#f97316' }}>não considerados</strong> nas análises de AI</span>
-          <a href="https://www.deribit.com" target="_blank" rel="noopener noreferrer" style={{ color: '#f97316', textDecoration: 'none', fontWeight: 700, whiteSpace: 'nowrap' }}>Deribit →</a>
-        </div>
-      )}
+      </>)}
     </div>
   );
 }
@@ -677,49 +712,25 @@ function TermStructurePanel() {
     );
   }
 
-  // Fallback: mock data
-  const ts = termStructure;
-  const maxOI = Math.max(...ts.expirations.map(e => e.oi_contracts));
+  // Deribit indisponível — mostrar cadeado
   return (
     <div>
       <SectionTitle
         title="Term Structure — IV por Prazo"
-        sub={`Estrutura: ${ts.structure_type} · 1W-1Y spread: +${(ts.front_back_spread * 100).toFixed(1)}pp`}
-        badge={ts.quality}
+        sub="Estrutura a termo da volatilidade implícita — Deribit BTC"
+        badge="D"
         mode="mock"
       />
       <div style={{ fontSize: 10, color: '#334155', marginBottom: 12, padding: '6px 10px', background: '#0a1220', borderRadius: 6, border: '1px solid #1a2535', display: 'inline-block' }}>
-        📌 <strong style={{ color: '#94a3b8' }}>Para que serve:</strong> Mostra como a volatilidade implícita varia conforme o prazo das opções. Contango = risco imediato. Backwardation = estrutura normal. <span style={{ color: '#f97316' }}>Exibindo dados simulados.</span>
+        📌 <strong style={{ color: '#94a3b8' }}>Para que serve:</strong> Mostra como a volatilidade implícita varia conforme o prazo das opções. Contango = risco imediato. Backwardation = estrutura normal.
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        {ts.expirations.map((e, i) => {
-          const ivDelta = e.iv_atm - e.iv_prev_day;
-          const barW = (e.oi_contracts / maxOI * 100);
-          return (
-            <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '7px 10px', background: '#0d1421', border: '1px solid #1a2535', borderRadius: 7 }}>
-              <div style={{ width: 28, fontSize: 10, fontWeight: 800, color: '#94a3b8', flexShrink: 0 }}>{e.label}</div>
-              <div style={{ width: 40, fontSize: 9, color: '#334155', flexShrink: 0 }}>{e.days}d</div>
-              <div style={{ width: 60, textAlign: 'right', fontSize: 12, fontFamily: 'JetBrains Mono, monospace', color: '#a78bfa', fontWeight: 800, flexShrink: 0 }}>{(e.iv_atm * 100).toFixed(1)}%</div>
-              <div style={{ fontSize: 9, fontFamily: 'JetBrains Mono, monospace', color: ivDelta >= 0 ? '#10b981' : '#ef4444', width: 46, flexShrink: 0 }}>
-                {ivDelta >= 0 ? '+' : ''}{(ivDelta * 100).toFixed(1)}pp
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ height: 8, borderRadius: 2, background: '#111827', overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${barW}%`, background: '#a78bfa', opacity: 0.7 }} />
-                </div>
-              </div>
-              <div style={{ width: 60, textAlign: 'right', fontSize: 9, color: '#475569', flexShrink: 0 }}>{(e.oi_contracts ?? 0).toLocaleString()} cont.</div>
-            </div>
-          );
-        })}
-      </div>
-      <div style={{ marginTop: 10, fontSize: 9, color: '#64748b', lineHeight: 1.7, padding: '9px 11px', background: 'rgba(167,139,250,0.04)', border: '1px solid rgba(167,139,250,0.15)', borderRadius: 7 }}>
-        <span style={{ color: '#a78bfa', fontWeight: 700 }}>📊 Interpretação: </span>{ts.interpretation}
-      </div>
-      <div style={{ marginTop: 10, padding: '6px 10px', borderRadius: 6, background: 'rgba(249,115,22,0.06)', border: '1px solid rgba(249,115,22,0.18)', fontSize: 10, color: '#78716c', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-        <span>🔒 Dados simulados — term structure real requer Deribit API (ENABLE_OPTIONS). <strong style={{ color: '#f97316' }}>Não considerado</strong> nas análises de AI</span>
-        <a href="https://www.deribit.com" target="_blank" rel="noopener noreferrer" style={{ color: '#f97316', textDecoration: 'none', fontWeight: 700, whiteSpace: 'nowrap' }}>Deribit →</a>
-      </div>
+      <LockedSection
+        title="Term Structure indisponível"
+        reason="Term structure real requer Deribit API com ENABLE_OPTIONS ativo. Configure a chave Deribit para ver a estrutura a termo real das opções BTC."
+        url="https://www.deribit.com"
+        urlLabel="Deribit →"
+        minHeight={160}
+      />
     </div>
   );
 }

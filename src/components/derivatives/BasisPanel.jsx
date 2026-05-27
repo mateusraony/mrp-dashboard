@@ -49,21 +49,17 @@ export default function BasisPanel() {
       }
     : mockFuturesBasis;
 
-  // Binance/Bybit/OKX: live quando disponível; Deribit/Bitget/Gate.io: mock
+  // Binance/Bybit/OKX/Deribit: live quando disponível
   const fundingChart = [
     { exchange: 'Binance', rate: ticker?.last_funding_rate ?? fundingByExchange[0].rate, color: '#f59e0b' },
     { exchange: 'Bybit',   rate: bybit?.funding_rate       ?? fundingByExchange[1].rate, color: '#10b981' },
     { exchange: 'OKX',     rate: okx?.funding_rate         ?? fundingByExchange[2].rate, color: '#3b82f6' },
     { exchange: 'Deribit', rate: deribitFunding?.funding_8h ?? fundingByExchange[3].rate, color: '#a78bfa' },
-    ...fundingByExchange.slice(4), // Bitget, Gate.io — sem API pública confiável
   ];
   const isLive = IS_LIVE && (ticker != null || bybit != null || okx != null || deribitFunding != null);
 
   // Spot: usar mark_price live quando disponível
   const spotPrice = ticker?.mark_price ?? d.spot;
-
-  // Exchanges com dados mock (sem API pública confiável)
-  const mockExchanges = fundingChart.slice(4).map(e => e.exchange);
 
   return (
     <div style={{
@@ -178,13 +174,6 @@ export default function BasisPanel() {
         <span style={{ color: '#10b981', fontWeight: 700 }}>Basis Signal: </span>{d.signal}
       </div>
 
-      {/* Nota de exchanges mock */}
-      {mockExchanges.length > 0 && (
-        <div style={{ marginTop: 10, padding: '6px 10px', borderRadius: 6, background: 'rgba(249,115,22,0.06)', border: '1px solid rgba(249,115,22,0.18)', fontSize: 10, color: '#78716c', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-          <span>🔒 {mockExchanges.join(', ')}: sem API pública confiável — dados simulados, <strong style={{ color: '#f97316' }}>não considerados na análise</strong></span>
-          <a href="https://coinglass.com/pricing" target="_blank" rel="noopener noreferrer" style={{ color: '#f97316', textDecoration: 'none', fontWeight: 700, whiteSpace: 'nowrap' }}>CoinGlass →</a>
-        </div>
-      )}
     </div>
   );
 }
