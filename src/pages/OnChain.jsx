@@ -1,6 +1,7 @@
 // ─── ON-CHAIN AVANÇADO ────────────────────────────────────────────────────────
 // NUPL · SOPR · Exchange Netflow · Whale Activity · Realized Price / MVRV
 // Hash Rate · Dificuldade · Mempool
+import { useState } from 'react';
 import {
   btcNUPL, btcSOPR, btcExchangeNetflow, btcWhaleActivity,
   btcRealizedMetrics, btcHashRate, onChain, fmtNum,
@@ -35,6 +36,61 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import HodlWavesPanel from '../components/onchain/HodlWavesPanel';
+
+// ─── TOOLTIP INLINE ──────────────────────────────────────────────────────────
+function Tip({ children, text }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <span
+      style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 3, cursor: 'help' }}
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
+      {children}
+      <span style={{ fontSize: 9, color: '#3b82f6', fontWeight: 700, opacity: 0.7 }}>?</span>
+      {open && (
+        <span style={{
+          position: 'absolute', bottom: '100%', left: 0, zIndex: 50,
+          background: '#0d1421', border: '1px solid #1e3048', borderRadius: 8,
+          padding: '8px 12px', fontSize: 11, color: '#cbd5e1', lineHeight: 1.6,
+          width: 240, boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+          whiteSpace: 'normal', pointerEvents: 'none',
+        }}>
+          {text}
+        </span>
+      )}
+    </span>
+  );
+}
+
+// ─── ACCORDION DE DICA ────────────────────────────────────────────────────────
+function TipCard({ emoji, title, body, tag }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div
+      onClick={() => setOpen(o => !o)}
+      style={{
+        background: '#0d1421', border: '1px solid #1e2d45', borderRadius: 10,
+        padding: '12px 14px', cursor: 'pointer',
+        borderLeft: '3px solid #3b82f6',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 16 }}>{emoji}</span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0' }}>{title}</span>
+          {tag && <span style={{ fontSize: 9, color: '#3b82f6', background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: 4, padding: '1px 6px', fontWeight: 700 }}>{tag}</span>}
+        </div>
+        <span style={{ fontSize: 12, color: '#4a5568' }}>{open ? '▲' : '▼'}</span>
+      </div>
+      {open && (
+        <div style={{ marginTop: 10, fontSize: 11, color: '#94a3b8', lineHeight: 1.7, borderTop: '1px solid #1e2d45', paddingTop: 10 }}>
+          {body}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ─── GLOSSÁRIO ────────────────────────────────────────────────────────────────
 const G = {
@@ -185,6 +241,9 @@ function NuplCard({ liveCycle }) {
           {n.delta_30d >= 0 ? '+' : ''}{n.delta_30d.toFixed(3)} 30d
         </span>
       </div>
+      <div style={{ marginTop: 8, padding: '6px 10px', borderRadius: 6, background: '#0a1220', border: '1px solid #1e2d45', fontSize: 10, color: '#334155' }}>
+        📌 <strong style={{ color: '#94a3b8' }}>Para que serve:</strong> Mede o "humor" geral dos holders de Bitcoin. Perto de 0 = mercado no prejuízo, possível fundo. Perto de 1 = euforia, possível topo.
+      </div>
       <InterpretBox text={n.interpretation} color="#94a3b8" />
     </OnChainCard>
   );
@@ -247,6 +306,9 @@ function SoprCard() {
           {s.delta_7d >= 0 ? '+' : ''}{s.delta_7d.toFixed(4)} 7d
         </span>
       </div>
+      <div style={{ marginTop: 8, padding: '6px 10px', borderRadius: 6, background: '#0a1220', border: '1px solid #1e2d45', fontSize: 10, color: '#334155' }}>
+        📌 <strong style={{ color: '#94a3b8' }}>Para que serve:</strong> Diz se as pessoas que venderam BTC hoje saíram com lucro ou prejuízo. Acima de 1.0 = lucro (pressão de venda). Abaixo de 1.0 = prejuízo (capitulação).
+      </div>
       <InterpretBox text={s.interpretation} color="#94a3b8" />
     </OnChainCard>
   );
@@ -289,6 +351,9 @@ function NetflowCard() {
       <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
         <span style={{ fontSize: 10, color: '#64748b' }}>7d: <span style={{ fontFamily: 'JetBrains Mono, monospace', color: n.netflow_7d < 0 ? '#10b981' : '#ef4444', fontWeight: 700 }}>{n.netflow_7d > 0 ? '+' : ''}{fmtNum(n.netflow_7d, 0)}</span></span>
         <span style={{ fontSize: 10, color: '#64748b' }}>30d: <span style={{ fontFamily: 'JetBrains Mono, monospace', color: n.netflow_30d < 0 ? '#10b981' : '#ef4444', fontWeight: 700 }}>{n.netflow_30d > 0 ? '+' : ''}{fmtNum(n.netflow_30d, 0)}</span></span>
+      </div>
+      <div style={{ marginTop: 8, padding: '6px 10px', borderRadius: 6, background: '#0a1220', border: '1px solid #1e2d45', fontSize: 10, color: '#334155' }}>
+        📌 <strong style={{ color: '#94a3b8' }}>Para que serve:</strong> BTC <em>saindo</em> de exchanges = acumulação (bullish). BTC <em>entrando</em> = preparação para vender (bearish). Reservas totais abaixo de 2M BTC = supply escasso.
       </div>
       <InterpretBox text={n.signal} color="#94a3b8" />
     </OnChainCard>
@@ -341,6 +406,9 @@ function WhaleCard() {
           <Bar dataKey="v10m" fill={`#8b5cf680`} radius={[1, 1, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>
+      <div style={{ marginTop: 8, padding: '6px 10px', borderRadius: 6, background: '#0a1220', border: '1px solid #1e2d45', fontSize: 10, color: '#334155' }}>
+        📌 <strong style={{ color: '#94a3b8' }}>Para que serve:</strong> Rastreia movimentações de grandes investidores (baleias). Picos acima da média 7d podem indicar acumulação institucional silenciosa — ou distribuição antes de uma queda.
+      </div>
       <InterpretBox text={w.signal} color="#94a3b8" />
     </OnChainCard>
   );
@@ -432,6 +500,28 @@ function MvrvCard({ liveCycle }) {
         <span style={{ fontSize: 10, color: '#64748b' }}>Z-Score: <span style={{ fontFamily: 'JetBrains Mono, monospace', color, fontWeight: 700 }}>{mvrvZ.toFixed(2)}</span></span>
         <span style={{ fontSize: 10, color: '#64748b' }}>Realized +{rDelta30d.toFixed(1)}% em 30d</span>
       </div>
+      <div style={{ marginTop: 4, marginBottom: 8, padding: '6px 10px', borderRadius: 6, background: '#0a1220', border: '1px solid #1e2d45', fontSize: 10, color: '#334155' }}>
+        📌 <strong style={{ color: '#94a3b8' }}>Para que serve:</strong> Compara o preço atual com o custo médio de todos os BTC. Abaixo de 1× = mercado barato (fundo histórico). Acima de 3.5× = mercado caro (histórico de topos).
+      </div>
+      <div style={{ padding: '8px 12px', borderRadius: 8, background: '#0a1220', border: '1px solid #1e2d45' }}>
+        <div style={{ fontSize: 9, color: '#3b82f6', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Como interpretar o MVRV</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 6 }}>
+          {[
+            { icon: '🔵', cond: 'MVRV < 1×', result: 'Mercado subvalorizado. Historicamente = fundo de ciclo. Compra de longo prazo.' },
+            { icon: '🟢', cond: 'MVRV 1–2.5×', result: 'Zona de acumulação / neutro. Preço razoável em relação ao custo médio.' },
+            { icon: '🟡', cond: 'MVRV 2.5–3.7×', result: 'Mercado caro. Realize lucros parciais. Risco crescente de correção.' },
+            { icon: '🔴', cond: 'MVRV > 3.7×', result: 'Zona de euforia / topo histórico. Alto risco. Venda progressiva recomendada.' },
+          ].map((r, i) => (
+            <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
+              <span style={{ fontSize: 12, lineHeight: 1.2 }}>{r.icon}</span>
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 600, color: '#cbd5e1', marginBottom: 2 }}>{r.cond}</div>
+                <div style={{ fontSize: 9, color: '#64748b', lineHeight: 1.5 }}>{r.result}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
       <InterpretBox text={btcRealizedMetrics.interpretation} color="#94a3b8" />
     </OnChainCard>
   );
@@ -496,6 +586,9 @@ function HashRateCard({ liveHashrate }) {
           Próximo ajuste estimado: <strong>{nextAdjPct >= 0 ? '+' : ''}{nextAdjPct.toFixed(1)}%</strong> — {nextAdjBlocks.toLocaleString()} blocos
         </span>
       </div>
+      <div style={{ marginTop: 8, padding: '6px 10px', borderRadius: 6, background: '#0a1220', border: '1px solid #1e2d45', fontSize: 10, color: '#334155' }}>
+        📌 <strong style={{ color: '#94a3b8' }}>Para que serve:</strong> Hash rate alto = rede segura, mineradores confiantes no preço. Queda brusca pode indicar desligamento em massa (bear market) ou proibição regulatória. Dado ao vivo via Mempool.space.
+      </div>
       <InterpretBox text={btcHashRate.signal} color="#94a3b8" />
     </OnChainCard>
   );
@@ -552,7 +645,10 @@ function MempoolCard({ liveMempool }) {
           </div>
         ))}
       </div>
-      <div style={{ marginTop: 8, fontSize: 10, color: '#334155' }}>
+      <div style={{ marginTop: 8, padding: '6px 10px', borderRadius: 6, background: '#0a1220', border: '1px solid #1e2d45', fontSize: 10, color: '#334155' }}>
+        📌 <strong style={{ color: '#94a3b8' }}>Para que serve:</strong> Mostra a "fila" de transações esperando confirmação. Taxa alta = rede congestionada, pague mais para ser priorizado. Taxa baixa = rede tranquila, bom momento para transações econômicas.
+      </div>
+      <div style={{ marginTop: 6, fontSize: 10, color: '#334155' }}>
         Fonte: mempool.space · Grade: {grade}
       </div>
     </OnChainCard>
@@ -701,6 +797,9 @@ function CddCard({ liveExtended }) {
         );
       })()}
 
+      <div style={{ marginTop: 8, padding: '6px 10px', borderRadius: 6, background: '#0a1220', border: '1px solid #1e2d45', fontSize: 10, color: '#334155' }}>
+        📌 <strong style={{ color: '#94a3b8' }}>Para que serve:</strong> CDD alto = moedas antigas estão se movendo (possível distribuição de holders veteranos). Z-Score positivo = movimento anormalmente alto vs. histórico recente. Dado ao vivo via CoinMetrics Community.
+      </div>
       <InterpretBox text={signal} color="#94a3b8" />
     </OnChainCard>
   );
@@ -848,6 +947,10 @@ function HodlWaveCard({ liveExtended }) {
         );
       })()}
 
+      <div style={{ marginTop: 8, padding: '6px 10px', borderRadius: 6, background: '#0a1220', border: '1px solid #1e2d45', fontSize: 10, color: '#334155' }}>
+        📌 <strong style={{ color: '#94a3b8' }}>Para que serve:</strong> Percentual do supply que não se moveu há mais de 1 ano. Subindo = holders guardando (bullish, oferta saindo de circulação). Caindo = distribuição em andamento (holders veteranos vendendo).
+      </div>
+
       {/* Dormancy proxy */}
       <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 7, background: 'rgba(30,45,69,0.5)', border: '1px solid #1e2d45' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
@@ -879,24 +982,53 @@ export default function OnChain() {
 
   return (
     <div style={{ maxWidth: 1400, margin: '0 auto' }}>
-      {/* Header */}
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          <h1 style={{ fontSize: 20, fontWeight: 900, color: '#f1f5f9', margin: 0, letterSpacing: '-0.03em' }}>
-            On-Chain Analytics
-          </h1>
-          <ModeBadge mode={modeLabel} />
-          <span style={{ fontSize: 10, color: '#f59e0b', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 4, padding: '2px 8px', fontWeight: 600 }}>
-            ⚠ Fontes: CoinMetrics · Mempool.space · Glassnode(mock)
-          </span>
+      {/* ── CABEÇALHO ─────────────────────────────────────────────────────────────── */}
+      <div style={{ marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 8 }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <h1 style={{ fontSize: 20, fontWeight: 900, color: '#f1f5f9', margin: 0, letterSpacing: '-0.03em' }}>
+              On-Chain Analytics
+            </h1>
+            <ModeBadge mode={modeLabel} />
+            <span style={{ fontSize: 10, color: '#f59e0b', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 4, padding: '2px 8px', fontWeight: 600 }}>
+              ⚠ Fontes: CoinMetrics · Mempool.space · Glassnode(mock)
+            </span>
+          </div>
+          <p style={{ fontSize: 11, color: '#475569', marginTop: 6, lineHeight: 1.6 }}>
+            MVRV/Realized Price/CDD/HODL: CoinMetrics Community (grátis, qualidade A). Hash Rate/Mempool: Mempool.space (live).
+            NUPL/SOPR/Netflow/Whales: estimativas mock (quality B) — requerem Glassnode/CryptoQuant para dados live.
+          </p>
         </div>
-        <p style={{ fontSize: 11, color: '#475569', marginTop: 6, lineHeight: 1.6 }}>
-          MVRV/Realized Price/CDD/HODL: CoinMetrics Community (grátis, qualidade A). Hash Rate/Mempool: Mempool.space (live).
-          NUPL/SOPR/Netflow/Whales: estimativas mock (quality B) — requerem Glassnode/CryptoQuant para dados live.
-        </p>
       </div>
 
-      {/* Banner de resumo de qualidade de dados — orientação rápida para novos usuários */}
+      {/* ── O QUE É ESTA PÁGINA ────────────────────────────────────────────────────── */}
+      <div style={{ marginBottom: 20, padding: '16px 20px', borderRadius: 12, background: 'linear-gradient(135deg, rgba(16,185,129,0.07) 0%, rgba(59,130,246,0.05) 100%)', border: '1px solid rgba(16,185,129,0.2)' }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+          <div style={{ fontSize: 28, lineHeight: 1, marginTop: 2 }}>🔗</div>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: '#e2e8f0', marginBottom: 6 }}>Para que serve esta página?</div>
+            <div style={{ fontSize: 11, color: '#94a3b8', lineHeight: 1.8, maxWidth: 800 }}>
+              <strong style={{ color: '#cbd5e1' }}>On-Chain Analytics</strong> lê diretamente o blockchain do Bitcoin — o livro-caixa público e imutável que registra cada transação. Diferente de gráficos de preço, aqui vemos o <strong style={{ color: '#10b981' }}>comportamento real dos holders</strong>: quem está acumulando, quem está distribuindo, e em que fase do ciclo o mercado está.{' '}
+              <strong style={{ color: '#3b82f6' }}>Use esta página para responder:</strong>{' '}
+              "O mercado está em acumulação ou distribuição? Estamos perto de um fundo ou de um topo de ciclo?" — Uma análise que preço sozinho não consegue responder.
+            </div>
+            <div style={{ display: 'flex', gap: 16, marginTop: 10, flexWrap: 'wrap' }}>
+              {[
+                { icon: '📊', text: 'Identificar fases de ciclo (acumulação → alta → distribuição → queda)' },
+                { icon: '🐋', text: 'Detectar movimentações de baleias e instituições' },
+                { icon: '💎', text: 'Ver se holders de longo prazo estão acumulando ou vendendo' },
+                { icon: '⛏️', text: 'Monitorar a saúde da rede e o custo de mineração' },
+              ].map((u, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: '#64748b' }}>
+                  <span>{u.icon}</span><span>{u.text}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── BANNER DE QUALIDADE DE DADOS ──────────────────────────────────────────── */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
         background: '#0d1421', border: '1px solid #1e2d45', borderRadius: 8,
@@ -906,26 +1038,31 @@ export default function OnChain() {
         {IS_LIVE ? (
           <>
             <span style={{ color: '#10b981', background: 'rgba(16,185,129,0.10)', border: '1px solid rgba(16,185,129,0.22)', borderRadius: 4, padding: '1px 7px', fontWeight: 700 }}>
-              AO VIVO — Mempool, Hash Rate (Mempool.space)
+              ✔ AO VIVO — Mempool, Hash Rate (Mempool.space)
             </span>
             <span style={{ color: '#10b981', background: 'rgba(16,185,129,0.10)', border: '1px solid rgba(16,185,129,0.22)', borderRadius: 4, padding: '1px 7px', fontWeight: 700 }}>
-              AO VIVO — MVRV, Realized Price, CDD, HODL Waves (CoinMetrics Community · grátis)
+              ✔ AO VIVO — MVRV, Realized Price, CDD, HODL Waves (CoinMetrics Community · grátis)
             </span>
             <span style={{ color: '#f59e0b', background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.22)', borderRadius: 4, padding: '1px 7px', fontWeight: 700 }}>
-              ESTIMADO — NUPL, SOPR, Netflow, Whales (requerem Glassnode ~$29/mês)
+              ⚠ ESTIMADO — NUPL, SOPR, Netflow, Whales (requerem Glassnode ~$29/mês)
             </span>
           </>
         ) : (
           <span style={{ color: '#f59e0b', background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.22)', borderRadius: 4, padding: '1px 7px', fontWeight: 700 }}>
-            DEMO — todos os dados são simulados (DATA_MODE=mock)
+            ⚠ DEMO — todos os dados são simulados (DATA_MODE=mock)
           </span>
         )}
       </div>
 
-      {/* Sentimento do mercado on-chain */}
+      {/* ── SENTIMENTO & COMPORTAMENTO DOS HOLDERS ────────────────────────────────── */}
       <div style={{ marginBottom: 8 }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
-          ● Sentimento & Comportamento dos Holders
+        <div style={{ marginBottom: 10 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>
+            ● Sentimento & Comportamento dos Holders
+          </div>
+          <div style={{ fontSize: 10, color: '#334155', padding: '6px 10px', borderRadius: 6, background: '#0a1220', border: '1px solid #1e2d45', display: 'inline-block' }}>
+            📌 <strong style={{ color: '#94a3b8' }}>Para que serve esta seção:</strong> Mede o "estado emocional" do mercado — se os holders estão no lucro, no prejuízo, se estão vendendo ou guardando. São os sinais mais confiáveis de topo e fundo histórico.
+          </div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14, marginBottom: 20 }}>
           <NuplCard liveCycle={cycle} />
@@ -934,10 +1071,15 @@ export default function OnChain() {
         </div>
       </div>
 
-      {/* Atividade institucional */}
+      {/* ── ATIVIDADE INSTITUCIONAL & BALEIAS ─────────────────────────────────────── */}
       <div style={{ marginBottom: 8 }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
-          ● Atividade Institucional & Baleias
+        <div style={{ marginBottom: 10 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>
+            ● Atividade Institucional & Baleias
+          </div>
+          <div style={{ fontSize: 10, color: '#334155', padding: '6px 10px', borderRadius: 6, background: '#0a1220', border: '1px solid #1e2d45', display: 'inline-block' }}>
+            📌 <strong style={{ color: '#94a3b8' }}>Para que serve esta seção:</strong> Rastreia grandes players (fundos, baleias) e mede se o preço atual está barato ou caro em relação ao custo histórico médio do Bitcoin. Essencial para posicionamento de médio/longo prazo.
+          </div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14, marginBottom: 20 }}>
           <WhaleCard />
@@ -946,31 +1088,93 @@ export default function OnChain() {
         </div>
       </div>
 
-      {/* Fluxo de Ciclo — CDD & HODL (Sprint 6.1 + 6.3) */}
+      {/* ── FLUXO DE CICLO — CDD & HODL ──────────────────────────────────────────── */}
       <div style={{ marginBottom: 8 }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
-          ● Fluxo de Ciclo — CDD & HODL
+        <div style={{ marginBottom: 10 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>
+            ● Fluxo de Ciclo — CDD & HODL Waves
+          </div>
+          <div style={{ fontSize: 10, color: '#334155', padding: '6px 10px', borderRadius: 6, background: '#0a1220', border: '1px solid #1e2d45', display: 'inline-block' }}>
+            📌 <strong style={{ color: '#94a3b8' }}>Para que serve esta seção:</strong> Mostra a "memória" do Bitcoin — se moedas antigas estão quietas (acumulação) ou se movendo (distribuição). HODL Waves altas indicam que o mercado está em fase de paciência. Dados ao vivo via CoinMetrics Community (grátis).
+          </div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14, marginBottom: 14 }}>
           <CddCard liveExtended={extended} />
           <HodlWaveCard liveExtended={extended} />
         </div>
-        {/* Sprint 6.3 — HODL Waves visual avançado: distribuição de supply por coorte */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 14, marginBottom: 20 }}>
           <HodlWavesPanel liveExtended={extended} />
         </div>
       </div>
 
-      {/* Saúde da rede */}
-      <div>
-        <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
-          ● Saúde da Rede Bitcoin
+      {/* ── SAÚDE DA REDE BITCOIN ─────────────────────────────────────────────────── */}
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ marginBottom: 10 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>
+            ● Saúde da Rede Bitcoin
+          </div>
+          <div style={{ fontSize: 10, color: '#334155', padding: '6px 10px', borderRadius: 6, background: '#0a1220', border: '1px solid #1e2d45', display: 'inline-block' }}>
+            📌 <strong style={{ color: '#94a3b8' }}>Para que serve esta seção:</strong> Monitora a infraestrutura do Bitcoin — velocidade de processamento, segurança da rede e custo das transações. Hash rate alto = mineradores confiantes. Taxas altas = demanda por espaço no bloco elevada. Dados ao vivo via Mempool.space.
+          </div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14 }}>
           <HashRateCard liveHashrate={hashrate} />
           <MempoolCard liveMempool={mempool} />
         </div>
       </div>
+
+      {/* ── DICAS DE OURO ────────────────────────────────────────────────────────── */}
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>🏆 Dicas de Ouro — Como Interpretar On-Chain</div>
+          <div style={{ fontSize: 10, color: '#475569', marginTop: 2 }}>Clique em cada dica para expandir · Conceitos usados por analistas institucionais</div>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <TipCard
+            emoji="📉"
+            title="NUPL negativo = sinal de fundo histórico"
+            tag="CICLO"
+            body="Toda vez que o NUPL caiu abaixo de zero na história do Bitcoin, foi um dos melhores momentos para comprar. Isso significa que o mercado, em agregado, está em prejuízo — e normalmente os detentores de longo prazo aproveitam para acumular enquanto os especuladores capitulam e vendem com prejuízo."
+          />
+          <TipCard
+            emoji="🔑"
+            title="Realized Price é o suporte mais importante do BTC"
+            tag="SUPORTE"
+            body="O Realized Price representa o custo médio de compra de todos os BTC em circulação. Historicamente, o Bitcoin nunca ficou muito tempo abaixo desse nível — ele funciona como um suporte psicológico e fundamental. Quando o preço cai até o Realized Price, é comum ver grandes compradores institucionais entrando."
+          />
+          <TipCard
+            emoji="💎"
+            title="HODL Wave acima de 70% = mercado maduro"
+            tag="ACUMULAÇÃO"
+            body="Quando mais de 70% do supply de BTC fica parado por mais de 1 ano, significa que os holders de longo prazo (diamantes) não estão vendendo — mesmo com preços altos. Esse é um sinal de convicção forte. Historicamente, mercados touro mais sustentados acontecem quando a HODL Wave está alta e crescendo."
+          />
+          <TipCard
+            emoji="🐋"
+            title="Baleias saindo de exchanges = acumulação silenciosa"
+            tag="NETFLOW"
+            body="Quando o Exchange Netflow fica consistentemente negativo (saída líquida de BTC), significa que grandes holders estão retirando BTC das exchanges para carteiras frias (cold wallets). Isso reduz a oferta disponível para venda e é historicamente bullish. O inverso — entradas em exchanges — precede vendas e correções."
+          />
+          <TipCard
+            emoji="⛏️"
+            title="Hash rate em ATH = mineradores confiantes"
+            tag="SEGURANÇA"
+            body="Mineradores são os participantes mais racionais do mercado — eles investem milhões em máquinas e eletricidade. Quando o hash rate atinge máximas históricas, significa que os mineradores estão expandindo operações, o que implica que eles esperam preços altos no futuro. Hash rate caindo pode indicar bear market ou crise no setor."
+          />
+          <TipCard
+            emoji="💀"
+            title="CDD alto = moedas dormentes acordando"
+            tag="DISTRIBUIÇÃO"
+            body="Imagine que cada BTC acumula 'dias de vida' enquanto não é movido. Quando alguém move um BTC que ficou parado por 5 anos, 1.825 'dias' são destruídos (5×365). CDD alto indica que holders veteranos — que compraram barato — estão vendendo agora. Isso frequentemente precede correções. CDD baixo = quietude, acumulação."
+          />
+          <TipCard
+            emoji="🔄"
+            title="MVRV > 3.5× = cuidado máximo"
+            tag="TOPO"
+            body="O MVRV Ratio acima de 3.5× apareceu próximo a todos os grandes topos históricos do Bitcoin (2013, 2017, 2021). Significa que o mercado está negociando 250% acima do custo médio de todos os holders — e a pressão para realizar lucros fica insustentável. Abaixo de 1× marcou todos os fundos históricos."
+          />
+        </div>
+      </div>
+
     </div>
   );
 }
