@@ -18,7 +18,7 @@ import { fetchFearGreed, type FearGreedData } from '@/services/alternative';
 import { subscribeBtcPrice, subscribeStatus } from '@/services/binanceWs';
 import { readModuleFlag } from '@/lib/moduleFlags';
 import { withCache, getStaleCache } from '@/services/marketCache';
-import { logError } from '@/lib/debugLog';
+import { logError, logWarn } from '@/lib/debugLog';
 import { reportApiFailure, reportApiRecovery } from '@/lib/apiHealthMonitor';
 
 // ─── DataState — interface padrão de resiliência ──────────────────────────────
@@ -297,7 +297,7 @@ export function useLongShortRatio(symbol = 'BTCUSDT') {
         reportApiRecovery('binance_futures');
         return { data, lastUpdated: new Date().toISOString(), isFallback: false, debugError: null };
       } catch (err) {
-        logError('LongShortRatio fetch failed', { error: String(err), symbol }, 'longshort');
+        logWarn('LongShortRatio fetch failed', { error: String(err), symbol }, 'longshort');
         const stale = await getStaleCache<LongShortRatioData>(`binance:longshort:${symbol}`);
         if (stale) return { data: stale.value, lastUpdated: stale.updatedAt.toISOString(), isFallback: true, debugError: String(err) };
         return { data: null, lastUpdated: null, isFallback: true, debugError: String(err) };
