@@ -22,7 +22,7 @@ function buildClusters(liquidations, spotPrice) {
     if (!price) continue;
     const bucket = Math.round(price / BUCKET) * BUCKET;
     if (!bucketMap.has(bucket)) bucketMap.set(bucket, { price: bucket, longs_usd: 0, shorts_usd: 0 });
-    const usd = Math.abs(liq.usd ?? (price * (liq.quantity ?? 0)));
+    const usd = Math.abs(liq.usd_value ?? (price * (liq.qty ?? 0)));
     const side = liq.side ?? liq.positionSide ?? '';
     if (side === 'SELL' || price < spotPrice) {
       bucketMap.get(bucket).longs_usd += usd;
