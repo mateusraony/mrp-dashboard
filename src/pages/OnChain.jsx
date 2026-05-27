@@ -206,11 +206,15 @@ function NuplZoneBar({ value }) {
 // ─── NUPL CARD ────────────────────────────────────────────────────────────────
 function NuplCard({ liveCycle }) {
   const n = btcNUPL;
-  // CoinMetrics Community fornece NUPL como proxy: (MCap−RCap)/MCap
-  const nuplValue = liveCycle?.nupl      ?? n.value;
-  const nuplZone  = liveCycle?.nupl_zone ?? n.zone;
-  const nuplColor = liveCycle?.nupl_zone_color ?? n.zone_color;
-  const isLive    = IS_LIVE && liveCycle != null;
+  // Usa dados live apenas quando CoinMetrics retornou valores reais (mvrv_current > 0)
+  // Se isFallback=true com zeros (API falhou, sem cache), exibe mock com badge de aviso
+  const hasLiveData = liveCycle && !liveCycle.isFallback && liveCycle.mvrv_current > 0;
+  const isFallbackWithStale = liveCycle && liveCycle.isFallback && liveCycle.mvrv_current > 0;
+  const nuplValue = (hasLiveData || isFallbackWithStale) ? liveCycle.nupl : n.value;
+  const nuplZone  = (hasLiveData || isFallbackWithStale) ? liveCycle.nupl_zone : n.zone;
+  const nuplColor = (hasLiveData || isFallbackWithStale) ? liveCycle.nupl_zone_color : n.zone_color;
+  const isLive    = IS_LIVE && hasLiveData;
+  const noKey     = IS_LIVE && !liveCycle?.mvrv_current;
   return (
     <OnChainCard title="NUPL" glossKey="nupl" accent={nuplColor} grade={isLive ? 'B' : n.quality}
       trustBadge={
@@ -218,6 +222,14 @@ function NuplCard({ liveCycle }) {
           ? <DataTrustBadge mode="estimated" confidence="B" source="CoinMetrics Community"
               reason="Proxy via (MCap−RCap)/MCap — não é o NUPL oficial Glassnode mas correlação >0.97"
               updatedAt={liveCycle.updated_at} />
+          : isFallbackWithStale
+          ? <DataTrustBadge mode="estimated" confidence="C" source="CoinMetrics (cache)"
+              reason="API com instabilidade — exibindo último dado válido do cache Supabase."
+              updatedAt={liveCycle.lastUpdated} />
+          : noKey
+          ? <DataTrustBadge mode="paid_required" confidence="D" source="CoinMetrics"
+              sourceUrl="https://coinmetrics.io/community-network-data/"
+              reason="Adicione VITE_COINMETRICS_KEY (gratuito em coinmetrics.io) para ativar dados reais." />
           : <DataTrustBadge mode="paid_required" confidence="D" source="Glassnode"
               sourceUrl="https://glassnode.com"
               reason="NUPL/SOPR/Netflow/Whales requerem Glassnode (~$29/mês). Exibindo dados de demonstração." />
@@ -258,7 +270,7 @@ function PaidRequiredCard({ title, glossKey, source, sourceUrl, reason }) {
           sourceUrl={sourceUrl} reason={reason} />
       }
     >
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 0', gap: 10 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px 0', gap: 10 }}>
         <div style={{ fontSize: 28, opacity: 0.3 }}>🔒</div>
         <div style={{ fontSize: 12, color: '#4a6580', textAlign: 'center', maxWidth: 200 }}>
           Dado não disponível sem assinatura {source}
@@ -267,6 +279,10 @@ function PaidRequiredCard({ title, glossKey, source, sourceUrl, reason }) {
           style={{ fontSize: 10, color: '#3b82f6', textDecoration: 'none', border: '1px solid #1e3a5f', borderRadius: 4, padding: '3px 8px' }}>
           Ver planos →
         </a>
+      </div>
+      <div style={{ marginTop: 4, padding: '6px 10px', borderRadius: 6, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)', fontSize: 10, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span style={{ color: '#ef4444', fontWeight: 700 }}>⚠</span>
+        <span>Não computa na análise de IA — será incluído automaticamente quando a assinatura estiver ativa.</span>
       </div>
     </OnChainCard>
   );
@@ -416,34 +432,42 @@ function WhaleCard() {
 
 // ─── REALIZED PRICE / MVRV ───────────────────────────────────────────────────
 function MvrvCard({ liveCycle }) {
-  // live via CoinMetrics Community API (grátis, qualidade A) se disponível
-  const mvrv      = liveCycle?.mvrv_current    ?? btcRealizedMetrics.mvrv_ratio;
-  const mvrvZ     = liveCycle?.mvrv_zscore     ?? btcRealizedMetrics.mvrv_zscore;
-  const rPrice    = liveCycle?.realized_price  ?? btcRealizedMetrics.realized_price;
-  const cPrice    = liveCycle?.current_price   ?? btcRealizedMetrics.current_price;
-  const zone      = liveCycle?.mvrv_zone       ?? btcRealizedMetrics.mvrv_zone;
-  const color     = liveCycle?.mvrv_zone_color ?? btcRealizedMetrics.mvrv_zone_color;
-  const grade     = liveCycle?.quality         ?? 'B';
+  // Usa dados live apenas quando mvrv_current > 0 (API retornou valores reais)
+  const hasLiveData = liveCycle && !liveCycle.isFallback && liveCycle.mvrv_current > 0;
+  const isFallbackWithStale = liveCycle && liveCycle.isFallback && liveCycle.mvrv_current > 0;
+  const useLive = hasLiveData || isFallbackWithStale;
+  const mvrv      = useLive ? liveCycle.mvrv_current    : btcRealizedMetrics.mvrv_ratio;
+  const mvrvZ     = useLive ? liveCycle.mvrv_zscore     : btcRealizedMetrics.mvrv_zscore;
+  const rPrice    = useLive ? liveCycle.realized_price  : btcRealizedMetrics.realized_price;
+  const cPrice    = useLive ? liveCycle.current_price   : btcRealizedMetrics.current_price;
+  const zone      = useLive ? liveCycle.mvrv_zone       : btcRealizedMetrics.mvrv_zone;
+  const color     = useLive ? liveCycle.mvrv_zone_color : btcRealizedMetrics.mvrv_zone_color;
+  const grade     = useLive ? (liveCycle.quality ?? 'B') : 'B';
   const distPct   = rPrice > 0 ? ((cPrice - rPrice) / rPrice * 100) : 0;
   const rDelta30d = btcRealizedMetrics.realized_price_delta_30d;
+  const noKey     = IS_LIVE && !liveCycle?.mvrv_current;
   return (
     <OnChainCard title="Realized Price · MVRV" glossKey="mvrv" accent={color} grade={grade}
       trustBadge={
         <DataTrustBadge
-          mode={IS_LIVE ? (liveCycle ? 'estimated' : 'mock') : 'mock'}
-          confidence={IS_LIVE && liveCycle ? 'B' : 'D'}
-          source="CoinMetrics"
-          sourceUrl="https://community-api.coinmetrics.io/v4"
-          updatedAt={liveCycle?.updated_at}
+          mode={hasLiveData ? 'estimated' : isFallbackWithStale ? 'estimated' : noKey ? 'paid_required' : 'mock'}
+          confidence={hasLiveData ? 'B' : isFallbackWithStale ? 'C' : 'D'}
+          source={noKey ? 'CoinMetrics (chave necessária)' : 'CoinMetrics Community'}
+          sourceUrl="https://coinmetrics.io/community-network-data/"
+          updatedAt={useLive ? liveCycle.lastUpdated : undefined}
           reason={
-            !liveCycle && IS_LIVE
+            noKey
+              ? 'Adicione VITE_COINMETRICS_KEY (gratuito em coinmetrics.io) para ativar dados reais de MVRV.'
+              : isFallbackWithStale
+              ? 'API instável — exibindo último dado válido do cache.'
+              : !useLive && IS_LIVE
               ? 'CoinMetrics não disponível — exibindo fallback mock'
               : 'NUPL derivado de (MCap−RCap)/MCap — proxy, não fórmula oficial Glassnode'
           }
         />
       }
     >
-      {liveCycle && (
+      {hasLiveData && (
         <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
           <DataQualityBadge
             freshness={liveCycle.updated_at && Date.now() - liveCycle.updated_at < 3_600_000 ? 100 : 60}
@@ -453,6 +477,13 @@ function MvrvCard({ liveCycle }) {
             source="CoinMetrics"
           />
           <span style={{ fontSize: 9, color: '#475569' }}>Community · Grátis</span>
+        </div>
+      )}
+      {noKey && IS_LIVE && (
+        <div style={{ marginBottom: 8, padding: '6px 10px', borderRadius: 6, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', fontSize: 10, color: '#f59e0b' }}>
+          🔑 <strong>Chave CoinMetrics gratuita necessária.</strong>{' '}
+          <a href="https://coinmetrics.io/community-network-data/" target="_blank" rel="noopener noreferrer" style={{ color: '#60a5fa', textDecoration: 'none' }}>Cadastre-se aqui →</a>
+          {' '}e adicione <code style={{ background: '#1e2d45', padding: '0 4px', borderRadius: 3, fontSize: 9 }}>VITE_COINMETRICS_KEY</code> nas variáveis de ambiente do Render.
         </div>
       )}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 10 }}>
@@ -657,11 +688,15 @@ function MempoolCard({ liveMempool }) {
 
 // ─── CDD CARD ─────────────────────────────────────────────────────────────────
 function CddCard({ liveExtended }) {
-  const cdd       = liveExtended?.cdd_current   ?? 8_000_000;
-  const ma30      = liveExtended?.cdd_ma30       ?? 7_500_000;
-  const zScore    = liveExtended?.cdd_z_score    ?? 0.3;
-  const signal    = liveExtended?.cdd_signal     ?? 'Dados não disponíveis — exibindo estimativa mock.';
-  const grade     = liveExtended?.quality        ?? 'B';
+  // Usa dados live apenas quando CoinMetrics retornou valores reais (cdd_current > 0)
+  const hasLiveExt = liveExtended && !liveExtended.isFallback && liveExtended.cdd_current > 0;
+  const hasFallbackExt = liveExtended && liveExtended.isFallback && liveExtended.cdd_current > 0;
+  const useExt = hasLiveExt || hasFallbackExt;
+  const cdd       = useExt ? liveExtended.cdd_current : 8_000_000;
+  const ma30      = useExt ? liveExtended.cdd_ma30    : 7_500_000;
+  const zScore    = useExt ? liveExtended.cdd_z_score : 0.3;
+  const signal    = useExt ? liveExtended.cdd_signal  : 'Dados não disponíveis — configure VITE_COINMETRICS_KEY (gratuito) para ativar.';
+  const grade     = useExt ? liveExtended.quality     : 'B';
 
   // Cor baseada no z-score: azul (baixo) → verde (neutro) → amarelo → vermelho (alto)
   const zColor = zScore > 2 ? '#ef4444' : zScore > 1 ? '#f59e0b' : zScore > 0 ? '#10b981' : '#3b82f6';
@@ -683,12 +718,20 @@ function CddCard({ liveExtended }) {
     ? { '1d': pts.slice(-2), '1w': pts.slice(-7), '1m': pts }
     : { '1d': [], '1w': [], '1m': [] };
 
+  const noCoinmetricsKey = IS_LIVE && !liveExtended?.cdd_current;
   return (
     <OnChainCard title="CDD — Coin Days Destroyed" glossKey="cdd" accent={zColor} grade={grade}>
-      {liveExtended && (
+      {hasLiveExt && (
         <div style={{ fontSize: 9, color: '#10b981', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 4 }}>
           <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
           CoinMetrics Community · Grátis · Qualidade A
+        </div>
+      )}
+      {noCoinmetricsKey && (
+        <div style={{ marginBottom: 8, padding: '6px 10px', borderRadius: 6, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', fontSize: 10, color: '#f59e0b' }}>
+          🔑 <strong>Chave CoinMetrics gratuita necessária.</strong>{' '}
+          <a href="https://coinmetrics.io/community-network-data/" target="_blank" rel="noopener noreferrer" style={{ color: '#60a5fa', textDecoration: 'none' }}>Cadastre-se aqui →</a>
+          {' '}e adicione <code style={{ background: '#1e2d45', padding: '0 4px', borderRadius: 3, fontSize: 9 }}>VITE_COINMETRICS_KEY</code> nas variáveis de ambiente do Render.
         </div>
       )}
 
@@ -807,12 +850,17 @@ function CddCard({ liveExtended }) {
 
 // ─── HODL WAVE CARD ───────────────────────────────────────────────────────────
 function HodlWaveCard({ liveExtended }) {
-  const hodlPct   = liveExtended?.hodl_wave_1yr_pct ?? 0.705;
-  const trend     = liveExtended?.hodl_wave_trend   ?? 'neutral';
-  const actSply   = liveExtended?.active_supply_1yr ?? 5_713_000;
-  const dormancy  = liveExtended?.dormancy_value    ?? 9.4;
-  const dormSig   = liveExtended?.dormancy_signal   ?? 'Dados não disponíveis — exibindo estimativa mock.';
-  const grade     = liveExtended?.quality           ?? 'B';
+  // Usa dados live apenas quando CoinMetrics retornou valores reais (hodl_wave_1yr_pct > 0)
+  const hasLiveExt     = liveExtended && !liveExtended.isFallback && liveExtended.hodl_wave_1yr_pct > 0;
+  const hasFallbackExt = liveExtended && liveExtended.isFallback && liveExtended.hodl_wave_1yr_pct > 0;
+  const useExt    = hasLiveExt || hasFallbackExt;
+  const hodlPct   = useExt ? liveExtended.hodl_wave_1yr_pct : 0.705;
+  const trend     = useExt ? liveExtended.hodl_wave_trend   : 'neutral';
+  const actSply   = useExt ? liveExtended.active_supply_1yr : 5_713_000;
+  const dormancy  = useExt ? liveExtended.dormancy_value    : 9.4;
+  const dormSig   = useExt ? liveExtended.dormancy_signal   : 'Dados não disponíveis — configure VITE_COINMETRICS_KEY (gratuito) para ativar.';
+  const grade     = useExt ? liveExtended.quality           : 'B';
+  const noCoinmetricsKey = IS_LIVE && !liveExtended?.hodl_wave_1yr_pct;
 
   // Cor e label de tendência
   const trendMeta = {
@@ -833,10 +881,17 @@ function HodlWaveCard({ liveExtended }) {
 
   return (
     <OnChainCard title="HODL Wave 1yr+ · Dormancy" glossKey="hodlWave" accent={trendMeta.color} grade={grade}>
-      {liveExtended && (
+      {hasLiveExt && (
         <div style={{ fontSize: 9, color: '#10b981', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 4 }}>
           <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
           CoinMetrics Community · Grátis · Qualidade A
+        </div>
+      )}
+      {noCoinmetricsKey && (
+        <div style={{ marginBottom: 8, padding: '6px 10px', borderRadius: 6, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', fontSize: 10, color: '#f59e0b' }}>
+          🔑 <strong>Chave CoinMetrics gratuita necessária.</strong>{' '}
+          <a href="https://coinmetrics.io/community-network-data/" target="_blank" rel="noopener noreferrer" style={{ color: '#60a5fa', textDecoration: 'none' }}>Cadastre-se aqui →</a>
+          {' '}e adicione <code style={{ background: '#1e2d45', padding: '0 4px', borderRadius: 3, fontSize: 9 }}>VITE_COINMETRICS_KEY</code> nas variáveis de ambiente do Render.
         </div>
       )}
 

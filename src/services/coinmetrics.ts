@@ -25,11 +25,19 @@
  */
 
 import { z } from 'zod';
-import { DATA_MODE } from '@/lib/env';
+import { DATA_MODE, env } from '@/lib/env';
+import { apiFetch } from '@/lib/apiClient';
 import { btcRealizedMetrics, btcNUPL } from '@/components/data/mockData';
 
 const BASE = 'https://community-api.coinmetrics.io/v4';
 const ASSET = 'btc';
+
+/** Adiciona api_key ao URLSearchParams se VITE_COINMETRICS_KEY estiver configurado */
+function withApiKey(params: URLSearchParams): URLSearchParams {
+  const key = env.VITE_COINMETRICS_KEY;
+  if (key) params.set('api_key', key);
+  return params;
+}
 
 // ─── Schemas ──────────────────────────────────────────────────────────────────
 
@@ -317,15 +325,15 @@ export async function fetchOnChainExtended(): Promise<OnChainExtendedData> {
   if (DATA_MODE === 'mock') return mockOnChainExtended();
 
   const metrics = 'CoinDaysDestroyed,SplyAdr1yrPlus,SplyAct1yr,AdrActCnt,VelCur1yr';
-  const params  = new URLSearchParams({
+  const params  = withApiKey(new URLSearchParams({
     assets:     ASSET,
     metrics,
     frequency:  '1d',
     page_size:  '90',
     paging_from: 'end',
-  });
+  }));
 
-  const res = await fetch(`${BASE}/timeseries/asset-metrics?${params}`);
+  const res = await apiFetch(`${BASE}/timeseries/asset-metrics?${params}`);
   if (!res.ok) {
     const body = await res.text().catch(() => '');
     throw new Error(`CoinMetrics Extended API error ${res.status}: ${res.statusText} — ${body.slice(0, 200)}`);
@@ -412,15 +420,15 @@ export async function fetchOnChainCycle(): Promise<OnChainCycleData> {
   if (DATA_MODE === 'mock') return mockOnChainCycle();
 
   const metrics = 'CapMVRVCur,CapRealUSD,PriceUSD,NVTAdj,SplyCur';
-  const params = new URLSearchParams({
+  const params = withApiKey(new URLSearchParams({
     assets:      ASSET,
     metrics,
     frequency:   '1d',
     page_size:   '365',
     paging_from: 'end',
-  });
+  }));
 
-  const res = await fetch(`${BASE}/timeseries/asset-metrics?${params}`);
+  const res = await apiFetch(`${BASE}/timeseries/asset-metrics?${params}`);
   if (!res.ok) {
     const body = await res.text().catch(() => '');
     throw new Error(`CoinMetrics API error ${res.status}: ${res.statusText} — ${body.slice(0, 200)}`);
