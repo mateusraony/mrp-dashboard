@@ -5,6 +5,7 @@ import {
 } from '../components/data/mockDataExtended';
 import { btcOptionsExtended } from '../components/data/mockData';
 import { ModeBadge, GradeBadge } from '../components/ui/DataBadge';
+import { DataTrustBadge } from '../components/ui/DataTrustBadge';
 import AIInsightPanel from '../components/ai/AIInsightPanel';
 import IVRankPanel from '../components/options/IVRankPanel';
 import TakerFlowPanel from '../components/options/TakerFlowPanel';
@@ -41,6 +42,57 @@ function SectionTitle({ title, sub, badge, mode }) {
   );
 }
 
+// ─── Tooltip educativo ────────────────────────────────────────────────────────
+function Tip({ children, text }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <span
+      style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 3, cursor: 'help' }}
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
+      {children}
+      <span style={{ fontSize: 9, color: '#3b82f6', fontWeight: 700, opacity: 0.7 }}>?</span>
+      {open && (
+        <span style={{
+          position: 'absolute', bottom: '100%', left: 0, zIndex: 50,
+          background: '#0d1421', border: '1px solid #1e3048', borderRadius: 8,
+          padding: '8px 12px', fontSize: 11, color: '#cbd5e1', lineHeight: 1.6,
+          width: 240, boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+          whiteSpace: 'normal', pointerEvents: 'none',
+        }}>
+          {text}
+        </span>
+      )}
+    </span>
+  );
+}
+
+// ─── Accordion de dica ────────────────────────────────────────────────────────
+function TipCard({ emoji, title, body, tag }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div
+      onClick={() => setOpen(o => !o)}
+      style={{ background: '#0d1421', border: '1px solid #1e2d45', borderRadius: 10, padding: '12px 14px', cursor: 'pointer', borderLeft: '3px solid #a78bfa' }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 16 }}>{emoji}</span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0' }}>{title}</span>
+          {tag && <span style={{ fontSize: 9, color: '#a78bfa', background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.2)', borderRadius: 4, padding: '1px 6px', fontWeight: 700 }}>{tag}</span>}
+        </div>
+        <span style={{ fontSize: 12, color: '#4a5568' }}>{open ? '▲' : '▼'}</span>
+      </div>
+      {open && (
+        <div style={{ marginTop: 10, fontSize: 11, color: '#94a3b8', lineHeight: 1.7, borderTop: '1px solid #1e2d45', paddingTop: 10 }}>
+          {body}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── LIQ HEATMAP — Gráfico de barras horizontal duplo (longs ← | → shorts) ──
 // Agrupa liquidações reais em clusters de $500
 function buildClustersFromLiquidations(liquidations, spotPrice) {
@@ -52,7 +104,7 @@ function buildClustersFromLiquidations(liquidations, spotPrice) {
     if (!price) continue;
     const bucket = Math.round(price / BUCKET) * BUCKET;
     if (!bucketMap.has(bucket)) bucketMap.set(bucket, { price: bucket, longs_usd: 0, shorts_usd: 0 });
-    const usd = Math.abs(liq.usd ?? (price * (liq.quantity ?? 0)));
+    const usd = Math.abs(liq.usd_value ?? (price * (liq.qty ?? 0)));
     const side = liq.side ?? liq.positionSide ?? '';
     if (side === 'SELL' || price < spotPrice) {
       bucketMap.get(bucket).longs_usd += usd;
@@ -69,7 +121,6 @@ function LiqHeatmapFull() {
   const SPOT_LIVE = ticker?.mark_price ?? SPOT;
   const [hover, setHover] = useState(null);
 
-  // Tenta construir clusters com dados reais; fallback para mock
   const liveClusters = liquidationsRaw && liquidationsRaw.length > 0
     ? buildClustersFromLiquidations(liquidationsRaw, SPOT_LIVE)
     : null;
@@ -86,21 +137,17 @@ function LiqHeatmapFull() {
     quality: 'A',
   } : liquidationClusters;
 
-  // Ordenar por preço crescente para o gráfico
   const sorted = [...d.clusters].sort((a, b) => a.price - b.price);
   const maxVal = Math.max(...sorted.map(c => Math.max(c.longs_usd, c.shorts_usd)));
 
-  // Prob AI: ratio longs vs shorts em risco
   const longRisk = d.total_longs_at_risk_10pct;
   const shortRisk = d.total_shorts_at_risk_10pct;
   const totalRisk = longRisk + shortRisk;
   const probLongFlush = Math.round((longRisk / totalRisk) * 100);
 
-  // Maior ameaça imediata (cluster abaixo/acima mais próximo)
   const closestLong  = [...sorted].filter(c => c.price < SPOT_LIVE).sort((a, b) => b.price - a.price)[0];
   const closestShort = [...sorted].filter(c => c.price > SPOT_LIVE).sort((a, b) => a.price - b.price)[0];
 
-  // Claude AI insight
   const derivAdvPayload = ticker ? {
     page: 'derivatives_advanced',
     riskScore: 50,
@@ -128,15 +175,23 @@ function LiqHeatmapFull() {
         mode={IS_LIVE ? 'live' : 'mock'}
       />
 
+      <div style={{ fontSize: 10, color: '#334155', marginBottom: 14, padding: '6px 10px', background: '#0a1220', borderRadius: 6, border: '1px solid #1a2535', display: 'inline-block' }}>
+        📌 <strong style={{ color: '#94a3b8' }}>Para que serve:</strong> Mostra onde estão concentradas as posições alavancadas que serão liquidadas automaticamente se o preço atingir aquele nível. Clusters grandes = "muralhas" que podem acelerar ou brecar movimentos.
+      </div>
+
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 16 }}>
         <div style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, padding: '10px 12px' }}>
-          <div style={{ fontSize: 8, color: '#ef4444', fontWeight: 700, marginBottom: 2, textTransform: 'uppercase' }}>Longs em Risco (−10%)</div>
+          <div style={{ fontSize: 8, color: '#ef4444', fontWeight: 700, marginBottom: 2, textTransform: 'uppercase' }}>
+            <Tip text="Total em USD de posições long que seriam forçosamente fechadas se o preço cair 10% a partir do spot atual.">Longs em Risco (−10%)</Tip>
+          </div>
           <div style={{ fontSize: 18, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: '#ef4444' }}>{fmtM(longRisk)}</div>
           <div style={{ fontSize: 8, color: '#334155', marginTop: 1 }}>Maior: ${(d.largest_long_cluster.price / 1000).toFixed(0)}K → {fmtM(d.largest_long_cluster.usd)}</div>
         </div>
         <div style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 8, padding: '10px 12px' }}>
-          <div style={{ fontSize: 8, color: '#10b981', fontWeight: 700, marginBottom: 2, textTransform: 'uppercase' }}>Shorts em Risco (+10%)</div>
+          <div style={{ fontSize: 8, color: '#10b981', fontWeight: 700, marginBottom: 2, textTransform: 'uppercase' }}>
+            <Tip text="Total em USD de posições short que seriam forçosamente fechadas se o preço subir 10%.">Shorts em Risco (+10%)</Tip>
+          </div>
           <div style={{ fontSize: 18, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: '#10b981' }}>{fmtM(shortRisk)}</div>
           <div style={{ fontSize: 8, color: '#334155', marginTop: 1 }}>Maior: ${(d.largest_short_cluster.price / 1000).toFixed(0)}K → {fmtM(d.largest_short_cluster.usd)}</div>
         </div>
@@ -159,14 +214,13 @@ function LiqHeatmapFull() {
         <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: '#f59e0b', display: 'inline-block' }} /> Preço Spot Atual</span>
       </div>
 
-      {/* Gráfico horizontal duplo — cada linha é um preço, barras opostas */}
+      {/* Gráfico horizontal duplo */}
       <div style={{ display: 'flex', gap: 0 }}>
-        {/* Lado esquerdo — LONGS (barras crescem da direita para a esquerda) */}
+        {/* Lado esquerdo — LONGS */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
           <div style={{ fontSize: 8, color: '#ef4444', textAlign: 'right', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>← LONGS EM RISCO (se preço cair)</div>
           {sorted.slice().reverse().map((c) => {
             const isAbove = c.price > SPOT_LIVE;
-            const isSpot = Math.abs(c.price - SPOT_LIVE) < 200;
             const val = c.longs_usd;
             const pct = (val / maxVal) * 100;
             const isHov = hover === c.price;
@@ -175,11 +229,9 @@ function LiqHeatmapFull() {
                 onMouseEnter={() => setHover(c.price)}
                 onMouseLeave={() => setHover(null)}
                 style={{ display: 'flex', alignItems: 'center', gap: 4, height: 22 }}>
-                {/* Value label */}
                 <div style={{ width: 50, textAlign: 'right', fontSize: 8, fontFamily: 'JetBrains Mono, monospace', color: isAbove ? '#1e3048' : '#ef4444', flexShrink: 0 }}>
                   {!isAbove ? fmtM(val) : ''}
                 </div>
-                {/* Bar fills right-to-left */}
                 <div style={{ flex: 1, height: 16, background: '#0d1421', borderRadius: '3px 0 0 3px', overflow: 'hidden', display: 'flex', justifyContent: 'flex-end' }}>
                   {!isAbove && (
                     <div style={{ width: `${pct}%`, height: '100%', background: isHov ? '#f87171' : `rgba(239,68,68,${0.2 + pct/100*0.7})`, borderRadius: '3px 0 0 3px', boxShadow: pct > 50 ? '0 0 8px rgba(239,68,68,0.4)' : 'none' }} />
@@ -214,7 +266,7 @@ function LiqHeatmapFull() {
           })}
         </div>
 
-        {/* Lado direito — SHORTS (barras crescem da esquerda para a direita) */}
+        {/* Lado direito — SHORTS */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
           <div style={{ fontSize: 8, color: '#10b981', textAlign: 'left', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>SHORTS EM RISCO (se preço subir) →</div>
           {sorted.slice().reverse().map((c) => {
@@ -273,6 +325,13 @@ function LiqHeatmapFull() {
           modelLabel={aiInsightText ? 'claude-haiku-4-5' : undefined}
         />
       </div>
+
+      {!usingLive && (
+        <div style={{ marginTop: 10, padding: '6px 10px', borderRadius: 6, background: 'rgba(249,115,22,0.06)', border: '1px solid rgba(249,115,22,0.18)', fontSize: 10, color: '#78716c', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <span>🔒 Dados simulados — configure uma Binance API Key para clustering real. Este dado <strong style={{ color: '#f97316' }}>não é considerado</strong> nas análises de AI sem chave configurada</span>
+          <a href="https://www.binance.com/en/support/faq/how-to-create-api-keys-on-binance-360002502072" target="_blank" rel="noopener noreferrer" style={{ color: '#f97316', textDecoration: 'none', fontWeight: 700, whiteSpace: 'nowrap' }}>Ver como →</a>
+        </div>
+      )}
     </div>
   );
 }
@@ -287,15 +346,14 @@ function OIByStrike() {
   const spotBtc = ticker?.mark_price ?? SPOT;
   const liveChain = liveOptions?.chain ?? [];
   const isLiveBtc = IS_LIVE && asset === 'BTC' && liveChain.length > 0;
+  const isEth = asset === 'ETH';
 
-  // ETH mock OI (scaled down)
   const ethStrikes = d.oi_by_strike.map(s => ({
     strike: Math.round(s.strike * 0.0381),
     call_oi: Math.round(s.call_oi * 0.12),
     put_oi: Math.round(s.put_oi * 0.12),
   }));
 
-  // BTC: prefer live chain, fall back to mock
   const btcStrikes = isLiveBtc
     ? liveChain.map(c => ({ strike: c.strike, call_oi: c.call_oi, put_oi: c.put_oi }))
     : d.oi_by_strike;
@@ -318,6 +376,8 @@ function OIByStrike() {
   const pcrVol = asset === 'BTC' ? (liveOptions?.put_call_ratio_vol ?? d.put_call_ratio_vol) : d.put_call_ratio_vol;
   const pcrOi = asset === 'BTC' ? (liveOptions?.put_call_ratio_oi ?? d.put_call_ratio_oi) : d.put_call_ratio_oi;
 
+  const effectiveMode = isLiveBtc ? 'live' : 'mock';
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
@@ -325,9 +385,12 @@ function OIByStrike() {
           title="Open Interest por Strike"
           sub={`${asset} Options — Calls (verde, acima) · Puts (vermelho, abaixo)`}
           badge={isLiveBtc ? 'A' : d.quality}
-          mode={isLiveBtc ? 'live' : undefined}
+          mode={effectiveMode}
         />
-        <div style={{ display: 'flex', gap: 4 }}>
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+          {!isLiveBtc && (
+            <DataTrustBadge mode="paid_required" confidence="D" source="Deribit" sourceUrl="https://www.deribit.com" reason="Chain de opções BTC requer Deribit API com ENABLE_OPTIONS ativo." />
+          )}
           {['BTC', 'ETH'].map(a => (
             <button key={a} onClick={() => setAsset(a)} style={{
               padding: '4px 12px', borderRadius: 6,
@@ -340,15 +403,31 @@ function OIByStrike() {
         </div>
       </div>
 
+      <div style={{ fontSize: 10, color: '#334155', marginBottom: 12, padding: '6px 10px', background: '#0a1220', borderRadius: 6, border: '1px solid #1a2535', display: 'inline-block' }}>
+        📌 <strong style={{ color: '#94a3b8' }}>Para que serve:</strong> Mostra onde estão os maiores contratos de opções em aberto. Concentração de calls = mercado apostando em alta naquele strike. Puts = proteção contra queda. O Max Pain é o preço onde a maioria expira sem valor — atração gravitacional próxima de vencimentos.
+      </div>
+
       {/* Summary stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 8, marginBottom: 12 }}>
         {[
-          { label: 'Put/Call Ratio (Vol)', value: pcrVol.toFixed(2), color: '#f59e0b', sub: 'Por volume' },
-          { label: 'Put/Call Ratio (OI)',  value: pcrOi.toFixed(2),  color: '#a78bfa', sub: 'Por OI' },
-          { label: 'Max Pain',             value: `$${(maxPain / 1000).toFixed(0)}K`, color: '#ef4444', sub: 'Maior expiração s/valor' },
-          { label: 'GEX',                  value: `${(gamma / 1e6).toFixed(0)}M`,  color: gamma < 0 ? '#ef4444' : '#10b981', sub: gamma < 0 ? 'Short gamma dealer' : 'Long gamma dealer' },
-        ].map(s => (
-          <div key={s.label} style={{ background: '#0d1421', border: '1px solid #1a2535', borderRadius: 8, padding: '9px 11px' }}>
+          {
+            label: <Tip text="Razão entre volume de Puts e Calls. Acima de 1.0: mais contratos de venda (proteção/bear). Abaixo de 1.0: mais calls (otimismo). Acima de 1.3 = extrema proteção (pânico ou hedge institucional).">Put/Call Ratio (Vol)</Tip>,
+            value: pcrVol.toFixed(2), color: '#f59e0b', sub: 'Por volume',
+          },
+          {
+            label: <Tip text="Razão entre OI em Puts e Calls. Mais estável que o PCR de volume — muda mais lentamente. Acima de 1.2: mercado estruturalmente mais hedgeado.">Put/Call Ratio (OI)</Tip>,
+            value: pcrOi.toFixed(2), color: '#a78bfa', sub: 'Por OI',
+          },
+          {
+            label: <Tip text="O preço onde os vendedores de opções (market makers/writers) sofrem menos perdas na expiração. Atua como imã — preço tende a gravitar para cá perto do vencimento. Não é garantia, mas é estatisticamente relevante.">Max Pain</Tip>,
+            value: `$${(maxPain / 1000).toFixed(0)}K`, color: '#ef4444', sub: 'Maior expiração s/valor',
+          },
+          {
+            label: <Tip text="GEX (Gamma Exposure) = posição de gamma dos dealers. Negativo: dealers estão short gamma → amplificam volatilidade (seguem o movimento). Positivo: dealers são long gamma → amortizam volatilidade (vendem na alta, compram na queda).">GEX</Tip>,
+            value: `${(gamma / 1e6).toFixed(0)}M`, color: gamma < 0 ? '#ef4444' : '#10b981', sub: gamma < 0 ? 'Short gamma dealer' : 'Long gamma dealer',
+          },
+        ].map((s, i) => (
+          <div key={i} style={{ background: '#0d1421', border: '1px solid #1a2535', borderRadius: 8, padding: '9px 11px' }}>
             <div style={{ fontSize: 8, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>{s.label}</div>
             <div style={{ fontSize: 16, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: s.color }}>{s.value}</div>
             <div style={{ fontSize: 8, color: '#334155', marginTop: 1 }}>{s.sub}</div>
@@ -385,6 +464,13 @@ function OIByStrike() {
         <span>■ <span style={{ color: '#ef4444' }}>Puts (abaixo)</span> — hedge/proteção</span>
         <span>■ <span style={{ color: '#22d3ee' }}>ATM atual</span></span>
       </div>
+
+      {(isEth || !isLiveBtc) && (
+        <div style={{ marginTop: 10, padding: '6px 10px', borderRadius: 6, background: 'rgba(249,115,22,0.06)', border: '1px solid rgba(249,115,22,0.18)', fontSize: 10, color: '#78716c', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <span>🔒 {isEth ? 'ETH: dados simulados' : 'BTC: chain de opções simulada'} — {isEth ? 'sem suporte ETH na API gratuita' : 'ative ENABLE_OPTIONS com chave Deribit'}. Dados <strong style={{ color: '#f97316' }}>não considerados</strong> nas análises de AI</span>
+          <a href="https://www.deribit.com" target="_blank" rel="noopener noreferrer" style={{ color: '#f97316', textDecoration: 'none', fontWeight: 700, whiteSpace: 'nowrap' }}>Deribit →</a>
+        </div>
+      )}
     </div>
   );
 }
@@ -392,11 +478,9 @@ function OIByStrike() {
 // ─── CARRY CALCULATOR ─────────────────────────────────────────────────────────
 function CarryCalculator() {
   const [capital, setCapital] = useState(100000);
-  const [selectedExp, setSelectedExp] = useState(0);   // index in futures array
+  const [selectedExp, setSelectedExp] = useState(0);
 
-  // Live futures basis — Binance /fapi/v1/premiumIndex
   const { data: liveBasis } = useFuturesBasis();
-  // Fallback: usar mock quando live não disponível ou em modo mock
   const futures = (liveBasis && liveBasis.length > 0)
     ? liveBasis.map(f => ({
         expiry:           f.expiry_label,
@@ -406,26 +490,21 @@ function CarryCalculator() {
       }))
     : futuresBasis.futures;
 
-  // Garantir que selectedExp não sai dos bounds quando dados mudam
   const safeIdx = Math.min(selectedExp, Math.max(0, futures.length - 1));
   const f = futures[safeIdx];
 
-  // US10Y live via FRED
   const { data: macroData } = useMacroBoard();
   const us10yEntry = macroData?.series?.find(s => s.id === 'US10Y');
   const US10Y = us10yEntry?.value ?? 4.512;
 
-  // SPOT live via BTC ticker
   const { data: ticker } = useBtcTicker();
   const SPOT_LIVE = ticker?.mark_price ?? SPOT;
 
-  // Carry calc
   const carryReturn    = capital * (f.basis_annualized / 100) * (f.days_to_exp / 365);
   const riskFreeReturn = capital * (US10Y / 100) * (f.days_to_exp / 365);
   const netCarry       = carryReturn - riskFreeReturn;
   const carrySpread    = f.basis_annualized - US10Y;
 
-  // Chart data — all vencimentos vs US10Y
   const chartData = futures.map(fx => ({
     expiry: fx.expiry.split('-').slice(0, 2).join('-'),
     basis:  parseFloat(fx.basis_annualized.toFixed(2)),
@@ -442,6 +521,10 @@ function CarryCalculator() {
         badge={(liveBasis && liveBasis.length > 0) ? 'A' : futuresBasis.quality}
         mode={(liveBasis && liveBasis.length > 0) ? 'live' : 'mock'}
       />
+
+      <div style={{ fontSize: 10, color: '#334155', marginBottom: 14, padding: '6px 10px', background: '#0a1220', borderRadius: 6, border: '1px solid #1a2535', display: 'inline-block' }}>
+        📌 <strong style={{ color: '#94a3b8' }}>Para que serve:</strong> Calcula se vale a pena fazer carry trade — comprar BTC spot e vender o futuro trimestral para capturar o prêmio. Se o basis anualizado for maior que o juro americano (US10Y), você ganha a diferença sem risco direcional. Use a calculadora interativa para simular com seu capital.
+      </div>
 
       {/* Basis chart */}
       <ResponsiveContainer width="100%" height={160}>
@@ -565,6 +648,9 @@ function TermStructurePanel() {
           badge="A"
           mode="live"
         />
+        <div style={{ fontSize: 10, color: '#334155', marginBottom: 12, padding: '6px 10px', background: '#0a1220', borderRadius: 6, border: '1px solid #1a2535', display: 'inline-block' }}>
+          📌 <strong style={{ color: '#94a3b8' }}>Para que serve:</strong> Mostra como a volatilidade implícita varia conforme o prazo das opções. Contango = risco percebido maior no curto prazo (evento iminente). Backwardation = estrutura normal, incerteza cresce com o tempo.
+        </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {liveTerm.map((e, i) => {
             const label = e.label.replace('BTC-', '');
@@ -602,6 +688,9 @@ function TermStructurePanel() {
         badge={ts.quality}
         mode="mock"
       />
+      <div style={{ fontSize: 10, color: '#334155', marginBottom: 12, padding: '6px 10px', background: '#0a1220', borderRadius: 6, border: '1px solid #1a2535', display: 'inline-block' }}>
+        📌 <strong style={{ color: '#94a3b8' }}>Para que serve:</strong> Mostra como a volatilidade implícita varia conforme o prazo das opções. Contango = risco imediato. Backwardation = estrutura normal. <span style={{ color: '#f97316' }}>Exibindo dados simulados.</span>
+      </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {ts.expirations.map((e, i) => {
           const ivDelta = e.iv_atm - e.iv_prev_day;
@@ -627,6 +716,10 @@ function TermStructurePanel() {
       <div style={{ marginTop: 10, fontSize: 9, color: '#64748b', lineHeight: 1.7, padding: '9px 11px', background: 'rgba(167,139,250,0.04)', border: '1px solid rgba(167,139,250,0.15)', borderRadius: 7 }}>
         <span style={{ color: '#a78bfa', fontWeight: 700 }}>📊 Interpretação: </span>{ts.interpretation}
       </div>
+      <div style={{ marginTop: 10, padding: '6px 10px', borderRadius: 6, background: 'rgba(249,115,22,0.06)', border: '1px solid rgba(249,115,22,0.18)', fontSize: 10, color: '#78716c', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <span>🔒 Dados simulados — term structure real requer Deribit API (ENABLE_OPTIONS). <strong style={{ color: '#f97316' }}>Não considerado</strong> nas análises de AI</span>
+        <a href="https://www.deribit.com" target="_blank" rel="noopener noreferrer" style={{ color: '#f97316', textDecoration: 'none', fontWeight: 700, whiteSpace: 'nowrap' }}>Deribit →</a>
+      </div>
     </div>
   );
 }
@@ -651,6 +744,34 @@ export function AdvancedContent() {
         </p>
       </div>
 
+      {/* Banner "Para que serve" */}
+      <div style={{ marginBottom: 20, padding: '16px 20px', borderRadius: 12, background: 'linear-gradient(135deg, rgba(167,139,250,0.07) 0%, rgba(99,102,241,0.05) 100%)', border: '1px solid rgba(167,139,250,0.2)' }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+          <div style={{ fontSize: 28, lineHeight: 1, marginTop: 2 }}>⚗️</div>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: '#e2e8f0', marginBottom: 6 }}>Para que serve esta aba?</div>
+            <div style={{ fontSize: 11, color: '#94a3b8', lineHeight: 1.8, maxWidth: 820 }}>
+              <strong style={{ color: '#cbd5e1' }}>Avançado</strong> expande a análise de derivativos com ferramentas usadas por traders profissionais e fundos:
+              onde estão os clusters de liquidação, como o mercado de opções está posicionado, e se o carry trade é rentável.{' '}
+              <strong style={{ color: '#a78bfa' }}>Use esta aba para responder:</strong>{' '}
+              "Onde estão os clusters de liquidação mais próximos? Vale fazer carry trade agora? O mercado de opções está com medo ou ganância?"
+            </div>
+            <div style={{ display: 'flex', gap: 16, marginTop: 10, flexWrap: 'wrap' }}>
+              {[
+                { icon: '💥', text: 'Clusters de liquidação por faixa de preço' },
+                { icon: '📊', text: 'OI por strike — onde estão as apostas' },
+                { icon: '🧮', text: 'Calculadora interativa de carry trade' },
+                { icon: '📈', text: 'Estrutura a termo da volatilidade implícita' },
+              ].map((u, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: '#64748b' }}>
+                  <span>{u.icon}</span><span>{u.text}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 2, borderBottom: '1px solid #0f1d2e', marginBottom: 18, flexWrap: 'wrap' }}>
         {TABS.map((t, i) => (
@@ -672,6 +793,58 @@ export function AdvancedContent() {
         {tab === 3 && <TermStructurePanel />}
         {tab === 4 && <IVRankPanel optionsData={liveOptions} />}
         {tab === 5 && <TakerFlowPanel optionsData={liveOptions} />}
+      </div>
+
+      {/* Dicas de Ouro */}
+      <div style={{ marginTop: 20 }}>
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>🏆 Dicas de Ouro — Como Interpretar Derivatives Avançado</div>
+          <div style={{ fontSize: 10, color: '#475569', marginTop: 2 }}>Clique em cada dica para expandir · Conceitos usados por traders institucionais</div>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <TipCard
+            emoji="💥"
+            title="Cluster grande = acelerador ou freio de movimentos"
+            tag="CLUSTERS"
+            body="Quando há um cluster enorme de longs logo abaixo do spot (ex: $5B em $94K), se o preço chegar naquele nível, todas essas posições serão liquidadas automaticamente — criando uma avalanche de vendas que acelera a queda. Por outro lado, um cluster grande de shorts acima atua como 'resistência magnética' que pode provocar short squeeze se rompido."
+          />
+          <TipCard
+            emoji="📊"
+            title="PCR > 1.2 = mercado em modo defensivo"
+            tag="OPTIONS"
+            body="Quando o Put/Call Ratio de volume ultrapassa 1.2, significa que muito mais contratos de venda (puts) estão sendo negociados do que compras (calls). Isso indica hedge institucional ou medo generalizado. Paradoxalmente, PCR extremamente alto (>1.5) pode ser sinal contrarian bullish — quando TODOS estão comprado proteção, o pior já pode ter precificado."
+          />
+          <TipCard
+            emoji="🎯"
+            title="Max Pain — a gravitação das opções"
+            tag="OPTIONS"
+            body="O Max Pain é o preço onde os compradores de opções perdem mais dinheiro (onde mais opções expiram sem valor). Os market makers que venderam essas opções têm incentivo para empurrar o preço nessa direção. Não é garantia, mas nas últimas 24-48h antes do vencimento, o preço frequentemente converge para o Max Pain com mais de 60% de probabilidade."
+          />
+          <TipCard
+            emoji="⚡"
+            title="GEX negativo = dealers amplificam o movimento"
+            tag="GEX"
+            body="Quando o Gamma Exposure (GEX) dos dealers é negativo, eles estão Short Gamma — precisam vender quando o preço cai e comprar quando sobe para se hedgearem. Isso AMPLIFICA a volatilidade. Em GEX positivo (Long Gamma), os dealers fazem o oposto: compram na queda e vendem na alta, AMORTECENDO a volatilidade. GEX muito negativo + liquidações próximas = combinação explosiva."
+          />
+          <TipCard
+            emoji="🧮"
+            title="Carry trade: capturando basis sem risco direcional"
+            tag="CARRY"
+            body="Se o futuro trimestral de BTC está a +15% anualizado e o juro americano está em 4.5%, a diferença de +10.5% é capturable sem apostar na direção do preço: compra BTC spot + vende o futuro. No vencimento, você recebe o prêmio independente de BTC subir ou cair. O risco é execution (slippage, custos de custódia) e o basis se comprimir antes do vencimento."
+          />
+          <TipCard
+            emoji="📈"
+            title="Contango de IV = evento próximo esperado"
+            tag="TERM STRUCTURE"
+            body="Quando a volatilidade implícita de curto prazo (1W) está ACIMA da de longo prazo (3M+), a term structure está em contango invertido. Isso indica que o mercado precifica um risco específico em breve (FOMC, halving, regulação). Operadores de volatilidade vendem IV cara de curto prazo e compram IV barata de longo prazo nesse cenário."
+          />
+          <TipCard
+            emoji="🌊"
+            title="IV Rank > 80%: venda de volatilidade é atraente"
+            tag="IV RANK"
+            body="IV Rank mostra onde a volatilidade atual está em relação ao histórico de 1 ano (0% = mínima histórica, 100% = máxima histórica). Com IV Rank > 80%, a volatilidade está cara comparada ao histórico — vender premium (puts cobertas, strangles) tem expectativa positiva pois IV tende a reverter para a média. Com IV Rank < 20%, comprar opções é mais barato que o normal."
+          />
+        </div>
       </div>
     </div>
   );
