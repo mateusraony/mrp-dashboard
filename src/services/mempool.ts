@@ -21,6 +21,7 @@
 
 import { z } from 'zod';
 import { DATA_MODE } from '@/lib/env';
+import { apiFetch } from '@/lib/apiClient';
 import {
   onChain,
   btcNUPL,
@@ -266,8 +267,11 @@ function mockOnChainAdvanced(): OnChainAdvancedData {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 async function safeFetch<S extends z.ZodTypeAny>(url: string, schema: S): Promise<z.infer<S>> {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Mempool.space API error ${res.status}: ${url}`);
+  const res = await apiFetch(url);
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`Mempool.space API error ${res.status}: ${url} — ${body.slice(0, 100)}`);
+  }
   const data = await res.json();
   return schema.parse(data) as z.infer<S>;
 }

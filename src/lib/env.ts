@@ -29,6 +29,14 @@ const EnvSchema = z.object({
   // Após registrar, copie a chave e adicione ao .env.local:
   //   VITE_SOSOVALUE_KEY=sua_chave_aqui
   VITE_SOSOVALUE_KEY: z.string().min(1).optional(),
+
+  // ── CoinMetrics Community API key (gratuito — requer cadastro) ────────────
+  // A partir de 2025, o endpoint community-api.coinmetrics.io exige chave.
+  // Cadastro gratuito: https://coinmetrics.io/community-network-data/
+  // Após cadastro, adicione ao .env.local / Render env vars:
+  //   VITE_COINMETRICS_KEY=sua_chave_aqui
+  // Sem a chave: MVRV, NUPL, CDD, HODL Wave exibem fallback mock com badge ⚠.
+  VITE_COINMETRICS_KEY: z.string().min(1).optional(),
 });
 
 // Valida no carregamento do módulo (falha silencioso em dev, hard fail em prod)
