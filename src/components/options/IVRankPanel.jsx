@@ -37,6 +37,39 @@ export default function IVRankPanel({ optionsData }) {
     history: mockIvRank.history,
   } : mockIvRank;
 
+  if (!isLive) {
+    return (
+      <div style={{
+        background: 'linear-gradient(135deg, #131e2e 0%, #111827 100%)',
+        border: '1px solid rgba(249,115,22,0.2)', borderRadius: 12, padding: 20,
+      }}>
+        <div style={{ fontSize: 10, color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 14 }}>
+          IV Rank / IV Percentile
+        </div>
+        <div style={{
+          padding: '32px 20px', borderRadius: 10, display: 'flex', flexDirection: 'column',
+          alignItems: 'center', gap: 10, textAlign: 'center',
+          background: 'rgba(249,115,22,0.03)', border: '1px dashed rgba(249,115,22,0.2)',
+        }}>
+          <div style={{ fontSize: 32, opacity: 0.5 }}>🔒</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#94a3b8' }}>IV Rank indisponível</div>
+          <div style={{ fontSize: 11, color: '#475569', maxWidth: 360, lineHeight: 1.7 }}>
+            Requer histórico de 52 semanas de IV ATM via Deribit API.
+            Configure <strong style={{ color: '#94a3b8' }}>ENABLE_OPTIONS</strong> com chave Deribit para ativar.
+          </div>
+          <a href="https://www.deribit.com/pages/information/api" target="_blank" rel="noopener noreferrer" style={{
+            fontSize: 10, color: '#3b82f6', textDecoration: 'none', fontWeight: 700,
+            padding: '4px 12px', borderRadius: 5, border: '1px solid rgba(59,130,246,0.25)',
+            background: 'rgba(59,130,246,0.05)',
+          }}>Ver API Deribit →</a>
+          <div style={{ fontSize: 9, color: '#475569', padding: '2px 10px', borderRadius: 4, background: 'rgba(249,115,22,0.05)', border: '1px solid rgba(249,115,22,0.12)' }}>
+            Dado <strong style={{ color: '#f97316' }}>não considerado</strong> nas análises de AI
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const zone = IVR_ZONES.find(z => d.iv_rank >= z.min && d.iv_rank < z.max) || IVR_ZONES[2];
 
   return (
@@ -129,12 +162,6 @@ export default function IVRankPanel({ optionsData }) {
         <span style={{ color: '#64748b' }}>{zone.action}. {d.signal}</span>
       </div>
 
-      {!isLive && (
-        <div style={{ marginTop: 10, padding: '6px 10px', borderRadius: 6, background: 'rgba(249,115,22,0.06)', border: '1px solid rgba(249,115,22,0.18)', fontSize: 10, color: '#78716c', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-          <span>🔒 Dados simulados — IV Rank 52 semanas requer conta Deribit</span>
-          <a href="https://www.deribit.com/pages/information/api" target="_blank" rel="noopener noreferrer" style={{ color: '#f97316', textDecoration: 'none', fontWeight: 700, whiteSpace: 'nowrap' }}>Ver API →</a>
-        </div>
-      )}
     </div>
   );
 }

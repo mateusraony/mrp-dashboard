@@ -36,6 +36,38 @@ export default function TakerFlowPanel({ optionsData }) {
     };
   })() : mockTakerFlow;
 
+  if (!hasLiveData) {
+    return (
+      <div style={{
+        background: 'linear-gradient(135deg, #131e2e 0%, #111827 100%)',
+        border: '1px solid rgba(249,115,22,0.2)', borderRadius: 14, padding: 20,
+      }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>Options Taker Flow</div>
+        <div style={{ fontSize: 11, color: '#475569', marginBottom: 14 }}>Premium líquido 24h · Buy vs Sell por tipo · Deribit</div>
+        <div style={{
+          padding: '32px 20px', borderRadius: 10, display: 'flex', flexDirection: 'column',
+          alignItems: 'center', gap: 10, textAlign: 'center',
+          background: 'rgba(249,115,22,0.03)', border: '1px dashed rgba(249,115,22,0.2)',
+        }}>
+          <div style={{ fontSize: 32, opacity: 0.5 }}>🔒</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#94a3b8' }}>Taker Flow indisponível</div>
+          <div style={{ fontSize: 11, color: '#475569', maxWidth: 380, lineHeight: 1.7 }}>
+            Options Taker Flow requer acesso a dados de fluxo de prêmio via Deribit API.
+            Configure <strong style={{ color: '#94a3b8' }}>ENABLE_OPTIONS</strong> com chave Deribit para ativar.
+          </div>
+          <a href="https://www.deribit.com/pages/information/api" target="_blank" rel="noopener noreferrer" style={{
+            fontSize: 10, color: '#3b82f6', textDecoration: 'none', fontWeight: 700,
+            padding: '4px 12px', borderRadius: 5, border: '1px solid rgba(59,130,246,0.25)',
+            background: 'rgba(59,130,246,0.05)',
+          }}>Ver API Deribit →</a>
+          <div style={{ fontSize: 9, color: '#475569', padding: '2px 10px', borderRadius: 4, background: 'rgba(249,115,22,0.05)', border: '1px solid rgba(249,115,22,0.12)' }}>
+            Dado <strong style={{ color: '#f97316' }}>não considerado</strong> nas análises de AI
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const d = liveData;
   const bullBearPct = ((d.bull_bear_index + 1) / 2 * 100);
   const bbColor = d.bull_bear_index > 0.1 ? '#10b981' : d.bull_bear_index < -0.1 ? '#ef4444' : '#f59e0b';
@@ -169,12 +201,6 @@ export default function TakerFlowPanel({ optionsData }) {
         {d.signal}
       </div>
 
-      {!hasLiveData && (
-        <div style={{ marginTop: 10, padding: '6px 10px', borderRadius: 6, background: 'rgba(249,115,22,0.06)', border: '1px solid rgba(249,115,22,0.18)', fontSize: 10, color: '#78716c', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-          <span>🔒 Dados simulados — Options Taker Flow requer conta Deribit</span>
-          <a href="https://www.deribit.com/pages/information/api" target="_blank" rel="noopener noreferrer" style={{ color: '#f97316', textDecoration: 'none', fontWeight: 700, whiteSpace: 'nowrap' }}>Ver API →</a>
-        </div>
-      )}
     </div>
   );
 }
