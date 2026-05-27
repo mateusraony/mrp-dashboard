@@ -17,7 +17,7 @@ import { IS_LIVE } from '@/lib/env';
 import { fetchBybitTicker, fetchBybitFunding, BybitTickerData, BybitFundingEntry } from '@/services/bybit';
 import { fetchOkxTicker, fetchOkxFunding, OkxTickerData, OkxFundingEntry } from '@/services/okx';
 import { withCache, getStaleCache } from '@/services/marketCache';
-import { logError } from '@/lib/debugLog';
+import { logWarn } from '@/lib/debugLog';
 import { reportApiFailure, reportApiRecovery } from '@/lib/apiHealthMonitor';
 import { DataState } from '@/hooks/useBtcData';
 
@@ -64,7 +64,7 @@ export function useBybitTicker() {
         reportApiRecovery('bybit');
         return { data, lastUpdated: new Date().toISOString(), isFallback: false, debugError: null };
       } catch (err) {
-        logError('Bybit ticker fetch failed', { error: String(err) }, 'bybit-ticker');
+        logWarn('Bybit ticker fetch failed', { error: String(err) }, 'bybit-ticker');
         reportApiFailure('bybit');
         const stale = await getStaleCache<BybitTickerData>('bybit:ticker');
         if (stale) {
@@ -96,7 +96,7 @@ export function useBybitFunding() {
         reportApiRecovery('bybit');
         return { data, lastUpdated: new Date().toISOString(), isFallback: false, debugError: null };
       } catch (err) {
-        logError('Bybit funding fetch failed', { error: String(err) }, 'bybit-funding');
+        logWarn('Bybit funding fetch failed', { error: String(err) }, 'bybit-funding');
         reportApiFailure('bybit');
         const stale = await getStaleCache<BybitFundingEntry[]>('bybit:funding');
         if (stale) {
@@ -125,7 +125,7 @@ export function useOkxTicker() {
         reportApiRecovery('okx');
         return { data, lastUpdated: new Date().toISOString(), isFallback: false, debugError: null };
       } catch (err) {
-        logError('OKX ticker fetch failed', { error: String(err) }, 'okx-ticker');
+        logWarn('OKX ticker fetch failed', { error: String(err) }, 'okx-ticker');
         reportApiFailure('okx');
         const stale = await getStaleCache<OkxTickerData>('okx:ticker');
         if (stale) {
@@ -157,7 +157,7 @@ export function useOkxFunding() {
         reportApiRecovery('okx');
         return { data, lastUpdated: new Date().toISOString(), isFallback: false, debugError: null };
       } catch (err) {
-        logError('OKX funding fetch failed', { error: String(err) }, 'okx-funding');
+        logWarn('OKX funding fetch failed', { error: String(err) }, 'okx-funding');
         reportApiFailure('okx');
         const stale = await getStaleCache<OkxFundingEntry[]>('okx:funding');
         if (stale) {

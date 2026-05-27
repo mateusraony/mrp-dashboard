@@ -10,7 +10,7 @@ import { IS_LIVE } from '@/lib/env';
 import { fetchOptionsData, fetchDvolHistory, fetchDeribitFunding, OptionsData, DeribitFundingData } from '@/services/deribit';
 import { readModuleFlag } from '@/lib/moduleFlags';
 import { withCache, getStaleCache } from '@/services/marketCache';
-import { logError } from '@/lib/debugLog';
+import { logError, logWarn } from '@/lib/debugLog';
 import { reportApiFailure, reportApiRecovery } from '@/lib/apiHealthMonitor';
 import { DataState } from '@/hooks/useBtcData';
 
@@ -125,7 +125,7 @@ export function useDeribitFunding() {
         reportApiRecovery('deribit');
         return { data, lastUpdated: new Date().toISOString(), isFallback: false, debugError: null };
       } catch (err) {
-        logError('Deribit funding fetch failed', { error: String(err) }, 'deribit-funding');
+        logWarn('Deribit funding fetch failed', { error: String(err) }, 'deribit-funding');
         reportApiFailure('deribit');
         const stale = await getStaleCache<DeribitFundingData>('deribit:funding');
         if (stale) return { data: stale.value, lastUpdated: stale.updatedAt.toISOString(), isFallback: true, debugError: String(err) };

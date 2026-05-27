@@ -63,7 +63,7 @@ export default function BasisPanel() {
   const spotPrice = ticker?.mark_price ?? d.spot;
 
   // Exchanges com dados mock (sem API pública confiável)
-  const mockExchanges = fundingChart.slice(3).map(e => e.exchange);
+  const mockExchanges = fundingChart.slice(4).map(e => e.exchange);
 
   return (
     <div style={{
