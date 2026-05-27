@@ -14,7 +14,7 @@ import { IS_LIVE } from '@/lib/env';
 import { fetchOnChainCycle, fetchOnChainExtended, OnChainCycleData, OnChainExtendedData } from '@/services/coinmetrics';
 import { readModuleFlag } from '@/lib/moduleFlags';
 import { withCache, getStaleCache } from '@/services/marketCache';
-import { logError } from '@/lib/debugLog';
+import { logError, logWarn } from '@/lib/debugLog';
 import { reportApiFailure, reportApiRecovery } from '@/lib/apiHealthMonitor';
 import { DataState } from '@/hooks/useBtcData';
 
@@ -76,13 +76,18 @@ export function useOnChainCycle(pageEnabled = true) {
         reportApiRecovery('coinmetrics');
         return { data, lastUpdated: new Date().toISOString(), isFallback: false, debugError: null };
       } catch (err) {
-        logError('OnChainCycle fetch failed', { error: String(err) }, 'coinmetrics-cycle');
+        const errStr = String(err);
+        if (errStr.includes('COINMETRICS_KEY_MISSING')) {
+          logWarn('CoinMetrics sem chave API — adicione VITE_COINMETRICS_KEY no Render para ativar dados reais (grátis em coinmetrics.io)', {}, 'coinmetrics-config');
+          return { data: null, lastUpdated: null, isFallback: false, debugError: 'no_api_key' };
+        }
+        logError('OnChainCycle fetch failed', { error: errStr }, 'coinmetrics-cycle');
         reportApiFailure('coinmetrics');
         const stale = await getStaleCache<OnChainCycleData>('coinmetrics:cycle');
         if (stale) {
-          return { data: stale.value, lastUpdated: stale.updatedAt.toISOString(), isFallback: true, debugError: String(err) };
+          return { data: stale.value, lastUpdated: stale.updatedAt.toISOString(), isFallback: true, debugError: errStr };
         }
-        return { data: null, lastUpdated: null, isFallback: true, debugError: String(err) };
+        return { data: null, lastUpdated: null, isFallback: true, debugError: errStr };
       }
     },
     staleTime:       3_500_000,
@@ -115,13 +120,18 @@ export function useOnChainExtended(pageEnabled = true) {
         reportApiRecovery('coinmetrics');
         return { data, lastUpdated: new Date().toISOString(), isFallback: false, debugError: null };
       } catch (err) {
-        logError('OnChainExtended fetch failed', { error: String(err) }, 'coinmetrics-extended');
+        const errStr = String(err);
+        if (errStr.includes('COINMETRICS_KEY_MISSING')) {
+          logWarn('CoinMetrics sem chave API — adicione VITE_COINMETRICS_KEY no Render para ativar dados reais (grátis em coinmetrics.io)', {}, 'coinmetrics-config');
+          return { data: null, lastUpdated: null, isFallback: false, debugError: 'no_api_key' };
+        }
+        logError('OnChainExtended fetch failed', { error: errStr }, 'coinmetrics-extended');
         reportApiFailure('coinmetrics');
         const stale = await getStaleCache<OnChainExtendedData>('coinmetrics:extended');
         if (stale) {
-          return { data: stale.value, lastUpdated: stale.updatedAt.toISOString(), isFallback: true, debugError: String(err) };
+          return { data: stale.value, lastUpdated: stale.updatedAt.toISOString(), isFallback: true, debugError: errStr };
         }
-        return { data: null, lastUpdated: null, isFallback: true, debugError: String(err) };
+        return { data: null, lastUpdated: null, isFallback: true, debugError: errStr };
       }
     },
     staleTime:       3_500_000,
