@@ -324,6 +324,10 @@ function mockOnChainExtended(): OnChainExtendedData {
 export async function fetchOnChainExtended(): Promise<OnChainExtendedData> {
   if (DATA_MODE === 'mock') return mockOnChainExtended();
 
+  if (!env.VITE_COINMETRICS_KEY) {
+    throw new Error('COINMETRICS_KEY_MISSING: cadastre-se em coinmetrics.io/community-network-data e adicione VITE_COINMETRICS_KEY nas variáveis de ambiente do Render');
+  }
+
   const metrics = 'CoinDaysDestroyed,SplyAdr1yrPlus,SplyAct1yr,AdrActCnt,VelCur1yr';
   const params  = withApiKey(new URLSearchParams({
     assets:     ASSET,
@@ -418,6 +422,10 @@ export async function fetchOnChainExtended(): Promise<OnChainExtendedData> {
  */
 export async function fetchOnChainCycle(): Promise<OnChainCycleData> {
   if (DATA_MODE === 'mock') return mockOnChainCycle();
+
+  if (!env.VITE_COINMETRICS_KEY) {
+    throw new Error('COINMETRICS_KEY_MISSING: cadastre-se em coinmetrics.io/community-network-data e adicione VITE_COINMETRICS_KEY nas variáveis de ambiente do Render');
+  }
 
   const metrics = 'CapMVRVCur,CapRealUSD,PriceUSD,NVTAdj,SplyCur';
   const params = withApiKey(new URLSearchParams({

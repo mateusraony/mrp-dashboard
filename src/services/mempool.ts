@@ -310,10 +310,29 @@ export async function fetchMempoolState(): Promise<MempoolData> {
 export async function fetchHashrate(): Promise<HashrateData> {
   if (DATA_MODE === 'mock') return mockHashrateData();
 
-  const [hashrateData, diffAdj] = await Promise.all([
+  const [hashrateResult, diffAdjResult] = await Promise.allSettled([
     safeFetch(`${BASE}/api/v1/mining/hashrate/3m`, HashrateSchema),
     safeFetch(`${BASE}/api/v1/difficulty-adjustment`, DifficultyAdjSchema),
   ]);
+
+  const hrFailed   = hashrateResult.status  === 'rejected';
+  const diffFailed = diffAdjResult.status   === 'rejected';
+
+  if (hrFailed && diffFailed) {
+    throw new Error(
+      `Mempool hashrate: ambos endpoints falharam — ` +
+      `hashrate/3m: ${hashrateResult.reason} | difficulty-adjustment: ${diffAdjResult.reason}`,
+    );
+  }
+  if (hrFailed) {
+    throw new Error(`Mempool hashrate/3m falhou: ${hashrateResult.reason}`);
+  }
+  if (diffFailed) {
+    throw new Error(`Mempool difficulty-adjustment falhou: ${diffAdjResult.reason}`);
+  }
+
+  const hashrateData = hashrateResult.value;
+  const diffAdj      = diffAdjResult.value;
 
   const history = hashrateData.hashrates;
   const current = hashrateData.currentHashrate ?? history[history.length - 1]?.avgHashrate ?? 0;
