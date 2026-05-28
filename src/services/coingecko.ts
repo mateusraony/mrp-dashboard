@@ -312,8 +312,8 @@ async function fetchMessariNews(): Promise<CoinGeckoNewsItem[]> {
     }> };
     const items = raw.data ?? [];
     if (items.length === 0) {
-      logWarn('Messari news: empty response', null, 'coingecko-news');
-      return [];
+      logWarn('Messari news: empty response — fallback RSS', null, 'coingecko-news');
+      return fetchRSSNews();
     }
     return items.slice(0, 20).map(item => ({
       id:           item.id,
@@ -324,13 +324,49 @@ async function fetchMessariNews(): Promise<CoinGeckoNewsItem[]> {
       news_site:    item.references?.[0]?.name ?? 'Messari',
     }));
   } catch (err) {
-    logWarn(`Messari news failed: ${String(err)}`, null, 'coingecko-news');
+    logWarn(`Messari news failed: ${String(err)} — fallback RSS`, null, 'coingecko-news');
+    return fetchRSSNews();
+  }
+}
+
+// RSS fallback — CoinTelegraph/Decrypt via fred-proxy, no API key, always free
+async function fetchRSSNews(): Promise<CoinGeckoNewsItem[]> {
+  const supUrl = env.VITE_SUPABASE_URL?.replace(/\/$/, '');
+  const supKey = env.VITE_SUPABASE_ANON_KEY;
+  if (!supUrl || !supKey) return [];
+  try {
+    const res = await fetch(`${supUrl}/functions/v1/fred-proxy`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${supKey}` },
+      body:    JSON.stringify({ type: 'crypto_rss', params: {} }),
+      signal:  AbortSignal.timeout(15_000),
+    });
+    if (!res.ok) {
+      logWarn(`RSS news proxy ${res.status}`, null, 'coingecko-news');
+      return [];
+    }
+    const raw = await res.json() as { items?: Array<{ id: string; title: string; url: string; published_at: string; source: string }> };
+    const items = raw.items ?? [];
+    if (items.length === 0) {
+      logWarn('RSS news: no articles from any feed', null, 'coingecko-news');
+      return [];
+    }
+    return items.map(item => ({
+      id:           item.id,
+      title:        item.title,
+      author:       '',
+      published_at: item.published_at,
+      url:          item.url,
+      news_site:    item.source,
+    }));
+  } catch (err) {
+    logWarn(`RSS news failed: ${String(err)}`, null, 'coingecko-news');
     return [];
   }
 }
 
 // CryptoCompare free news API — routed via fred-proxy to avoid CORS
-// Falls back to CoinPaprika when CryptoCompare is unavailable
+// Falls back to Messari → RSS when CryptoCompare is unavailable
 async function fetchCryptoCompareNews(): Promise<CoinGeckoNewsItem[]> {
   const supUrl = env.VITE_SUPABASE_URL?.replace(/\/$/, '');
   const supKey = env.VITE_SUPABASE_ANON_KEY;
