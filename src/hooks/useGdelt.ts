@@ -35,7 +35,7 @@ export function useGdeltNews(query?: string) {
       try {
         const articles = await withCache<GdeltArticleEnriched[]>(
           `gdelt:news:${resolvedQuery}`,
-          300,    // 5 min — shorter TTL so empty-cache from failed call expires quickly
+          1800,   // 30 min — validate on write (marketCache) prevents caching [] on failure
           'gdelt',
           () => fetchGdeltNews(resolvedQuery),
           (v) => Array.isArray(v) && (v as GdeltArticleEnriched[]).length > 0 ? v as GdeltArticleEnriched[] : null,
@@ -64,8 +64,8 @@ export function useGdeltNews(query?: string) {
         return { data: null, lastUpdated: null, isFallback: true, debugError: String(err) };
       }
     },
-    staleTime:       2 * 60_000,                        // 2 min
-    refetchInterval: IS_LIVE ? 5 * 60_000 : false,     // 5 min em live
+    staleTime:       5 * 60_000,                         // 5 min
+    refetchInterval: IS_LIVE ? 10 * 60_000 : false,    // 10 min em live
     retry:           1,
     enabled:         readModuleFlag('ENABLE_NEWS'),
     select:          (state: DataState<GdeltArticleEnriched[]>) => state.data ?? [],

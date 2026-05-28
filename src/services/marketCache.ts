@@ -132,7 +132,9 @@ export async function withCache<T>(
   }
 
   const result = await fetcher();
-  setCached(cacheKey, result, source);
+  if (!validate || validate(result) !== null) {
+    setCached(cacheKey, result, source);
+  }
   return result;
 }
 

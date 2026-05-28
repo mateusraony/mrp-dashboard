@@ -27,8 +27,7 @@ async function fetchGdeltViaProxy(params: Record<string, string>): Promise<unkno
     signal:  AbortSignal.timeout(20_000),
   });
   if (!res.ok) {
-    logWarn(`GDELT proxy ${res.status} — degrading to empty`, { status: res.status }, 'gdelt');
-    return { articles: [] };
+    throw new Error(`GDELT proxy ${res.status}`);
   }
   return res.json();
 }
