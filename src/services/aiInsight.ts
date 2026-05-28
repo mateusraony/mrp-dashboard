@@ -12,7 +12,7 @@ export interface AiInsightPayload {
   riskRegime:     string;
   fearGreedValue: number;
   fearGreedLabel: string;
-  fundingRate:    number;
+  fundingRate?:   number;
   mtfConfluence?: string;
   mtfDirection?:  string;
   zAlerts?: Array<{
