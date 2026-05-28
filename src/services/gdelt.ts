@@ -26,6 +26,8 @@ async function fetchGdeltViaProxy(params: Record<string, string>): Promise<unkno
     body:    JSON.stringify({ type: 'gdelt', params }),
     signal:  AbortSignal.timeout(20_000),
   });
+  // 429 = GDELT rate-limiting the Edge Function IP — degrade silently, no throw
+  if (res.status === 429) return { articles: [] };
   if (!res.ok) {
     const err = await res.json().catch(() => ({} as Record<string, unknown>));
     throw new Error(`gdelt proxy error ${res.status}: ${(err.error as string) ?? res.statusText}`);
