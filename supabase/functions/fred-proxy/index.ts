@@ -106,7 +106,7 @@ Deno.serve(async (req: Request) => {
       const url = `${GDELT_BASE}?${queryParams.toString()}`;
       const gdeltRes = await fetch(url, {
         headers: { 'User-Agent': 'Mozilla/5.0 (compatible; mrp-dashboard/1.0)' },
-        signal: AbortSignal.timeout(15_000),
+        signal: AbortSignal.timeout(8_000),   // 8s — fail fast before client times out
       });
       if (!gdeltRes.ok) {
         console.error(`[fred-proxy] GDELT ${gdeltRes.status}`);
@@ -124,6 +124,29 @@ Deno.serve(async (req: Request) => {
         data = { articles: [] };
       }
       return new Response(JSON.stringify(data), {
+        status:  200,
+        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // ── CryptoCompare News — sem API key, evita CORS do browser ─────────────
+    if (type === 'cryptocompare_news') {
+      const ccRes = await fetch(
+        'https://min-api.cryptocompare.com/data/v2/news/?lang=EN&limit=20',
+        {
+          headers: { 'User-Agent': 'Mozilla/5.0 (compatible; mrp-dashboard/1.0)' },
+          signal: AbortSignal.timeout(10_000),
+        },
+      );
+      if (!ccRes.ok) {
+        console.error(`[fred-proxy] CryptoCompare news ${ccRes.status}`);
+        return new Response(
+          JSON.stringify({ Data: [] }),
+          { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } },
+        );
+      }
+      const ccData = await ccRes.json();
+      return new Response(JSON.stringify(ccData), {
         status:  200,
         headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
       });
