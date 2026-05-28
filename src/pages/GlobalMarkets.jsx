@@ -4,7 +4,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip,
   ResponsiveContainer, Cell, ReferenceLine,
 } from 'recharts';
-import { useGlobalMarkets } from '../hooks/useGlobalMarkets';
+import { useGlobalMarkets, useGlobalMarketsBase } from '../hooks/useGlobalMarkets';
 import { useBcbData } from '../hooks/useBcb';
 import { useBtcTicker } from '../hooks/useBtcData';
 import { IS_LIVE } from '../lib/env';
@@ -58,6 +58,31 @@ const CORR_DESC  = {
   GOLD:  'BTC e ouro disputam o papel de "reserva de valor"',
   VIX:   'Volatilidade extrema força desalavancagem — pressão em todos os ativos',
 };
+
+// ─── Accordion de dica ────────────────────────────────────────────────────────
+function TipCard({ emoji, title, body, tag }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div
+      onClick={() => setOpen(o => !o)}
+      style={{ background: '#0d1421', border: '1px solid #1e2d45', borderRadius: 10, padding: '12px 14px', cursor: 'pointer', borderLeft: '3px solid #3b82f6' }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 16 }}>{emoji}</span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0' }}>{title}</span>
+          {tag && <span style={{ fontSize: 9, color: '#3b82f6', background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: 4, padding: '1px 6px', fontWeight: 700 }}>{tag}</span>}
+        </div>
+        <span style={{ fontSize: 12, color: '#4a5568' }}>{open ? '▲' : '▼'}</span>
+      </div>
+      {open && (
+        <div style={{ marginTop: 10, fontSize: 11, color: '#94a3b8', lineHeight: 1.7, borderTop: '1px solid #1e2d45', paddingTop: 10 }}>
+          {body}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function fmtPct(v, dec = 2) { return `${v >= 0 ? '+' : ''}${v.toFixed(dec)}%`; }
@@ -258,8 +283,12 @@ export default function GlobalMarkets() {
   const [corrPeriod, setCorrPeriod] = useState('30d');
 
   const { data, isLoading }   = useGlobalMarkets();
+  const { data: baseData }    = useGlobalMarketsBase();
   const { data: bcb }         = useBcbData();
   const { data: ticker }      = useBtcTicker();
+
+  const isFallback  = baseData?.isFallback  ?? false;
+  const lastUpdated = baseData?.lastUpdated ?? null;
 
   const fxRates        = (data?.fxRates        ?? []).map(r => ({ ...r, icon: FX_ICONS[r.pair]     ?? '💱' }));
   const commodities    = (data?.commodities    ?? []).map(c => ({ ...c, icon: COMM_ICONS[c.name]  ?? '📦' }));
@@ -287,7 +316,7 @@ export default function GlobalMarkets() {
     <div style={{ maxWidth: 1300, margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
         <div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4, flexWrap: 'wrap' }}>
             <h1 style={{ fontSize: 20, fontWeight: 900, color: '#f1f5f9', margin: 0, letterSpacing: '-0.03em' }}>🌍 Mercados Globais</h1>
             <ModeBadge mode={IS_LIVE ? 'live' : 'mock'} />
             <DataTrustBadge
@@ -297,11 +326,52 @@ export default function GlobalMarkets() {
               sourceUrl="https://api.stlouisfed.org/fred"
               reason={!isSupabaseConfigured() && IS_LIVE ? 'Supabase não configurado — dados FRED indisponíveis' : !IS_LIVE ? 'DATA_MODE=mock' : undefined}
             />
+            {isFallback && lastUpdated && (
+              <span title={`Último salvo no Supabase: ${new Date(lastUpdated).toLocaleString('pt-BR')}`}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 9, color: '#f59e0b', cursor: 'help' }}>
+                ⚠ Cache · {new Date(lastUpdated).toLocaleDateString('pt-BR')}
+              </span>
+            )}
           </div>
           <p style={{ fontSize: 11, color: '#475569', margin: 0 }}>EUR · BRL · GBP · JPY · Ouro · Petróleo · Bancos Centrais · Correlações com BTC</p>
         </div>
         {data && <div style={{ fontSize: 9, color: '#334155', fontFamily: 'JetBrains Mono, monospace' }}>Qualidade: {data.quality} · FRED/BCB</div>}
       </div>
+
+      {/* ── PARA QUE SERVE ───────────────────────────────────────────────────────── */}
+      <div style={{ marginBottom: 20, padding: '16px 20px', borderRadius: 12, background: 'linear-gradient(135deg, rgba(59,130,246,0.07) 0%, rgba(16,185,129,0.05) 100%)', border: '1px solid rgba(59,130,246,0.2)' }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+          <div style={{ fontSize: 28, lineHeight: 1, marginTop: 2 }}>🌍</div>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: '#e2e8f0', marginBottom: 6 }}>Para que serve esta página?</div>
+            <div style={{ fontSize: 11, color: '#94a3b8', lineHeight: 1.8, maxWidth: 800 }}>
+              <strong style={{ color: '#cbd5e1' }}>Mercados Globais</strong> reúne os principais termômetros do ambiente macro mundial — câmbio, commodities, juros dos bancos centrais e correlações com BTC.{' '}
+              <strong style={{ color: '#3b82f6' }}>Use esta página para responder:</strong>{' '}
+              "O ambiente global está favorável ou desfavorável para o BTC agora?" — Liquidez global, força do dólar e ciclo de juros são os três maiores drivers macro do preço do Bitcoin.
+            </div>
+            <div style={{ display: 'flex', gap: 16, marginTop: 10, flexWrap: 'wrap' }}>
+              {[
+                { icon: '✅', text: 'Verificar se BTC está seguindo o SP500 (risco on/off global)' },
+                { icon: '💵', text: 'Monitorar USD/BRL para calcular seu retorno real em reais' },
+                { icon: '🏦', text: 'Entender se bancos centrais estão expandindo ou contraindo liquidez' },
+                { icon: '🥇', text: 'Comparar BTC com ouro como reserva de valor alternativa' },
+              ].map((u, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: '#64748b' }}>
+                  <span>{u.icon}</span><span>{u.text}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── BANNER CACHE / FALLBACK ───────────────────────────────────────────────── */}
+      {isFallback && lastUpdated && (
+        <div style={{ marginBottom: 16, padding: '7px 14px', borderRadius: 8, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.2)', fontSize: 10, color: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <span>⚠ Usando último valor salvo no Supabase — API FRED indisponível no momento</span>
+          <span style={{ fontFamily: 'JetBrains Mono, monospace', whiteSpace: 'nowrap' }}>Última atualização: {new Date(lastUpdated).toLocaleString('pt-BR')}</span>
+        </div>
+      )}
 
       <GoldenRule compact />
       <GlobalNewsPanel />
@@ -335,35 +405,48 @@ export default function GlobalMarkets() {
 
       {/* TAB: FX */}
       {tab === 'FX & Câmbio' && (
-        <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, overflow: 'hidden' }}>
-          <div style={{ padding: '12px 14px', borderBottom: '1px solid #1a2535', display: 'flex', gap: 6, alignItems: 'center' }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0' }}>💱 Câmbio & FX</span>
-            <span style={{ fontSize: 9, color: '#475569' }}>via FRED API + BCB OpenData</span>
+        <div>
+          <div style={{ padding: '6px 10px', borderRadius: 6, background: '#0a1220', border: '1px solid #1e2d45', fontSize: 10, color: '#475569', display: 'inline-block', marginBottom: 10 }}>
+            📌 <strong style={{ color: '#64748b' }}>Para que serve:</strong> Mostra quanto custa 1 USD em outras moedas. Dólar forte (DXY subindo) historicamente pressiona o BTC. Acompanhe USD/BRL para saber o seu retorno real em reais.
           </div>
-          {fxRates.length > 0
-            ? fxRates.map((item, i) => <AssetRow key={i} item={item} />)
-            : <div style={{ padding: '20px 14px', fontSize: 11, color: '#334155', textAlign: 'center' }}>Aguardando dados FRED...</div>
-          }
+          <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, overflow: 'hidden' }}>
+            <div style={{ padding: '12px 14px', borderBottom: '1px solid #1a2535', display: 'flex', gap: 6, alignItems: 'center' }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0' }}>💱 Câmbio & FX</span>
+              <span style={{ fontSize: 9, color: '#475569' }}>via FRED API + BCB OpenData</span>
+            </div>
+            {fxRates.length > 0
+              ? fxRates.map((item, i) => <AssetRow key={i} item={item} />)
+              : <div style={{ padding: '20px 14px', fontSize: 11, color: '#334155', textAlign: 'center' }}>Aguardando dados FRED...</div>
+            }
+          </div>
         </div>
       )}
 
       {/* TAB: Commodities */}
       {tab === 'Commodities' && (
-        <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, overflow: 'hidden' }}>
-          <div style={{ padding: '12px 14px', borderBottom: '1px solid #1a2535' }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0' }}>🏗️ Commodities</span>
-            <span style={{ fontSize: 9, color: '#475569', marginLeft: 8 }}>Gold, Silver, WTI via FRED</span>
+        <div>
+          <div style={{ padding: '6px 10px', borderRadius: 6, background: '#0a1220', border: '1px solid #1e2d45', fontSize: 10, color: '#475569', display: 'inline-block', marginBottom: 10 }}>
+            📌 <strong style={{ color: '#64748b' }}>Para que serve:</strong> Ouro e prata competem com BTC como reserva de valor. WTI (petróleo bruto) reflete risco geopolítico e inflação. Quando ouro sobe em momentos de incerteza, BTC frequentemente acompanha.
           </div>
-          {commodities.length > 0
-            ? commodities.map((item, i) => <AssetRow key={i} item={item} />)
-            : <div style={{ padding: '20px 14px', fontSize: 11, color: '#334155', textAlign: 'center' }}>Aguardando dados FRED...</div>
-          }
+          <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, overflow: 'hidden' }}>
+            <div style={{ padding: '12px 14px', borderBottom: '1px solid #1a2535' }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0' }}>🏗️ Commodities</span>
+              <span style={{ fontSize: 9, color: '#475569', marginLeft: 8 }}>Gold, Silver, WTI via FRED</span>
+            </div>
+            {commodities.length > 0
+              ? commodities.map((item, i) => <AssetRow key={i} item={item} />)
+              : <div style={{ padding: '20px 14px', fontSize: 11, color: '#334155', textAlign: 'center' }}>Aguardando dados FRED...</div>
+            }
+          </div>
         </div>
       )}
 
       {/* TAB: Bancos Centrais */}
       {tab === 'Bancos Centrais' && (
         <div>
+          <div style={{ padding: '6px 10px', borderRadius: 6, background: '#0a1220', border: '1px solid #1e2d45', fontSize: 10, color: '#475569', display: 'inline-block', marginBottom: 10 }}>
+            📌 <strong style={{ color: '#64748b' }}>Para que serve:</strong> Juros altos = capital migra para renda fixa, saindo do BTC. Cortes de juros = liquidez cresce = historicamente bullish para cripto. O Fed (EUA) é o mais relevante globalmente.
+          </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 14 }}>
             {cbRates.length > 0
               ? cbRates.map((b, i) => <RateCard key={i} bank={b} />)
@@ -392,6 +475,10 @@ export default function GlobalMarkets() {
 
       {/* TAB: Correlações */}
       {tab === 'Correlações BTC' && (
+        <div>
+        <div style={{ padding: '6px 10px', borderRadius: 6, background: '#0a1220', border: '1px solid #1e2d45', fontSize: 10, color: '#475569', display: 'inline-block', marginBottom: 10 }}>
+          📌 <strong style={{ color: '#64748b' }}>Para que serve:</strong> Indica se BTC está se comportando como ativo de risco (correlação positiva com SP500), reserva de valor (junto ao ouro) ou inversamente ao dólar (DXY negativo). Correlações mudam conforme o regime de mercado.
+        </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: 14 }}>
           <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '18px 20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
@@ -446,12 +533,50 @@ export default function GlobalMarkets() {
             </div>
           </div>
         </div>
+        </div>
       )}
 
       {/* TAB: Brasil */}
       {tab === 'Brasil (BRL)' && (
-        <BRLSection bcb={bcb} btcPrice={ticker?.mark_price} />
+        <div>
+          <div style={{ padding: '6px 10px', borderRadius: 6, background: '#0a1220', border: '1px solid #1e2d45', fontSize: 10, color: '#475569', display: 'inline-block', marginBottom: 10 }}>
+            📌 <strong style={{ color: '#64748b' }}>Para que serve:</strong> Para o investidor brasileiro: mostra quanto BTC vale em reais, e como a Selic alta compete com o retorno do BTC. Compare BTC/BRL vs CDI para saber se vale o risco.
+          </div>
+          <BRLSection bcb={bcb} btcPrice={ticker?.mark_price} />
+        </div>
       )}
+
+      {/* ── DICAS DE OURO ────────────────────────────────────────────────────────── */}
+      <div style={{ marginTop: 28 }}>
+        <div style={{ fontSize: 14, fontWeight: 800, color: '#e2e8f0', marginBottom: 4 }}>🏆 Dicas de Ouro</div>
+        <div style={{ fontSize: 10, color: '#475569', marginBottom: 12 }}>Como usar os Mercados Globais para tomar decisões melhores com BTC</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <TipCard
+            emoji="📈" title="DXY subindo = pressão no BTC" tag="CÂMBIO"
+            body="Quando o índice do dólar (DXY) sobe, geralmente o BTC cai. O dólar forte atrai capital global, tirando liquidez de ativos de risco como cripto. Monitore o DXY antes de abrir posições grandes — se o DXY estiver em tendência de alta, seja mais cauteloso com BTC."
+          />
+          <TipCard
+            emoji="🏦" title="Bancos Centrais cortando juros = vento a favor" tag="LIQUIDEZ"
+            body="Historicamente, ciclos de corte de juros (especialmente do Fed) precedem altas em BTC. Mais liquidez no sistema → mais apetite por risco. Quando Fed e BCE cortam ao mesmo tempo, o efeito é amplificado. Observe a direção (▲ Subindo / ▼ Cortando) em cada banco central."
+          />
+          <TipCard
+            emoji="🥇" title="Ouro e BTC — reserva de valor comparada" tag="CORRELAÇÃO"
+            body="Em períodos de stress geopolítico, ouro e BTC podem subir juntos como ativos de proteção. Mas quando o mercado entra em pânico total (VIX >30), BTC pode cair junto com tudo. A correlação BTC × Ouro muda conforme o regime — verifique sempre a janela de 30d."
+          />
+          <TipCard
+            emoji="🇧🇷" title="Selic alta: calcule o CDI líquido antes de comprar BTC" tag="BRASIL"
+            body="Com Selic a 14%+, o CDI líquido de IR (~11-12% a.a.) é o custo de oportunidade real para o investidor brasileiro. BTC precisaria superar isso para justificar o risco. Compare sempre BTC/BRL vs CDI no período — não BTC/USD, pois a desvalorização do real já 'ajuda' o retorno em reais."
+          />
+          <TipCard
+            emoji="⚠️" title="VIX acima de 25: cuidado com alavancagem" tag="RISCO"
+            body="Quando o VIX (medidor de medo do SP500) passa de 25, a volatilidade global sobe. Grandes players institucionais fecham posições alavancadas em todos os ativos, inclusive BTC. Em momentos de VIX elevado, prefira reduzir exposição ou proteger posições com stops mais apertados."
+          />
+          <TipCard
+            emoji="🌐" title="Correlação BTC × SP500 não é constante" tag="AVANÇADO"
+            body="Durante bull markets cripto, BTC frequentemente descorrelaciona do SP500 e age como ativo independente. Em crises sistêmicas (2020, 2022), a correlação sobe para 0.8+. Sempre olhe a janela de 30d na aba 'Correlações BTC' — a janela de 7d é muito ruidosa para decisões de médio prazo."
+          />
+        </div>
+      </div>
     </div>
   );
 }
