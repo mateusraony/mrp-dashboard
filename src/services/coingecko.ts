@@ -291,6 +291,8 @@ const CoinGeckoNewsItemSchema = z.object({
 export async function fetchCoinGeckoNews(): Promise<CoinGeckoNewsItem[]> {
   if (DATA_MODE === 'mock') return [];
   const res = await apiFetch(`${BASE}/news`);
+  // 401/403 = demo-key required; 429 = rate limit — return empty, not an error
+  if (res.status === 401 || res.status === 403 || res.status === 429) return [];
   if (!res.ok) throw new Error(`CoinGecko /news ${res.status}`);
   const raw: unknown = await res.json();
   // CoinGecko pode retornar { data: [...] } ou diretamente [...]

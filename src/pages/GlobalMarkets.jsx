@@ -199,7 +199,7 @@ function BRLSection({ bcb, btcPrice }) {
 function GlobalNewsPanel() {
   const [sourceFilter, setSourceFilter] = useState('all');
 
-  const { data: gdeltArticles = [], isLoading: gdeltLoading } = useGdeltNews('bitcoin macro inflation "federal reserve"');
+  const { data: gdeltArticles = [], isLoading: gdeltLoading } = useGdeltNews('bitcoin macro economy inflation fed rates');
   const { data: cgData } = useCoinGeckoNews();
 
   const cgItems     = cgData?.items     ?? [];
