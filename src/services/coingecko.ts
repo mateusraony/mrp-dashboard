@@ -256,3 +256,48 @@ export async function fetchTopAltcoins(limit = 20): Promise<AltcoinMarketData[]>
     }
   }, validateAltcoins);
 }
+
+// ─── News ─────────────────────────────────────────────────────────────────────
+
+export interface CoinGeckoNewsItem {
+  id:           string;
+  title:        string;
+  author:       string;
+  published_at: string;   // ISO 8601 (normalizado de unix timestamp)
+  url:          string;
+  news_site:    string;
+  thumb_2x?:    string;
+}
+
+const CoinGeckoNewsItemSchema = z.object({
+  id:           z.union([z.string(), z.number()]).transform(String),
+  title:        z.string(),
+  author:       z.string().catch(''),
+  published_at: z.union([z.string(), z.number()]).transform((v) =>
+    typeof v === 'number'
+      ? new Date(v * 1_000).toISOString()
+      : new Date(v).toISOString(),
+  ),
+  url:          z.string().url(),
+  news_site:    z.string().catch('CoinGecko'),
+  thumb_2x:     z.string().optional(),
+});
+
+/**
+ * fetchCoinGeckoNews — últimas notícias cripto via CoinGecko /news.
+ * Gratuito, sem autenticação. Rate limit: 30 req/min free tier.
+ * Cache recomendado: 10 min (withCache no hook).
+ */
+export async function fetchCoinGeckoNews(): Promise<CoinGeckoNewsItem[]> {
+  if (DATA_MODE === 'mock') return [];
+  const res = await apiFetch(`${BASE}/news`);
+  if (!res.ok) throw new Error(`CoinGecko /news ${res.status}`);
+  const raw: unknown = await res.json();
+  // CoinGecko pode retornar { data: [...] } ou diretamente [...]
+  const list: unknown[] = Array.isArray(raw)
+    ? raw
+    : ((raw as Record<string, unknown>)?.data ?? []) as unknown[];
+  const parsed = z.array(CoinGeckoNewsItemSchema).safeParse(list);
+  if (!parsed.success) return [];
+  return (parsed.data as unknown as CoinGeckoNewsItem[]).slice(0, 20);
+}
