@@ -35,9 +35,10 @@ export function useGdeltNews(query?: string) {
       try {
         const articles = await withCache<GdeltArticleEnriched[]>(
           `gdelt:news:${resolvedQuery}`,
-          1800,   // 30 min — reduce GDELT hit frequency to avoid 429s
+          300,    // 5 min — shorter TTL so empty-cache from failed call expires quickly
           'gdelt',
           () => fetchGdeltNews(resolvedQuery),
+          (v) => Array.isArray(v) && (v as GdeltArticleEnriched[]).length > 0 ? v as GdeltArticleEnriched[] : null,
         );
         // Persiste no Supabase para histórico — fire-and-forget, não bloqueia UI
         if (IS_LIVE && articles.length > 0) {
@@ -63,8 +64,8 @@ export function useGdeltNews(query?: string) {
         return { data: null, lastUpdated: null, isFallback: true, debugError: String(err) };
       }
     },
-    staleTime:       5 * 60_000,                         // 5 min
-    refetchInterval: IS_LIVE ? 10 * 60_000 : false,     // 10 min em live
+    staleTime:       2 * 60_000,                        // 2 min
+    refetchInterval: IS_LIVE ? 5 * 60_000 : false,     // 5 min em live
     retry:           1,
     enabled:         readModuleFlag('ENABLE_NEWS'),
     select:          (state: DataState<GdeltArticleEnriched[]>) => state.data ?? [],
