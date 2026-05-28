@@ -308,7 +308,11 @@ async function fetchCoinPaprikaNews(): Promise<CoinGeckoNewsItem[]> {
     const raw = await res.json() as Array<{
       id: string; title: string; url: string; date: string; source?: string;
     }>;
-    if (!Array.isArray(raw) || raw.length === 0) return [];
+    if (!Array.isArray(raw)) {
+      logWarn('CoinPaprika news: response is not array', { type: typeof raw }, 'coingecko-news');
+      return [];
+    }
+    if (raw.length === 0) return [];
     return raw.slice(0, 20).map(item => ({
       id:           item.id,
       title:        item.title,
@@ -340,11 +344,21 @@ async function fetchCryptoCompareNews(): Promise<CoinGeckoNewsItem[]> {
       logWarn(`CryptoCompare news proxy ${res.status} — fallback CoinPaprika`, null, 'coingecko-news');
       return fetchCoinPaprikaNews();
     }
-    const raw = await res.json() as { Data?: Array<{
-      id: string | number; title: string; url: string;
-      published_on: number; source: string; imageurl?: string;
-    }> };
-    const items = (raw.Data ?? []).map(item => ({
+    const raw = await res.json() as { Data?: unknown };
+    const dataField = raw.Data;
+    // CryptoCompare changed format: old = { Data: [...] }, new = { Data: { Promoted: [], Data: [...] } }
+    type CCItem = { id: string | number; title: string; url: string; published_on: number; source: string; imageurl?: string };
+    const list: CCItem[] =
+      Array.isArray(dataField)
+        ? dataField as CCItem[]
+        : Array.isArray((dataField as Record<string, unknown>)?.Data)
+          ? (dataField as Record<string, unknown>).Data as CCItem[]
+          : [];
+    if (list.length === 0) {
+      logWarn('CryptoCompare news: Data empty or unrecognized format — fallback CoinPaprika', { format: typeof dataField }, 'coingecko-news');
+      return fetchCoinPaprikaNews();
+    }
+    const items = list.map(item => ({
       id:           String(item.id),
       title:        item.title,
       author:       '',
@@ -353,10 +367,6 @@ async function fetchCryptoCompareNews(): Promise<CoinGeckoNewsItem[]> {
       news_site:    item.source,
       thumb_2x:     item.imageurl,
     }));
-    if (items.length === 0) {
-      logWarn('CryptoCompare news empty — fallback CoinPaprika', null, 'coingecko-news');
-      return fetchCoinPaprikaNews();
-    }
     return items;
   } catch (err) {
     logWarn(`CryptoCompare news failed: ${String(err)} — fallback CoinPaprika`, null, 'coingecko-news');
