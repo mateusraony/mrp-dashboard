@@ -288,11 +288,42 @@ const CoinGeckoNewsItemSchema = z.object({
  * Gratuito, sem autenticação. Rate limit: 30 req/min free tier.
  * Cache recomendado: 10 min (withCache no hook).
  */
+// CryptoCompare free news API — fallback when CoinGecko requires demo key
+const CC_NEWS_BASE = 'https://min-api.cryptocompare.com/data/v2/news/?lang=EN&limit=20';
+
+async function fetchCryptoCompareNews(): Promise<CoinGeckoNewsItem[]> {
+  try {
+    const res = await apiFetch(CC_NEWS_BASE);
+    if (!res.ok) return [];
+    const raw = await res.json() as { Data?: Array<{
+      id: string | number;
+      title: string;
+      url: string;
+      published_on: number;
+      source: string;
+      imageurl?: string;
+    }> };
+    return (raw.Data ?? []).map(item => ({
+      id:           String(item.id),
+      title:        item.title,
+      author:       '',
+      published_at: new Date(item.published_on * 1_000).toISOString(),
+      url:          item.url,
+      news_site:    item.source,
+      thumb_2x:     item.imageurl,
+    }));
+  } catch {
+    return [];
+  }
+}
+
 export async function fetchCoinGeckoNews(): Promise<CoinGeckoNewsItem[]> {
   if (DATA_MODE === 'mock') return [];
   const res = await apiFetch(`${BASE}/news`);
-  // 401/403 = demo-key required; 429 = rate limit — return empty, not an error
-  if (res.status === 401 || res.status === 403 || res.status === 429) return [];
+  // 401/403 = demo-key required; 429 = rate limit — fall back to CryptoCompare
+  if (res.status === 401 || res.status === 403 || res.status === 429) {
+    return fetchCryptoCompareNews();
+  }
   if (!res.ok) throw new Error(`CoinGecko /news ${res.status}`);
   const raw: unknown = await res.json();
   // CoinGecko pode retornar { data: [...] } ou diretamente [...]
