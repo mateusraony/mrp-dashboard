@@ -1,4 +1,4 @@
-import { macroBoard as macroBoardMock, macroHistory, fmtNum, aiAnalysis as aiAnalysisMock } from '../components/data/mockData';
+import { macroBoard as macroBoardMock, macroHistory, fmtNum } from '../components/data/mockData';
 import { useMacroBoard, useGlobalLiquidity } from '@/hooks/useFred';
 import { useBcbData } from '@/hooks/useBcb';
 import { useFearGreed } from '@/hooks/useBtcData';
@@ -100,7 +100,7 @@ function historyToWindows(history) {
   return { '1d': pts.slice(-2), '1w': pts.slice(-5), '1m': pts };
 }
 
-function SeriesCard({ s }) {
+function SeriesCard({ s, isMock = false }) {
   const isYield = s.format === 'yield';
   const d1Color = s.delta_1d >= 0 ? '#10b981' : '#ef4444';
   const d7Color = s.delta_7d >= 0 ? '#10b981' : '#ef4444';
@@ -126,7 +126,7 @@ function SeriesCard({ s }) {
             <span style={{ fontSize: 12, color: '#4a5568', marginLeft: 4 }}>{s.unit}</span>
           </div>
         </div>
-        <GradeBadge grade={s.quality} />
+        <GradeBadge grade={isMock ? 'C' : s.quality} />
       </div>
 
       {/* MiniTimeChart com 1D/1W/1M */}
@@ -624,8 +624,6 @@ export default function Macro() {
         },
       })
     : null;
-  const aiAnalysis = liveAnalysis ?? aiAnalysisMock;
-
   // Yield spread computed before payload so it can be included in Claude context
   const { yieldSpread, yieldSpreadBp, isInverted } = useMemo(() => {
     const us10y = m.series.find(s => s.id === 'US10Y');
@@ -650,7 +648,6 @@ export default function Macro() {
     riskRegime: riskScore?.regime ?? 'MODERADO',
     fearGreedValue: fng.value,
     fearGreedLabel: fng.label,
-    fundingRate: 0,
     context: {
       vix: vixVal,
       dxy: dxyVal,
@@ -848,7 +845,7 @@ export default function Macro() {
         </div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14, marginBottom: 20 }}>
-        {m.series.map(s => <SeriesCard key={s.id} s={s} />)}
+        {m.series.map(s => <SeriesCard key={s.id} s={s} isMock={!isLiveMacro} />)}
       </div>
 
       {/* Analysis */}
@@ -858,7 +855,26 @@ export default function Macro() {
         <div style={{ fontSize: 10, color: '#334155', marginBottom: 10, padding: '6px 10px', borderRadius: 6, background: '#0a1220', border: '1px solid #1e2d45', display: 'inline-block' }}>
           📌 <strong style={{ color: '#94a3b8' }}>Para que serve:</strong> Resume todos os sinais macro em um único veredito (BULLISH/BEARISH/NEUTRAL) com score 0–100. Use como confirmação final do contexto macro antes de tomar decisões de entrada ou saída.
         </div>
-        <AIModuleCard module={aiAnalysis.modules.macro} title="Macro Board" icon="⊞" />
+        {liveAnalysis != null ? (
+          <AIModuleCard module={liveAnalysis.modules.macro} title="Macro Board" icon="⊞" />
+        ) : (
+          <div style={{
+            padding: '14px 16px', borderRadius: 10,
+            background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.2)',
+            display: 'flex', alignItems: 'flex-start', gap: 10,
+          }}>
+            <span style={{ fontSize: 18 }}>⏸️</span>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b', marginBottom: 3 }}>
+                Análise não computada
+              </div>
+              <div style={{ fontSize: 10, color: '#78716c', lineHeight: 1.6 }}>
+                Aguardando dados ao vivo (Fear &amp; Greed + Risk Score) para calcular a análise macro.
+                Quando disponíveis, a análise é ativada automaticamente — sem necessidade de configuração adicional.
+              </div>
+            </div>
+          </div>
+        )}
         <ClaudeInsight text={macroInsight} loading={macroAiLoading} />
       </div>
 
