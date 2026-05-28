@@ -10,7 +10,7 @@
  */
 
 import { z } from 'zod';
-import { DATA_MODE } from '@/lib/env';
+import { DATA_MODE, env } from '@/lib/env';
 import { btcDominance, stablecoinSupply } from '@/components/data/mockData';
 import { ethDominance, topAltcoins } from '@/components/data/mockDataAltcoins';
 import { withCache } from './marketCache';
@@ -288,20 +288,22 @@ const CoinGeckoNewsItemSchema = z.object({
  * Gratuito, sem autenticação. Rate limit: 30 req/min free tier.
  * Cache recomendado: 10 min (withCache no hook).
  */
-// CryptoCompare free news API — fallback when CoinGecko requires demo key
-const CC_NEWS_BASE = 'https://min-api.cryptocompare.com/data/v2/news/?lang=EN&limit=20';
-
+// CryptoCompare free news API — routed via fred-proxy to avoid CORS
 async function fetchCryptoCompareNews(): Promise<CoinGeckoNewsItem[]> {
+  const supUrl = env.VITE_SUPABASE_URL?.replace(/\/$/, '');
+  const supKey = env.VITE_SUPABASE_ANON_KEY;
+  if (!supUrl || !supKey) return [];
   try {
-    const res = await apiFetch(CC_NEWS_BASE);
+    const res = await fetch(`${supUrl}/functions/v1/fred-proxy`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${supKey}` },
+      body:    JSON.stringify({ type: 'cryptocompare_news', params: {} }),
+      signal:  AbortSignal.timeout(15_000),
+    });
     if (!res.ok) return [];
     const raw = await res.json() as { Data?: Array<{
-      id: string | number;
-      title: string;
-      url: string;
-      published_on: number;
-      source: string;
-      imageurl?: string;
+      id: string | number; title: string; url: string;
+      published_on: number; source: string; imageurl?: string;
     }> };
     return (raw.Data ?? []).map(item => ({
       id:           String(item.id),
