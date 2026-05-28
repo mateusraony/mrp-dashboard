@@ -17,6 +17,35 @@ const YAHOO_BASE   = 'https://query1.finance.yahoo.com/v8/finance/chart';
 const BINANCE_FAPI = 'https://fapi.binance.com';
 const GDELT_BASE   = 'https://api.gdeltproject.org/api/v2/doc/doc';
 
+// ── RSS helpers ──────────────────────────────────────────────────────────────
+function extractCDATAOrText(chunk: string, tag: string): string {
+  const re = new RegExp(`<${tag}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${tag}>`, 'i');
+  const m = chunk.match(re);
+  if (!m) return '';
+  const inner = m[1].trim();
+  const cdata = inner.match(/^<!\[CDATA\[([\s\S]*?)\]\]>$/);
+  return (cdata ? cdata[1] : inner).trim();
+}
+
+interface RSSItem { id: string; title: string; url: string; published_at: string; source: string }
+
+function parseRSSItems(xml: string, sourceName: string): RSSItem[] {
+  const items: RSSItem[] = [];
+  const itemRe = /<item>([\s\S]*?)<\/item>/g;
+  let m: RegExpExecArray | null;
+  while ((m = itemRe.exec(xml)) !== null && items.length < 20) {
+    const chunk = m[1];
+    const title = extractCDATAOrText(chunk, 'title');
+    const link  = extractCDATAOrText(chunk, 'link') || extractCDATAOrText(chunk, 'guid');
+    const pub   = extractCDATAOrText(chunk, 'pubDate');
+    if (!title || !link) continue;
+    let iso = new Date().toISOString();
+    try { if (pub) iso = new Date(pub).toISOString(); } catch { /* keep default */ }
+    items.push({ id: link, title, url: link, published_at: iso, source: sourceName });
+  }
+  return items;
+}
+
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin':  '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -147,6 +176,36 @@ Deno.serve(async (req: Request) => {
       }
       const ccData = await ccRes.json();
       return new Response(JSON.stringify(ccData), {
+        status:  200,
+        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // ── Crypto RSS News — CoinTelegraph / Decrypt feeds públicos, sem API key ──
+    if (type === 'crypto_rss') {
+      const rssSources = [
+        { url: 'https://cointelegraph.com/rss',  name: 'CoinTelegraph' },
+        { url: 'https://decrypt.co/feed',         name: 'Decrypt' },
+        { url: 'https://www.coindesk.com/arc/outboundfeeds/rss/', name: 'CoinDesk' },
+      ];
+      for (const src of rssSources) {
+        try {
+          const rssRes = await fetch(src.url, {
+            headers: { 'User-Agent': 'Mozilla/5.0 (compatible; mrp-dashboard/1.0)' },
+            signal: AbortSignal.timeout(10_000),
+          });
+          if (!rssRes.ok) { console.error(`[fred-proxy] RSS ${src.name} ${rssRes.status}`); continue; }
+          const xml   = await rssRes.text();
+          const items = parseRSSItems(xml, src.name);
+          if (items.length > 0) {
+            return new Response(JSON.stringify({ items }), {
+              status:  200,
+              headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+            });
+          }
+        } catch (e) { console.error(`[fred-proxy] RSS ${src.name} error: ${String(e)}`); }
+      }
+      return new Response(JSON.stringify({ items: [] }), {
         status:  200,
         headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
       });
