@@ -7,45 +7,27 @@ import {
 import { useGlobalMarkets, useGlobalMarketsBase } from '../hooks/useGlobalMarkets';
 import { useBcbData } from '../hooks/useBcb';
 import { useBtcTicker } from '../hooks/useBtcData';
+import { useGdeltNews } from '../hooks/useGdelt';
+import { useCoinGeckoNews } from '../hooks/useCoinGeckoNews';
 import { IS_LIVE } from '../lib/env';
 import { isSupabaseConfigured } from '../services/supabase';
 import { ModeBadge } from '../components/ui/DataBadge';
 import { DataTrustBadge } from '../components/ui/DataTrustBadge';
 import GoldenRule from '../components/ui/GoldenRule';
 
-// ─── Static news (editorial — não requer API) ─────────────────────────────────
-const GLOBAL_NEWS = [
-  {
-    period: 'dia',
-    items: [
-      { title: 'Fed mantém juros — Powell sinaliza cautela para próximos cortes', source: 'Reuters', impact: 'alto', tag: 'Fed', color: '#ef4444', url: 'https://www.reuters.com/markets/rates-bonds/' },
-      { title: 'VIX oscila — hedge funds ajustam proteções antes do CPI', source: 'Bloomberg', impact: 'alto', tag: 'VIX', color: '#ef4444', url: 'https://www.bloomberg.com/markets/rates-bonds/treasuries' },
-      { title: 'BCE sinaliza novo corte — euro se fortalece vs USD', source: 'FT', impact: 'médio', tag: 'BCE', color: '#f59e0b', url: 'https://www.ft.com/central-banks' },
-    ],
-  },
-  {
-    period: 'semana',
-    items: [
-      { title: 'CPI EUA — mercado precifica impacto em política monetária', source: 'BLS', impact: 'alto', tag: 'CPI', color: '#ef4444', url: 'https://www.bls.gov/cpi/' },
-      { title: 'NFP — dados de emprego influenciam expectativa de juros', source: 'BLS', impact: 'alto', tag: 'NFP', color: '#ef4444', url: 'https://www.bls.gov/ces/' },
-      { title: 'IBOVESPA reage às condições globais — Selic alta pesa em fluxo', source: 'B3', impact: 'médio', tag: 'IBOV', color: '#f59e0b', url: 'https://www.b3.com.br/pt_br/market-data-e-indices/indices/' },
-    ],
-  },
-  {
-    period: 'mês',
-    items: [
-      { title: 'FOMC: Fed mantém taxa — discurso divide mercado', source: 'Fed Reserve', impact: 'alto', tag: 'FOMC', color: '#ef4444', url: 'https://www.federalreserve.gov/monetarypolicy/' },
-      { title: 'BoJ ajusta política monetária — carry trade em alerta', source: 'BoJ', impact: 'alto', tag: 'BoJ', color: '#ef4444', url: 'https://www.boj.or.jp/en/mopo/index.htm' },
-      { title: 'PCE surpreende para cima — cortes Fed ficam mais distantes', source: 'BEA', impact: 'alto', tag: 'PCE', color: '#ef4444', url: 'https://www.bea.gov/data/personal-consumption-expenditures-price-index' },
-    ],
-  },
-];
+// ─── News helpers ─────────────────────────────────────────────────────────────
+function timeAgo(iso) {
+  const diff = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(diff / 60_000);
+  if (m < 1) return 'agora';
+  if (m < 60) return `há ${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `há ${h}h`;
+  return `há ${Math.floor(h / 24)}d`;
+}
 
-const IMPACT_STYLE = {
-  alto:  { color: '#ef4444', bg: 'rgba(239,68,68,0.1)',  border: 'rgba(239,68,68,0.25)',  icon: '🔴' },
-  médio: { color: '#f59e0b', bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.25)', icon: '🟡' },
-  baixo: { color: '#64748b', bg: 'rgba(100,116,139,0.1)',border: 'rgba(100,116,139,0.2)', icon: '⚪' },
-};
+const SENT_ICON  = { '1': '🟢', '-1': '🔴', '0': '⚪' };
+const SENT_COLOR = { '1': '#10b981', '-1': '#ef4444', '0': '#64748b' };
 
 const FX_ICONS   = { 'EUR/USD': '🇪🇺', 'USD/JPY': '🇯🇵', 'GBP/USD': '🇬🇧', 'USD/CNY': '🇨🇳', 'USD/BRL': '🇧🇷' };
 const CB_ICONS   = { 'Federal Reserve': '🇺🇸', 'Banco Central': '🇧🇷', 'BCE': '🇪🇺', 'BoJ': '🇯🇵' };
@@ -213,63 +195,141 @@ function BRLSection({ bcb, btcPrice }) {
   );
 }
 
-// ─── News Panel ───────────────────────────────────────────────────────────────
+// ─── News Panel (GDELT macro + CoinGecko cripto) ─────────────────────────────
 function GlobalNewsPanel() {
-  const [period, setPeriod] = useState('dia');
-  const newsData = GLOBAL_NEWS.find(n => n.period === period);
+  const [sourceFilter, setSourceFilter] = useState('all');
+
+  const { data: gdeltArticles = [], isLoading: gdeltLoading } = useGdeltNews('bitcoin macro inflation "federal reserve"');
+  const { data: cgData } = useCoinGeckoNews();
+
+  const cgItems     = cgData?.items     ?? [];
+  const isFallback  = cgData?.isFallback  ?? false;
+  const lastUpdated = cgData?.lastUpdated ?? null;
+  const isLoading   = gdeltLoading && cgItems.length === 0;
+
+  // Normaliza GDELT → shape unificado
+  const macroArticles = gdeltArticles.map(a => ({
+    title:        a.title,
+    url:          a.url,
+    source:       a.domain,
+    published_at: a.published_at,
+    sentiment:    String(a.sentiment),
+    type:         'macro',
+  }));
+
+  // Normaliza CoinGecko → shape unificado
+  const cryptoArticles = cgItems.map(a => ({
+    title:        a.title,
+    url:          a.url,
+    source:       a.news_site,
+    published_at: a.published_at,
+    sentiment:    '0',
+    type:         'crypto',
+  }));
+
+  // Merge, dedup por URL, ordenar por data desc
+  const seen = new Set();
+  const merged = [...macroArticles, ...cryptoArticles]
+    .filter(a => { if (seen.has(a.url)) return false; seen.add(a.url); return true; })
+    .sort((a, b) => new Date(b.published_at).getTime() - new Date(a.published_at).getTime())
+    .slice(0, 12);
+
+  const filtered = sourceFilter === 'all'
+    ? merged
+    : merged.filter(a => a.type === sourceFilter);
+
+  const isLive = merged.length > 0;
 
   return (
     <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, overflow: 'hidden', marginBottom: 14 }}>
+      {/* Header */}
       <div style={{ padding: '12px 16px', borderBottom: '1px solid #1a2535', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-        <div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <span style={{ fontSize: 13, fontWeight: 800, color: '#e2e8f0' }}>📰 Contexto de Mercado Global</span>
-          <span style={{ fontSize: 9, color: '#475569', marginLeft: 8 }}>manchetes editoriais fixas · links para fontes reais</span>
+          {IS_LIVE ? (
+            isLive
+              ? <span style={{ fontSize: 8, padding: '1px 6px', borderRadius: 4, background: 'rgba(16,185,129,0.1)', color: '#10b981', border: '1px solid rgba(16,185,129,0.2)', fontWeight: 700 }}>● LIVE</span>
+              : <span style={{ fontSize: 8, padding: '1px 6px', borderRadius: 4, background: 'rgba(245,158,11,0.1)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.2)', fontWeight: 700 }}>{isLoading ? 'CARREGANDO' : 'SEM DADOS'}</span>
+          ) : (
+            <span style={{ fontSize: 8, padding: '1px 6px', borderRadius: 4, background: 'rgba(245,158,11,0.1)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.2)', fontWeight: 700 }}>MOCK</span>
+          )}
+          {isFallback && lastUpdated && (
+            <span title={`Último salvo no Supabase: ${new Date(lastUpdated).toLocaleString('pt-BR')}`}
+              style={{ fontSize: 8, color: '#f59e0b', cursor: 'help' }}>
+              ⚠ Cache · {new Date(lastUpdated).toLocaleDateString('pt-BR')}
+            </span>
+          )}
         </div>
+        {/* Source filter */}
         <div style={{ display: 'flex', gap: 4, background: '#0d1421', padding: 3, borderRadius: 7, border: '1px solid #1a2535' }}>
-          {['dia', 'semana', 'mês'].map(p => (
-            <button key={p} onClick={() => setPeriod(p)} style={{
-              padding: '4px 12px', borderRadius: 5, border: 'none', cursor: 'pointer', fontSize: 10, fontWeight: 700,
-              background: period === p ? 'rgba(59,130,246,0.18)' : 'transparent',
-              color: period === p ? '#60a5fa' : '#475569', textTransform: 'capitalize',
+          {[
+            { key: 'all', label: 'Todas' },
+            { key: 'macro', label: 'Macro' },
+            { key: 'crypto', label: 'Cripto' },
+          ].map(({ key, label }) => (
+            <button key={key} onClick={() => setSourceFilter(key)} style={{
+              padding: '4px 10px', borderRadius: 5, border: 'none', cursor: 'pointer', fontSize: 9, fontWeight: 700,
+              background: sourceFilter === key ? 'rgba(59,130,246,0.18)' : 'transparent',
+              color: sourceFilter === key ? '#60a5fa' : '#475569',
             }}>
-              {p === 'dia' ? 'Hoje' : p === 'semana' ? 'Esta Semana' : 'Este Mês'}
+              {label}
             </button>
           ))}
         </div>
       </div>
-      {/* Disclaimer — sempre visível (manchetes são editoriais fixas, não scraped) */}
-      <div style={{ padding: '6px 16px', background: 'rgba(245,158,11,0.06)', borderBottom: '1px solid rgba(245,158,11,0.15)', display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span style={{ fontSize: 10 }}>⚠️</span>
-        <span style={{ fontSize: 10, color: '#78716c' }}>
-          Manchetes editoriais fixas — não são notícias em tempo real. Use os links para acessar as fontes diretamente.
+
+      {/* Banner fallback */}
+      {isFallback && lastUpdated && (
+        <div style={{ padding: '5px 16px', background: 'rgba(245,158,11,0.06)', borderBottom: '1px solid rgba(245,158,11,0.15)', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 10 }}>⚠️</span>
+          <span style={{ fontSize: 10, color: '#78716c' }}>
+            Notícias do cache Supabase — última atualização: {new Date(lastUpdated).toLocaleString('pt-BR')}
+          </span>
+        </div>
+      )}
+
+      {/* Fontes */}
+      <div style={{ padding: '5px 16px', background: 'rgba(59,130,246,0.03)', borderBottom: '1px solid rgba(59,130,246,0.08)', display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span style={{ fontSize: 9, color: '#334155' }}>
+          Macro: GDELT Project (4.500+ fontes globais) · Cripto: CoinGecko News · Atualização automática a cada 10 min
         </span>
       </div>
+
+      {/* Artigos */}
       <div>
-        {newsData?.items.map((n, i) => {
-          const imp = IMPACT_STYLE[n.impact] || IMPACT_STYLE.baixo;
-          return (
-            <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '11px 16px', borderBottom: i < newsData.items.length - 1 ? '1px solid rgba(26,37,53,0.5)' : 'none' }}>
-              <span style={{ fontSize: 13, marginTop: 1, flexShrink: 0 }}>{imp.icon}</span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 12, color: '#e2e8f0', fontWeight: 500, lineHeight: 1.4, marginBottom: 4 }}>{n.title}</div>
-                <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 9, color: '#475569' }}>{n.source}</span>
-                  <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 4, background: imp.bg, color: imp.color, border: `1px solid ${imp.border}`, fontWeight: 700 }}>{n.impact.toUpperCase()}</span>
-                  <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 4, background: '#0d1421', color: '#64748b', border: '1px solid #1a2535', fontFamily: 'JetBrains Mono, monospace' }}>{n.tag}</span>
-                </div>
-              </div>
-              {IS_LIVE ? (
-                <a href={n.url} target="_blank" rel="noopener noreferrer" style={{ flexShrink: 0, fontSize: 10, color: '#3b82f6', textDecoration: 'none', padding: '3px 8px', borderRadius: 5, background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', fontWeight: 600, whiteSpace: 'nowrap', marginTop: 2 }}>
-                  Ver ↗
-                </a>
-              ) : (
-                <span style={{ flexShrink: 0, fontSize: 10, color: '#334155', padding: '3px 8px', borderRadius: 5, background: 'rgba(51,65,85,0.15)', border: '1px solid rgba(51,65,85,0.3)', fontWeight: 600, whiteSpace: 'nowrap', marginTop: 2, cursor: 'default' }}>
-                  Demo
+        {isLoading && !isLive && (
+          <div style={{ padding: '20px 16px', fontSize: 11, color: '#334155', textAlign: 'center' }}>Carregando notícias ao vivo...</div>
+        )}
+        {!isLoading && filtered.length === 0 && (
+          <div style={{ padding: '20px 16px', fontSize: 11, color: '#334155', textAlign: 'center' }}>
+            {IS_LIVE ? 'Nenhuma notícia disponível no momento — aguardando resposta das APIs.' : 'Modo mock — notícias ao vivo requerem DATA_MODE=live.'}
+          </div>
+        )}
+        {filtered.map((n, i) => (
+          <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '11px 16px', borderBottom: i < filtered.length - 1 ? '1px solid rgba(26,37,53,0.5)' : 'none' }}>
+            <span style={{ fontSize: 12, marginTop: 2, flexShrink: 0 }}>{SENT_ICON[n.sentiment] ?? '⚪'}</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 11, color: '#e2e8f0', fontWeight: 500, lineHeight: 1.45, marginBottom: 4 }}>{n.title}</div>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 9, color: '#475569' }}>{n.source}</span>
+                <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 4,
+                  background: n.type === 'macro' ? 'rgba(59,130,246,0.08)' : 'rgba(16,185,129,0.08)',
+                  color: n.type === 'macro' ? '#3b82f6' : '#10b981',
+                  border: n.type === 'macro' ? '1px solid rgba(59,130,246,0.2)' : '1px solid rgba(16,185,129,0.2)',
+                  fontWeight: 700 }}>
+                  {n.type === 'macro' ? 'MACRO' : 'CRIPTO'}
                 </span>
-              )}
+                <span style={{ fontSize: 8, color: '#334155', fontFamily: 'JetBrains Mono, monospace' }}>
+                  {timeAgo(n.published_at)}
+                </span>
+              </div>
             </div>
-          );
-        })}
+            <a href={n.url} target="_blank" rel="noopener noreferrer"
+              style={{ flexShrink: 0, fontSize: 10, color: '#3b82f6', textDecoration: 'none', padding: '3px 8px', borderRadius: 5, background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', fontWeight: 600, whiteSpace: 'nowrap', marginTop: 1 }}>
+              Ver ↗
+            </a>
+          </div>
+        ))}
       </div>
     </div>
   );
