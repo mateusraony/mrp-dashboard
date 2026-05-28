@@ -35,7 +35,7 @@ export function useGdeltNews(query?: string) {
       try {
         const articles = await withCache<GdeltArticleEnriched[]>(
           `gdelt:news:${resolvedQuery}`,
-          600,
+          1800,   // 30 min — reduce GDELT hit frequency to avoid 429s
           'gdelt',
           () => fetchGdeltNews(resolvedQuery),
         );
