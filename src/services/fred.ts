@@ -22,7 +22,7 @@ import { z } from 'zod';
 import { DATA_MODE, env } from '@/lib/env';
 import { isSupabaseConfigured } from '@/services/supabase';
 import { macroBoard } from '@/components/data/mockData';
-import { fetchSP500, fetchVIX } from '@/services/yahooFinance';
+import { fetchSP500, fetchVIX, fetchGold } from '@/services/yahooFinance';
 
 // ─── Schemas ─────────────────────────────────────────────────────────────────────────────
 
@@ -96,12 +96,11 @@ interface SeriesConfig {
 }
 
 const MACRO_SERIES: SeriesConfig[] = [
-  { id: 'DXY',    name: 'USD Broad Index',    series_id: 'DTWEXBGS',            unit: '',     format: 'number' },
-  { id: 'GOLD',   name: 'Gold (LBMA AM)',     series_id: 'GOLDAMGBD228NLBM',    unit: '$/oz', format: 'number' },
-  { id: 'US10Y',  name: 'US 10Y Yield',       series_id: 'DGS10',               unit: '%',    format: 'yield'  },
-  { id: 'US2Y',   name: 'US 2Y Yield',        series_id: 'DGS2',                unit: '%',    format: 'yield'  },
+  { id: 'DXY',   name: 'USD Broad Index', series_id: 'DTWEXBGS', unit: '',    format: 'number' },
+  { id: 'US10Y', name: 'US 10Y Yield',    series_id: 'DGS10',    unit: '%',   format: 'yield'  },
+  { id: 'US2Y',  name: 'US 2Y Yield',     series_id: 'DGS2',     unit: '%',   format: 'yield'  },
 ];
-// SP500 e VIX são buscados via Yahoo Finance (sem restrição de licença S&P/CBOE)
+// SP500, VIX e GOLD via Yahoo Finance — FRED GOLDAMGBD228NLBM descontinuado em 2024
 
 // ─── Mock transformer ─────────────────────────────────────────────────────────────────────────────
 
@@ -304,10 +303,11 @@ export async function fetchMacroBoard(): Promise<MacroBoardData> {
     });
   }
 
-  // SP500 e VIX via Yahoo Finance (sem restrição de licença S&P/CBOE)
-  const [sp500Result, vixResult] = await Promise.allSettled([
+  // SP500, VIX e GOLD via Yahoo Finance (FRED GOLDAMGBD228NLBM descontinuado 2024)
+  const [sp500Result, vixResult, goldResult] = await Promise.allSettled([
     fetchSP500(35),
     fetchVIX(35),
+    fetchGold(35),
   ]);
 
   if (sp500Result.status === 'fulfilled' && sp500Result.value.length > 0) {
@@ -334,6 +334,19 @@ export async function fetchMacroBoard(): Promise<MacroBoardData> {
     });
   } else {
     console.warn('[fred] VIX via Yahoo Finance falhou — série omitida');
+  }
+
+  if (goldResult.status === 'fulfilled' && goldResult.value.length > 0) {
+    const history = goldResult.value;
+    const deltas  = extractDeltas(history, 'number');
+    series.push({
+      id: 'GOLD', name: 'Gold (GC=F)', series_id: 'GC=F',
+      unit: '$/oz', format: 'number',
+      history: history.slice(-30), quality: 'A',
+      ...deltas,
+    });
+  } else {
+    console.warn('[fred] Gold via Yahoo Finance falhou — série omitida');
   }
 
   return {

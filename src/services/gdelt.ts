@@ -24,7 +24,7 @@ async function fetchGdeltViaProxy(params: Record<string, string>): Promise<unkno
     method:  'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${_supKey}` },
     body:    JSON.stringify({ type: 'gdelt', params }),
-    signal:  AbortSignal.timeout(15_000),
+    signal:  AbortSignal.timeout(20_000),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({} as Record<string, unknown>));
@@ -184,8 +184,9 @@ export async function fetchGdeltNews(
     query,
     mode:       'artlist',
     format:     'json',
-    maxrecords: '25',
+    maxrecords: '15',
     sort:       'DateDesc',
+    timespan:   '7d',   // limit to last 7 days — prevents slow full-corpus scans
   };
 
   let raw: unknown;
