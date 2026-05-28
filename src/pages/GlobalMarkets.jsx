@@ -234,9 +234,12 @@ function GlobalNewsPanel() {
     .sort((a, b) => new Date(b.published_at).getTime() - new Date(a.published_at).getTime())
     .slice(0, 12);
 
+  // When GDELT unavailable, Macro tab falls back to CryptoCompare articles
   const filtered = sourceFilter === 'all'
     ? merged
-    : merged.filter(a => a.type === sourceFilter);
+    : sourceFilter === 'macro' && macroArticles.length === 0
+      ? merged
+      : merged.filter(a => a.type === sourceFilter);
 
   const isLive = merged.length > 0;
 
