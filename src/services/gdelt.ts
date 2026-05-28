@@ -192,9 +192,8 @@ export async function fetchGdeltNews(
   try {
     raw = await fetchGdeltViaProxy(params);
   } catch (proxyErr) {
-    const err = new Error(`GDELT fetch failed via proxy: ${proxyErr instanceof Error ? proxyErr.message : String(proxyErr)}`);
-    logError('GDELT fetch failed', err, 'gdelt-news');
-    throw err;
+    // Don't double-log here — useGdeltNews catches and logs at the hook level
+    throw new Error(`GDELT fetch failed via proxy: ${proxyErr instanceof Error ? proxyErr.message : String(proxyErr)}`);
   }
   const parsed = GdeltResponseSchema.parse(raw);
 
