@@ -14,17 +14,34 @@ import { Area, AreaChart } from 'recharts';
 // useMacroBoard() retorna MacroBoardData — shape idêntico ao macroBoardMock:
 //   { series: MacroSeriesEntry[], updated_at: number }
 function useMacroPageData() {
-  const { data: live, isError: fredError } = useMacroBoard();
-  const { data: liquidity } = useGlobalLiquidity();
+  const macroRaw     = useMacroBoard();
+  const liquidityRaw = useGlobalLiquidity();
   const { data: bcb, isLoading: bcbLoading, isError: bcbError } = useBcbData();
-  const { data: fng } = useFearGreed(1);
+  const fngRaw       = useFearGreed(1);
   const { data: riskScore } = useRiskScore();
-  const macroBoard = live ?? macroBoardMock;
+  const macroBoard = macroRaw.data ?? macroBoardMock;
   // isLiveMacro=true somente quando FRED retornou ao menos uma série quality 'A'.
   // fetchMacroBoard usa Promise.allSettled e retorna placeholders quality 'C' quando
   // o FRED proxy falha — live fica truthy mas os dados são zeros sem valor real.
-  const isLiveMacro = IS_LIVE && !!live && live.series.some(s => s.quality === 'A');
-  return { macroBoard, isLiveMacro, fredError, liquidity, bcb, bcbLoading, bcbError, fng, riskScore };
+  const isLiveMacro = IS_LIVE && !!macroRaw.data && macroRaw.data.series.some(s => s.quality === 'A');
+  return {
+    macroBoard,
+    isLiveMacro,
+    fredError:            macroRaw.isError,
+    fredIsFallback:       macroRaw.data?.isFallback  ?? false,
+    fredLastUpdated:      macroRaw.data?.lastUpdated ?? null,
+    liquidity:            liquidityRaw.data,
+    liquidityIsFallback:  liquidityRaw.data?.isFallback  ?? false,
+    liquidityLastUpdated: liquidityRaw.data?.lastUpdated ?? null,
+    bcb,
+    bcbLoading,
+    bcbError,
+    bcbIsFallback:  bcb?.isFallback  ?? false,
+    bcbLastUpdated: bcb?.lastUpdated ?? null,
+    fng:            fngRaw.data,
+    fngIsFallback:  fngRaw.data?.isFallback ?? false,
+    riskScore,
+  };
 }
 import { AIModuleCard } from '../components/ui/AIAnalysisPanel';
 import GoldenRule from '../components/ui/GoldenRule';
@@ -204,19 +221,18 @@ function LiquidityMetricCard({ label, value, sub, color = '#e2e8f0', trend, tren
   );
 }
 
-function GlobalLiquiditySection({ liq }) {
+function GlobalLiquiditySection({ liq, isFallback = false, lastUpdated = null }) {
   if (!liq) return null;
 
   const netColor = liq.net_liquidity > 6_500 ? '#10b981' : liq.net_liquidity > 5_500 ? '#f59e0b' : '#ef4444';
   const chgColor = liq.fed_balance_chg_4w >= 0 ? '#10b981' : '#ef4444';
 
-  // Badge de qualidade: dados FRED são atualizados diariamente; freshness~60 = <24h
   const qualityBadge = (
     <DataQualityBadge
-      freshness={Date.now() - liq.updated_at < 3_600_000 ? 100 : 60}
+      freshness={isFallback ? 40 : (Date.now() - liq.updated_at < 3_600_000 ? 100 : 60)}
       completeness={100}
       consistency={100}
-      fallback_active={false}
+      fallback_active={isFallback}
       source="FRED"
     />
   );
@@ -234,7 +250,13 @@ function GlobalLiquiditySection({ liq }) {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          <DataQualityBadge freshness={60} completeness={100} consistency={100} fallback_active={false} source="FRED" />
+          <DataQualityBadge freshness={isFallback ? 40 : (Date.now() - liq.updated_at < 3_600_000 ? 100 : 60)} completeness={100} consistency={100} fallback_active={isFallback} source="FRED" />
+          {isFallback && lastUpdated && (
+            <div title={`Cache Supabase · ${new Date(lastUpdated).toLocaleString('pt-BR')}`}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 9, color: '#f59e0b', cursor: 'help' }}>
+              ⚠ Cache · {new Date(lastUpdated).toLocaleDateString('pt-BR')}
+            </div>
+          )}
           <span style={{ fontSize: 9, color: '#334155' }}>
             WALCL · RRPONTSYD · WTREGEN · DFII10 · THREEFYTP10 · DTWEXBGS
           </span>
@@ -420,7 +442,7 @@ function bcbColor(metric, value) {
  * BrMacroPanel — exibe SELIC, IPCA e USDBRL do BCB com badges de qualidade/fonte.
  * Estilo consistente com LiquidityMetricCard.
  */
-function BrMacroPanel({ bcb, isLoading, isError }) {
+function BrMacroPanel({ bcb, isLoading, isError, isFallback = false, lastUpdated = null }) {
   // Calcula DataQualityBadge props a partir do BcbData
   const freshness = bcb
     ? (Date.now() - bcb.updated_at < 3_600_000 ? 100 : 60)
@@ -499,6 +521,12 @@ function BrMacroPanel({ bcb, isLoading, isError }) {
           }}>
             {isMock ? 'Mock' : 'BCB OpenData'}
           </span>
+          {isFallback && lastUpdated && (
+            <div title={`Cache Supabase · ${new Date(lastUpdated).toLocaleString('pt-BR')}`}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 9, color: '#f59e0b', cursor: 'help' }}>
+              ⚠ Cache · {new Date(lastUpdated).toLocaleDateString('pt-BR')}
+            </div>
+          )}
           <span style={{ fontSize: 9, color: '#334155' }}>
             SGS 11 · SGS 433 · SGS 1
           </span>
@@ -610,7 +638,14 @@ function ClaudeInsight({ text, loading }) {
 }
 
 export default function Macro() {
-  const { macroBoard, isLiveMacro, fredError, liquidity, bcb, bcbLoading, bcbError, fng, riskScore } = useMacroPageData();
+  const {
+    macroBoard, isLiveMacro, fredError,
+    fredIsFallback, fredLastUpdated,
+    liquidity, liquidityIsFallback, liquidityLastUpdated,
+    bcb, bcbLoading, bcbError, bcbIsFallback, bcbLastUpdated,
+    fng, fngIsFallback,
+    riskScore,
+  } = useMacroPageData();
   const m = macroBoard;
 
   // Rule-based AI analysis from live macro data
@@ -747,6 +782,29 @@ export default function Macro() {
         </div>
       </div>
 
+      {/* Banner: usando último dado salvo no Supabase (cache stale) */}
+      {IS_LIVE && fredIsFallback && fredLastUpdated && (
+        <div style={{
+          marginBottom: 16, padding: '10px 14px', borderRadius: 8,
+          background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.25)',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, fontSize: 11,
+        }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#92400e' }}>
+            <span>⚠️</span>
+            <span>
+              <strong style={{ color: '#f59e0b' }}>Usando último dado salvo no Supabase</strong>
+              {' — API FRED indisponível. Valores abaixo refletem o mercado em '}
+              <strong style={{ fontFamily: 'JetBrains Mono, monospace', color: '#f59e0b' }}>
+                {new Date(fredLastUpdated).toLocaleDateString('pt-BR')}
+              </strong>.
+            </span>
+          </span>
+          <span style={{ fontSize: 9, fontFamily: 'JetBrains Mono, monospace', color: '#4a5568', whiteSpace: 'nowrap' }}>
+            {new Date(fredLastUpdated).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+          </span>
+        </div>
+      )}
+
       {/* Banner de fallback mock quando FRED está indisponível em modo live */}
       {IS_LIVE && !isLiveMacro && (
         <div style={{
@@ -758,7 +816,9 @@ export default function Macro() {
           <span>
             <strong style={{ color: '#f59e0b' }}>FRED API indisponível</strong>
             {fredError ? ' — erro na requisição.' : ' — sem resposta.'}{' '}
-            Exibindo dados de demonstração. Os valores abaixo não refletem o mercado atual.
+            {fredIsFallback && !fredLastUpdated
+              ? 'Sem cache disponível — exibindo dados de demonstração.'
+              : 'Exibindo dados de demonstração. Os valores abaixo não refletem o mercado atual.'}
           </span>
         </div>
       )}
@@ -778,6 +838,12 @@ export default function Macro() {
             <div style={{ fontSize: 10, color: macroVerdict.color, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>Panorama Macro Atual</div>
             <div style={{ fontSize: 20, fontWeight: 800, color: macroVerdict.color, letterSpacing: '-0.02em', marginBottom: 4 }}>{macroVerdict.label}</div>
             <div style={{ fontSize: 12, color: '#94a3b8', maxWidth: 460 }}>{macroVerdict.text}</div>
+            {fredIsFallback && fredLastUpdated && (
+              <div title={`Última atualização: ${new Date(fredLastUpdated).toLocaleString('pt-BR')}`}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 9, color: '#f59e0b', cursor: 'help', marginTop: 6 }}>
+                ⚠ Cache · {new Date(fredLastUpdated).toLocaleDateString('pt-BR')}
+              </div>
+            )}
           </div>
         </div>
         <div style={{ display: 'flex', gap: 24 }}>
@@ -921,10 +987,10 @@ export default function Macro() {
       </div>
 
       {/* Liquidez Global — Fed BS / RRP / TGA / Real Yield / Term Premium / DXY */}
-      <GlobalLiquiditySection liq={liquidity} />
+      <GlobalLiquiditySection liq={liquidity} isFallback={liquidityIsFallback} lastUpdated={liquidityLastUpdated} />
 
       {/* Brasil — Macro BCB: SELIC / IPCA / USDBRL */}
-      <BrMacroPanel bcb={bcb} isLoading={bcbLoading} isError={bcbError} />
+      <BrMacroPanel bcb={bcb} isLoading={bcbLoading} isError={bcbError} isFallback={bcbIsFallback} lastUpdated={bcbLastUpdated} />
 
       {/* ── DICAS DE OURO ────────────────────────────────────────────────────────── */}
       <div style={{ marginBottom: 16 }}>
