@@ -152,21 +152,21 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // ── CoinPaprika News — sem API key, sem CORS, fallback de último recurso ─
-    if (type === 'coinpaprika_news') {
-      const paprikaRes = await fetch('https://api.coinpaprika.com/v1/news', {
+    // ── Messari News — sem API key, 1000 req/dia free, fallback de último recurso
+    if (type === 'messari_news') {
+      const messariRes = await fetch('https://data.messari.io/api/v1/news', {
         headers: { 'User-Agent': 'Mozilla/5.0 (compatible; mrp-dashboard/1.0)' },
         signal: AbortSignal.timeout(10_000),
       });
-      if (!paprikaRes.ok) {
-        console.error(`[fred-proxy] CoinPaprika news ${paprikaRes.status}`);
+      if (!messariRes.ok) {
+        console.error(`[fred-proxy] Messari news ${messariRes.status}`);
         return new Response(
-          JSON.stringify([]),
+          JSON.stringify({ data: [] }),
           { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } },
         );
       }
-      const paprikaData = await paprikaRes.json();
-      return new Response(JSON.stringify(paprikaData), {
+      const messariData = await messariRes.json();
+      return new Response(JSON.stringify(messariData), {
         status:  200,
         headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
       });

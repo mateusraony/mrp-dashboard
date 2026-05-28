@@ -289,8 +289,8 @@ const CoinGeckoNewsItemSchema = z.object({
  * Gratuito, sem autenticação. Rate limit: 30 req/min free tier.
  * Cache recomendado: 10 min (withCache no hook).
  */
-// CoinPaprika public news — no API key, zero-auth, last-resort fallback
-async function fetchCoinPaprikaNews(): Promise<CoinGeckoNewsItem[]> {
+// Messari public news — no API key, 1000 req/day free, last-resort fallback
+async function fetchMessariNews(): Promise<CoinGeckoNewsItem[]> {
   const supUrl = env.VITE_SUPABASE_URL?.replace(/\/$/, '');
   const supKey = env.VITE_SUPABASE_ANON_KEY;
   if (!supUrl || !supKey) return [];
@@ -298,31 +298,33 @@ async function fetchCoinPaprikaNews(): Promise<CoinGeckoNewsItem[]> {
     const res = await fetch(`${supUrl}/functions/v1/fred-proxy`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${supKey}` },
-      body:    JSON.stringify({ type: 'coinpaprika_news', params: {} }),
+      body:    JSON.stringify({ type: 'messari_news', params: {} }),
       signal:  AbortSignal.timeout(12_000),
     });
     if (!res.ok) {
-      logWarn(`CoinPaprika news proxy ${res.status}`, null, 'coingecko-news');
+      logWarn(`Messari news proxy ${res.status}`, null, 'coingecko-news');
       return [];
     }
-    const raw = await res.json() as Array<{
-      id: string; title: string; url: string; date: string; source?: string;
-    }>;
-    if (!Array.isArray(raw)) {
-      logWarn('CoinPaprika news: response is not array', { type: typeof raw }, 'coingecko-news');
+    const raw = await res.json() as { data?: Array<{
+      id: string; title: string; published_at: string;
+      author?: { name?: string };
+      references?: Array<{ name?: string; url?: string }>;
+    }> };
+    const items = raw.data ?? [];
+    if (items.length === 0) {
+      logWarn('Messari news: empty response', null, 'coingecko-news');
       return [];
     }
-    if (raw.length === 0) return [];
-    return raw.slice(0, 20).map(item => ({
+    return items.slice(0, 20).map(item => ({
       id:           item.id,
       title:        item.title,
-      author:       '',
-      published_at: new Date(item.date).toISOString(),
-      url:          item.url,
-      news_site:    item.source ?? 'CoinPaprika',
+      author:       item.author?.name ?? '',
+      published_at: item.published_at,
+      url:          item.references?.[0]?.url ?? `https://messari.io/news/${item.id}`,
+      news_site:    item.references?.[0]?.name ?? 'Messari',
     }));
   } catch (err) {
-    logWarn(`CoinPaprika news failed: ${String(err)}`, null, 'coingecko-news');
+    logWarn(`Messari news failed: ${String(err)}`, null, 'coingecko-news');
     return [];
   }
 }
@@ -332,7 +334,7 @@ async function fetchCoinPaprikaNews(): Promise<CoinGeckoNewsItem[]> {
 async function fetchCryptoCompareNews(): Promise<CoinGeckoNewsItem[]> {
   const supUrl = env.VITE_SUPABASE_URL?.replace(/\/$/, '');
   const supKey = env.VITE_SUPABASE_ANON_KEY;
-  if (!supUrl || !supKey) return fetchCoinPaprikaNews();
+  if (!supUrl || !supKey) return fetchMessariNews();
   try {
     const res = await fetch(`${supUrl}/functions/v1/fred-proxy`, {
       method:  'POST',
@@ -341,8 +343,8 @@ async function fetchCryptoCompareNews(): Promise<CoinGeckoNewsItem[]> {
       signal:  AbortSignal.timeout(15_000),
     });
     if (!res.ok) {
-      logWarn(`CryptoCompare news proxy ${res.status} — fallback CoinPaprika`, null, 'coingecko-news');
-      return fetchCoinPaprikaNews();
+      logWarn(`CryptoCompare news proxy ${res.status} — fallback Messari`, null, 'coingecko-news');
+      return fetchMessariNews();
     }
     const raw = await res.json() as { Data?: unknown };
     const dataField = raw.Data;
@@ -355,8 +357,8 @@ async function fetchCryptoCompareNews(): Promise<CoinGeckoNewsItem[]> {
           ? (dataField as Record<string, unknown>).Data as CCItem[]
           : [];
     if (list.length === 0) {
-      logWarn('CryptoCompare news: Data empty or unrecognized format — fallback CoinPaprika', { format: typeof dataField }, 'coingecko-news');
-      return fetchCoinPaprikaNews();
+      logWarn('CryptoCompare news: Data empty or unrecognized format — fallback Messari', { format: typeof dataField }, 'coingecko-news');
+      return fetchMessariNews();
     }
     const items = list.map(item => ({
       id:           String(item.id),
@@ -369,8 +371,8 @@ async function fetchCryptoCompareNews(): Promise<CoinGeckoNewsItem[]> {
     }));
     return items;
   } catch (err) {
-    logWarn(`CryptoCompare news failed: ${String(err)} — fallback CoinPaprika`, null, 'coingecko-news');
-    return fetchCoinPaprikaNews();
+    logWarn(`CryptoCompare news failed: ${String(err)} — fallback Messari`, null, 'coingecko-news');
+    return fetchMessariNews();
   }
 }
 
