@@ -22,17 +22,18 @@ export function useCoinGeckoNews() {
     queryFn:         async (): Promise<DataState<CoinGeckoNewsItem[]>> => {
       try {
         const items = await withCache<CoinGeckoNewsItem[]>(
-          'coingecko:news',
-          600,
+          'crypto:news:v3',   // v3 = busts any stale empty [] from previous keys
+          1800,
           'coingecko',
           fetchCoinGeckoNews,
+          (v) => Array.isArray(v) && (v as CoinGeckoNewsItem[]).length > 0 ? v as CoinGeckoNewsItem[] : null,
         );
         reportApiRecovery('coingecko_news');
         return { data: items, lastUpdated: new Date().toISOString(), isFallback: false, debugError: null };
       } catch (err) {
         logError('CoinGecko news fetch failed', { error: String(err) }, 'coingecko-news');
         reportApiFailure('coingecko_news');
-        const stale = await getStaleCache<CoinGeckoNewsItem[]>('coingecko:news');
+        const stale = await getStaleCache<CoinGeckoNewsItem[]>('crypto:news:v3');
         if (stale) return { data: stale.value, lastUpdated: stale.updatedAt.toISOString(), isFallback: true, debugError: String(err) };
         return { data: null, lastUpdated: null, isFallback: true, debugError: String(err) };
       }
