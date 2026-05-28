@@ -14,6 +14,7 @@
 
 import { DATA_MODE } from '@/lib/env';
 import { fetchSeries } from '@/services/fred';
+import { fetchGold } from '@/services/yahooFinance';
 import { fetchBcbData } from '@/services/bcb';
 
 function calcDeltas(history: Array<{ date: string; value: number }>) {
@@ -259,28 +260,40 @@ export async function fetchFxRates(): Promise<FxRateData[]> {
   return rates;
 }
 
-/** fetchCommodities — Gold, Silver, WTI via FRED */
+/** fetchCommodities — Gold via Yahoo Finance (GC=F); Silver, WTI via FRED */
 export async function fetchCommodities(): Promise<CommodityData[]> {
   if (DATA_MODE === 'mock') return mockGlobalMarkets().commodities;
 
-  const configs = [
-    { name: 'Gold',          symbol: 'XAU',  unit: '$/oz',    series: 'GOLDAMGBD228NLBM' },
-    { name: 'Silver',        symbol: 'XAG',  unit: '$/oz',    series: 'SLVPRUSD'         },
-    { name: 'WTI Crude Oil', symbol: 'WTI',  unit: '$/bbl',   series: 'DCOILWTICO'       },
+  const fredConfigs = [
+    { name: 'Silver',        symbol: 'XAG',  unit: '$/oz',  series: 'SLVPRUSD'   },
+    { name: 'WTI Crude Oil', symbol: 'WTI',  unit: '$/bbl', series: 'DCOILWTICO' },
   ];
 
-  const results = await Promise.allSettled(
-    configs.map(c => fetchSeries(c.series, 35)),
-  );
+  const [goldResult, ...fredResults] = await Promise.allSettled([
+    fetchGold(35),
+    ...fredConfigs.map(c => fetchSeries(c.series, 35)),
+  ]);
 
-  return configs
-    .map((c, i) => {
-      const r = results[i];
-      if (r.status === 'rejected' || r.value.length === 0) return null;
-      const { last, delta_1d, delta_7d, delta_30d } = calcDeltas(r.value);
-      return { ...c, value: parseFloat(last.toFixed(2)), delta_1d, delta_7d, delta_30d, source: 'FRED' as const, series_id: c.series };
-    })
-    .filter((x): x is NonNullable<typeof x> => x !== null) as CommodityData[];
+  const commodities: CommodityData[] = [];
+
+  // Gold via Yahoo Finance (FRED GOLDAMGBD228NLBM descontinuado 2024)
+  if (goldResult.status === 'fulfilled' && goldResult.value.length > 0) {
+    const { last, delta_1d, delta_7d, delta_30d } = calcDeltas(goldResult.value);
+    commodities.push({
+      name: 'Gold', symbol: 'XAU', unit: '$/oz',
+      value: parseFloat(last.toFixed(2)), delta_1d, delta_7d, delta_30d,
+      source: 'FRED' as const, series_id: 'GC=F',
+    });
+  }
+
+  fredConfigs.forEach((c, i) => {
+    const r = fredResults[i];
+    if (r.status === 'rejected' || r.value.length === 0) return;
+    const { last, delta_1d, delta_7d, delta_30d } = calcDeltas(r.value);
+    commodities.push({ ...c, value: parseFloat(last.toFixed(2)), delta_1d, delta_7d, delta_30d, source: 'FRED' as const, series_id: c.series });
+  });
+
+  return commodities;
 }
 
 /** fetchCentralBankRates — Fed Funds, ECB, BoJ via FRED + SELIC via BCB */

@@ -22,7 +22,7 @@ const YahooChartSchema = z.object({
     result: z.array(z.object({
       meta: z.object({
         regularMarketPrice: z.number(),
-        previousClose:      z.number(),
+        previousClose:      z.number().optional(),  // absent for some indices/futures
         symbol:             z.string(),
       }),
       timestamp: z.array(z.number()),
@@ -112,4 +112,9 @@ export async function fetchSP500(days = 40): Promise<Array<{ date: string; value
 /** CBOE VIX — ticker ^VIX */
 export async function fetchVIX(days = 40): Promise<Array<{ date: string; value: number }>> {
   return fetchYahooSeries('%5EVIX', days);
+}
+
+/** Gold Futures — ticker GC=F (LBMA proxy; FRED GOLDAMGBD228NLBM discontinued 2024) */
+export async function fetchGold(days = 40): Promise<Array<{ date: string; value: number }>> {
+  return fetchYahooSeries('GC%3DF', days);
 }
