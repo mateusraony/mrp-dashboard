@@ -9,7 +9,7 @@
 
 import { z } from 'zod';
 import { env, DATA_MODE } from '@/lib/env';
-import { logInfo, logError } from '@/lib/debugLog';
+import { logInfo, logError, logWarn } from '@/lib/debugLog';
 
 // ─── Persistência Supabase ────────────────────────────────────────────────────
 
@@ -26,8 +26,10 @@ async function fetchGdeltViaProxy(params: Record<string, string>): Promise<unkno
     body:    JSON.stringify({ type: 'gdelt', params }),
     signal:  AbortSignal.timeout(20_000),
   });
-  // Any non-200 from the proxy (429 rate-limit, 500 timeout, etc.) → degrade silently
-  if (!res.ok) return { articles: [] };
+  if (!res.ok) {
+    logWarn(`GDELT proxy ${res.status} — degrading to empty`, { status: res.status }, 'gdelt');
+    return { articles: [] };
+  }
   return res.json();
 }
 

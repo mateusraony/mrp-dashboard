@@ -16,6 +16,7 @@ import { ethDominance, topAltcoins } from '@/components/data/mockDataAltcoins';
 import { withCache } from './marketCache';
 import { apiFetch, RateLimitError } from '@/lib/apiClient';
 import { fetchAltcoinsFromCryptoCompare } from './providers/cryptoCompare';
+import { logWarn } from '@/lib/debugLog';
 
 const BASE = 'https://api.coingecko.com/api/v3';
 
@@ -288,8 +289,8 @@ const CoinGeckoNewsItemSchema = z.object({
  * Gratuito, sem autenticação. Rate limit: 30 req/min free tier.
  * Cache recomendado: 10 min (withCache no hook).
  */
-// CryptoCompare free news API — routed via fred-proxy to avoid CORS
-async function fetchCryptoCompareNews(): Promise<CoinGeckoNewsItem[]> {
+// CoinPaprika public news — no API key, zero-auth, last-resort fallback
+async function fetchCoinPaprikaNews(): Promise<CoinGeckoNewsItem[]> {
   const supUrl = env.VITE_SUPABASE_URL?.replace(/\/$/, '');
   const supKey = env.VITE_SUPABASE_ANON_KEY;
   if (!supUrl || !supKey) return [];
@@ -297,15 +298,53 @@ async function fetchCryptoCompareNews(): Promise<CoinGeckoNewsItem[]> {
     const res = await fetch(`${supUrl}/functions/v1/fred-proxy`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${supKey}` },
+      body:    JSON.stringify({ type: 'coinpaprika_news', params: {} }),
+      signal:  AbortSignal.timeout(12_000),
+    });
+    if (!res.ok) {
+      logWarn(`CoinPaprika news proxy ${res.status}`, null, 'coingecko-news');
+      return [];
+    }
+    const raw = await res.json() as Array<{
+      id: string; title: string; url: string; date: string; source?: string;
+    }>;
+    if (!Array.isArray(raw) || raw.length === 0) return [];
+    return raw.slice(0, 20).map(item => ({
+      id:           item.id,
+      title:        item.title,
+      author:       '',
+      published_at: new Date(item.date).toISOString(),
+      url:          item.url,
+      news_site:    item.source ?? 'CoinPaprika',
+    }));
+  } catch (err) {
+    logWarn(`CoinPaprika news failed: ${String(err)}`, null, 'coingecko-news');
+    return [];
+  }
+}
+
+// CryptoCompare free news API — routed via fred-proxy to avoid CORS
+// Falls back to CoinPaprika when CryptoCompare is unavailable
+async function fetchCryptoCompareNews(): Promise<CoinGeckoNewsItem[]> {
+  const supUrl = env.VITE_SUPABASE_URL?.replace(/\/$/, '');
+  const supKey = env.VITE_SUPABASE_ANON_KEY;
+  if (!supUrl || !supKey) return fetchCoinPaprikaNews();
+  try {
+    const res = await fetch(`${supUrl}/functions/v1/fred-proxy`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${supKey}` },
       body:    JSON.stringify({ type: 'cryptocompare_news', params: {} }),
       signal:  AbortSignal.timeout(15_000),
     });
-    if (!res.ok) return [];
+    if (!res.ok) {
+      logWarn(`CryptoCompare news proxy ${res.status} — fallback CoinPaprika`, null, 'coingecko-news');
+      return fetchCoinPaprikaNews();
+    }
     const raw = await res.json() as { Data?: Array<{
       id: string | number; title: string; url: string;
       published_on: number; source: string; imageurl?: string;
     }> };
-    return (raw.Data ?? []).map(item => ({
+    const items = (raw.Data ?? []).map(item => ({
       id:           String(item.id),
       title:        item.title,
       author:       '',
@@ -314,8 +353,14 @@ async function fetchCryptoCompareNews(): Promise<CoinGeckoNewsItem[]> {
       news_site:    item.source,
       thumb_2x:     item.imageurl,
     }));
-  } catch {
-    return [];
+    if (items.length === 0) {
+      logWarn('CryptoCompare news empty — fallback CoinPaprika', null, 'coingecko-news');
+      return fetchCoinPaprikaNews();
+    }
+    return items;
+  } catch (err) {
+    logWarn(`CryptoCompare news failed: ${String(err)} — fallback CoinPaprika`, null, 'coingecko-news');
+    return fetchCoinPaprikaNews();
   }
 }
 

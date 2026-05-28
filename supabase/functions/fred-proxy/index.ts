@@ -152,6 +152,26 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    // ── CoinPaprika News — sem API key, sem CORS, fallback de último recurso ─
+    if (type === 'coinpaprika_news') {
+      const paprikaRes = await fetch('https://api.coinpaprika.com/v1/news', {
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; mrp-dashboard/1.0)' },
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!paprikaRes.ok) {
+        console.error(`[fred-proxy] CoinPaprika news ${paprikaRes.status}`);
+        return new Response(
+          JSON.stringify([]),
+          { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } },
+        );
+      }
+      const paprikaData = await paprikaRes.json();
+      return new Response(JSON.stringify(paprikaData), {
+        status:  200,
+        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+      });
+    }
+
     // ── FRED — requer API key ────────────────────────────────────────────────
     const fredApiKey = Deno.env.get('FRED_API_KEY');
     if (!fredApiKey) {

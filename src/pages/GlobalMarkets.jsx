@@ -294,7 +294,7 @@ function GlobalNewsPanel() {
       {/* Fontes */}
       <div style={{ padding: '5px 16px', background: 'rgba(59,130,246,0.03)', borderBottom: '1px solid rgba(59,130,246,0.08)', display: 'flex', alignItems: 'center', gap: 6 }}>
         <span style={{ fontSize: 9, color: '#334155' }}>
-          Macro: GDELT Project (4.500+ fontes globais) · Cripto: CoinGecko News · Atualização automática a cada 10 min
+          Macro: GDELT Project (4.500+ fontes globais) · Cripto: CryptoCompare / CoinPaprika (fallback automático) · Atualização automática a cada 30 min
         </span>
       </div>
 
