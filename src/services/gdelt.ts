@@ -164,6 +164,42 @@ function enrichArticle(article: GdeltArticle): GdeltArticleEnriched {
   };
 }
 
+// ─── Macro RSS fallback (BBC Business / Reuters / CNBC via fred-proxy) ───────
+
+async function fetchMacroRSSNews(): Promise<GdeltArticleEnriched[]> {
+  if (!_supUrl || !_supKey) return [];
+  try {
+    const res = await fetch(`${_supUrl.replace(/\/$/, '')}/functions/v1/fred-proxy`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${_supKey}` },
+      body:    JSON.stringify({ type: 'macro_rss', params: {} }),
+      signal:  AbortSignal.timeout(15_000),
+    });
+    if (!res.ok) { logWarn(`macro_rss proxy ${res.status}`, null, 'gdelt'); return []; }
+    const raw = await res.json() as { items?: Array<{ id: string; title: string; url: string; published_at: string; source: string }> };
+    const items = raw.items ?? [];
+    if (items.length === 0) { logWarn('macro RSS: no articles returned', null, 'gdelt'); return []; }
+    return items.map(item => {
+      let domain = item.source.toLowerCase().replace(/\s+/g, '');
+      try { domain = new URL(item.url).hostname.replace(/^www\./, ''); } catch { /* keep default */ }
+      const { sentiment, sentiment_label } = detectSentiment(item.title);
+      return {
+        title:           item.title,
+        url:             item.url,
+        seendate:        item.published_at,
+        domain,
+        language:        'english',
+        sentiment,
+        sentiment_label,
+        published_at:    item.published_at,
+      };
+    });
+  } catch (err) {
+    logWarn(`macro RSS failed: ${String(err)}`, null, 'gdelt');
+    return [];
+  }
+}
+
 // ─── Fetcher principal ────────────────────────────────────────────────────────
 
 /**
@@ -192,8 +228,8 @@ export async function fetchGdeltNews(
   try {
     raw = await fetchGdeltViaProxy(params);
   } catch (proxyErr) {
-    // Don't double-log here — useGdeltNews catches and logs at the hook level
-    throw new Error(`GDELT fetch failed via proxy: ${proxyErr instanceof Error ? proxyErr.message : String(proxyErr)}`);
+    logWarn(`GDELT proxy unavailable — fallback macro RSS`, { error: String(proxyErr) }, 'gdelt');
+    return fetchMacroRSSNews();
   }
   const parsed = GdeltResponseSchema.parse(raw);
 
