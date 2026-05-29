@@ -10,6 +10,7 @@ import { useFearGreed, useKlines } from '@/hooks/useBtcData';
 import { IS_LIVE } from '../lib/env';
 import { ModeBadge } from '../components/ui/DataBadge';
 import { DataTrustBadge } from '../components/ui/DataTrustBadge';
+import PurposeLabel from '@/components/ui/PurposeLabel';
 
 // Palavras irrelevantes a filtrar da word cloud
 const STOP_WORDS = new Set([
