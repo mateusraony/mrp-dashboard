@@ -13,6 +13,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell,
 } from 'recharts';
+import PurposeLabel from '@/components/ui/PurposeLabel';
 
 const CATEGORY_CONFIG = {
   institutional: { icon: '🏦', label: 'Institucional', color: '#a78bfa' },
@@ -218,6 +219,7 @@ export default function NewsIntelligence() {
 
       {mainTab === 'feed' && (
         <div style={{ maxWidth: 1000 }}>
+          <PurposeLabel text="Notícias cripto filtradas por relevância e impacto potencial — notícias de regulação, ETF, hack ou liquidação de whale são os eventos com maior impacto imediato no preço." />
           <div style={{ marginBottom: 16, padding: '12px 16px', background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.15)', borderRadius: 10, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
             <div style={{ flex: 1 }}><div style={{ fontSize: 12, color: '#4a5568', lineHeight: 1.6 }}><strong style={{ color: '#60a5fa' }}>Fonte:</strong> <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11 }}>GDELT DOC 2.0 · query=&quot;bitcoin crypto&quot; · sort=DateDesc</span></div></div>
             <ModeBadge mode={IS_LIVE ? 'live' : 'mock'} />
@@ -235,7 +237,8 @@ export default function NewsIntelligence() {
                 <div><div style={{ fontSize: 12, fontWeight: 700, color: '#60a5fa', marginBottom: 12 }}>Recentes — Parte 2</div>{gdeltArticles.slice(12).map((a, i) => <GdeltNewsCard key={a.url} article={a} rank={i + 13} />)}</div>
               </div>
               <div style={{ marginTop: 20, background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: 20 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 12 }}>Resumo de Sentimento — GDELT</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>Resumo de Sentimento — GDELT</div>
+                <PurposeLabel text="Classificação automática das notícias como positiva, neutra ou negativa — quando 70%+ das notícias recentes são negativas, frequentemente coincide com fundo de mercado (leia contrariamente)." mb={12} />
                 <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'center' }}>
                   {[{ label: 'Positivo', count: gdeltBullishCount, color: '#10b981' }, { label: 'Neutro', count: gdeltNeutralCount, color: '#f59e0b' }, { label: 'Negativo', count: gdeltBearishCount, color: '#ef4444' }].map(s => (
                     <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -254,12 +257,13 @@ export default function NewsIntelligence() {
 
       {mainTab === 'intelligence' && (
         <div style={{ maxWidth: 1200 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 4 }}>
             <h1 style={{ fontSize: 20, fontWeight: 900, color: '#f1f5f9', margin: 0, letterSpacing: '-0.03em' }}>Análise Institucional</h1>
             <ModeBadge mode={IS_LIVE ? 'live' : 'mock'} />
             <span style={{ fontSize: 10, color: '#a78bfa', background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.2)', borderRadius: 4, padding: '2px 8px', fontWeight: 700 }}>🤖 GDELT Institucional</span>
             <div style={{ marginLeft: 'auto' }}><RefreshButton onRefresh={() => { instRefetch(); }} isLoading={instFetching} lastUpdated={instUpdatedAt} label="Atualizar Feed Institucional" /></div>
           </div>
+          <PurposeLabel text="Cobertura de movimentos de fundos, empresas e governos em cripto — adoção institucional é um dos catalisadores mais duradouros de alta no longo prazo." mb={12} />
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10, marginBottom: 16 }}>
             {[
               { label: 'Sentiment Net', value: `${avgSentiment24h >= 0 ? '+' : ''}${avgSentiment24h.toFixed(2)}`, color: sentColor, sub: avgSentiment24h > 0 ? 'Net Bullish' : avgSentiment24h < 0 ? 'Net Bearish' : 'Neutro' },
@@ -285,7 +289,8 @@ export default function NewsIntelligence() {
           )}
           {instArticles.length > 0 && (
             <div style={{ background: 'linear-gradient(135deg,#131e2e,#111827)', border: '1px solid #1e2d45', borderRadius: 14, padding: 18, marginBottom: 16 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 12 }}>Distribuição de Sentimento — Batch Atual ({instArticles.length} artigos institucionais)</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>Distribuição de Sentimento — Batch Atual ({instArticles.length} artigos institucionais)</div>
+              <PurposeLabel text="Classificação automática das notícias como positiva, neutra ou negativa — quando 70%+ das notícias recentes são negativas, frequentemente coincide com fundo de mercado (leia contrariamente)." mb={12} />
               <ResponsiveContainer width="100%" height={110}>
                 <BarChart data={[{ label: 'Bullish', value: instBullishCount, fill: '#10b981' }, { label: 'Neutro', value: instNeutralCount, fill: '#f59e0b' }, { label: 'Bearish', value: instBearishCount, fill: '#ef4444' }]} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#1e2d45" vertical={false} />

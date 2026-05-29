@@ -10,6 +10,7 @@ import { useFearGreed, useKlines } from '@/hooks/useBtcData';
 import { IS_LIVE } from '../lib/env';
 import { ModeBadge } from '../components/ui/DataBadge';
 import { DataTrustBadge } from '../components/ui/DataTrustBadge';
+import PurposeLabel from '@/components/ui/PurposeLabel';
 
 // Palavras irrelevantes a filtrar da word cloud
 const STOP_WORDS = new Set([
@@ -435,6 +436,7 @@ export default function MarketSentiment() {
           {/* Word cloud + top words */}
           <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '18px 20px' }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>☁️ Nuvem de Palavras Detalhada</div>
+            <PurposeLabel text="Palavras mais mencionadas sobre BTC nas últimas horas. Termos como 'crash', 'dump' = pânico. 'Moon', 'ATH', 'buy' = euforia. Útil para detectar narrativas emergentes antes que se reflitam no preço." mb={6} />
             <div style={{ fontSize: 9, color: '#334155', marginBottom: 10 }}>Hover para ver detalhes · Cores = sentimento</div>
             <WordCloud words={activeWordCloud} />
             <div style={{ marginTop: 12 }}>
@@ -482,7 +484,8 @@ export default function MarketSentiment() {
       {tab === 'Correlações' && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
           <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '18px 20px' }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', marginBottom: 12 }}>🔗 Correlação Social → Preço BTC</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>🔗 Correlação Social → Preço BTC</div>
+            <PurposeLabel text="Análise de quanto o sentimento social antecede ou segue o preço do BTC. Correlação positiva alta e defasada = sentimento é leading indicator para este período — use como sinal de timing." mb={10} />
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
               {[
                 { label: 'Sentimento vs Preço (24h)', value: activeSocialCorrelation.sentiment_vs_price_24h, color: '#60a5fa' },

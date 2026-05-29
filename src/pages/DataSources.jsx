@@ -5,6 +5,7 @@ import { DataTrustBadge } from '../components/ui/DataTrustBadge';
 import { SOURCE_REGISTRY, getRuntimeMode, getSourceSummary } from '@/utils/dataStatus';
 import { DATA_MODE, IS_LIVE } from '@/lib/env';
 import { isSupabaseConfigured } from '@/services/supabase';
+import PurposeLabel from '@/components/ui/PurposeLabel';
 
 // ─── Legenda de grades ────────────────────────────────────────────────────────
 const CONFIDENCE_LABELS = {
@@ -82,18 +83,21 @@ function EdgeFunctionsPanel() {
 
   return (
     <div style={{ background: '#0A1220', border: '1px solid #162032', borderRadius: 12, overflow: 'hidden', marginBottom: 20 }}>
-      <div style={{ background: '#07101c', borderBottom: '1px solid #162032', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div>
-          <span style={{ fontSize: 13, fontWeight: 800, color: '#f1f5f9' }}>Edge Functions Supabase</span>
-          <span style={{ fontSize: 10, color: '#475569', marginLeft: 10 }}>7 funções registradas no projeto</span>
+      <div style={{ background: '#07101c', borderBottom: '1px solid #162032', padding: '12px 16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+          <div>
+            <span style={{ fontSize: 13, fontWeight: 800, color: '#f1f5f9' }}>Edge Functions Supabase</span>
+            <span style={{ fontSize: 10, color: '#475569', marginLeft: 10 }}>7 funções registradas no projeto</span>
+          </div>
+          <span style={{
+            fontSize: 9, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace',
+            padding: '3px 8px', borderRadius: 4,
+            color: status.color, background: status.bg, border: `1px solid ${status.border}`,
+          }}>
+            {status.label}
+          </span>
         </div>
-        <span style={{
-          fontSize: 9, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace',
-          padding: '3px 8px', borderRadius: 4,
-          color: status.color, background: status.bg, border: `1px solid ${status.border}`,
-        }}>
-          {status.label}
-        </span>
+        <PurposeLabel text="Funções serverless do Supabase que executam lógica de backend — necessárias para FRED proxy, AI analysis e alertas Telegram; requerem deploy via CLI e secrets configurados." mb={0} mt={0} />
       </div>
       <div style={{ padding: '4px 0' }}>
         {EDGE_FUNCTIONS.map((fn) => (
@@ -332,6 +336,7 @@ export default function DataSources() {
         <p style={{ fontSize: 12, color: '#475569', marginTop: 4 }}>
           Auditoria completa de confiabilidade — LIVE · MOCK · ESTIMADO · PAGO · ERRO
         </p>
+        <PurposeLabel text="Auditoria de todas as fontes de dados do dashboard — mostra quais dados são ao vivo, quais usam cache, e quais requerem API paga para ativação." mt={6} mb={0} />
       </div>
 
       {/* Ambiente Atual */}
@@ -341,12 +346,13 @@ export default function DataSources() {
       <EdgeFunctionsPanel />
 
       {/* Título da seção de APIs externas */}
-      <div style={{ marginBottom: 12 }}>
+      <div style={{ marginBottom: 4 }}>
         <span style={{ fontSize: 13, fontWeight: 800, color: '#f1f5f9' }}>APIs Externas</span>
         <span style={{ fontSize: 10, color: '#475569', marginLeft: 10 }}>
           {Object.keys(SOURCE_REGISTRY).length} fontes registradas · Filtrar por status:
         </span>
       </div>
+      <PurposeLabel text="Saúde em tempo real de cada integração — fonte com status 'ERRO' está usando dados do cache Supabase; dados com grade D requerem atenção ou atualização de chave." mb={12} />
 
       {/* Resumo */}
       <div style={{
@@ -421,9 +427,10 @@ export default function DataSources() {
       }}>
         {/* Graus */}
         <div style={{ background: '#0A1220', border: '1px solid #162032', borderRadius: 10, padding: '14px 16px' }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: '#4a6580', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: '#4a6580', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>
             Graus de Confiança
           </div>
+          <PurposeLabel text="Classificação A-D de confiabilidade — A = fonte oficial direta; B = cálculo derivado; C = proxy ou estimativa; D = mock ou API paga indisponível." mb={10} />
           {Object.entries(CONFIDENCE_LABELS).map(([grade, info]) => (
             <div key={grade} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 8 }}>
               <span style={{

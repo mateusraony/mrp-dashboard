@@ -4,6 +4,7 @@ import { GradeBadge } from '../ui/DataBadge';
 import { DataTrustBadge } from '../ui/DataTrustBadge';
 import { HelpIcon } from '../ui/Tooltip';
 import MiniTimeChart from '../dashboard/MiniTimeChart';
+import PurposeLabel from '../ui/PurposeLabel';
 
 const IVR_ZONES = [
   { min: 0,  max: 25,  label: 'Muito Barata',  color: '#10b981', bg: 'rgba(16,185,129,0.12)', action: 'Comprar volatilidade (long vol)' },
@@ -99,6 +100,7 @@ export default function IVRankPanel({ optionsData }) {
         </div>
         <GradeBadge grade={d.quality} />
       </div>
+      <PurposeLabel text="Percentil histórico da volatilidade implícita atual — abaixo de 25 = IV barata (comprar volatilidade com straddles/long options); acima de 75 = IV cara (vender volatilidade com spreads/iron condors). A gauge mais objetiva de 'caro vs barato' em opções de BTC." mb={10} />
 
       {/* Main value */}
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 12 }}>

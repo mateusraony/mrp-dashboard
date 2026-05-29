@@ -1,5 +1,6 @@
 // ─── PREDICTIVE PANEL — BTC 24h Price Projection ────────────────────────────
 import { useState, useMemo } from 'react';
+import PurposeLabel from '@/components/ui/PurposeLabel';
 import { ModeBadge } from '../components/ui/DataBadge';
 import { DataTrustBadge } from '../components/ui/DataTrustBadge';
 import { Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -162,6 +163,7 @@ function InstitutionalPanel() {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0' }}>Pressão Institucional de Compra</div>
+            <PurposeLabel text="Score composto de atividade institucional (ETFs, stablecoins, CME, VIX, funding) — acima de 65 = pressão compradora forte; abaixo de 40 = mercado sem suporte institucional." mt={4} mb={4} />
             <DataTrustBadge
               mode="paid_required"
               confidence="C"
@@ -383,6 +385,7 @@ export default function PredictivePanel() {
             );
           })()}
         </div>
+        <PurposeLabel text="Modelo preditivo de direção de preço para as próximas 24h baseado em múltiplos indicadores — use como input adicional, nunca como única base de decisão." />
         <p style={{ fontSize: 11, color: '#475569', margin: 0 }}>
           Projeção baseada em correlações históricas, fluxo de stablecoin, pressão institucional e VIX · Spot:{' '}
           {SPOT > 0
@@ -413,6 +416,7 @@ export default function PredictivePanel() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: 16 }}>
           {/* Scenario cards */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <PurposeLabel text="Probabilidade estimada de movimento direcional — acima de 70% de confiança em uma direção sugere setup mais favorável; entre 40-60% indica indecisão." mt={0} mb={4} />
             {scenarios.map(s => (
               <ScenarioCard key={s.id} s={s} selected={selected === s.id} onSelect={setSelected} />
             ))}
@@ -454,7 +458,8 @@ export default function PredictivePanel() {
 
               {/* Confidence */}
               <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '14px 16px' }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: '#e2e8f0', marginBottom: 8 }}>Confiança do Modelo</div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>Confiança do Modelo</div>
+                <PurposeLabel text="Predição gerada por modelo de machine learning treinado em dados históricos — performance passada não garante resultados futuros; sempre use stop loss." mb={8} />
                 <ProbBar value={Math.round(selectedScenario.confidence * 100)} color={selectedScenario.color} />
                 <div style={{ fontSize: 9, color: '#334155', marginTop: 6 }}>
                   Preços-alvo calculados via ATR(14) · 30 klines diários Binance. {liveScenarioProbs ? 'Probabilidades ajustadas por Fear&Greed + Funding rate em tempo real.' : 'Probabilidades são referência estática — não derivadas de modelo preditivo.'}
@@ -470,6 +475,7 @@ export default function PredictivePanel() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '16px 18px' }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>Trajetórias de Preço Simuladas — Próximas 24h</div>
+            <PurposeLabel text="Projeção de caminhos de preço para os três cenários principais — bull, neutro e bear — baseada no spot atual e na volatilidade ATR(14)." />
             <div style={{ fontSize: 9, color: '#334155', marginBottom: 12 }}>Clique em um cenário para destacar sua trajetória correspondente</div>
             {/* Scenario selector pills */}
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
@@ -554,12 +560,15 @@ export default function PredictivePanel() {
             </span>
           </div>
           <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, overflow: 'hidden' }}>
-            <div style={{ padding: '12px 16px', borderBottom: '1px solid #0f1a28', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: '#e2e8f0' }}>Tabela de Probabilidade de Rompimento — Próximas 24H</div>
-              <div style={{ display: 'flex', gap: 10, fontSize: 9, color: '#334155' }}>
-                <span>■ <span style={{ color: '#10b981' }}>Upside</span></span>
-                <span>■ <span style={{ color: '#ef4444' }}>Downside</span></span>
+            <div style={{ padding: '12px 16px', borderBottom: '1px solid #0f1a28' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#e2e8f0' }}>Tabela de Probabilidade de Rompimento — Próximas 24H</div>
+                <div style={{ display: 'flex', gap: 10, fontSize: 9, color: '#334155' }}>
+                  <span>■ <span style={{ color: '#10b981' }}>Upside</span></span>
+                  <span>■ <span style={{ color: '#ef4444' }}>Downside</span></span>
+                </div>
               </div>
+              <PurposeLabel text="Conjunto de indicadores técnicos (RSI, MACD, médias móveis) convergindo — quando 3+ indicadores apontam na mesma direção, o sinal é mais robusto." mt={4} mb={0} />
             </div>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>

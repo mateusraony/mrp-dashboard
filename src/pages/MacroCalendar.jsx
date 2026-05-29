@@ -1,5 +1,6 @@
 // ─── CALENDÁRIO MACRO — CPI · FOMC · NFP · Volatilidade Histórica · Alertas ──
 import { useState, useMemo } from 'react';
+import PurposeLabel from '@/components/ui/PurposeLabel';
 import {
   ComposedChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, Cell, BarChart, Legend,
@@ -1232,6 +1233,7 @@ export default function MacroCalendar() {
             />
           </div>
           <p style={{ fontSize: 11, color: '#475569', margin: 0 }}>CPI · FOMC · NFP · PCE · GDP · Volatilidade Histórica BTC · Alertas Push</p>
+          <PurposeLabel text="Agenda de eventos econômicos globais que historicamente impactam o BTC. FOMC, CPI, NFP e dados BCB são Tier-1 — o BTC tende a reduzir volatilidade pré-evento e amplificar a reação pós-resultado." />
         </div>
       </div>
 
@@ -1285,6 +1287,7 @@ export default function MacroCalendar() {
       {tab === 'Agenda' && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 16 }}>
           <div>
+            <PurposeLabel text="Próximos eventos macroeconômicos com impacto histórico no BTC — Tier-1 (FOMC, CPI, NFP) costumam causar movimentos de 2-5% no dia; ative alertas para não ser pego de surpresa." mb={10} />
             {/* Upcoming Tier-1 */}
             <div style={{ fontSize: 10, color: '#ef4444', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>🔴 TIER-1 — Alta Relevância</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
@@ -1353,6 +1356,7 @@ export default function MacroCalendar() {
       {/* TAB: Surpresa */}
       {tab === 'Surpresa' && (
         <div>
+          <PurposeLabel text="Compara resultado real vs consenso de analistas — surpresas positivas (resultado acima do esperado) tendem a depreciar o BTC quando são dados inflacionários; surpresas no CPI abaixo do esperado historicamente causam alta de 3-8% no BTC." mb={10} />
           <div style={{ marginBottom: 14, padding: '10px 14px', background: 'rgba(96,165,250,0.05)', border: '1px solid rgba(96,165,250,0.15)', borderRadius: 8, fontSize: 11, color: '#475569', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
             <span><strong style={{ color: '#60a5fa' }}>Surprise Layer:</strong>{' '}Compara o resultado real (actual) vs a expectativa de consenso. A magnitude da surpresa é o motor principal da reação do BTC.</span>
             {hasLiveVol

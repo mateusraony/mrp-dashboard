@@ -7,6 +7,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip,
   ResponsiveContainer, Cell,
 } from 'recharts';
+import PurposeLabel from '../ui/PurposeLabel';
 
 function fmt(v) { return `$${v.toFixed(1)}M`; }
 
@@ -111,6 +112,7 @@ export default function TakerFlowPanel({ optionsData }) {
           <div style={{ fontSize: 11, color: '#475569' }}>Premium líquido 24h · Buy vs Sell por tipo · Deribit</div>
         </div>
       </div>
+      <PurposeLabel text="Fluxo de compradores vs vendedores de opções BTC nas últimas 24h — quando compras de call superam puts, o mercado está apostando em alta; quando puts dominam, há demanda por proteção. Bull-Bear Index derivado do Put/Call Ratio real da Deribit." mb={10} />
 
       {/* Aviso: fluxos em $M são estimados do PCR, não dados reais de taker flow */}
       {hasLiveData && (

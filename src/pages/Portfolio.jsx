@@ -1,5 +1,6 @@
 // ─── PORTFOLIO MANAGER PAGE ───────────────────────────────────────────────────
 import { useState, useMemo, useEffect, useRef } from 'react';
+import PurposeLabel from '@/components/ui/PurposeLabel';
 import {
   computePortfolioGreeks, computePositionPnL,
   stressTest, stressScenarios, SPOT_PRICE,
@@ -284,6 +285,7 @@ export default function Portfolio() {
             {!ticker?.mark_price && <StaleIndicator lastUpdatedAt={tickerUpdatedAt.current} size={9} />}
           </span>
         </div>
+        <PurposeLabel text="Visão consolidada de todos os seus ativos cripto — permite ver performance total, alocação e risco em um único painel." />
         <p style={{ fontSize: 11, color: '#475569' }}>
           Portfólio com Greeks ponderados · BTC Spot + Futuros + Opções · Spot:{' '}
           <span style={{ fontFamily: 'JetBrains Mono, monospace', color: '#f59e0b' }}>
@@ -341,10 +343,11 @@ export default function Portfolio() {
 
       {/* ─── RISK PACK ─────────────────────────────────────────────────────── */}
       <div style={{ background: 'linear-gradient(135deg, #0f1c2e 0%, #111827 100%)', border: '1px solid rgba(239,68,68,0.15)', borderRadius: 12, padding: '16px 18px', marginBottom: 16 }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: '#e2e8f0', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#e2e8f0', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 9, color: '#ef4444', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 4, padding: '2px 7px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em' }}>Risk Pack</span>
           VaR · Sharpe · Drawdown · Beta
         </div>
+        <PurposeLabel text="Métricas institucionais de risco da carteira — use em conjunto para avaliar se o retorno obtido justifica o risco assumido." mt={0} mb={14} />
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10 }}>
           {/* VaR 95% */}
           <div style={{ background: '#0d1421', border: '1px solid rgba(239,68,68,0.15)', borderRadius: 10, padding: '12px 14px', borderLeft: '3px solid rgba(239,68,68,0.4)' }}>
@@ -354,6 +357,7 @@ export default function Portfolio() {
               {btcPriceHistory.length === 0 && <StaleIndicator lastUpdatedAt={null} size={11} />}
             </div>
             <div style={{ fontSize: 9, color: '#334155', marginTop: 5 }}>Perda máx. 95% confiança · 1 dia</div>
+            <PurposeLabel text="Estimativa de perda máxima esperada com 95% de confiança em 24h — se VaR é $1.000, significa que há 5% de chance de perder mais que isso num dia." mt={6} mb={0} />
           </div>
           {/* VaR 99% */}
           <div style={{ background: '#0d1421', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 10, padding: '12px 14px', borderLeft: '3px solid rgba(239,68,68,0.6)' }}>
@@ -371,6 +375,7 @@ export default function Portfolio() {
               {riskMetrics.sharpe.toFixed(2)}
             </div>
             <div style={{ fontSize: 9, color: '#334155', marginTop: 5 }}>Retorno ajustado ao risco · anual</div>
+            <PurposeLabel text="Retorno ajustado pelo risco: quanto lucro por unidade de risco assumido — acima de 1.0 é bom; acima de 2.0 é excelente; negativo = risco não compensado." mt={6} mb={0} />
           </div>
           {/* Max Drawdown */}
           <div style={{ background: '#0d1421', border: '1px solid rgba(245,158,11,0.15)', borderRadius: 10, padding: '12px 14px', borderLeft: '3px solid rgba(245,158,11,0.4)' }}>
@@ -379,6 +384,7 @@ export default function Portfolio() {
               {fmtUSD(maxDrawdownUSD)}
             </div>
             <div style={{ fontSize: 9, color: '#334155', marginTop: 5 }}>P&L simulado em queda de 20%</div>
+            <PurposeLabel text="Maior queda do pico ao vale no período — mede a pior experiência de perda; drawdown acima de -30% geralmente indica necessidade de revisar alocação." mt={6} mb={0} />
           </div>
           {/* Beta */}
           <div style={{ background: '#0d1421', border: '1px solid rgba(96,165,250,0.15)', borderRadius: 10, padding: '12px 14px', borderLeft: '3px solid rgba(96,165,250,0.4)' }}>
@@ -387,6 +393,7 @@ export default function Portfolio() {
               {riskMetrics.beta.toFixed(2)}x
             </div>
             <div style={{ fontSize: 9, color: '#334155', marginTop: 5 }}>Sensibilidade ao movimento do BTC</div>
+            <PurposeLabel text="Sensibilidade da carteira vs Bitcoin — beta 1.0 = move igual ao BTC; acima de 1.0 = amplifica movimentos; abaixo de 1.0 = menos volátil que BTC." mt={6} mb={0} />
           </div>
           {/* Vol Anualizada */}
           <div style={{ background: '#0d1421', border: '1px solid rgba(167,139,250,0.15)', borderRadius: 10, padding: '12px 14px', borderLeft: '3px solid rgba(167,139,250,0.4)' }}>
@@ -482,7 +489,8 @@ export default function Portfolio() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
         {/* P&L per position */}
         <div style={{ background: 'linear-gradient(135deg, #131e2e 0%, #111827 100%)', border: '1px solid #1e2d45', borderRadius: 12, padding: '16px 18px' }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 12 }}>P&L por Posição</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>P&L por Posição</div>
+          <PurposeLabel text="Evolução do valor da carteira no tempo — use para identificar períodos de drawdown e comparar com benchmark (BTC)." />
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={pnlData} margin={{ top: 4, right: 4, left: -10, bottom: 40 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#1e2d45" vertical={false} />
@@ -501,6 +509,7 @@ export default function Portfolio() {
         {/* Stress Test */}
         <div style={{ background: 'linear-gradient(135deg, #131e2e 0%, #111827 100%)', border: '1px solid #1e2d45', borderRadius: 12, padding: '16px 18px' }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>Stress Test — Simulação de Move</div>
+          <PurposeLabel text="Distribuição percentual entre ativos — uma carteira bem diversificada tem no máximo 40-50% em qualquer ativo individual." />
           <div style={{ fontSize: 10, color: '#334155', marginBottom: 12 }}>P&L do portfólio em cenários de variação do BTC</div>
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={stressData} margin={{ top: 4, right: 4, left: -10, bottom: 0 }}>

@@ -1,6 +1,7 @@
 // ─── STRATEGIES PAGE ──────────────────────────────────────────────────────────
 // Setups operacionais baseados em IV Rank, Basis, Funding, Sentiment
 import { useState, useMemo } from 'react';
+import PurposeLabel from '@/components/ui/PurposeLabel';
 import { strategies, marketConditionsSummary } from '../components/data/mockDataStrategies';
 
 // Avalia se uma condição de estratégia é atendida com dados live.
@@ -357,6 +358,7 @@ export function StrategiesContent() {
         <p style={{ fontSize: 11, color: '#475569', lineHeight: 1.5 }}>
           Setups gerados por engine quantitativa · baseados em IV Rank, Basis, Funding Rate, Sentiment e On-Chain · Não é recomendação de investimento.
         </p>
+        <PurposeLabel text="Biblioteca de estratégias de trading configuráveis — cada estratégia define entradas, saídas e gestão de risco baseada em indicadores técnicos e on-chain." mt={6} />
         <div style={{
           marginTop: 8, padding: '7px 14px',
           background: 'rgba(245,158,11,0.04)', border: '1px solid rgba(245,158,11,0.15)',
@@ -375,6 +377,9 @@ export function StrategiesContent() {
       }}>
         <div style={{ fontSize: 10, color: '#475569', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', gridColumn: '1 / -1', marginBottom: 8 }}>
           ⚡ Condições de Mercado Atuais
+        </div>
+        <div style={{ gridColumn: '1 / -1' }}>
+          <PurposeLabel text="Condições atuais que validam ou invalidam cada estratégia — todos os indicadores devem estar alinhados para ativar um setup; condição parcial indica monitoramento." mt={0} mb={6} />
         </div>
         {Object.entries(mc.conditions).map(([key, cond]) => {
           // Indica se esta célula tem dado live disponível
@@ -442,6 +447,7 @@ export function StrategiesContent() {
         }}>
           <div style={{ padding: '12px 20px', borderBottom: '1px solid #1e2d45' }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0' }}>📋 Setup Detalhado</div>
+            <PurposeLabel text="Backtest / simulação da estratégia em dados históricos — sharpe acima de 1.5 e drawdown máximo abaixo de 20% são referências para uma estratégia robusta." mt={4} />
           </div>
           <StrategyDetail strategy={selectedStrategy} />
         </div>

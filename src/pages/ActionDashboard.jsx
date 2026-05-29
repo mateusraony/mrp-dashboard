@@ -1,6 +1,7 @@
 // ─── DASHBOARD DE AÇÕES ───────────────────────────────────────────────────────
 import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
+import PurposeLabel from '@/components/ui/PurposeLabel';
 import { createPageUrl } from '@/utils';
 import {
   AreaChart, Area, BarChart, Bar, ResponsiveContainer,
@@ -344,6 +345,7 @@ export function ActionsContent() {
           <p style={{ fontSize: 11, color: '#475569', margin: 0 }}>
             Feed de oportunidades · baseadas em regras quantitativas · Performance em tempo real
           </p>
+          <PurposeLabel text="Setups de trading identificados automaticamente com base em confluência de indicadores — cada setup mostra direção, confiança e condições de invalidação." mt={6} />
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <span style={{ fontSize: 11, padding: '5px 12px', borderRadius: 7, background: `${regColor}12`, color: regColor, border: `1px solid ${regColor}30`, fontWeight: 700 }}>
@@ -432,6 +434,7 @@ export function ActionsContent() {
       {tab === 'Performance' && (
         <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '18px 20px' }}>
           <div style={{ fontSize: 13, fontWeight: 800, color: '#e2e8f0', marginBottom: 10 }}>📈 Performance do Sistema</div>
+          <PurposeLabel text="Histórico de performance dos setups anteriores — win rate acima de 60% com RR de 2:1 indica sistema com edge positivo; abaixo de 50% requer revisão de critérios." mt={2} />
           <div style={{
             marginBottom: 16, padding: '10px 14px', borderRadius: 8,
             background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.2)',
