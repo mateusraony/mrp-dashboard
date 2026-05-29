@@ -134,6 +134,39 @@ function SectionTitle({ icon, label, sub = '', action = null }) {
   );
 }
 
+// ─── TIP CARD (dica expansível) ───────────────────────────────────────────────
+function TipCard({ emoji, title, body, tag }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div
+      onClick={() => setOpen(o => !o)}
+      style={{
+        background: '#0d1421', border: '1px solid #1e2d45', borderRadius: 10,
+        padding: '12px 14px', cursor: 'pointer',
+        borderLeft: '3px solid #3b82f6',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 16 }}>{emoji}</span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0' }}>{title}</span>
+          {tag && (
+            <span style={{ fontSize: 9, color: '#3b82f6', background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: 4, padding: '1px 6px', fontWeight: 700 }}>
+              {tag}
+            </span>
+          )}
+        </div>
+        <span style={{ fontSize: 12, color: '#4a5568' }}>{open ? '▲' : '▼'}</span>
+      </div>
+      {open && (
+        <div style={{ marginTop: 10, fontSize: 11, color: '#94a3b8', lineHeight: 1.7, borderTop: '1px solid #1e2d45', paddingTop: 10 }}>
+          {body}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── FEAR & GREED ─────────────────────────────────────────────────────────────
 function FearGreedGauge({ liveValue, fngError, liveHistory }) {
   const hasError = fngError && DATA_MODE === 'live';
@@ -509,6 +542,21 @@ function AITrackRecord({ predictions = [], isConfigured = false }) {
           <div style={{ fontSize: 9, color: '#334155' }}>{hits}/{resolved.length} resolvidos</div>
         </div>
       </div>
+      {/* Banner demo — aparece quando Supabase não está configurado */}
+      {useDemo && (
+        <div style={{
+          margin: '0 18px 12px', marginTop: 10, padding: '6px 12px', borderRadius: 6,
+          background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.2)',
+          fontSize: 10, color: '#f59e0b',
+          display: 'flex', alignItems: 'center', gap: 6,
+        }}>
+          <span>⚠</span>
+          <span>
+            <strong>Dados de demonstração</strong> — predições simuladas para exemplo.
+            Configure o Supabase para ver o histórico real de previsões.
+          </span>
+        </div>
+      )}
       {/* Empty state when Supabase is configured but no predictions yet */}
       {!useDemo && displayData.length === 0 && (
         <div style={{ padding: '28px 18px', textAlign: 'center' }}>
@@ -581,6 +629,10 @@ function AITrackRecord({ predictions = [], isConfigured = false }) {
 export default function Dashboard() {
   const { ticker: liveTicker, fng: liveFng, riskScore: liveRiskScore, klines7d, btcFutures: _btcLive, fearGreed: _fngLive, errors: liveErrors } = useDashboardLiveData();
 
+  // Stale detection: usamos as mesmas query keys — TanStack Query deduplica (sem requests extras)
+  const { data: macroForStale }   = useMacroBoard();
+  const { data: mempoolForStale } = useMempoolState();
+
   // Pesos calibrados por histórico de previsões (fallback: equiponderado)
   const { data: calibration } = useAiCalibration();
 
@@ -646,6 +698,10 @@ export default function Dashboard() {
   // Contagem de fontes live/falhas para o banner de status
   const KNOWN_SOURCES_COUNT = 6; // binance_futures, alternative_me, coingecko, mempool, fred, deribit
   const liveOkCount = Math.max(0, KNOWN_SOURCES_COUNT - liveFailedCount);
+
+  // Detecta se alguma fonte primária está servindo dado do cache Supabase (fallback)
+  const isAnyStale = !!(liveTicker?.isFallback || liveFng?.isFallback || macroForStale?.isFallback || mempoolForStale?.isFallback);
+  const staleDate  = liveTicker?.lastUpdated ?? liveFng?.lastUpdated ?? macroForStale?.lastUpdated ?? mempoolForStale?.lastUpdated ?? null;
 
   // Calcula retorno 1W e CVD a partir das klines diárias (quando disponíveis)
   const spotFlowLive = (() => {
@@ -726,7 +782,60 @@ export default function Dashboard() {
         <ModeBadge />
       </div>
 
+      {/* ── BANNER: Para que serve esta página ── */}
+      <div style={{
+        marginBottom: 16, padding: '16px 20px', borderRadius: 12,
+        background: 'linear-gradient(135deg, rgba(59,130,246,0.07) 0%, rgba(16,185,129,0.05) 100%)',
+        border: '1px solid rgba(59,130,246,0.2)',
+      }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+          <div style={{ fontSize: 28, lineHeight: 1, marginTop: 2 }}>🎯</div>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: '#e2e8f0', marginBottom: 6 }}>
+              Para que serve esta página?
+            </div>
+            <div style={{ fontSize: 11, color: '#94a3b8', lineHeight: 1.8, maxWidth: 800 }}>
+              O <strong style={{ color: '#cbd5e1' }}>Dashboard</strong> é o seu{' '}
+              <strong style={{ color: '#cbd5e1' }}>centro de comando</strong> — uma visão completa e integrada
+              do estado do mercado BTC em um único painel. Em vez de abrir 10 telas diferentes, aqui você vê em
+              segundos se o mercado está saudável ou em risco, o sentimento dos traders, os principais indicadores
+              macro e os sinais da IA.{' '}
+              <strong style={{ color: '#3b82f6' }}>Use diariamente para responder:</strong>{' '}
+              "Devo estar mais exposto ou mais protegido agora?"
+            </div>
+            <div style={{ display: 'flex', gap: 16, marginTop: 10, flexWrap: 'wrap' }}>
+              {[
+                { icon: '🌡️', text: 'Risk Score 0–100: nível de perigo global do mercado' },
+                { icon: '😱', text: 'Fear & Greed: sentimento atual dos traders' },
+                { icon: '🌐', text: 'Macro Board: como o cenário global está impactando o BTC' },
+                { icon: '🤖', text: 'Análise AI: síntese automática com histórico de acertos' },
+              ].map((u, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: '#64748b' }}>
+                  <span>{u.icon}</span><span>{u.text}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── BANNER: Último valor salvo (fallback de cache) ── */}
+      {isAnyStale && staleDate && (
+        <div style={{
+          marginBottom: 16, padding: '7px 14px', borderRadius: 8,
+          background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.2)',
+          fontSize: 10, color: '#f59e0b',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+        }}>
+          <span>⚠ Usando último valor salvo — uma ou mais APIs estão temporariamente indisponíveis</span>
+          <span style={{ fontFamily: 'JetBrains Mono, monospace', whiteSpace: 'nowrap' }}>
+            Último salvo: {new Date(staleDate).toLocaleString('pt-BR')}
+          </span>
+        </div>
+      )}
+
       {/* ── ZONA A: Risk + F&G + BTC ── */}
+      <SectionTitle icon="🌡️" label="Visão Geral" sub="Risk Score · Fear &amp; Greed · BTC Snapshot — estado atual em 3 indicadores-chave" />
       <PurposeLabel text="Risk Score: índice composto 0-100 da saúde do mercado BTC — acima de 70 = risk-on (aumentar exposição); abaixo de 30 = risk-off (reduzir posições e proteger capital)." mb={10} mt={0} />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px,1fr))', gap: 14, marginBottom: 20 }}>
         <RiskMeter
@@ -767,6 +876,101 @@ export default function Dashboard() {
           action={null} />
         <PurposeLabel text="Sinais complementares de mercado — dominância BTC acima de 58% indica rotação de altcoins para BTC; liquidações crescentes indicam alavancagem excessiva no mercado." />
         <ExtraSignals />
+      </div>
+
+      {/* ── DICAS DE OURO — Dashboard ── */}
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>🏆 Dicas de Ouro — Como Usar o Dashboard</div>
+          <div style={{ fontSize: 10, color: '#475569', marginTop: 2 }}>Clique em cada dica para expandir · Leitura recomendada antes de operar</div>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <TipCard
+            emoji="🌡️"
+            title="Risk Score: como interpretar os thresholds de 30 e 70"
+            tag="RISCO"
+            body={<span>
+              O Risk Score combina 5 fontes: funding rate, delta de OI, DVOL de opções, Fear {'&'} Greed e desvio de preço da EMA20.
+              <br /><br />
+              <strong>Acima de 70 (sobreaquecido):</strong> Funding alto, longs excessivos, risco de flush liquidatório. Reduza exposição ou use stops apertados.<br />
+              <strong>Entre 30 e 70 (neutro/moderado):</strong> Sinais mistos. Exija confluência de outros indicadores antes de entrar.<br />
+              <strong>Abaixo de 30 (capitulação):</strong> Medo extremo — historicamente precede recuperações. Potencial zona de entrada, mas confirme com reversão de preço e CVD positivo.
+              <br /><br />
+              <strong>Regra prática:</strong> Nunca entre em longs alavancados com Risk Score acima de 65. Nunca entre em shorts alavancados com Risk Score abaixo de 35.
+            </span>}
+          />
+          <TipCard
+            emoji="😱"
+            title="Fear & Greed divergindo do preço: o sinal mais poderoso"
+            tag="CONTRARIAN"
+            body={<span>
+              A divergência entre o índice Fear {'&'} Greed e o preço do BTC é um dos sinais mais potentes da análise de sentimento.
+              <br /><br />
+              <strong>Preço subindo + F{'&'}G em queda:</strong> A alta não está gerando euforia — possível acumulação institucional silenciosa. Tende a ser sustentável.<br />
+              <strong>Preço em queda + F{'&'}G subindo:</strong> O sentimento melhora antes do preço — possível fundo antecipado pelo mercado.<br />
+              <strong>Preço subindo + F{'&'}G {'>'} 80 (Ganância Extrema):</strong> Alerta — varejo eufórico, smart money pode estar distribuindo.
+              <br /><br />
+              <strong>Como usar:</strong> Compare o valor atual (número grande) com os 7 dias anteriores (barras abaixo do gauge). Tendência de queda do F{'&'}G com preço estável é sinal de warning.
+            </span>}
+          />
+          <TipCard
+            emoji="🌐"
+            title="Sinais macro: o vento que empurra ou freia o BTC"
+            tag="MACRO"
+            body={<span>
+              O BTC não existe em vácuo. Os mercados macro definem o ambiente de risco global e afetam a disposição a comprar ativos especulativos.
+              <br /><br />
+              <strong>VIX {'>'} 25:</strong> Stress de mercado — correlação BTC/SPX aumenta, quedas conjuntas mais prováveis. Reduza posições.<br />
+              <strong>DXY em alta (USD forte):</strong> Capital migra para dólar. Ambiente desfavorável para BTC. Cautela.<br />
+              <strong>US10Y caindo:</strong> Juros em queda = apetite por risco crescendo = favorável ao BTC.<br />
+              <strong>Ouro subindo + BTC caindo:</strong> "Flight to safety" — não é momento de arriscar.
+              <br /><br />
+              <strong>Cenário ideal para BTC:</strong> VIX {'<'} 18, DXY estável ou em queda, yields caindo, S{'&'}P em alta.
+            </span>}
+          />
+          <TipCard
+            emoji="👑"
+            title="BTC Dominance: decifrando o ciclo de altseason"
+            tag="CICLO"
+            body={<span>
+              A dominância do BTC (% do marketcap total cripto) indica onde o dinheiro está fluindo dentro do ecossistema.
+              <br /><br />
+              <strong>Dominância {'>'} 58% e subindo:</strong> Capital migrando de altcoins para BTC — "Bitcoin season". Favorável para BTC, desfavorável para altcoins.<br />
+              <strong>Dominância {'<'} 50% e caindo:</strong> Capital fluindo para altcoins — "Altcoin season". ETH e altcoins large-cap tendem a superar BTC.<br />
+              <strong>Dominância caindo com BTC em alta:</strong> Melhor momento para exposição diversificada.
+              <br /><br />
+              <strong>Checagem rápida:</strong> Use o painel Market Signals acima para ver o valor atual de BTC.D.
+            </span>}
+          />
+          <TipCard
+            emoji="⛓️"
+            title="Mempool congestionada: demanda real on-chain"
+            tag="ON-CHAIN"
+            body={<span>
+              O mempool é a fila de transações aguardando confirmação. Seu tamanho e as taxas revelam o nível de atividade on-chain real.
+              <br /><br />
+              <strong>Fees altas (Fastest {'>'} 50 sat/vB):</strong> Rede congestionada — alta demanda por blockspace. Ocorre em períodos de alta atividade.<br />
+              <strong>Mempool {'>'} 100MB:</strong> Backlog significativo — transações lentas para quem paga fee mínimo.<br />
+              <strong>Fees caindo com preço subindo:</strong> A alta não está sendo acompanhada por atividade on-chain — possível alta fraca.
+              <br /><br />
+              <strong>Para traders:</strong> Fees altas correlacionam com volatilidade elevada. Um spike de fees antes de um movimento grande pode ser indicador antecipado.
+            </span>}
+          />
+          <TipCard
+            emoji="🤖"
+            title="Como usar a análise de IA sem depender cegamente dela"
+            tag="IA"
+            body={<span>
+              A análise de IA do Dashboard combina regras de threshold (funding, OI, F{'&'}G, retorno de preço) em quatro módulos: derivativos, spot, opções e macro.
+              <br /><br />
+              <strong>Use a IA para:</strong> Confirmar uma hipótese já formada. Se você já viu funding alto, F{'&'}G elevado e OI crescendo, e a IA diz "CAUTION", a confluência aumenta a confiança.<br />
+              <strong>Não use a IA para:</strong> Decisões isoladas. O modelo não tem acesso a notícias, eventos inesperados ou movimentos de baleias.<br />
+              <strong>Track Record:</strong> Verifique o histórico abaixo. Acurácia acima de 60% indica modelo calibrado.
+              <br /><br />
+              <strong>Regra de ouro:</strong> Confluência entre IA + Z-Score + MTF + Macro = convicção máxima. IA isolada = ruído.
+            </span>}
+          />
+        </div>
       </div>
 
       {/* ── ZONA D: AI Analysis + Track Record (2 cols) ── */}
@@ -890,11 +1094,24 @@ export default function Dashboard() {
       {/* ── ZONA E: Alertas ── */}
       <div style={{ marginBottom: 20 }}>
         <SectionTitle icon="◎" label="Alertas Recentes"
+          sub="Notificações automáticas de condições extremas de mercado"
           action={<Link to={createPageUrl('SmartAlerts')} style={{ fontSize: 11, color: '#3b82f6', textDecoration: 'none', background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', padding: '3px 9px', borderRadius: 5, fontWeight: 600 }}>Ver todos →</Link>} />
         <PurposeLabel text="Notificações automáticas de condições de mercado configuradas — permite reagir a mudanças sem monitorar a tela o tempo todo; cada alerta indica intensidade e tipo do evento." />
-        <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, overflow: 'hidden' }}>
-          {RECENT_ALERTS_FALLBACK.map(a => <AlertRow key={a.id} alert={a} />)}
-        </div>
+        {RECENT_ALERTS_FALLBACK.length > 0 ? (
+          <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, overflow: 'hidden' }}>
+            {RECENT_ALERTS_FALLBACK.map(a => <AlertRow key={a.id} alert={a} />)}
+          </div>
+        ) : (
+          <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '20px 18px', textAlign: 'center' }}>
+            <div style={{ fontSize: 20, marginBottom: 8 }}>🔔</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', marginBottom: 4 }}>Nenhum alerta ativo</div>
+            <div style={{ fontSize: 10, color: '#334155', lineHeight: 1.6 }}>
+              Configure alertas em{' '}
+              <Link to={createPageUrl('SmartAlerts')} style={{ color: '#3b82f6', textDecoration: 'none', fontWeight: 600 }}>Smart Alerts →</Link>
+              {' '}para ser notificado de funding extremo, liquidações e eventos macro.
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── ZONA F: Mempool + Data Quality ── */}
