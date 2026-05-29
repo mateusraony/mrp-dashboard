@@ -701,7 +701,12 @@ export default function Dashboard() {
 
   // Detecta se alguma fonte primária está servindo dado do cache Supabase (fallback)
   const isAnyStale = !!(liveTicker?.isFallback || liveFng?.isFallback || macroForStale?.isFallback || mempoolForStale?.isFallback);
-  const staleDate  = liveTicker?.lastUpdated ?? liveFng?.lastUpdated ?? macroForStale?.lastUpdated ?? mempoolForStale?.lastUpdated ?? null;
+  // staleDate: usa apenas o timestamp de fontes que estão em fallback (não das que estão ao vivo)
+  const staleDate  = (liveTicker?.isFallback ? liveTicker.lastUpdated : null)
+    ?? (liveFng?.isFallback ? liveFng.lastUpdated : null)
+    ?? (macroForStale?.isFallback ? macroForStale.lastUpdated : null)
+    ?? (mempoolForStale?.isFallback ? mempoolForStale.lastUpdated : null)
+    ?? null;
 
   // Calcula retorno 1W e CVD a partir das klines diárias (quando disponíveis)
   const spotFlowLive = (() => {
