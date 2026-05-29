@@ -112,6 +112,13 @@ export default function TakerFlowPanel({ optionsData }) {
         </div>
       </div>
 
+      {/* Aviso: fluxos em $M são estimados do PCR, não dados reais de taker flow */}
+      {hasLiveData && (
+        <div style={{ fontSize: 9, color: '#f59e0b', marginBottom: 12, padding: '5px 9px', borderRadius: 5, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.15)', lineHeight: 1.5 }}>
+          ⚠ Valores de prêmio ($M) são estimativas baseadas no mock — a API pública Deribit não expõe taker flow diretamente. O <strong>Bull-Bear Index</strong> é calculado a partir do PCR real da Deribit.
+        </div>
+      )}
+
       {/* Bull-Bear Index */}
       <div style={{ marginBottom: 16, padding: '12px 14px', borderRadius: 10, background: '#0d1421', border: `1px solid ${bbColor}20` }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>

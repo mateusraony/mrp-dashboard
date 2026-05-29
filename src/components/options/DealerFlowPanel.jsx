@@ -175,8 +175,13 @@ export default function DealerFlowPanel({ spot = 85_000, iv = 0.65 }) {
           borderRadius: 4, background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)',
           color: '#f59e0b', textTransform: 'uppercase',
         }}>
-          simulado — strike OI via Deribit
+          OI simulada
         </span>
+      </div>
+
+      {/* Banner explicativo sobre OI simulada */}
+      <div style={{ fontSize: 9, color: '#a78bfa', marginBottom: 14, padding: '5px 9px', borderRadius: 5, background: 'rgba(167,139,250,0.06)', border: '1px solid rgba(167,139,250,0.18)', lineHeight: 1.5 }}>
+        ◬ GEX/Vanna/Charm calculados com <strong>OI sintética</strong> (distribuição gaussiana centrada no ATM). Quando dados reais de OI por strike estão disponíveis via Deribit, o painel principal usa esses valores — este componente sempre usa OI simulada para ilustrar a exposição teórica dos dealers.
       </div>
 
       {/* Cards de resumo */}
