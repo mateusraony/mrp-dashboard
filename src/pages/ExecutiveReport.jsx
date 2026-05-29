@@ -16,6 +16,7 @@ import { useMarketRegime, useRegimeHistory } from '@/hooks/useMarketRegime';
 import { useOnChainCycle, useOnChainExtended } from '@/hooks/useCoinMetrics';
 import { IS_LIVE } from '@/lib/env';
 import { computeRuleBasedAnalysis } from '@/utils/ruleBasedAnalysis';
+import PurposeLabel from '@/components/ui/PurposeLabel';
 
 // ─── Fallbacks — dados sem API gratuita equivalente ──────────────────────────
 const FEAR_GREED_FALLBACK        = { value: 50, classification: 'Neutral', label: 'Neutral' };
@@ -184,6 +185,7 @@ function GlobalOverview({ period, liveTicker, liveFng, liveRisk }) {
       subtitle={`Snapshot consolidado — período: ${period}`}
       links={[{ label: 'Dashboard', page: 'Dashboard', icon: '◈' }, { label: 'Macro Board', page: 'Macro', icon: '⊞' }]}
     >
+      <PurposeLabel text="Snapshot consolidado de todos os mercados — BTC, macro, regime e sentimento num único painel. Use como ponto de partida diário antes de analisar seções específicas." mb={12} />
       {/* Regime badge grande */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14, padding: '12px 16px', borderRadius: 10, background: `${regColor}0d`, border: `1px solid ${regColor}25` }}>
         <div style={{ fontSize: 32, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: regColor }}>{riskScore}</div>
@@ -277,6 +279,7 @@ function RegimeSection({ period, liveRegime, regimeLoading, regimeHistoryData })
       subtitle="Classificação automática baseada em 6 variáveis macro + crypto"
       links={[{ label: 'Ver Regime Completo', page: 'MarketRegime', icon: '🎯' }]}
     >
+      <PurposeLabel text="Classificação do ambiente atual como Risk-On, Risk-Off ou Neutral — quando Risk-On, ampliar exposição; quando Risk-Off, reduzir posições e aumentar stablecoins. Score acima de 62 = Risk-On; abaixo de 38 = Risk-Off." mb={12} />
       <div style={{ display: 'grid', gridTemplateColumns: '170px 1fr', gap: 16, alignItems: 'flex-start' }}>
         <ResponsiveContainer width="100%" height={150}>
           <RadarChart data={radarData}>
@@ -363,6 +366,7 @@ function StablecoinSection({ period }) {
       subtitle="USDT + USDC · Mint/Burn · Supply por chain · Anomalias"
       links={[{ label: 'Ver Completo', page: 'InstitutionalFlows', icon: '💧', tab: 'stablecoins' }]}
     >
+      <PurposeLabel text="Movimentação de stablecoins — crescimento do supply indica 'dry powder' para compras futuras; entrada em exchanges indica compra iminente; saída de exchanges indica acumulação long-term ou DeFi." mb={12} />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 12 }}>
         <Metric label="Supply Total" value={`$${s.total_b.toFixed(1)}B`} color="#60a5fa" sub={`${sign(delta)}${delta.toFixed(1)}% ${period.toLowerCase()}`} />
         <Metric label="USDT" value={`$${s.usdt_supply_b.toFixed(1)}B`} color="#10b981" sub={`Net 24h: +$${snap.usdt.net_24h_m.toFixed(0)}M`} />
@@ -468,6 +472,7 @@ function DerivativesSection({ period, liveTicker, oiHistoryData }) {
         { label: 'Options', page: 'Options', icon: '◬' },
       ]}
     >
+      <PurposeLabel text="Termômetro da alavancagem no mercado — funding positivo extremo indica excesso de longs (risco de short squeeze); OI crescendo com preço em alta confirma tendência; liquidações pico sinalizam extremos de preço." mb={12} />
       {/* Top metrics */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 12 }}>
         <Metric label="Funding Rate" value={`${(fundingRate * 100).toFixed(4)}%`} color={fundingRate > 0.0006 ? '#f59e0b' : '#10b981'} sub={`Ann: ${fundingAnn.toFixed(1)}%`} />
@@ -599,6 +604,7 @@ function OnChainSection({ period, liveOnChain }) {
       subtitle="NUPL · SOPR · MVRV · Exchange Netflow · Whales · Hash Rate"
       links={[{ label: 'Ver On-Chain Completo', page: 'OnChain', icon: '⛓' }]}
     >
+      <PurposeLabel text="Dados diretamente da blockchain Bitcoin — NUPL abaixo de 0 = capitulação (fundo potencial); MVRV abaixo de 1 = preço abaixo do custo médio de mercado (acumulação); netflow negativo de exchange = retirada para custódia (bullish)." mb={12} />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 12 }}>
         <Metric label="NUPL" value={nupl.value.toFixed(3)} color={nupl.zone_color} sub={nupl.zone} />
         <Metric label="SOPR" value={sopr.value.toFixed(3)} color={sopr.value > 1 ? '#10b981' : '#ef4444'} sub={`7D avg: ${sopr.smoothed_7d.toFixed(3)}`} />
@@ -667,6 +673,7 @@ function ETFMacroSection({ period }) {
         { label: 'Calendário', page: 'MacroCalendar', icon: '◷' },
       ]}
     >
+      <PurposeLabel text="Fluxo de ETFs de Bitcoin e indicadores macro — entradas consecutivas acima de $300M/dia indicam demanda institucional forte; alinhamento de ETF bullish + macro neutro é setup favorável para alta estrutural." mb={12} />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 12 }}>
         <Metric label="AUM Total" value={`$${etf.total_aum_b.toFixed(1)}B`} color="#60a5fa" sub={`${etf.consec_inflow_days}d consecutivos entrada`} />
         <Metric label={`Net Flow ${period}`} value={fmtM(etf[netKey] * 1e6)} color={etf[netKey] > 0 ? '#10b981' : '#ef4444'} sub="USD" />
@@ -713,7 +720,8 @@ function PeriodSummaryTable() {
 
   return (
     <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '18px 20px' }}>
-      <div style={{ fontSize: 13, fontWeight: 800, color: '#e2e8f0', marginBottom: 14 }}>📅 Comparativo Multi-Período</div>
+      <div style={{ fontSize: 13, fontWeight: 800, color: '#e2e8f0', marginBottom: 6 }}>📅 Comparativo Multi-Período</div>
+      <PurposeLabel text="Comparativo de performance e indicadores chave em múltiplos períodos (1D, 1W, 1M). Permite identificar se as tendências são de curto prazo (noise) ou estruturais (sinal relevante)." mb={10} />
       <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>

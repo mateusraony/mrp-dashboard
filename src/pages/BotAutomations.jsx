@@ -1,6 +1,7 @@
 // ─── AUTOMAÇÕES — Telegram · Discord · Webhooks ───────────────────────────────
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import PurposeLabel from '@/components/ui/PurposeLabel';
 import { createPageUrl } from '@/utils';
 import { automationRules, botConnections, recentBotMessages } from '../components/data/mockDataActionDashboard';
 import { globalRisk, fearGreed, btcFutures } from '../components/data/mockData';
@@ -348,6 +349,7 @@ export function BotsContent() {
             <ModeBadge mode={ticker ? 'live' : 'mock'} />
           </div>
           <p style={{ fontSize: 11, color: '#475569', margin: 0 }}>Telegram · Discord · Webhooks · Regras baseadas em métricas de mercado</p>
+          <PurposeLabel text="Automação de execução de ordens baseada em condições predefinidas — permite executar estratégias sem intervenção manual; sempre configure stop loss máximo." mt={6} />
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <Link to={createPageUrl('Opportunities')} style={{ fontSize: 11, padding: '7px 14px', borderRadius: 7, background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', color: '#f59e0b', textDecoration: 'none', fontWeight: 700 }}>
@@ -398,6 +400,7 @@ export function BotsContent() {
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>Canais de Notificação</div>
+            <PurposeLabel text="Parâmetros que controlam o comportamento do bot — position size, stop loss, take profit e horários de operação definem o perfil de risco da automação." mt={4} />
             <button onClick={() => setShowAddBot(true)} style={{ padding: '7px 14px', borderRadius: 7, background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.3)', color: '#60a5fa', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>
               ➕ Adicionar Canal
             </button>
@@ -432,6 +435,7 @@ export function BotsContent() {
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>Regras de Automação</div>
+            <PurposeLabel text="Configure regras de disparo automático baseadas em condições de mercado — permite automatizar monitoramento 24/7 sem ficar preso na tela." mt={4} />
             <div style={{ fontSize: 10, color: '#475569' }}>{activeRules} de {rules.length} ativas</div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -446,6 +450,7 @@ export function BotsContent() {
       {tab === 'Histórico' && (
         <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '18px 20px' }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', marginBottom: 14 }}>📨 Histórico de Mensagens Enviadas</div>
+          <PurposeLabel text="Histórico de todas as automações executadas — use para auditar eficácia das regras e ajustar thresholds com base em resultados reais." mt={2} />
           {messages.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '32px', color: '#334155', fontSize: 12 }}>Nenhuma mensagem enviada ainda.</div>
           ) : (

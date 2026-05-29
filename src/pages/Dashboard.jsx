@@ -83,6 +83,7 @@ import { HelpIcon } from '../components/ui/Tooltip';
 import ExtraSignals from '../components/dashboard/ExtraSignals';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
+import PurposeLabel from '@/components/ui/PurposeLabel';
 
 // ─── MINI STAT ────────────────────────────────────────────────────────────────
 function Stat({ label, value, sub, color = '#f1f5f9', big = false, help }) {
@@ -153,7 +154,7 @@ function FearGreedGauge({ liveValue, fngError, liveHistory }) {
 
   return (
     <div style={{ background: '#111827', border: `1px solid ${color}25`, borderRadius: 14, padding: 18 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
         <span style={{ fontSize: 9, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700 }}>
           Fear &amp; Greed Index
         </span>
@@ -166,6 +167,7 @@ function FearGreedGauge({ liveValue, fngError, liveHistory }) {
           reason={hasError ? 'Alternative.me API indisponível' : !IS_LIVE ? 'DATA_MODE=mock' : undefined}
         />
       </div>
+      <PurposeLabel text="Índice 0-100 do sentimento do mercado — abaixo de 20 = medo extremo (potencial fundo); acima de 80 = ganância extrema (potencial topo)." />
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12, marginBottom: 12 }}>
         <div style={{
           fontSize: 52, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace',
@@ -246,6 +248,7 @@ function BTCSnapshot({ liveData, tickerError, spotFlow = null }) {
           reason={err ? 'Binance Futures API indisponível' : !IS_LIVE ? 'DATA_MODE=mock' : undefined}
         />
       </div>
+      <PurposeLabel text="Preço spot atual do Bitcoin nas principais exchanges — variações de 5%+ em 24h indicam evento relevante; desvio entre exchanges sinaliza arbitragem." mt={4} mb={10} />
 
       {/* Price */}
       <div style={{ marginBottom: 14, paddingBottom: 12, borderBottom: '1px solid #1a2535' }}>
@@ -266,6 +269,7 @@ function BTCSnapshot({ liveData, tickerError, spotFlow = null }) {
       </div>
 
       {/* Key metrics grid */}
+      <PurposeLabel text="Funding Rate: taxa paga entre longs e shorts nos futuros perpétuos — positivo = longs pagam (mercado alavancado para cima); negativo = shorts pagam (capitulação de bears). Open Interest: total de contratos em aberto — aumento com alta de preço = tendência forte; queda com alta = alerta de divergência." mb={10} />
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 16px' }}>
         <Stat label="Funding Rate" value={fundingStr} color={fundingColor} big
           sub={err ? '—' : `${fr.funding_rate > 0 ? 'Longs pagam' : 'Shorts pagam'} · ${Math.round((fr.next_funding_time.getTime() - Date.now()) / 3600000)}h`}
@@ -490,7 +494,8 @@ function AITrackRecord({ predictions = [], isConfigured = false }) {
       <div style={{ padding: '14px 18px', borderBottom: '1px solid #1a2535', display: 'flex', alignItems: 'center', gap: 10 }}>
         <span style={{ width: 28, height: 28, borderRadius: 7, background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>🤖</span>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>AI — Track Record</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', marginBottom: 2 }}>AI — Track Record</div>
+          <PurposeLabel text="Histórico de acertos e erros das previsões da IA — acurácia acima de 60% indica modelo calibrado; use o histórico para avaliar a confiabilidade dos sinais atuais." mt={2} mb={4} />
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
             <span style={{ fontSize: 10, color: '#334155' }}>Histórico de previsões vs resultado real</span>
             {useDemo
@@ -722,6 +727,7 @@ export default function Dashboard() {
       </div>
 
       {/* ── ZONA A: Risk + F&G + BTC ── */}
+      <PurposeLabel text="Risk Score: índice composto 0-100 da saúde do mercado BTC — acima de 70 = risk-on (aumentar exposição); abaixo de 30 = risk-off (reduzir posições e proteger capital)." mb={10} mt={0} />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px,1fr))', gap: 14, marginBottom: 20 }}>
         <RiskMeter
           score={activeScore}
@@ -751,6 +757,7 @@ export default function Dashboard() {
               <Link to={createPageUrl('Macro')} style={{ fontSize: 11, color: '#475569', textDecoration: 'none', border: '1px solid #1e2d45', padding: '3px 9px', borderRadius: 5 }}>Ver Detalhes →</Link>
             </div>
           } />
+        <PurposeLabel text="Indicadores macro globais atualizados diariamente — VIX acima de 30 sinaliza stress; DXY em alta pressiona BTC; yields em queda são favoráveis a ativos de risco." />
         <MacroRow />
       </div>
 
@@ -758,12 +765,14 @@ export default function Dashboard() {
       <div style={{ marginBottom: 20 }}>
         <SectionTitle icon="📡" label="Market Signals" sub="BTC Dominance · Liquidações · Stablecoins · Correlações · Yield Curve · Credit Spread"
           action={null} />
+        <PurposeLabel text="Sinais complementares de mercado — dominância BTC acima de 58% indica rotação de altcoins para BTC; liquidações crescentes indicam alavancagem excessiva no mercado." />
         <ExtraSignals />
       </div>
 
       {/* ── ZONA D: AI Analysis + Track Record (2 cols) ── */}
       <div style={{ marginBottom: 20 }}>
         <SectionTitle icon="📊" label="Análise & Previsões" sub="Análise automática por regras de threshold · Claude Haiku quando configurado · Com histórico de acertos" />
+        <PurposeLabel text="Síntese automática das condições atuais pelo modelo de IA — use como ponto de partida para análise, nunca como única fonte de decisão; confluência entre múltiplos timeframes aumenta a confiança no sinal." />
 
         {/* Confluência Multi-Timeframe — sempre visível (AGUARDANDO enquanto klines carregam) */}
         <div style={{ marginBottom: 14, background: '#0d1421', border: '1px solid #162032', borderRadius: 12, padding: '14px 18px' }}>
@@ -807,9 +816,10 @@ export default function Dashboard() {
         {/* Alertas Estatísticos Z-Score */}
         {zAlerts.length > 0 && (
           <div style={{ marginBottom: 14, background: '#0d1421', border: '1px solid #162032', borderRadius: 12, padding: '14px 18px' }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', letterSpacing: 0.3, marginBottom: 10 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', letterSpacing: 0.3, marginBottom: 4 }}>
               Alertas Estatísticos — Z-Score
             </div>
+            <PurposeLabel text="Desvios estatísticos em relação à média histórica — Z acima de +2σ ou abaixo de -2σ indica movimento extremo que frequentemente precede reversão ou aceleração de tendência." mb={10} />
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
               {zAlerts.map(a => (
                 <div key={a.metric} style={{
@@ -847,7 +857,7 @@ export default function Dashboard() {
         {/* Análise AI — Claude Haiku 4.5 — só mostra quando IS_LIVE + Supabase configurado */}
         {(haiku || haikuLoading) && (
           <div style={{ marginBottom: 14, background: '#0d1421', border: '1px solid rgba(139,92,246,0.25)', borderRadius: 12, padding: '14px 18px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
               <span style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>Análise Natural — Claude Haiku</span>
               <span style={{
                 fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 4,
@@ -855,6 +865,7 @@ export default function Dashboard() {
                 border: '1px solid rgba(139,92,246,0.3)', letterSpacing: '0.06em',
               }}>AI · 15min cache</span>
             </div>
+            <PurposeLabel text="Interpretação em linguagem natural gerada pelo Claude Haiku — resume o estado atual integrando todos os módulos; atualizado a cada 15 minutos para evitar excesso de chamadas à API." mb={10} />
             {haikuLoading
               ? <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                   {[0, 1, 2].map(i => (
@@ -880,12 +891,14 @@ export default function Dashboard() {
       <div style={{ marginBottom: 20 }}>
         <SectionTitle icon="◎" label="Alertas Recentes"
           action={<Link to={createPageUrl('SmartAlerts')} style={{ fontSize: 11, color: '#3b82f6', textDecoration: 'none', background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', padding: '3px 9px', borderRadius: 5, fontWeight: 600 }}>Ver todos →</Link>} />
+        <PurposeLabel text="Notificações automáticas de condições de mercado configuradas — permite reagir a mudanças sem monitorar a tela o tempo todo; cada alerta indica intensidade e tipo do evento." />
         <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, overflow: 'hidden' }}>
           {RECENT_ALERTS_FALLBACK.map(a => <AlertRow key={a.id} alert={a} />)}
         </div>
       </div>
 
       {/* ── ZONA F: Mempool + Data Quality ── */}
+      <PurposeLabel text="Estado da rede Bitcoin em tempo real — taxas altas indicam congestionamento e demanda elevada pela chain; mempool grande sinaliza backlog de transações pendentes." mt={0} mb={8} />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <MempoolRow />
         <DataQualityStrip />

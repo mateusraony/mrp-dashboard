@@ -3,6 +3,7 @@
 import { termStructure as mockTermStructure } from '../../components/data/mockDataExtended';
 import { ModeBadge, GradeBadge } from '../ui/DataBadge';
 import { DataTrustBadge } from '../ui/DataTrustBadge';
+import PurposeLabel from '../ui/PurposeLabel';
 import { XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Area, AreaChart,
 } from 'recharts';
@@ -88,6 +89,7 @@ export default function TermStructure({ optionsData }) {
             {struct.label}
           </div>
         </div>
+        <PurposeLabel text="Curva de IV implícita por vencimento — contango (curto prazo mais caro) indica stress imediato ou evento iminente precificado; backwardation (curva normal) indica mercado calmo com incerteza crescendo apenas no longo prazo." mb={10} />
 
         <ResponsiveContainer width="100%" height={200}>
           <AreaChart data={chartData} margin={{ top: 4, right: 4, left: -10, bottom: 0 }}>
@@ -174,6 +176,7 @@ export default function TermStructure({ optionsData }) {
           {struct.label}
         </div>
       </div>
+      <PurposeLabel text="Curva de IV implícita por vencimento — contango (curto prazo mais caro) indica stress imediato ou evento iminente precificado; backwardation (curva normal) indica mercado calmo com incerteza crescendo apenas no longo prazo." mb={10} />
 
       {/* Chart */}
       <ResponsiveContainer width="100%" height={200}>

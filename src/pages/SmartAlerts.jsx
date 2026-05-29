@@ -15,6 +15,7 @@ import { useMultiVenueSnapshot } from '@/hooks/useMultiVenue';
 import { IS_LIVE } from '@/lib/env';
 import { logInfo, logError } from '@/lib/debugLog';
 import { computeRuleBasedAnalysis } from '@/utils/ruleBasedAnalysis';
+import PurposeLabel from '@/components/ui/PurposeLabel';
 
 // ─── Componentes do Ciclo de Alertas ─────────────────────────────────────────
 const cycleTypeConfig = {
@@ -449,20 +450,25 @@ export default function SmartAlerts() {
           {activeAlerts.length > 0 && <span style={{ fontSize: 10, color: '#ef4444', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 4, padding: '2px 8px', fontWeight: 800 }}>🔔 {activeAlerts.length} ativo{activeAlerts.length > 1 ? 's' : ''}</span>}
         </div>
         <p style={{ fontSize: 11, color: '#475569', margin: 0 }}>Monitoramento automático de mercado · AI identifica anomalias e emite sugestões · Configure prioridade e gatilhos por tipo de sinal</p>
+        <PurposeLabel text="Central de notificações automáticas — cada alerta indica uma condição de mercado relevante que requer atenção ou ação imediata; use os gauges de risco para avaliar a urgência antes de agir." mt={6} mb={0} />
       </div>
 
+      <PurposeLabel text="Gauges de risco em tempo real — cada indicador monitora um vetor de risco específico; quando o threshold é atingido o alerta é disparado automaticamente para notificação imediata." mt={0} mb={8} />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(145px, 1fr))', gap: 8, marginBottom: 16 }}>
         <div>
           <RiskGauge label="Long Flush" icon="⬇️" value={longFlushVal} max={100} threshold={70} color="#ef4444" sub={`${Math.max(0, 70 - longFlushVal)}pts p/ ativar`} />
           <div style={{ marginTop: 3, display: 'flex', justifyContent: 'flex-end' }}><DataQualityBadge freshness={longFlushLive ? 100 : 0} completeness={longFlushLive ? 100 : 60} fallback_active={!longFlushLive} source={longFlushLive ? 'Binance' : 'MOCK'} /></div>
+          <PurposeLabel text="Volume de posições longas liquidadas à força — score acima de 70 indica flush iminente; frequentemente marca mínimos locais de preço." mt={4} mb={0} />
         </div>
         <div>
           <RiskGauge label="Short Squeeze" icon="⬆️" value={shortSqueezeVal} max={100} threshold={65} color="#10b981" sub={`${Math.max(0, 65 - shortSqueezeVal)}pts p/ ativar`} />
           <div style={{ marginTop: 3, display: 'flex', justifyContent: 'flex-end' }}><DataQualityBadge freshness={shortSqueezeLive ? 100 : 0} completeness={shortSqueezeLive ? 100 : 60} fallback_active={!shortSqueezeLive} source={shortSqueezeLive ? 'Binance' : 'MOCK'} /></div>
+          <PurposeLabel text="Proporção de shorts sendo liquidados — acima de 65 indica squeeze em andamento; frequentemente catalisa aceleração de alta no preço." mt={4} mb={0} />
         </div>
         <div>
           <RiskGauge label="Funding Rate" icon="💸" value={fundingCrossVenue ?? fundingCurrent} max={rd.funding_threshold_hi * 1.5} threshold={rd.funding_threshold_hi} color="#f59e0b" sub={fundingCrossVenue ? `Cross-venue avg · Threshold: ${rd.funding_threshold_hi}%` : `Threshold: ${rd.funding_threshold_hi}%`} />
           <div style={{ marginTop: 3, display: 'flex', justifyContent: 'flex-end' }}><DataQualityBadge freshness={isFundingLive ? 100 : 0} completeness={isFundingLive ? 100 : 60} fallback_active={!isFundingLive} source={fundingCrossVenue ? 'Cross-venue' : isFundingLive ? 'Binance' : 'MOCK'} /></div>
+          <PurposeLabel text="Custo de manter posições alavancadas — acima de +0.1% por 8h = excesso de longs; abaixo de -0.05% = excesso de shorts; ambos extremos precedem reversões." mt={4} mb={0} />
         </div>
         <div>
           <RiskGauge label="Basis Dev." icon="📐" value={rd.basis_deviation} max={5} threshold={3} color="#a78bfa" sub={`${rd.basis_current.toFixed(1)}% ann.`} />
@@ -497,6 +503,7 @@ export default function SmartAlerts() {
 
       {tab === 'ai' && (
         <>
+          <PurposeLabel text="Sinais e sugestões gerados pela análise rule-based — prioridade CRITICAL exige ação imediata; HIGH requer monitoramento próximo; MEDIUM e LOW são informativos para ajuste de estratégia." mt={0} mb={10} />
           <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
             <button onClick={() => setCategoryFilter('all')} style={{ padding: '4px 12px', borderRadius: 20, border: `1px solid ${categoryFilter === 'all' ? 'rgba(59,130,246,0.4)' : '#1a2535'}`, background: categoryFilter === 'all' ? 'rgba(59,130,246,0.12)' : 'transparent', color: categoryFilter === 'all' ? '#60a5fa' : '#475569', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>Todos</button>
             {CATEGORIES.map(c => <button key={c.id} onClick={() => setCategoryFilter(c.id)} style={{ padding: '4px 12px', borderRadius: 20, border: `1px solid ${categoryFilter === c.id ? c.color + '40' : '#1a2535'}`, background: categoryFilter === c.id ? `${c.color}12` : 'transparent', color: categoryFilter === c.id ? c.color : '#475569', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>{c.icon} {c.label}</button>)}
@@ -528,6 +535,7 @@ export default function SmartAlerts() {
 
       {tab === 'active' && (
         <div>
+          <PurposeLabel text="Feed de alertas disparados em tempo real — cada alerta indica uma condição de mercado relevante; alertas HIGH em vermelho requerem resposta mais rápida do que alertas MEDIUM em amarelo." mt={0} mb={12} />
           {activeAlerts.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '40px 0', color: '#334155' }}>
               <div style={{ fontSize: 32, marginBottom: 10 }}>✅</div>
@@ -560,6 +568,7 @@ export default function SmartAlerts() {
 
       {tab === 'config' && (
         <div>
+          <PurposeLabel text="Configure condições para disparo automático — defina thresholds para funding, liquidações, RSI e outros indicadores; prioridades mais altas geram notificações mais urgentes." mt={0} mb={10} />
           <div style={{ fontSize: 11, color: '#475569', marginBottom: 16 }}>Configure a prioridade e os gatilhos de cada alerta.</div>
           {CATEGORIES.map(cat => {
             const catRules = rules.filter(r => cat.types.includes(r.type));
@@ -581,6 +590,7 @@ export default function SmartAlerts() {
 
       {tab === 'history' && (
         <div>
+          <PurposeLabel text="Registro histórico de todos os alertas disparados — use para identificar padrões recorrentes e calibrar thresholds; alertas resolvidos confirmam que o sistema respondeu ao evento." mt={0} mb={12} />
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 11, color: '#475569' }}>
               {history.length} alertas registrados · {history.filter(a => a.resolved).length} resolvidos
@@ -618,6 +628,7 @@ export default function SmartAlerts() {
 
       {tab === 'cycle' && (
         <div style={{ maxWidth: 1100 }}>
+          <PurposeLabel text="Ciclo de vida dos alertas com deduplicação — cada alerta tem um cooldown para evitar spam; o ciclo mostra o estado global do mercado e todos os alertas disparados em sequência." mt={0} mb={12} />
           <div style={{ marginBottom: 20, background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: 16 }}>
             <div style={{ fontSize: 11, color: '#4a5568', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.07em' }}>Tipos de Alerta</div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -626,6 +637,7 @@ export default function SmartAlerts() {
           </div>
           <div style={{ marginBottom: 20, padding: '12px 16px', background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.15)', borderRadius: 10 }}>
             <div style={{ fontSize: 12, color: '#60a5fa', fontWeight: 600, marginBottom: 4 }}>Estado Global: {riskScore?.regime ?? '—'} · Score {riskScore?.score ?? '—'}/100</div>
+            <PurposeLabel text="Score composto do risco sistêmico atual — acima de 70 sugere cautela e redução de exposição; abaixo de 30 sugere oportunidade de entrada para traders de risco." mt={2} mb={6} />
             <div style={{ fontSize: 11, color: '#4a5568' }}>{(riskScore?.score ?? 50) >= 65 ? 'RISK-ON threshold não atingido' : (riskScore?.score ?? 50) <= 35 ? '🔴 RISK-OFF threshold atingido' : 'Zona neutra — monitorando'} (RISKON ≥ 65, RISKOFF ≤ 35)</div>
           </div>
           <div style={{ fontSize: 11, color: '#4a5568', marginBottom: 12 }}>Ciclo atual · {history.length} alertas · Deduplicados · Anti-spam cooldown</div>
@@ -636,7 +648,12 @@ export default function SmartAlerts() {
         </div>
       )}
 
-      {tab === 'auditoria' && <AlertAuditPanel />}
+      {tab === 'auditoria' && (
+        <div>
+          <PurposeLabel text="Auditoria completa de alertas e governança — rastreia o histórico de mudanças em thresholds e regras; útil para revisão de processo e conformidade com estratégia definida." mt={0} mb={12} />
+          <AlertAuditPanel />
+        </div>
+      )}
     </div>
   );
 }

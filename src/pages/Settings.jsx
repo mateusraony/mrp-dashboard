@@ -74,6 +74,7 @@ function useSourceHealth() {
   return health;
 }
 import { ModeBadge, GradeBadge } from '../components/ui/DataBadge';
+import PurposeLabel from '@/components/ui/PurposeLabel';
 import { DATA_MODE, setDataMode } from '@/lib/env';
 import { isSupabaseConfigured } from '@/services/supabase';
 import { useUserSettings, useUpdateSettings } from '@/hooks/useSupabase';
@@ -482,6 +483,7 @@ function TelegramSection() {
 
   return (
     <Section title="📨 Reports & Telegram">
+      <PurposeLabel text="Defina como e quando receber alertas — Telegram é recomendado para alertas urgentes de mercado; email para relatórios diários." />
       {/* Supabase not configured warning */}
       {!isSupabaseConfigured() && (
         <div style={{
@@ -695,6 +697,7 @@ export default function Settings() {
 
       {/* Data Mode */}
       <Section title="📡 Data Mode">
+        <PurposeLabel text="Configure chaves de API para ativar fontes de dados premium — sem configuração, o dashboard usa fontes públicas gratuitas com limitações." />
         <DataModeToggle />
         <div style={{ padding: '12px 0', borderBottom: '1px solid rgba(30,45,69,0.5)', display: 'flex', alignItems: 'flex-start', gap: 16 }}>
           <div style={{ flex: 1 }}>
@@ -707,6 +710,7 @@ export default function Settings() {
 
       {/* Modules */}
       <Section title="🔧 Module Toggles">
+        <PurposeLabel text="Ative ou desative módulos de dados individualmente — desabilitar módulos lentos ou não utilizados melhora a performance e reduz requisições desnecessárias às APIs." />
         <ModuleToggles />
       </Section>
 
@@ -715,6 +719,7 @@ export default function Settings() {
 
       {/* Thresholds */}
       <Section title="⚡ Alert Thresholds">
+        <PurposeLabel text="Personalize a interface de acordo com seu estilo de análise — valores de threshold controlam quando alertas são disparados; ajuste conforme sua tolerância a risco e volatilidade esperada." />
         <div style={{
           marginBottom: 12, padding: '7px 12px', borderRadius: 6, fontSize: 10,
           background: 'rgba(148,163,184,0.06)', border: '1px solid rgba(148,163,184,0.15)',
@@ -744,6 +749,7 @@ export default function Settings() {
 
       {/* FRED Series */}
       <Section title="📊 FRED Macro Series">
+        <PurposeLabel text="Configuração do banco de dados para persistência de alertas e configurações — necessário para salvar dados entre sessões e usar fallback de cache." />
         <div style={{ fontSize: 11, color: '#4a5568', marginBottom: 6 }}>
           IDs das séries FRED buscadas diariamente via edge function <code style={{ fontFamily: 'JetBrains Mono, monospace', color: '#475569' }}>fred-proxy</code>. Dados não são intraday.
         </div>
@@ -773,6 +779,7 @@ export default function Settings() {
       }}>
         <div style={{ padding: '14px 20px', borderBottom: '1px solid #1e2d45' }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>📡 Source Health (leitura)</div>
+          <PurposeLabel text="Saúde em tempo real de cada integração — fonte com status 'ERRO' está usando dados do cache Supabase; dados com grade D requerem atenção ou atualização de chave." mb={4} />
           <div style={{ fontSize: 10, color: '#334155' }}>
             Teste de conectividade TCP — mede se o servidor responde, não se a API retorna dados válidos. FRED é verificado via servidor FRED diretamente (não via edge function).
           </div>

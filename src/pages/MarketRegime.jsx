@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useMarketRegime, useRegimeHistory } from '../hooks/useMarketRegime';
 import { IS_LIVE } from '../lib/env';
 import { ModeBadge } from '../components/ui/DataBadge';
+import PurposeLabel from '@/components/ui/PurposeLabel';
 import {
   RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
   ResponsiveContainer, Tooltip, AreaChart, Area, XAxis, YAxis,
@@ -225,6 +226,7 @@ export default function MarketRegime() {
         <p style={{ fontSize: 11, color: '#475569', margin: 0 }}>
           Classificação automática Risk-On / Risk-Off / Neutral · Yield Curve · DXY · VIX · Funding · NUPL
         </p>
+        <PurposeLabel text="Classifica o ambiente atual como Risk-On, Risk-Off ou Neutral com base em 8+ indicadores macro e cripto — quando Risk-On, aumente exposição; quando Risk-Off, reduza e proteja capital; Neutral = aguarde confirmação antes de operar." mt={6} mb={0} />
       </div>
 
       {/* ── REGIME HERO ── */}
@@ -297,6 +299,7 @@ export default function MarketRegime() {
         <div style={{ display: 'grid', gridTemplateColumns: '340px 1fr', gap: 16, alignItems: 'start' }}>
           <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '16px 18px' }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>Radar de Regime</div>
+            <PurposeLabel text="Visualização dos 8 componentes do regime em formato radar — cada eixo representa um indicador (macro, on-chain, derivativos); quanto mais próximo do círculo externo, mais risk-on aquele fator está." mb={12} />
             <div style={{ fontSize: 9, color: '#334155', marginBottom: 12 }}>Score por componente · 100 = Risk-On máximo · 0 = Risk-Off máximo</div>
             <ResponsiveContainer width="100%" height={280}>
               <RadarChart data={radarData} margin={{ top: 10, right: 30, bottom: 10, left: 30 }}>
@@ -321,7 +324,8 @@ export default function MarketRegime() {
           </div>
 
           <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#e2e8f0', marginBottom: 10 }}>Componentes do Regime</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>Componentes do Regime</div>
+            <PurposeLabel text="Score individual de cada indicador que compõe o regime — vermelho = contribuindo para Risk-Off; verde = contribuindo para Risk-On. Identifique qual fator está pesando mais no regime atual." mb={10} />
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 8 }}>
               {components.map(c => <ComponentCard key={c.key} c={c} />)}
             </div>
@@ -332,6 +336,7 @@ export default function MarketRegime() {
       {/* ── HISTÓRICO ── */}
       {tab === 1 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <PurposeLabel text="Evolução do regime nos últimos 90 dias — permite identificar se o regime atual é uma mudança estrutural ou apenas oscilação temporária; transições confirmadas por 5+ dias tendem a ser mais significativas." mb={10} />
           <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '16px 18px' }}>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4, flexWrap: 'wrap' }}>
               <span style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0' }}>Score de Regime — Últimos {regimeHistory.length} Dias</span>

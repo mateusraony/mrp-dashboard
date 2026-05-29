@@ -17,6 +17,7 @@ import {
   ResponsiveContainer, ReferenceLine, Cell,
 } from 'recharts';
 import { computeContractGreeks } from '@/utils/riskCalculations';
+import PurposeLabel from '@/components/ui/PurposeLabel';
 
 // ─── Constantes de configuração do painel ────────────────────────────────────
 
@@ -178,6 +179,8 @@ export default function DealerFlowPanel({ spot = 85_000, iv = 0.65 }) {
           OI simulada
         </span>
       </div>
+
+      <PurposeLabel text="Mede a exposição agregada dos dealers (market makers) em gama, vanna e charm — GEX positivo = dealers long gamma (amortecendo volatilidade); GEX negativo = dealers short gamma (amplificando movimentos, espere swings maiores e stops mais amplos)." mb={8} />
 
       {/* Banner explicativo sobre OI simulada */}
       <div style={{ fontSize: 9, color: '#a78bfa', marginBottom: 14, padding: '5px 9px', borderRadius: 5, background: 'rgba(167,139,250,0.06)', border: '1px solid rgba(167,139,250,0.18)', lineHeight: 1.5 }}>

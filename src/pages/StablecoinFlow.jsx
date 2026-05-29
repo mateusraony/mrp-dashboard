@@ -1,5 +1,6 @@
 // ─── STABLECOIN FLOW TRACKER ─────────────────────────────────────────────────
 import { useState, useMemo } from 'react';
+import PurposeLabel from '@/components/ui/PurposeLabel';
 
 // Fallbacks — dados de mint/burn requerem API paga (Glassnode ~$29/mês ou Nansen)
 const DAILY_MINT_BURN_FALLBACK = [];
@@ -196,12 +197,14 @@ export function StablecoinContent() {
         <p style={{ fontSize: 11, color: '#475569', margin: 0 }}>
           Mint/Burn USDT · USDC · Ethereum · Arbitrum · Correlação com volume BTC
         </p>
+        <PurposeLabel text="Total de stablecoins em circulação — crescimento da oferta indica 'dry powder' disponível para compra de cripto; é combustível potencial para uma alta." mt={6} />
       </div>
 
       {/* Anomaly banners */}
       {STABLECOIN_ANOMALIES_FALLBACK.map(a => <AnomalyBanner key={a.id} anomaly={a} />)}
 
       {/* Top stats */}
+      <PurposeLabel text="Fluxo de stablecoins para exchanges — entrada maciça de USDT/USDC em exchanges geralmente precede compras de BTC; saída indica saques para DeFi ou custódia." mb={10} />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8, marginBottom: 14 }}>
         <StatCard label="Supply Total" value={`$${snap.total_supply_b.toFixed(1)}B`} icon="💰" sub="USDT + USDC" />
         <StatCard label="Net 24h" value={`+$${snap.total_net_24h_m.toFixed(0)}M`} color="#10b981" icon="🪙" sub={snap.avg7d_net_m !== 0 ? `Avg 7d: +$${snap.avg7d_net_m.toFixed(0)}M` : 'Avg 7d: N/D'} />
@@ -250,6 +253,7 @@ export function StablecoinContent() {
           {/* Net Flow chart (Mint - Burn) */}
           <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '16px 18px' }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>Net Flow Diário — USDT + USDC</div>
+            <PurposeLabel text="Fluxo de stablecoins para exchanges — entrada maciça de USDT/USDC em exchanges geralmente precede compras de BTC; saída indica saques para DeFi ou custódia." mt={2} />
             <div style={{ fontSize: 9, color: '#334155', marginBottom: 12 }}>Mint líquido (Mint − Burn) em USD milhões · Linha = média 7 dias</div>
             <ResponsiveContainer width="100%" height={200}>
               <ComposedChart data={slicedData} margin={{ top: 4, right: 4, left: -18, bottom: 0 }}>
@@ -338,6 +342,7 @@ export function StablecoinContent() {
           {/* Pie */}
           <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '16px 18px' }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>Supply por Rede</div>
+            <PurposeLabel text="Percentual do market cap cripto total em stablecoins — alta acima de 10% indica posicionamento defensivo; queda indica rotação para ativos de risco." mt={2} />
             {chainPieData.length > 0 && (
               <div style={{ fontSize: 9, color: '#10b981', marginBottom: 10 }}>● AO VIVO · DeFiLlama (total por chain)</div>
             )}
@@ -425,6 +430,7 @@ export function StablecoinContent() {
           {/* Interpretation */}
           <div style={{ padding: '13px 15px', background: 'rgba(167,139,250,0.06)', border: '1px solid rgba(167,139,250,0.2)', borderRadius: 10 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: '#a78bfa', marginBottom: 6 }}>🔗 Interpretação da Correlação</div>
+            <PurposeLabel text="Dominância de stablecoin — percentual do market cap cripto total em stablecoins — alta acima de 10% indica posicionamento defensivo; queda indica rotação para ativos de risco." mt={2} />
             <div style={{ fontSize: 11, color: '#64748b', lineHeight: 1.8 }}>{MINT_VS_BTC_CORR_FALLBACK.note}</div>
             <div style={{ marginTop: 8, display: 'flex', gap: 14, flexWrap: 'wrap' }}>
               <div style={{ fontSize: 10, color: '#334155' }}>📌 <strong style={{ color: '#475569' }}>Mint grande isolado</strong> = capital sendo preparado para deploy. Alta probabilidade de compra em 6-24h.</div>

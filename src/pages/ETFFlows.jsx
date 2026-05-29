@@ -1,6 +1,7 @@
 // ─── ETF FLOWS PAGE ───────────────────────────────────────────────────────────
 // Bitcoin Spot ETF capital flows — BlackRock, Fidelity, ARK, Grayscale, etc.
 import { useState } from 'react';
+import PurposeLabel from '@/components/ui/PurposeLabel';
 import { etfFlows } from '../components/data/mockDataExtended';
 import { GradeBadge } from '../components/ui/DataBadge';
 import { DataTrustBadge } from '../components/ui/DataTrustBadge';
@@ -142,9 +143,11 @@ export function ETFContent() {
             : 'Fonte: simulado — configure VITE_SOSOVALUE_KEY (gratuito em sosovalue.com/developer) para dados reais.'
           }
         </p>
+        <PurposeLabel text="Fluxo diário de capital entrando ou saindo dos ETFs de Bitcoin spot nos EUA — entradas acima de $300M/dia indicam demanda institucional forte; saídas persistentes acima de $200M/dia pressionam o preço." mt={6} />
       </div>
 
       {/* Summary cards */}
+      <PurposeLabel text="Total de ativos sob gestão nos ETFs BTC — AUM acima de $50B indica que ETFs tornaram-se força dominante no mercado; comparável a holdings de Satoshi (~1M BTC)." mb={10} />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12, marginBottom: 20 }}>
         <SummaryCard
           label="AUM Total"
@@ -205,6 +208,7 @@ export function ETFContent() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
           <div>
             <div style={{ fontSize: 14, fontWeight: 700, color: '#e2e8f0' }}>Flows Diários — Últimos 30 dias</div>
+            <PurposeLabel text="Total acumulado de entradas líquidas desde o lançamento dos ETFs — crescimento constante confirma demanda estrutural de longo prazo de investidores tradicionais." mt={4} />
             <div style={{ fontSize: 11, color: '#475569', marginTop: 2 }}>Entrada (verde) vs Saída (vermelho) · USD Milhões</div>
           </div>
           {sosoAvailable
@@ -243,6 +247,7 @@ export function ETFContent() {
           <div>
             <div style={{ fontSize: 14, fontWeight: 700, color: '#e2e8f0' }}>Fundos por Emissor</div>
             <div style={{ fontSize: 11, color: '#475569' }}>AUM, flows e concentração por produto</div>
+            <PurposeLabel text="Fluxo diário de capital entrando ou saindo dos ETFs de Bitcoin spot nos EUA — entradas acima de $300M/dia indicam demanda institucional forte; saídas persistentes acima de $200M/dia pressionam o preço." mt={4} />
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
             {['aum', 'today', '7d', '30d'].map(k => (
@@ -359,6 +364,7 @@ export function ETFContent() {
           <span style={{ fontSize: 18 }}>🟠</span>
           <div>
             <div style={{ fontSize: 14, fontWeight: 700, color: '#e2e8f0' }}>Reddit Pulse — BTC ETF</div>
+            <PurposeLabel text="Discussões recentes sobre ETFs de BTC no Reddit — volume de posts e upvotes elevado indica interesse institucional crescente; tópicos negativos persistentes podem antecipar resgates." mt={4} />
             <div style={{ fontSize: 10, color: '#475569' }}>Discussões recentes em r/ETFs e r/Bitcoin · atualizado a cada 30min</div>
           </div>
         </div>

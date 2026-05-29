@@ -1,5 +1,6 @@
 // ─── ALTCOINS — Dominância · Rotação · Alt Season ─────────────────────────────
 import { useAltcoinsData } from '../hooks/useAltcoins';
+import PurposeLabel from '@/components/ui/PurposeLabel';
 import { useDominance, useDominanceHistory } from '../hooks/useBtcData';
 import { SECTOR_MAP } from '../services/altcoins';
 import { IS_LIVE } from '../lib/env';
@@ -46,6 +47,7 @@ function AltSeasonGauge({ index, trend }) {
           <div style={{ fontSize: 10, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, marginBottom: 4 }}>
             Alt Season Index
           </div>
+          <PurposeLabel text="Score 0-100 indicando se altcoins estão superando BTC — acima de 75 = altseason ativa; abaixo de 25 = Bitcoin liderando o mercado." mb={6} />
           <div style={{ fontSize: 48, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: cfg.color, lineHeight: 1 }}>
             {value}
           </div>
@@ -216,6 +218,7 @@ export default function Altcoins() {
             </div>
           )}
         </div>
+        <PurposeLabel text="Painel de rotação de capital no mercado cripto — acompanhe se o dinheiro está concentrado no BTC ou se está se espalhando para altcoins, guiando decisões de alocação." />
         <p style={{ fontSize: 11, color: '#475569', margin: 0 }}>
           Alt Season Index · BTC/ETH Dominância · Top Alts vs BTC · Rotação Setorial
         </p>
@@ -232,8 +235,14 @@ export default function Altcoins() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 220px', gap: 14, marginBottom: 16 }}>
         <AltSeasonGauge index={altSeasonIndex} trend={altSeasonTrend} />
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <DominanceCard label="BTC" value={dominance?.btc_dominance} color="#f59e0b" history={domHistory?.history} />
-          <DominanceCard label="ETH" value={dominance?.eth_dominance} color="#627eea" />
+          <div>
+            <DominanceCard label="BTC" value={dominance?.btc_dominance} color="#f59e0b" history={domHistory?.history} />
+            <PurposeLabel text="Percentual do market cap total cripto que pertence ao Bitcoin — queda abaixo de 40% historicamente coincide com altseason; alta acima de 60% = capital fluindo para BTC (risco-off em alts)." mt={6} mb={0} />
+          </div>
+          <div>
+            <DominanceCard label="ETH" value={dominance?.eth_dominance} color="#627eea" />
+            <PurposeLabel text="Participação do Ethereum no market cap total — subida simultânea com queda do BTC.D indica rotação de BTC para ETH antes de se espalhar para alts menores." mt={6} mb={0} />
+          </div>
           <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '14px 16px', flex: 1 }}>
             <div style={{ fontSize: 9, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6, fontWeight: 700 }}>Outperformers</div>
             <div style={{ fontSize: 28, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: '#64748b', lineHeight: 1 }}>
@@ -248,6 +257,7 @@ export default function Altcoins() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 16 }}>
         <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '16px 18px' }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>Dominância — Distribuição Atual</div>
+          <PurposeLabel text="Fluxo de capital entre diferentes camadas do mercado cripto — a rotação tipicamente vai BTC → ETH → large caps → mid caps → small caps." />
           <div style={{ fontSize: 10, color: '#334155', marginBottom: 12 }}>BTC · ETH · Others</div>
           <ResponsiveContainer width="100%" height={180}>
             <BarChart data={domData} layout="vertical" margin={{ top: 4, right: 60, left: 40, bottom: 0 }}>
@@ -263,6 +273,7 @@ export default function Altcoins() {
 
         <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '16px 18px' }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>Rotação Setorial — 7d</div>
+          <PurposeLabel text="Fluxo de capital entre setores do mercado cripto (DeFi, L1, L2, etc.) — identifica quais setores estão liderando ou ficando para trás na semana." />
           <div style={{ fontSize: 10, color: '#334155', marginBottom: 12 }}>Retorno ponderado por market cap</div>
           <ResponsiveContainer width="100%" height={180}>
             <BarChart data={sectorRotation} layout="vertical" margin={{ top: 4, right: 50, left: 40, bottom: 0 }}>
@@ -285,9 +296,12 @@ export default function Altcoins() {
 
       {/* Top Alts Table */}
       <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, overflow: 'hidden' }}>
-        <div style={{ padding: '14px 18px', borderBottom: '1px solid #1e2d45', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>Top Altcoins — Performance vs BTC</div>
-          <div style={{ fontSize: 9, color: '#334155', marginLeft: 'auto' }}>90d lookback · vs BTC retornos relativos · setores: classificação manual</div>
+        <div style={{ padding: '14px 18px', borderBottom: '1px solid #1e2d45' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>Top Altcoins — Performance vs BTC</div>
+            <div style={{ fontSize: 9, color: '#334155' }}>90d lookback · vs BTC retornos relativos · setores: classificação manual</div>
+          </div>
+          <PurposeLabel text="Altcoins com maior variação positiva/negativa nas últimas 24h — momentum extremo (>20% em 24h) frequentemente reverte; use como alerta de posicionamento." mt={4} mb={0} />
         </div>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>

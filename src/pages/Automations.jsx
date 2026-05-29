@@ -1,5 +1,6 @@
 // ─── AUTOMATIONS — Rule Engine Page ──────────────────────────────────────────
 import { useState, useEffect, useMemo } from 'react';
+import PurposeLabel from '@/components/ui/PurposeLabel';
 import {
   defaultRules, fireLog, AVAILABLE_METRICS, NOTIFICATION_CHANNELS, PRIORITY_CONFIG,
 } from '../components/data/mockDataAutomations';
@@ -497,6 +498,7 @@ export default function Automations() {
           <ModeBadge />
         </div>
         <p style={{ fontSize: 11, color: '#475569', margin: 0 }}>Crie regras baseadas em métricas de mercado · Disparos via Telegram · In-App · Webhook</p>
+        <PurposeLabel text="Configure regras de disparo automático baseadas em condições de mercado — permite automatizar monitoramento 24/7 sem ficar preso na tela." mt={6} />
       </div>
 
       {/* Stats bar */}
@@ -554,6 +556,7 @@ export default function Automations() {
         <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, overflow: 'hidden' }}>
           <div style={{ padding: '12px 16px', borderBottom: '1px solid #0f1a28' }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0' }}>Log de Disparos</div>
+            <PurposeLabel text="Histórico de todas as automações executadas — use para auditar eficácia das regras e ajustar thresholds com base em resultados reais." mt={4} />
           </div>
           {fireLog.length === 0 && (
             <div style={{ padding: 24, textAlign: 'center', color: '#334155', fontSize: 11 }}>Nenhum disparo registrado ainda.</div>
