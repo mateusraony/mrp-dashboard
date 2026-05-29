@@ -208,7 +208,8 @@ function ClaudeInsight({ text, loading }) {
 // ─── Label educativo de seção ─────────────────────────────────────────────────
 function SectionPurpose({ text }) {
   return (
-    <div style={{ fontSize: 10, color: '#475569', marginTop: 2, marginBottom: 10, lineHeight: 1.5 }}>
+    <div style={{ fontSize: 10, color: '#475569', marginTop: 2, marginBottom: 10, lineHeight: 1.6 }}>
+      <span style={{ color: '#94a3b8', fontWeight: 700 }}>📌 Para que serve:</span>{' '}
       {text}
     </div>
   );
@@ -622,24 +623,18 @@ export default function Options() {
 
       {/* ── Term Structure ── */}
       <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 10, color: '#475569', marginBottom: 6 }}>
-          <strong style={{ color: '#94a3b8' }}>Term Structure:</strong> Curva de volatilidade implícita ao longo dos vencimentos — revela eventos específicos precificados e o perfil de risco temporal do mercado.
-        </div>
+        <SectionPurpose text="Curva de volatilidade implícita ao longo dos vencimentos — contango (curto prazo mais caro) indica stress imediato ou evento iminente precificado; backwardation (curva normal) indica mercado calmo com incerteza crescendo apenas no longo prazo." />
         <TermStructure optionsData={liveOptionsData} />
       </div>
 
       {/* ── IV Rank + Taker Flow ── */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
         <div>
-          <div style={{ fontSize: 10, color: '#475569', marginBottom: 6 }}>
-            <strong style={{ color: '#94a3b8' }}>IV Rank:</strong> Percentil histórico da volatilidade atual — &lt;25% = IV barata (considerar comprar vol), &gt;75% = IV cara (considerar vender vol / spreads).
-          </div>
+          <SectionPurpose text="Percentil histórico da volatilidade atual — abaixo de 25 = IV barata (considerar comprar vol com straddles/long options); acima de 75 = IV cara (considerar vender vol com spreads/iron condors). A gauge mais objetiva de 'caro vs barato' em opções." />
           <IVRankPanel optionsData={liveOptionsData} />
         </div>
         <div>
-          <div style={{ fontSize: 10, color: '#475569', marginBottom: 6 }}>
-            <strong style={{ color: '#94a3b8' }}>Taker Flow:</strong> Fluxo de compradores vs vendedores de opções — quem está pagando prêmio e quem está recebendo. Bull-Bear Index derivado do PCR real da Deribit.
-          </div>
+          <SectionPurpose text="Fluxo de compradores vs vendedores de opções BTC nas últimas 24h — quando compras de call superam puts, o mercado aposta em alta; quando puts dominam, há demanda por proteção. Bull-Bear Index derivado do Put/Call Ratio real da Deribit." />
           <TakerFlowPanel optionsData={liveOptionsData} />
         </div>
       </div>
@@ -649,9 +644,7 @@ export default function Options() {
         <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 2 }}>
           ● Dealer Flow (GEX/Vanna/Charm)
         </div>
-        <div style={{ fontSize: 10, color: '#475569', marginBottom: 10 }}>
-          <strong style={{ color: '#94a3b8' }}>GEX:</strong> mede se market makers estão amplificando (negativo / Short Gamma) ou amortecendo (positivo / Long Gamma) os movimentos do BTC. Crucial para entender a dinâmica de volatilidade intraday.
-        </div>
+        <SectionPurpose text="Mede a exposição agregada dos dealers (market makers) em gama, vanna e charm — GEX positivo = dealers long gamma (amortecendo volatilidade, moves menores); GEX negativo = dealers short gamma (amplificando movimentos, espere swings maiores e use stops mais amplos)." />
         <DealerFlowPanel
           spot={o.spot}
           iv={o.iv_atm}
