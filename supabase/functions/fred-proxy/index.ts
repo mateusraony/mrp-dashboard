@@ -211,6 +211,36 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    // ── Macro RSS News — BBC Business / Reuters / CNBC, sem API key ─────────────
+    if (type === 'macro_rss') {
+      const macroSources = [
+        { url: 'https://feeds.bbci.co.uk/news/business/rss.xml', name: 'BBC Business' },
+        { url: 'https://www.cnbc.com/id/100003114/device/rss/rss.html', name: 'CNBC' },
+        { url: 'https://feeds.reuters.com/reuters/businessNews', name: 'Reuters' },
+      ];
+      for (const src of macroSources) {
+        try {
+          const rssRes = await fetch(src.url, {
+            headers: { 'User-Agent': 'Mozilla/5.0 (compatible; mrp-dashboard/1.0)' },
+            signal: AbortSignal.timeout(10_000),
+          });
+          if (!rssRes.ok) { console.error(`[fred-proxy] macro RSS ${src.name} ${rssRes.status}`); continue; }
+          const xml   = await rssRes.text();
+          const items = parseRSSItems(xml, src.name);
+          if (items.length > 0) {
+            return new Response(JSON.stringify({ items }), {
+              status:  200,
+              headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+            });
+          }
+        } catch (e) { console.error(`[fred-proxy] macro RSS ${src.name} error: ${String(e)}`); }
+      }
+      return new Response(JSON.stringify({ items: [] }), {
+        status:  200,
+        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+      });
+    }
+
     // ── Messari News — sem API key, 1000 req/dia free, fallback de último recurso
     if (type === 'messari_news') {
       const messariRes = await fetch('https://data.messari.io/api/v1/news', {
