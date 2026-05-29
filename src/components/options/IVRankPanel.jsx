@@ -152,6 +152,11 @@ export default function IVRankPanel({ optionsData }) {
 
       <MiniTimeChart data={d.history} color={zone.color} height={60} formatter={v => v.toFixed(1) + ' IVR'} />
 
+      {/* Aviso: limites 52w são estimados */}
+      <div style={{ fontSize: 9, color: '#f59e0b', margin: '8px 0', padding: '4px 8px', borderRadius: 5, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.15)', lineHeight: 1.5 }}>
+        ⚠ Limites históricos 52w (IV Min/Max) são estimados com dados de referência — não calculados a partir de histórico real de 52 semanas via API Deribit. IVR é aproximado.
+      </div>
+
       {/* Action */}
       <div style={{
         marginTop: 10, padding: '8px 10px', borderRadius: 7,

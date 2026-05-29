@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useOptionsData } from '@/hooks/useDeribit';
 import { readModuleFlag } from '@/lib/moduleFlags';
 import { DisabledModuleBanner } from '@/components/ui/DisabledModuleBanner';
@@ -17,7 +18,7 @@ import {
   ResponsiveContainer, ReferenceLine,
 } from 'recharts';
 
-// Fallbacks for options fields without live API equivalents
+// Fallbacks para campos sem equivalente direto na API live
 const BTC_OPTIONS_FALLBACK = {
   spot: 0, iv_atm: 0, strikes: [],
   skew: 0, skew_direction: 'neutral', regime: 'normal',
@@ -36,11 +37,15 @@ const AI_MODULE_FALLBACK = {
 };
 const AI_OPTIONS_FALLBACK = { modules: { options: AI_MODULE_FALLBACK } };
 
-// ─── DATA LAYER (live > fallback) ────────────────────────────────────────────
+// ─── DATA LAYER (live > Supabase cache > fallback) ────────────────────────────
 function useOptionsPageData() {
-  const { data: live } = useOptionsData();
+  // useOptionsData select retorna { ...OptionsData, isFallback, lastUpdated }
+  const { data: rawData } = useOptionsData();
+  const isFallback  = rawData?.isFallback  ?? true;
+  const lastUpdated = rawData?.lastUpdated ?? null;
+  // "live" = temos dados com spot real (>0); inclui dados do cache Supabase
+  const live = rawData && rawData.spot > 0 ? rawData : null;
 
-  // Derived fields computed from live chain
   const chainSkew = live && live.chain.length > 0
     ? live.chain.reduce((acc, c) => acc + (c.put_iv - c.call_iv), 0) / live.chain.length
     : null;
@@ -52,7 +57,6 @@ function useOptionsPageData() {
     : null;
   const nearestExpiry = live?.term_structure?.[0] ?? null;
 
-  // IV deltas from DVOL history (Deribit get_volatility_index_data — already fetched)
   const dvolHistory = live?.dvol_history ?? [];
   const dvolLen = dvolHistory.length;
   const dvolLast = dvolLen > 0 ? dvolHistory[dvolLen - 1].value : null;
@@ -78,7 +82,6 @@ function useOptionsPageData() {
       }
     : BTC_OPTIONS_FALLBACK;
 
-  // GEX calculado da chain viva (fórmula validada em scripts/validate_gex.py)
   const gexData = live
     ? computeGex(
         live.chain.map(c => ({
@@ -93,7 +96,6 @@ function useOptionsPageData() {
       )
     : null;
 
-  // Max Pain calculado da chain viva
   const maxPain = live
     ? computeMaxPain(
         live.chain.map(c => ({ strike: c.strike, call_oi: c.call_oi, put_oi: c.put_oi, call_iv: c.call_iv, put_iv: c.put_iv })),
@@ -119,15 +121,76 @@ function useOptionsPageData() {
     livePcrOi,
     liveMaxPainDistancePct,
     hasLiveData:           !!live,
+    isFallback:            isFallback ?? !live,
+    lastUpdated:           lastUpdated ?? null,
   };
 }
 
 const regimeLabels = {
-  low_vol:      { label: 'Low Vol', color: '#10b981', bg: 'rgba(16,185,129,0.1)' },
-  normal:       { label: 'Normal', color: '#3b82f6', bg: 'rgba(59,130,246,0.1)' },
+  low_vol:      { label: 'Low Vol',      color: '#10b981', bg: 'rgba(16,185,129,0.1)' },
+  normal:       { label: 'Normal',       color: '#3b82f6', bg: 'rgba(59,130,246,0.1)' },
   elevated_vol: { label: 'Elevated Vol', color: '#f59e0b', bg: 'rgba(245,158,11,0.1)' },
-  crisis:       { label: 'Crisis', color: '#ef4444', bg: 'rgba(239,68,68,0.1)' },
+  crisis:       { label: 'Crisis',       color: '#ef4444', bg: 'rgba(239,68,68,0.1)' },
 };
+
+// ─── Tooltip educativo ────────────────────────────────────────────────────────
+function Tip({ children, text }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <span
+      style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 3, cursor: 'help' }}
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
+      {children}
+      <span style={{ fontSize: 9, color: '#3b82f6', fontWeight: 700, opacity: 0.7 }}>?</span>
+      {open && (
+        <span style={{
+          position: 'absolute', bottom: '100%', left: 0, zIndex: 50,
+          background: '#0d1421', border: '1px solid #1e3048', borderRadius: 8,
+          padding: '8px 12px', fontSize: 11, color: '#cbd5e1', lineHeight: 1.6,
+          width: 260, boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+          whiteSpace: 'normal', pointerEvents: 'none',
+        }}>
+          {text}
+        </span>
+      )}
+    </span>
+  );
+}
+
+// ─── Accordion de dica ────────────────────────────────────────────────────────
+function TipCard({ emoji, title, body, tag }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div
+      onClick={() => setOpen(o => !o)}
+      style={{
+        background: '#0d1421', border: '1px solid #1e2d45', borderRadius: 10,
+        padding: '12px 14px', cursor: 'pointer',
+        borderLeft: '3px solid #a78bfa',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 16 }}>{emoji}</span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0' }}>{title}</span>
+          {tag && (
+            <span style={{ fontSize: 9, color: '#a78bfa', background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.2)', borderRadius: 4, padding: '1px 6px', fontWeight: 700 }}>
+              {tag}
+            </span>
+          )}
+        </div>
+        <span style={{ fontSize: 12, color: '#4a5568' }}>{open ? '▲' : '▼'}</span>
+      </div>
+      {open && (
+        <div style={{ marginTop: 10, fontSize: 11, color: '#94a3b8', lineHeight: 1.7, borderTop: '1px solid #1e2d45', paddingTop: 10 }}>
+          {body}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function ClaudeInsight({ text, loading }) {
   if (!text && !loading) return null;
@@ -142,12 +205,24 @@ function ClaudeInsight({ text, loading }) {
   );
 }
 
+// ─── Label educativo de seção ─────────────────────────────────────────────────
+function SectionPurpose({ text }) {
+  return (
+    <div style={{ fontSize: 10, color: '#475569', marginTop: 2, marginBottom: 10, lineHeight: 1.5 }}>
+      {text}
+    </div>
+  );
+}
+
 export default function Options() {
-  const { btcOptions, liveOptionsData, liveGex, liveMaxPain, liveOiByStrike, livePcrVol, livePcrOi, liveMaxPainDistancePct, hasLiveData } = useOptionsPageData();
+  const {
+    btcOptions, liveOptionsData, liveGex, liveMaxPain,
+    liveOiByStrike, livePcrVol, livePcrOi, liveMaxPainDistancePct,
+    hasLiveData, isFallback, lastUpdated,
+  } = useOptionsPageData();
   const o = btcOptions;
   const regime = regimeLabels[o.regime] ?? regimeLabels.normal;
 
-  // Rule-based AI analysis from live options data
   const liveAnalysis = IS_LIVE && hasLiveData
     ? computeRuleBasedAnalysis({
         options: {
@@ -160,7 +235,6 @@ export default function Options() {
     : null;
   const aiAnalysis = liveAnalysis ?? AI_OPTIONS_FALLBACK;
 
-  // Claude AI insight
   const optPayload = hasLiveData ? {
     page: 'options',
     riskScore: 50,
@@ -197,7 +271,9 @@ export default function Options() {
 
   return (
     <div style={{ maxWidth: 1400, margin: '0 auto' }}>
-      <div style={{ marginBottom: 20 }}>
+
+      {/* Header */}
+      <div style={{ marginBottom: 16 }}>
         <h1 style={{ fontSize: 20, fontWeight: 800, color: '#e2e8f0', margin: 0, letterSpacing: '-0.02em' }}>
           BTC Options
         </h1>
@@ -206,17 +282,102 @@ export default function Options() {
         </p>
       </div>
 
-      {/* Top metrics — IV ATM com Δ1D/1W/1M */}
+      {/* ── Banner "Para que serve" ── */}
+      <div style={{
+        marginBottom: 20, padding: '16px 20px', borderRadius: 12,
+        background: 'linear-gradient(135deg, rgba(167,139,250,0.07) 0%, rgba(59,130,246,0.05) 100%)',
+        border: '1px solid rgba(167,139,250,0.2)',
+      }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+          <div style={{ fontSize: 28, lineHeight: 1, marginTop: 2 }}>◬</div>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: '#e2e8f0', marginBottom: 6 }}>
+              Para que serve esta página?
+            </div>
+            <div style={{ fontSize: 11, color: '#94a3b8', lineHeight: 1.8, maxWidth: 860 }}>
+              Opções são contratos que dão o <strong>direito — sem obrigação</strong> — de comprar (<strong>call</strong>)
+              ou vender (<strong>put</strong>) BTC a um preço específico (<strong>strike</strong>) em uma data futura (<strong>vencimento</strong>).
+              O mercado de opções revela a <strong>distribuição de probabilidade implícita</strong> sobre o preço futuro do BTC —
+              algo que spot e futuros <em>não mostram diretamente</em>.
+            </div>
+            <div style={{ display: 'flex', gap: 16, marginTop: 10, flexWrap: 'wrap' }}>
+              {[
+                { icon: '✅', text: 'Ver se o mercado compra proteção (puts) ou aposta em alta (calls) via PCR' },
+                { icon: '✅', text: 'Identificar strikes com grande concentração de posições (Max Pain, OI)' },
+                { icon: '✅', text: 'Avaliar se a volatilidade implícita está cara ou barata (IV Rank) antes de operar' },
+                { icon: '✅', text: 'Entender como dealers irão se comportar via Gamma Exposure (GEX)' },
+              ].map((u, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: '#64748b' }}>
+                  <span>{u.icon}</span><span>{u.text}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Banner de cache Supabase (quando API offline) ── */}
+      {isFallback && (
+        <div style={{
+          marginBottom: 16, padding: '7px 14px', borderRadius: 8,
+          background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.2)',
+          fontSize: 10, color: '#f59e0b', display: 'flex', alignItems: 'center',
+          justifyContent: 'space-between', gap: 8,
+        }}>
+          <span>⚠ API Deribit indisponível — exibindo último valor salvo no Supabase</span>
+          {lastUpdated && (
+            <span style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+              Última atualização: {new Date(lastUpdated).toLocaleString('pt-BR')}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* ── Top metrics — IV ATM com Δ1D/1W/1M ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, marginBottom: 16 }}>
         {[
-          { label: 'IV ATM', value: `${(o.iv_atm * 100).toFixed(1)}%`, color: o.iv_atm > 0.6 ? '#f59e0b' : '#10b981' },
-          { label: 'IV ATM Δ 1D', value: `${o.iv_atm_1d_delta > 0 ? '+' : ''}${(o.iv_atm_1d_delta * 100).toFixed(1)}pp`, color: o.iv_atm_1d_delta > 0 ? '#ef4444' : '#10b981' },
-          { label: 'IV ATM Δ 1W', value: `${o.iv_atm_1w_delta > 0 ? '+' : ''}${(o.iv_atm_1w_delta * 100).toFixed(1)}pp`, color: o.iv_atm_1w_delta > 0 ? '#ef4444' : '#10b981' },
-          { label: 'IV ATM Δ 1M', value: `${o.iv_atm_1m_delta > 0 ? '+' : ''}${(o.iv_atm_1m_delta * 100).toFixed(1)}pp`, color: o.iv_atm_1m_delta > 0 ? '#ef4444' : '#10b981' },
-          { label: 'Put/Call Skew', value: `${(o.skew * 100).toFixed(1)}pp`, sub: o.skew_direction === 'put_skew' ? '▲ Put fear' : '▼ Call greed', color: o.skew < 0 ? '#ef4444' : '#10b981' },
-          { label: 'Regime', value: regime.label, color: regime.color },
-          { label: 'BTC Spot', value: `$${o.spot.toLocaleString()}`, color: '#e2e8f0' },
-          { label: 'Hours to Exp', value: `${o.expiry_hours}h`, color: '#e2e8f0', sub: o.expiry },
+          {
+            label: <Tip text="Volatilidade Implícita ATM: preço que o mercado cobra por incerteza. IV < 35% é historicamente baixa para BTC; > 80% indica crise.">IV ATM</Tip>,
+            value: `${(o.iv_atm * 100).toFixed(1)}%`,
+            color: o.iv_atm > 0.6 ? '#f59e0b' : '#10b981',
+          },
+          {
+            label: <Tip text="Variação em pontos percentuais da IV ATM vs ontem. Positivo = volatilidade subindo (medo crescente).">IV ATM Δ 1D</Tip>,
+            value: `${o.iv_atm_1d_delta > 0 ? '+' : ''}${(o.iv_atm_1d_delta * 100).toFixed(1)}pp`,
+            color: o.iv_atm_1d_delta > 0 ? '#ef4444' : '#10b981',
+          },
+          {
+            label: <Tip text="Variação da IV ATM vs há 7 dias. Tendência de volatilidade na semana.">IV ATM Δ 1W</Tip>,
+            value: `${o.iv_atm_1w_delta > 0 ? '+' : ''}${(o.iv_atm_1w_delta * 100).toFixed(1)}pp`,
+            color: o.iv_atm_1w_delta > 0 ? '#ef4444' : '#10b981',
+          },
+          {
+            label: <Tip text="Variação da IV ATM vs há 30 dias. Tendência estrutural de volatilidade no mês.">IV ATM Δ 1M</Tip>,
+            value: `${o.iv_atm_1m_delta > 0 ? '+' : ''}${(o.iv_atm_1m_delta * 100).toFixed(1)}pp`,
+            color: o.iv_atm_1m_delta > 0 ? '#ef4444' : '#10b981',
+          },
+          {
+            label: <Tip text="Diferença entre IV das puts e calls ATM. Positivo = puts mais caras (medo/hedging). Negativo = calls mais caras (euforia/bull).">Put/Call Skew</Tip>,
+            value: `${(o.skew * 100).toFixed(1)}pp`,
+            sub: o.skew_direction === 'put_skew' ? '▲ Put fear' : o.skew_direction === 'call_skew' ? '▼ Call greed' : '— Neutro',
+            color: o.skew < 0 ? '#ef4444' : '#10b981',
+          },
+          {
+            label: <Tip text="Regime de volatilidade atual: Low Vol (<35%), Normal (35–55%), Elevated (55–80%), Crisis (>80%). Determina quais estratégias de opções fazem sentido.">Regime</Tip>,
+            value: regime.label,
+            color: regime.color,
+          },
+          {
+            label: 'BTC Spot',
+            value: `$${o.spot.toLocaleString()}`,
+            color: '#e2e8f0',
+          },
+          {
+            label: <Tip text="Tempo restante até o vencimento da cadeia mais próxima analisada no Deribit. Quanto menor o tempo, maior a influência do Max Pain.">Hours to Exp</Tip>,
+            value: `${o.expiry_hours}h`,
+            color: '#e2e8f0',
+            sub: o.expiry,
+          },
         ].map((m, i) => (
           <div key={i} style={{
             background: '#111827', border: '1px solid #1e2d45', borderRadius: 10, padding: '12px 14px',
@@ -228,15 +389,17 @@ export default function Options() {
         ))}
       </div>
 
-      {/* Charts */}
+      {/* ── Charts: Vol Smile + Skew ── */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
-        {/* Vol Smile */}
+
+        {/* Volatility Smile */}
         <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: 20 }}>
           <SectionHeader
             title="Volatility Smile"
             subtitle={`ATM IV: ${(o.iv_atm * 100).toFixed(1)}% · Strikes ±5% from spot`}
             grade={o.quality}
           />
+          <SectionPurpose text="Mostra como a volatilidade implícita varia por strike — revela onde o mercado enxerga maior risco de movimento." />
           <ResponsiveContainer width="100%" height={220}>
             <LineChart data={smileData} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#1e2d45" vertical={false} />
@@ -257,11 +420,17 @@ export default function Options() {
             <span style={{ fontSize: 11, color: '#ef4444' }}>── Puts</span>
             <span style={{ fontSize: 11, color: '#4a5568' }}>│ ATM</span>
           </div>
+          <div style={{ marginTop: 10, padding: '8px 12px', borderRadius: 7, background: '#0a1220', border: '1px solid #1e2d45', fontSize: 10, color: '#475569', lineHeight: 1.7 }}>
+            <strong style={{ color: '#94a3b8' }}>Sorriso normal:</strong> calls e puts ATM com IV similar — mercado equilibrado.{' '}
+            <strong style={{ color: '#94a3b8' }}>Skew para puts (asa direita mais alta):</strong> mercado pagando prêmio por proteção de queda.{' '}
+            <strong style={{ color: '#94a3b8' }}>Skew para calls (asa esquerda mais alta):</strong> euforia — antecipação de alta explosiva.
+          </div>
         </div>
 
         {/* Skew analysis */}
         <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: 20 }}>
-          <SectionHeader title="Skew Analysis" subtitle="Put IV − Call IV per strike" grade={o.quality} />
+          <SectionHeader title="Skew Analysis" subtitle="Put IV − Call IV por strike" grade={o.quality} />
+          <SectionPurpose text="Puts mais caras que calls = mercado comprando proteção contra queda. Calls mais caras = euforia, aposta em alta rápida." />
           <ResponsiveContainer width="100%" height={220}>
             <LineChart
               data={smileData.map(s => ({ ...s, skew: parseFloat((s.put - s.call).toFixed(3)) }))}
@@ -284,36 +453,40 @@ export default function Options() {
               {o.skew < 0 ? '🔴 Put Skew — Hedging demand elevated' : '🟢 Call Skew — Bullish positioning'}
             </div>
             <div style={{ fontSize: 11, color: '#4a5568' }}>
-              Average skew {o.expiry}: {o.skew > 0 ? '+' : ''}{(o.skew * 100).toFixed(2)}pp.{' '}
+              Skew médio {o.expiry}: {o.skew > 0 ? '+' : ''}{(o.skew * 100).toFixed(2)}pp.{' '}
               {o.skew < -0.02
-                ? 'Market paying up for downside protection. Consistent with risk-off sentiment.'
+                ? 'Mercado pagando mais por proteção downside. Consistente com risk-off.'
                 : o.skew < 0
-                ? 'Mild put premium — cautious sentiment but not extreme.'
-                : 'Call premium — market leaning bullish for near-term expiry.'}
+                ? 'Leve prêmio em puts — sentimento cauteloso mas não extremo.'
+                : 'Prêmio em calls — mercado com viés bullish para o vencimento próximo.'}
             </div>
           </div>
         </div>
       </div>
 
-      {/* AI Analysis */}
+      {/* ── AI Analysis ── */}
       <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 10 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>
           Análise Options
-          <span style={{ fontSize: 9, color: '#475569', fontWeight: 400, marginLeft: 8 }}>Sinal calculado por regras de threshold (IV ATM · skew · P/C ratio · max pain) — não por modelo de linguagem. Claude Haiku exibido abaixo quando configurado.</span>
+        </div>
+        <div style={{ fontSize: 10, color: '#475569', marginBottom: 10 }}>
+          Sinal calculado por regras de threshold (IV ATM · skew · P/C ratio · max pain) — não por modelo de linguagem. Claude Haiku exibido abaixo quando configurado.
         </div>
         <AIModuleCard module={aiAnalysis.modules.options} title="Options" icon="◬" />
         <ClaudeInsight text={optInsight} loading={optAiLoading} />
       </div>
 
-      {/* Put/Call Ratio + Max Pain */}
+      {/* ── Put/Call Ratio + Max Pain ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, marginBottom: 16 }}>
+
         {/* Put/Call Ratio */}
         {(() => {
           const pcrVol = livePcrVol ?? BTC_OPTIONS_EXT_FALLBACK.put_call_ratio_vol;
           const pcrOi  = livePcrOi  ?? BTC_OPTIONS_EXT_FALLBACK.put_call_ratio_oi;
           return (
             <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: 20 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 14 }}>Put/Call Ratio</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 2 }}>Put/Call Ratio</div>
+              <SectionPurpose text="Razão entre o volume de puts e calls negociadas. Abaixo de 1.0 é bullish (mais calls). Acima de 1.2 = hedging extremo — potencial sinal contrarian de reversão bullish." />
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 14 }}>
                 <div>
                   <div style={{ fontSize: 10, color: '#4a5568', marginBottom: 3 }}>Por Volume</div>
@@ -329,6 +502,36 @@ export default function Options() {
                   </div>
                 </div>
               </div>
+
+              {/* Tabela de interpretação */}
+              <div style={{ marginBottom: 12, borderRadius: 7, overflow: 'hidden', border: '1px solid #1e2d45' }}>
+                {[
+                  { range: 'PCR < 0.7',    label: 'Otimismo excessivo',        color: '#10b981', bg: 'rgba(16,185,129,0.04)',  note: 'Possível topo de curto prazo' },
+                  { range: 'PCR 0.7–1.0',  label: 'Leve bullish',              color: '#60a5fa', bg: 'rgba(59,130,246,0.04)',  note: 'Mais calls que puts' },
+                  { range: 'PCR 1.0–1.2',  label: 'Leve bearish',              color: '#f59e0b', bg: 'rgba(245,158,11,0.04)', note: 'Hedging crescendo' },
+                  { range: 'PCR > 1.2',    label: 'Medo extremo',              color: '#ef4444', bg: 'rgba(239,68,68,0.04)',  note: 'Potencial contrarian buy' },
+                ].map((row, i) => {
+                  const isCurrent = (
+                    (row.range === 'PCR < 0.7'   && pcrVol < 0.7) ||
+                    (row.range === 'PCR 0.7–1.0' && pcrVol >= 0.7 && pcrVol < 1.0) ||
+                    (row.range === 'PCR 1.0–1.2' && pcrVol >= 1.0 && pcrVol < 1.2) ||
+                    (row.range === 'PCR > 1.2'   && pcrVol >= 1.2)
+                  );
+                  return (
+                    <div key={i} style={{
+                      display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px',
+                      background: isCurrent ? row.bg : 'transparent',
+                      borderLeft: isCurrent ? `3px solid ${row.color}` : '3px solid transparent',
+                      borderBottom: i < 3 ? '1px solid #1e2d45' : undefined,
+                    }}>
+                      <span style={{ fontSize: 9, fontFamily: 'JetBrains Mono, monospace', color: row.color, minWidth: 72 }}>{row.range}</span>
+                      <span style={{ fontSize: 10, color: isCurrent ? row.color : '#64748b', fontWeight: isCurrent ? 700 : 400, flex: 1 }}>{row.label}</span>
+                      <span style={{ fontSize: 9, color: '#334155' }}>{row.note}</span>
+                    </div>
+                  );
+                })}
+              </div>
+
               <div style={{ padding: '8px 12px', borderRadius: 7, background: pcrVol < 1 ? 'rgba(16,185,129,0.06)' : 'rgba(239,68,68,0.06)', border: `1px solid ${pcrVol < 1 ? 'rgba(16,185,129,0.18)' : 'rgba(239,68,68,0.18)'}` }}>
                 <div style={{ fontSize: 11, color: pcrVol < 1 ? '#10b981' : '#ef4444', fontWeight: 600, marginBottom: 3 }}>
                   {pcrVol < 0.8 ? '🟢 Mercado priorizando Calls — viés bullish' : pcrVol < 1.0 ? '🟡 Levemente bullish — mais calls que puts' : '🔴 Puts dominando — hedging ativo, viés bearish'}
@@ -343,7 +546,8 @@ export default function Options() {
 
         {/* Max Pain */}
         <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: 20 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 14 }}>Max Pain</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 2 }}>Max Pain</div>
+          <SectionPurpose text="Strike onde a maioria das opções expira sem valor — ponto de atração gravitacional no vencimento. Especialmente relevante nas últimas 48h antes do vencimento." />
           <div style={{ fontSize: 32, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: '#a78bfa', marginBottom: 4, letterSpacing: '-0.04em' }}>
             ${liveMaxPain.toLocaleString()}
           </div>
@@ -355,8 +559,14 @@ export default function Options() {
               O que é Max Pain?
             </div>
             <div style={{ fontSize: 10, color: '#4a5568', lineHeight: 1.6 }}>
-              Strike onde o maior número de opções expiram sem valor — maior prejuízo para compradores de opções.
-              Preço tende a ser "atraído" para este nível próximo ao vencimento. Distância atual: {Math.abs(liveMaxPainDistancePct ?? BTC_OPTIONS_EXT_FALLBACK.max_pain_distance_pct).toFixed(1)}%.
+              Strike onde o maior número de opções expira sem valor — maior prejuízo para compradores de opções.
+              O preço tende a ser "atraído" para este nível próximo ao vencimento. Distância atual:{' '}
+              <strong style={{ color: '#a78bfa' }}>{Math.abs(liveMaxPainDistancePct ?? BTC_OPTIONS_EXT_FALLBACK.max_pain_distance_pct).toFixed(1)}%</strong>.
+            </div>
+            <div style={{ fontSize: 10, color: '#475569', marginTop: 6, lineHeight: 1.5 }}>
+              {Math.abs(liveMaxPainDistancePct ?? 0) > 3
+                ? `⚡ Distância > 3% — market makers têm incentivo para pressionar o preço em direção ao Max Pain nas próximas horas.`
+                : `✓ Spot próximo ao Max Pain — menor pressão direcional de dealers até o vencimento.`}
             </div>
           </div>
           {(() => {
@@ -383,9 +593,10 @@ export default function Options() {
         </div>
       </div>
 
-      {/* OI por Strike */}
+      {/* ── OI por Strike ── */}
       <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: 20, marginBottom: 16 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 14 }}>OI por Strike — Calls vs Puts</div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 2 }}>OI por Strike — Calls vs Puts</div>
+        <SectionPurpose text="Barras mostram concentração de contratos abertos por preço. Strikes com alto OI funcionam como suporte (puts) e resistência (calls) implícitos de mercado." />
         <ResponsiveContainer width="100%" height={160}>
           <BarChart data={liveOiByStrike ?? BTC_OPTIONS_EXT_FALLBACK.oi_by_strike} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#1e2d45" vertical={false} />
@@ -409,21 +620,37 @@ export default function Options() {
         </div>
       </div>
 
-      {/* Term Structure */}
+      {/* ── Term Structure ── */}
       <div style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 10, color: '#475569', marginBottom: 6 }}>
+          <strong style={{ color: '#94a3b8' }}>Term Structure:</strong> Curva de volatilidade implícita ao longo dos vencimentos — revela eventos específicos precificados e o perfil de risco temporal do mercado.
+        </div>
         <TermStructure optionsData={liveOptionsData} />
       </div>
 
-      {/* IV Rank + Taker Flow */}
+      {/* ── IV Rank + Taker Flow ── */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
-        <IVRankPanel optionsData={liveOptionsData} />
-        <TakerFlowPanel optionsData={liveOptionsData} />
+        <div>
+          <div style={{ fontSize: 10, color: '#475569', marginBottom: 6 }}>
+            <strong style={{ color: '#94a3b8' }}>IV Rank:</strong> Percentil histórico da volatilidade atual — &lt;25% = IV barata (considerar comprar vol), &gt;75% = IV cara (considerar vender vol / spreads).
+          </div>
+          <IVRankPanel optionsData={liveOptionsData} />
+        </div>
+        <div>
+          <div style={{ fontSize: 10, color: '#475569', marginBottom: 6 }}>
+            <strong style={{ color: '#94a3b8' }}>Taker Flow:</strong> Fluxo de compradores vs vendedores de opções — quem está pagando prêmio e quem está recebendo. Bull-Bear Index derivado do PCR real da Deribit.
+          </div>
+          <TakerFlowPanel optionsData={liveOptionsData} />
+        </div>
       </div>
 
-      {/* Dealer Flow — GEX / Vanna / Charm */}
+      {/* ── Dealer Flow — GEX / Vanna / Charm ── */}
       <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 10 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 2 }}>
           ● Dealer Flow (GEX/Vanna/Charm)
+        </div>
+        <div style={{ fontSize: 10, color: '#475569', marginBottom: 10 }}>
+          <strong style={{ color: '#94a3b8' }}>GEX:</strong> mede se market makers estão amplificando (negativo / Short Gamma) ou amortecendo (positivo / Long Gamma) os movimentos do BTC. Crucial para entender a dinâmica de volatilidade intraday.
         </div>
         <DealerFlowPanel
           spot={o.spot}
@@ -431,12 +658,97 @@ export default function Options() {
         />
       </div>
 
-      {/* Strikes table */}
+      {/* ── Dicas de Ouro ── */}
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>
+          🏆 Dicas de Ouro — Como Ler o Mercado de Opções BTC
+        </div>
+        <div style={{ fontSize: 10, color: '#475569', marginBottom: 12 }}>
+          Clique em cada dica para expandir · Estratégias usadas por traders institucionais
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <TipCard
+            emoji="🧲"
+            title="Max Pain como nível de gravidade no vencimento"
+            tag="EXPIRAÇÃO"
+            body={
+              <span>
+                Próximo ao vencimento (últimas 48h), market makers têm incentivo econômico para manter o preço perto do Max Pain — onde o maior número de opções expira sem valor, maximizando os prêmios recebidos pelos vendedores.
+                <br /><br />
+                <strong>Como usar:</strong> Se o BTC estiver a mais de 3% do Max Pain com menos de 48h para o vencimento, observe pressão latente em direção a esse nível. Não é uma regra absoluta, mas é um viés estatisticamente relevante.
+                <br /><br />
+                <strong>Atenção:</strong> Em momentos de alta volatilidade (crise, notícias macro), o mercado pode ignorar completamente o Max Pain.
+              </span>
+            }
+          />
+          <TipCard
+            emoji="🌡"
+            title="IV Rank < 25% → considerar comprar volatilidade"
+            tag="ENTRY"
+            body={
+              <span>
+                Quando o IV Rank está abaixo de 25%, a volatilidade implícita está no quartil mais barato dos últimos 12 meses. Estratégias de compra de vol (straddles, long calls/puts) ficam estruturalmente mais atrativas.
+                <br /><br />
+                <strong>Lógica:</strong> Volatilidade mean-reverts. IV barata tende a voltar para a média — especialmente antes de eventos conhecidos (FOMC, earnings de ETF, halvings).
+                <br /><br />
+                <strong>Risco:</strong> "Barato pode ficar mais barato." Aguarde confirmação de catalisador antes de entrar. O theta (custo do tempo) corrói posições de long vol rapidamente.
+              </span>
+            }
+          />
+          <TipCard
+            emoji="⚡"
+            title="GEX negativo = dealers Short Gamma = moves amplificados"
+            tag="RISCO"
+            body={
+              <span>
+                Quando o Gamma Exposure (GEX) é negativo, dealers precisam <strong>comprar quando o preço sobe</strong> e <strong>vender quando cai</strong> para rebalancear seus hedges — o oposto do que estabilizaria o mercado.
+                <br /><br />
+                <strong>Consequências práticas:</strong> Volatilidade intraday maior, moves pró-tendência mais violentos, stop loss mais amplos necessários, liquidações em cascata mais prováveis.
+                <br /><br />
+                <strong>GEX positivo</strong> (Long Gamma) é o oposto: dealers amortecem — vendem na alta, compram na baixa. Moves menores, range-bound natural.
+              </span>
+            }
+          />
+          <TipCard
+            emoji="🔄"
+            title="Put Skew extremo (+5pp) = sinal contrarian bullish"
+            tag="CONTRARIAN"
+            body={
+              <span>
+                Quando puts estão muito mais caras que calls (skew positivo elevado), significa que grandes players já compraram proteção. O mercado está "hedgeado".
+                <br /><br />
+                <strong>Lógica contrarian:</strong> Quando todo mundo já está protegido, quem resta para vender? A pressão de compra de puts alivia. Historicamente, put skew extremo precede reversões bullish nas semanas seguintes.
+                <br /><br />
+                <strong>Não confundir:</strong> Skew alto pode persistir durante quedas prolongadas. Use como <em>confirmação adicional</em> junto com outros indicadores, não como sinal isolado.
+              </span>
+            }
+          />
+          <TipCard
+            emoji="📊"
+            title="PCR > 1.3 = capitulação de hedgers → potencial reversão"
+            tag="REVERSAL"
+            body={
+              <span>
+                Put/Call Ratio acima de 1.3 significa que há muito mais puts que calls sendo negociadas. O "smart money" e investidores institucionais já estão protegidos.
+                <br /><br />
+                <strong>Por que é contrarian:</strong> Quando todos já compraram proteção, o risco downside marginal diminui. Os vendedores de puts (quem recebe o prêmio) geralmente são players sofisticados que acreditam que o downside é limitado.
+                <br /><br />
+                <strong>Confirmação:</strong> PCR acima de 1.3 + Fear &amp; Greed abaixo de 20 + spot acima de suporte técnico = setup de reversão com maior probabilidade histórica.
+              </span>
+            }
+          />
+        </div>
+      </div>
+
+      {/* ── Strike Matrix ── */}
       <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, overflow: 'hidden' }}>
         <div style={{ padding: '14px 18px', borderBottom: '1px solid #1e2d45' }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>Strike Matrix</div>
           <div style={{ fontSize: 11, color: '#4a5568', marginTop: 2 }}>
-            mark_iv per strike — filtered ±5% from spot ${o.spot.toLocaleString()}
+            mark_iv por strike — filtrado ±5% do spot ${o.spot.toLocaleString()}
+          </div>
+          <div style={{ fontSize: 10, color: '#475569', marginTop: 4 }}>
+            <strong style={{ color: '#94a3b8' }}>Como usar:</strong> Tabela completa de IV por strike — identifique assimetrias (put IV muito acima da call IV no mesmo strike = put skew local). A coluna "Skew (P-C)" positiva indica prêmio de proteção naquele nível.
           </div>
         </div>
         <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
