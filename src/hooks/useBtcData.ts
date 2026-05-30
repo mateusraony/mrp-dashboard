@@ -332,7 +332,11 @@ export function useLiquidations(limit = 50) {
     refetchInterval: OI_INTERVAL,
     retry: 0,
     refetchOnWindowFocus: false,
-    select: (state: DataState<LiquidationEntry[]>) => state.data ?? [],
+    select: (state: DataState<LiquidationEntry[]>) => ({
+      items:       state.data ?? [],
+      isFallback:  state.isFallback,
+      lastUpdated: state.lastUpdated,
+    }),
   });
 }
 

@@ -5,6 +5,7 @@ import { HelpIcon } from '../ui/Tooltip';
 import MiniTimeChart from './MiniTimeChart';
 import CorrelationChart from './CorrelationChart';
 import { IS_LIVE } from '@/lib/env';
+import { DataTrustBadge } from '../ui/DataTrustBadge';
 
 import { useDominance, useLiquidations } from '@/hooks/useBtcData';
 import { useStablecoinData } from '@/hooks/useStablecoin';
@@ -18,8 +19,8 @@ const GLOSSARY = {
     content: 'Percentual do market cap total de crypto representado pelo Bitcoin. Subindo = capital fluindo para BTC. Caindo = capital migrando para altcoins (altseason). Acima de 60% historicamente antecede forte valorização de altcoins.',
   },
   liquidations: {
-    title: 'Liquidações 24h (Coinglass)',
-    content: 'Total em USD de posições alavancadas forçadamente encerradas nas últimas 24h. Longs liquidados = queda brusca de preço. Picos acima de $500M/dia indicam excesso de alavancagem.',
+    title: 'Liquidações 24h (Binance Futures)',
+    content: 'Total em USD de posições alavancadas forçadamente encerradas nas últimas horas. Longs liquidados = queda brusca de preço. Shorts liquidados = rally surpresa. Picos acima de $200M/dia indicam excesso de alavancagem — risco de volatilidade extrema.',
   },
   stablecoin: {
     title: 'Stablecoin Supply (USDT + USDC)',
@@ -113,10 +114,14 @@ function BtcDominanceCard() {
 // ─── Liquidações 24h ──────────────────────────────────────────────────────────
 
 function LiquidationsCard() {
-  const { data: items, isLoading, isError } = useLiquidations(200);
+  const { data: liqState, isLoading } = useLiquidations(200);
+  const items        = liqState?.items ?? [];
+  const isFallback   = liqState?.isFallback ?? false;
+  // True error: hook returned fallback and has no stale data to show
+  const isHardError  = isFallback && items.length === 0;
 
   const agg = useMemo(() => {
-    if (!items || items.length === 0) return null;
+    if (items.length === 0) return null;
     const longs_usd  = items.filter(x => x.side === 'SELL').reduce((s, x) => s + x.usd_value, 0);
     const shorts_usd = items.filter(x => x.side === 'BUY').reduce((s, x) => s + x.usd_value, 0);
     const total_usd  = longs_usd + shorts_usd;
@@ -128,25 +133,67 @@ function LiquidationsCard() {
   const pctLongs  = agg && agg.total_usd > 0 ? (agg.longs_usd  / agg.total_usd * 100).toFixed(0) : '—';
   const pctShorts = agg && agg.total_usd > 0 ? (agg.shorts_usd / agg.total_usd * 100).toFixed(0) : '—';
 
+  const riskLevel = agg
+    ? agg.total_usd > 500e6 ? { label: '🔴 Liquidação extrema', color: '#ef4444', bg: 'rgba(239,68,68,0.08)', border: 'rgba(239,68,68,0.2)' }
+    : agg.total_usd > 200e6 ? { label: '⚠ Alavancagem excessiva', color: '#f59e0b', bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.2)' }
+    : { label: '✓ Volume normal', color: '#10b981', bg: 'rgba(16,185,129,0.06)', border: 'rgba(16,185,129,0.15)' }
+    : null;
+
   return (
-    <SignalCard title="Liquidações 24h" glossKey="liquidations" accent="#ef4444">
+    <SignalCard title="Liquidações 24h" glossKey="liquidations" accent={isHardError ? '#475569' : '#ef4444'}>
       {isLoading ? (
         <>
           <SkeletonLine w="50%" h={26} mb={10} />
           <SkeletonLine />
         </>
-      ) : isError || !agg ? (
+      ) : isHardError ? (
+        // Fallback sem dados: API falhou e não há cache Supabase disponível
         <>
-          <div style={{ fontSize: 13, color: '#475569', marginBottom: 8 }}>Dados indisponíveis</div>
-          <div style={{ fontSize: 10, color: '#334155' }}>Endpoint requer autenticação Binance</div>
+          <div style={{ marginBottom: 8 }}>
+            <DataTrustBadge
+              mode="error"
+              confidence="D"
+              source="Binance Futures"
+              reason="API de liquidações indisponível — proxy Supabase sem acesso ou cache expirado"
+            />
+          </div>
+          <div style={{ fontSize: 10, color: '#475569', lineHeight: 1.6 }}>
+            O endpoint público da Binance pode estar temporariamente inacessível via proxy Supabase.
+          </div>
+        </>
+      ) : !agg ? (
+        // Array vazio com dado fresco = sem liquidações recentes = mercado calmo
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <span style={{ fontSize: 22, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: '#10b981' }}>
+              $0M
+            </span>
+            {IS_LIVE && <LiveBadge />}
+          </div>
+          <div style={{ fontSize: 11, color: '#475569', marginBottom: 8, lineHeight: 1.6 }}>
+            Sem liquidações expressivas no período — mercado com alavancagem controlada.
+          </div>
+          <div style={{ fontSize: 10, color: '#64748b', background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.15)', borderRadius: 4, padding: '5px 8px', lineHeight: 1.6 }}>
+            💡 Calmo = risco de flush menor. Picos acima de $200M/dia sinalizam excesso de alavancagem no mercado.
+          </div>
+          <div style={{ marginTop: 8, fontSize: 10, color: '#334155' }}>
+            Fonte: Binance Futures · {IS_LIVE ? 'endpoint público ao vivo' : 'modo demo'}
+          </div>
         </>
       ) : (
+        // Dados disponíveis — exibir agregação completa
         <>
+          {isFallback && liqState?.lastUpdated && (
+            <div style={{ marginBottom: 6, fontSize: 9, color: '#f59e0b', display: 'flex', alignItems: 'center', gap: 4 }}
+              title={`Última atualização: ${new Date(liqState.lastUpdated).toLocaleString('pt-BR')}`}>
+              ⚠ Cache · {new Date(liqState.lastUpdated).toLocaleDateString('pt-BR')}
+            </div>
+          )}
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 8 }}>
             <span style={{ fontSize: 24, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: '#f1f5f9' }}>
               ${(agg.total_usd / 1e6).toFixed(0)}M
             </span>
-            <LiveBadge />
+            {!isFallback && <LiveBadge />}
           </div>
           <div style={{ marginBottom: 6 }}>
             <div style={{ display: 'flex', height: 8, borderRadius: 4, overflow: 'hidden', marginBottom: 4 }}>
@@ -154,15 +201,21 @@ function LiquidationsCard() {
               <div style={{ width: `${pctShorts}%`, background: '#10b981' }} />
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 10, color: '#ef4444', fontWeight: 600 }}>Longs {pctLongs}% — ${(agg.longs_usd / 1e6).toFixed(0)}M</span>
-              <span style={{ fontSize: 10, color: '#10b981', fontWeight: 600 }}>${(agg.shorts_usd / 1e6).toFixed(0)}M — {pctShorts}% Shorts</span>
+              <span style={{ fontSize: 10, color: '#ef4444', fontWeight: 600 }}>↓ Longs {pctLongs}% — ${(agg.longs_usd / 1e6).toFixed(0)}M</span>
+              <span style={{ fontSize: 10, color: '#10b981', fontWeight: 600 }}>${(agg.shorts_usd / 1e6).toFixed(0)}M — {pctShorts}% Shorts ↑</span>
             </div>
           </div>
           <div style={{ fontSize: 10, color: '#475569', marginTop: 4 }}>
-            Maior isolada: ${(agg.largest / 1e6).toFixed(1)}M · BTC longs: ${(agg.btc_longs / 1e6).toFixed(0)}M
+            Maior isolada: <span style={{ fontFamily: 'JetBrains Mono, monospace', color: '#94a3b8' }}>${(agg.largest / 1e6).toFixed(1)}M</span>
+            {' · '}BTC longs: <span style={{ fontFamily: 'JetBrains Mono, monospace', color: '#94a3b8' }}>${(agg.btc_longs / 1e6).toFixed(0)}M</span>
           </div>
+          {riskLevel && (
+            <div style={{ marginTop: 8, fontSize: 10, color: riskLevel.color, background: riskLevel.bg, border: `1px solid ${riskLevel.border}`, borderRadius: 4, padding: '4px 8px', fontWeight: 600 }}>
+              {riskLevel.label}
+            </div>
+          )}
           <div style={{ marginTop: 8, fontSize: 10, color: '#334155' }}>
-            Fonte: Binance · {items.length} liquidações recentes
+            Fonte: Binance Futures · {items.length} liquidações recentes
           </div>
         </>
       )}
@@ -365,9 +418,10 @@ function CreditSpreadCard() {
 export default function ExtraSignals() {
   return (
     <div>
-      <div style={{ marginBottom: 8, padding: '5px 10px', background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.18)', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: '#64748b' }}>
+      <div style={{ marginBottom: 8, padding: '5px 10px', background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.18)', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: '#64748b', flexWrap: 'wrap' }}>
         <span style={{ color: '#10b981', fontWeight: 700 }}>● LIVE</span>
-        <span>BTC Dominância (CoinGecko) · Stablecoins (DeFiLlama) · Yield Curve (FRED) · HY Credit Spread (FRED BAMLH0A0HYM2)</span>
+        <span>BTC Dominância (CoinGecko) · Liquidações (Binance Futures) · Stablecoins (DeFiLlama) · Yield Curve (FRED) · HY Credit Spread (FRED)</span>
+        <span style={{ color: '#f59e0b', marginLeft: 4 }}>· Correlações (Binance + Yahoo)</span>
       </div>
       <div style={{
         display: 'grid',
