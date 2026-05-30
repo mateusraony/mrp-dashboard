@@ -114,10 +114,14 @@ function BtcDominanceCard() {
 // ─── Liquidações 24h ──────────────────────────────────────────────────────────
 
 function LiquidationsCard() {
-  const { data: items, isLoading, isError } = useLiquidations(200);
+  const { data: liqState, isLoading } = useLiquidations(200);
+  const items        = liqState?.items ?? [];
+  const isFallback   = liqState?.isFallback ?? false;
+  // True error: hook returned fallback and has no stale data to show
+  const isHardError  = isFallback && items.length === 0;
 
   const agg = useMemo(() => {
-    if (!items || items.length === 0) return null;
+    if (items.length === 0) return null;
     const longs_usd  = items.filter(x => x.side === 'SELL').reduce((s, x) => s + x.usd_value, 0);
     const shorts_usd = items.filter(x => x.side === 'BUY').reduce((s, x) => s + x.usd_value, 0);
     const total_usd  = longs_usd + shorts_usd;
@@ -129,7 +133,6 @@ function LiquidationsCard() {
   const pctLongs  = agg && agg.total_usd > 0 ? (agg.longs_usd  / agg.total_usd * 100).toFixed(0) : '—';
   const pctShorts = agg && agg.total_usd > 0 ? (agg.shorts_usd / agg.total_usd * 100).toFixed(0) : '—';
 
-  // Interpretação do nível de liquidações
   const riskLevel = agg
     ? agg.total_usd > 500e6 ? { label: '🔴 Liquidação extrema', color: '#ef4444', bg: 'rgba(239,68,68,0.08)', border: 'rgba(239,68,68,0.2)' }
     : agg.total_usd > 200e6 ? { label: '⚠ Alavancagem excessiva', color: '#f59e0b', bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.2)' }
@@ -137,29 +140,29 @@ function LiquidationsCard() {
     : null;
 
   return (
-    <SignalCard title="Liquidações 24h" glossKey="liquidations" accent={isError ? '#475569' : '#ef4444'}>
+    <SignalCard title="Liquidações 24h" glossKey="liquidations" accent={isHardError ? '#475569' : '#ef4444'}>
       {isLoading ? (
         <>
           <SkeletonLine w="50%" h={26} mb={10} />
           <SkeletonLine />
         </>
-      ) : isError ? (
-        // Falha real de API/proxy — Supabase offline ou rede indisponível
+      ) : isHardError ? (
+        // Fallback sem dados: API falhou e não há cache Supabase disponível
         <>
           <div style={{ marginBottom: 8 }}>
             <DataTrustBadge
               mode="error"
               confidence="D"
               source="Binance Futures"
-              reason="API de liquidações indisponível — verifique a conexão com Supabase"
+              reason="API de liquidações indisponível — proxy Supabase sem acesso ou cache expirado"
             />
           </div>
           <div style={{ fontSize: 10, color: '#475569', lineHeight: 1.6 }}>
-            Proxy Supabase pode estar offline ou sem acesso ao endpoint público da Binance.
+            O endpoint público da Binance pode estar temporariamente inacessível via proxy Supabase.
           </div>
         </>
       ) : !agg ? (
-        // Array vazio = mercado calmo (sem liquidações significativas recentes)
+        // Array vazio com dado fresco = sem liquidações recentes = mercado calmo
         <>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
             <span style={{ fontSize: 22, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: '#10b981' }}>
@@ -180,11 +183,17 @@ function LiquidationsCard() {
       ) : (
         // Dados disponíveis — exibir agregação completa
         <>
+          {isFallback && liqState?.lastUpdated && (
+            <div style={{ marginBottom: 6, fontSize: 9, color: '#f59e0b', display: 'flex', alignItems: 'center', gap: 4 }}
+              title={`Última atualização: ${new Date(liqState.lastUpdated).toLocaleString('pt-BR')}`}>
+              ⚠ Cache · {new Date(liqState.lastUpdated).toLocaleDateString('pt-BR')}
+            </div>
+          )}
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 8 }}>
             <span style={{ fontSize: 24, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: '#f1f5f9' }}>
               ${(agg.total_usd / 1e6).toFixed(0)}M
             </span>
-            <LiveBadge />
+            {!isFallback && <LiveBadge />}
           </div>
           <div style={{ marginBottom: 6 }}>
             <div style={{ display: 'flex', height: 8, borderRadius: 4, overflow: 'hidden', marginBottom: 4 }}>
