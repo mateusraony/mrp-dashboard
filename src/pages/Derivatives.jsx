@@ -701,7 +701,9 @@ export function DerivativesOverview() {
 
 // ─── LIQUIDATIONS PANEL ────────────────────────────────────────────────────────
 function LiquidationsPanel() {
-  const { data: liq, isLoading, isError } = useLiquidations(50);
+  const { data: _liqState, isLoading } = useLiquidations(50);
+  const liq     = _liqState?.items ?? [];
+  const isError = (_liqState?.isFallback ?? false) && liq.length === 0;
 
   const longLiqs  = liq?.filter(l => l.side === 'SELL') ?? [];
   const shortLiqs = liq?.filter(l => l.side === 'BUY')  ?? [];

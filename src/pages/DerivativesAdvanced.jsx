@@ -142,7 +142,8 @@ function buildClustersFromLiquidations(liquidations, spotPrice) {
 
 function LiqHeatmapFull() {
   const { data: ticker } = useBtcTicker();
-  const { data: liquidationsRaw } = useLiquidations(50);
+  const { data: _liqState1 } = useLiquidations(50);
+  const liquidationsRaw = _liqState1?.items ?? [];
   const SPOT_LIVE = ticker?.mark_price ?? SPOT;
   const [hover, setHover] = useState(null);
 

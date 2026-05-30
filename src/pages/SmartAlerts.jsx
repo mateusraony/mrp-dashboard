@@ -335,7 +335,9 @@ export default function SmartAlerts() {
   const { data: alertEvents } = useAlertEvents(50);
 
   const { data: ticker, isLoading: tickerLoading, isError: tickerError } = useBtcTicker();
-  const { data: liquidations, isLoading: liqLoading, isError: liqError } = useLiquidations(100);
+  const { data: _liqState2, isLoading: liqLoading } = useLiquidations(100);
+  const liquidations = _liqState2?.items ?? [];
+  const liqError     = (_liqState2?.isFallback ?? false) && liquidations.length === 0;
   const { data: riskScore, isLoading: riskLoading, isError: riskError } = useRiskScore();
   const { data: fngData } = useFearGreed(1);
   const multiVenue = useMultiVenueSnapshot();

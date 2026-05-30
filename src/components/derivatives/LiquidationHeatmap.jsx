@@ -35,7 +35,8 @@ function buildClusters(liquidations, spotPrice) {
 
 export default function LiquidationHeatmap() {
   const { data: ticker } = useBtcTicker();
-  const { data: liquidationsRaw } = useLiquidations(50);
+  const { data: _liqState0 } = useLiquidations(50);
+  const liquidationsRaw = _liqState0?.items ?? [];
   const spotPrice = ticker?.mark_price ?? mockClusters.spot;
 
   const liveClusters = liquidationsRaw && liquidationsRaw.length > 0
