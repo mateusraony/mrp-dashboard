@@ -6,11 +6,64 @@ import { DataTrustBadge } from '../components/ui/DataTrustBadge';
 import { Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, ComposedChart, Line,
 } from 'recharts';
-import { useBtcTicker, useKlines, useFearGreed } from '@/hooks/useBtcData';
+import { useBtcTicker, useKlines, useKlinesMeta, useFearGreed } from '@/hooks/useBtcData';
 import { useRiskScore } from '@/hooks/useRiskScore';
 import { useAiInsight } from '@/hooks/useAiInsight';
 import { computeRuleBasedAnalysis } from '@/utils/ruleBasedAnalysis';
 import { IS_LIVE } from '@/lib/env';
+
+// ─── TOOLTIP EDUCATIVO ────────────────────────────────────────────────────────
+function Tip({ children, text }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 3, cursor: 'help' }}
+      onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
+      {children}
+      <span style={{ fontSize: 9, color: '#3b82f6', fontWeight: 700, opacity: 0.7 }}>?</span>
+      {open && (
+        <span style={{
+          position: 'absolute', bottom: '100%', left: 0, zIndex: 50,
+          background: '#0d1421', border: '1px solid #1e3048', borderRadius: 8,
+          padding: '8px 12px', fontSize: 11, color: '#cbd5e1', lineHeight: 1.6,
+          width: 240, boxShadow: '0 8px 24px rgba(0,0,0,0.5)', whiteSpace: 'normal', pointerEvents: 'none',
+        }}>
+          {text}
+        </span>
+      )}
+    </span>
+  );
+}
+
+// ─── DICA DE OURO CARD ───────────────────────────────────────────────────────
+function TipCard({ emoji, title, body, tag = null }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div onClick={() => setOpen(o => !o)} style={{
+      background: '#0d1421', border: '1px solid #1e2d45', borderRadius: 10,
+      padding: '12px 14px', cursor: 'pointer', borderLeft: '3px solid #3b82f6',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 16 }}>{emoji}</span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0' }}>{title}</span>
+          {tag && (
+            <span style={{ fontSize: 9, color: '#3b82f6', background: 'rgba(59,130,246,0.1)',
+              border: '1px solid rgba(59,130,246,0.2)', borderRadius: 4, padding: '1px 6px', fontWeight: 700 }}>
+              {tag}
+            </span>
+          )}
+        </div>
+        <span style={{ fontSize: 12, color: '#4a5568' }}>{open ? '▲' : '▼'}</span>
+      </div>
+      {open && (
+        <div style={{ marginTop: 10, fontSize: 11, color: '#94a3b8', lineHeight: 1.7,
+          borderTop: '1px solid #1e2d45', paddingTop: 10 }}>
+          {body}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // Fallbacks — dados preditivos requerem APIs pagas (Glassnode, Bloomberg) ou cálculo histórico
 // target_price é null quando spot não disponível; componente exibe apenas o %
@@ -155,47 +208,58 @@ function PathChart({ selected, spotPrice: chartSpot = 0, paths = PRICE_PATHS_FAL
 
 // ─── INSTITUTIONAL PRESSURE ───────────────────────────────────────────────────
 function InstitutionalPanel() {
-  const ip = INSTITUTIONAL_PRESSURE_FALLBACK;
-  const scoreColor = ip.overall_score >= 65 ? '#10b981' : ip.overall_score >= 40 ? '#f59e0b' : '#ef4444';
   return (
     <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '16px 18px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0' }}>Pressão Institucional de Compra</div>
-            <PurposeLabel text="Score composto de atividade institucional (ETFs, stablecoins, CME, VIX, funding) — acima de 65 = pressão compradora forte; abaixo de 40 = mercado sem suporte institucional." mt={4} mb={4} />
-            <DataTrustBadge
-              mode="paid_required"
-              confidence="C"
-              source="Glassnode/Bloomberg"
-              reason="ETF inflows e stablecoin flows requerem API paga"
-            />
-          </div>
-          <div style={{ fontSize: 9, color: '#334155' }}>Score composto baseado em ETF, stablecoin, CME, VIX e funding</div>
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>Pressão Institucional de Compra</div>
+          <DataTrustBadge
+            mode="paid_required"
+            confidence="D"
+            source="Glassnode"
+            sourceUrl="https://glassnode.com/pricing"
+            reason="ETF inflows, stablecoin flows e CME data requerem API Glassnode (~$29/mês)"
+          />
         </div>
-        <div style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: 36, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: scoreColor, lineHeight: 1, letterSpacing: '-0.04em' }}>{ip.overall_score.toFixed(0)}</div>
-          <div style={{ fontSize: 8, color: '#334155' }}>/ 100</div>
+        <div style={{ fontSize: 11, color: '#94a3b8', lineHeight: 1.7, maxWidth: 700 }}>
+          <strong style={{ color: '#cbd5e1' }}>O que é Pressão Institucional?</strong> É uma medida de
+          quanto dinheiro grande (fundos, ETFs, empresas) está comprando ou vendendo BTC.
+          Quando a pressão institucional é alta, significa que o &quot;dinheiro esperto&quot; está
+          entrando — historicamente um sinal positivo para o médio prazo.
         </div>
       </div>
-      {ip.components.map((c, i) => (
-        <div key={i} style={{ marginBottom: 10 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              <span style={{ fontSize: 10, color: '#475569' }}>{c.label}</span>
-              <span style={{ fontSize: 8, color: c.signal === 'bullish' ? '#10b981' : c.signal === 'bearish' ? '#ef4444' : '#f59e0b', fontWeight: 800, background: c.signal === 'bullish' ? 'rgba(16,185,129,0.1)' : c.signal === 'bearish' ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.1)', borderRadius: 3, padding: '1px 5px' }}>
-                {c.signal.toUpperCase()}
-              </span>
-            </div>
-            <span style={{ fontSize: 10, fontFamily: 'JetBrains Mono, monospace', color: '#94a3b8', fontWeight: 700 }}>
-              {typeof c.value === 'number' ? (c.value < 1 ? c.value.toFixed(4) : c.value.toFixed(1)) : c.value}{c.unit ? ` ${c.unit}` : ''}
-            </span>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 16 }}>
+        {[
+          { icon: '🏦', label: 'ETF Flows', desc: 'Entrada/saída de capital nos ETFs de BTC (BlackRock IBIT, Fidelity, etc.)' },
+          { icon: '💵', label: 'Stablecoin Mint', desc: 'Criação de novas stablecoins (USDT, USDC) — capital esperando entrar em cripto' },
+          { icon: '📈', label: 'CME Premium', desc: 'Prêmio dos futuros de BTC na bolsa americana CME — proxy de interesse institucional' },
+          { icon: '🔒', label: 'HODL Waves', desc: '% de BTC que não se moveu em mais de 6 meses — acumulação de longo prazo' },
+        ].map((c, i) => (
+          <div key={i} style={{ padding: '10px 12px', background: '#0d1421', border: '1px solid #1e2d45', borderRadius: 8 }}>
+            <div style={{ fontSize: 18, marginBottom: 6 }}>{c.icon}</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', marginBottom: 4 }}>{c.label}</div>
+            <div style={{ fontSize: 10, color: '#475569', lineHeight: 1.5 }}>{c.desc}</div>
           </div>
-          <ProbBar value={c.score} color={c.color} showPct={false} />
-        </div>
-      ))}
-      <div style={{ marginTop: 10, fontSize: 10, color: '#64748b', lineHeight: 1.7, padding: '9px 11px', background: 'rgba(59,130,246,0.04)', border: '1px solid rgba(59,130,246,0.15)', borderRadius: 7 }}>
-        {ip.interpretation}
+        ))}
+      </div>
+
+      <div style={{ marginBottom: 12, padding: '10px 14px', borderRadius: 8,
+        background: 'rgba(59,130,246,0.04)', border: '1px solid rgba(59,130,246,0.15)', fontSize: 10, color: '#64748b', lineHeight: 1.7 }}>
+        <strong style={{ color: '#94a3b8' }}>Como interpretar quando disponível:</strong> Score acima de 65 = pressão compradora forte
+        (dinheiro institucional entrando). Score abaixo de 40 = mercado sem suporte institucional — risco elevado de queda sem base.
+        Score entre 40–65 = neutro, aguardar confirmação direcional.
+      </div>
+
+      <div style={{ padding: '8px 12px', borderRadius: 6,
+        background: 'rgba(249,115,22,0.06)', border: '1px solid rgba(249,115,22,0.18)',
+        fontSize: 10, color: '#78716c', display: 'flex', alignItems: 'center',
+        justifyContent: 'space-between', gap: 8 }}>
+        <span>🔒 Dados indisponíveis — requer Glassnode Standard (~$29/mês) ou Bloomberg Terminal</span>
+        <a href="https://glassnode.com/pricing" target="_blank" rel="noopener noreferrer"
+          style={{ color: '#f97316', textDecoration: 'none', fontWeight: 700, whiteSpace: 'nowrap' }}>
+          Ver planos →
+        </a>
       </div>
     </div>
   );
@@ -223,10 +287,15 @@ export default function PredictivePanel() {
   const [selected, setSelected] = useState('bull_mild');
 
   // ── Live data hooks ────────────────────────────────────────────────────
-  const { data: ticker }    = useBtcTicker();
-  const { data: klines }    = useKlines('1d', 30);
-  const { data: fng }       = useFearGreed(1);
-  const { data: riskScore } = useRiskScore();
+  const { data: ticker }     = useBtcTicker();
+  const { data: klines }     = useKlines('1d', 30);
+  const { data: klinesMeta } = useKlinesMeta('1d', 30); // mesmo queryKey → zero request extra
+  const { data: fng }        = useFearGreed(1);
+  const { data: riskScore }  = useRiskScore();
+
+  // ── Estado de fallback agregado (qualquer fonte em cache → mostrar banner) ─
+  const isStale   = !!(ticker?.isFallback || klinesMeta?.isFallback || fng?.isFallback);
+  const staleDate = ticker?.lastUpdated ?? klinesMeta?.lastUpdated ?? fng?.lastUpdated ?? null;
 
   // ── ATR(14): média de (high - low) dos últimos 14 candles diários ──────
   const atr14 = useMemo(() => {
@@ -392,9 +461,61 @@ export default function PredictivePanel() {
             ? <span style={{ fontFamily: 'JetBrains Mono, monospace', color: ticker?.isFallback ? '#f59e0b' : '#f59e0b', fontWeight: 700 }}>${SPOT.toLocaleString()}{ticker?.isFallback && ' ⚠'}</span>
             : <span style={{ fontFamily: 'JetBrains Mono, monospace', color: '#334155' }}>carregando…</span>
           }
-          {atr14 && <span style={{ marginLeft: 8, color: '#334155' }}>· ATR(14): <span style={{ fontFamily: 'JetBrains Mono, monospace', color: '#64748b' }}>${Math.round(atr14).toLocaleString()}</span></span>}
+          {atr14 && (
+            <span style={{ marginLeft: 8, color: '#334155' }}>
+              ·{' '}
+              <Tip text="ATR = Average True Range. Mede quanto o preço do BTC oscila em média por dia nos últimos 14 dias. Quanto maior o ATR, mais volátil o mercado — os targets bull/bear ficam mais distantes do spot.">
+                ATR(14): <span style={{ fontFamily: 'JetBrains Mono, monospace', color: '#64748b' }}>${Math.round(atr14).toLocaleString()}</span>
+              </Tip>
+            </span>
+          )}
         </p>
       </div>
+
+      {/* ── BANNER EXPLICATIVO DE PROPÓSITO ── */}
+      <div style={{ marginBottom: 20, padding: '16px 20px', borderRadius: 12,
+        background: 'linear-gradient(135deg, rgba(167,139,250,0.07) 0%, rgba(59,130,246,0.05) 100%)',
+        border: '1px solid rgba(167,139,250,0.2)' }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+          <div style={{ fontSize: 28, lineHeight: 1, marginTop: 2 }}>🔮</div>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: '#e2e8f0', marginBottom: 6 }}>
+              Para que serve esta página?
+            </div>
+            <div style={{ fontSize: 11, color: '#94a3b8', lineHeight: 1.8, maxWidth: 800 }}>
+              O <strong style={{ color: '#cbd5e1' }}>Painel Preditivo</strong> usa dados reais de mercado
+              (preço, volatilidade, sentimento, funding) para estimar{' '}
+              <strong style={{ color: '#cbd5e1' }}>qual cenário de preço é mais provável nas próximas 24h</strong>.
+              Não é bola de cristal — é probabilidade baseada em evidências quantitativas.
+            </div>
+            <div style={{ display: 'flex', gap: 16, marginTop: 10, flexWrap: 'wrap' }}>
+              {[
+                { icon: '📊', text: 'Ver qual cenário tem maior probabilidade hoje' },
+                { icon: '📐', text: 'Entender níveis de suporte/resistência mais relevantes' },
+                { icon: '🧠', text: 'Calibrar expectativa antes de tomar uma decisão' },
+                { icon: '⚠️', text: 'Lembrar que nenhuma previsão é 100% — sempre use stop loss' },
+              ].map((u, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: '#64748b' }}>
+                  <span>{u.icon}</span><span>{u.text}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── BANNER AMBER — ÚLTIMO SALVO ── */}
+      {isStale && staleDate && (
+        <div style={{ marginBottom: 16, padding: '7px 14px', borderRadius: 8,
+          background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.2)',
+          fontSize: 10, color: '#f59e0b', display: 'flex', alignItems: 'center',
+          justifyContent: 'space-between', gap: 8 }}>
+          <span>⚠ Usando último valor salvo — API indisponível no momento</span>
+          <span style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+            Último salvo: {new Date(staleDate).toLocaleString('pt-BR')}
+          </span>
+        </div>
+      )}
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 2, borderBottom: '1px solid #0f1d2e', marginBottom: 16 }}>
@@ -408,7 +529,47 @@ export default function PredictivePanel() {
         ))}
       </div>
 
-      {/* Claude Insight — exibido no topo da página, abaixo dos tabs */}
+      {/* ── DICAS DE OURO ── */}
+      <div style={{ marginTop: 24, marginBottom: 8 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>
+          🏆 Dicas de Ouro — Como Usar o Painel Preditivo
+        </div>
+        <div style={{ fontSize: 10, color: '#475569', marginBottom: 12 }}>
+          Clique em cada dica para expandir · Erros comuns de quem usa previsões de preço
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <TipCard
+            emoji="🎯"
+            title="Cenário com maior prob. ≠ certeza"
+            tag="ATENÇÃO"
+            body="Se 'Alta Moderada' tem 40%, significa que em 60% das vezes o mercado foi diferente. Use o painel para calibrar expectativas, não para apostar tudo em uma direção."
+          />
+          <TipCard
+            emoji="📊"
+            title="Fear & Greed muda as probabilidades"
+            tag="DADO VIVO"
+            body="Quando o índice Fear & Greed está abaixo de 20 (medo extremo), o modelo aumenta a probabilidade de recuperação. Acima de 80 (ganância extrema), aumenta a de correção. Os dados são atualizados automaticamente a cada hora."
+          />
+          <TipCard
+            emoji="📐"
+            title="ATR(14) = tamanho esperado do movimento"
+            body="Um ATR de $2.000 significa que o BTC se move ~$2.000 por dia em média. Se o target bull está a $4.000 do spot, isso é 2× o ATR — pouco provável em 24h, mas possível em 2–3 dias."
+          />
+          <TipCard
+            emoji="⚠️"
+            title="Prob. de Rompimento não é recomendação"
+            tag="RISCO"
+            body="A tabela mostra quais níveis têm maior chance de serem tocados, não se é hora de comprar ou vender. Use junto com análise de volume e tendência — nunca isoladamente."
+          />
+          <TipCard
+            emoji="🔄"
+            title="Dados se atualizam automaticamente"
+            body="O painel busca dados novos a cada 5 segundos (preço) e a cada hora (Fear & Greed). Se a API falhar, o sistema usa o último valor salvo no Supabase — o aviso ⚠ aparece no topo da página quando isso acontece."
+          />
+        </div>
+      </div>
+
+      {/* Claude Insight — exibido abaixo das Dicas de Ouro */}
       <ClaudeInsight text={predInsight} loading={predAiLoading} />
 
       {/* ── CENÁRIOS ── */}
@@ -420,6 +581,27 @@ export default function PredictivePanel() {
             {scenarios.map(s => (
               <ScenarioCard key={s.id} s={s} selected={selected === s.id} onSelect={setSelected} />
             ))}
+            {/* Interpretation guide */}
+            <div style={{ marginTop: 4, padding: '10px 14px', borderRadius: 8,
+              background: '#0a1220', border: '1px solid #1e2d45', fontSize: 10 }}>
+              <div style={{ color: '#3b82f6', fontWeight: 700, marginBottom: 8 }}>Como ler as probabilidades</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 8 }}>
+                {[
+                  { icon: '🟢', cond: '> 40% em cenário bull', result: 'Bias comprador — maioria dos indicadores apontam alta.' },
+                  { icon: '🔴', cond: '> 30% em cenário bear', result: 'Risco real de queda — funding elevado ou FNG < 30.' },
+                  { icon: '🟡', cond: 'Cenário Lateral > 25%', result: 'Indecisão — evitar posições grandes, sem direção clara.' },
+                  { icon: '📐', cond: 'Confiança < 50%', result: 'Modelo sem convicção — aguarde sinal mais claro.' },
+                ].map((r, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                    <span style={{ fontSize: 14, lineHeight: 1.2 }}>{r.icon}</span>
+                    <div>
+                      <div style={{ fontWeight: 600, color: '#cbd5e1', marginBottom: 2 }}>{r.cond}</div>
+                      <div style={{ fontSize: 9, color: '#64748b', lineHeight: 1.5 }}>{r.result}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
 
           {/* Selected detail */}
@@ -503,6 +685,24 @@ export default function PredictivePanel() {
                 </div>
               ))}
             </div>
+            {/* Como ler o gráfico */}
+            <div style={{ marginTop: 14, padding: '10px 14px', borderRadius: 8,
+              background: '#0a1220', border: '1px solid #1e2d45', fontSize: 10 }}>
+              <div style={{ color: '#3b82f6', fontWeight: 700, marginBottom: 8 }}>Como ler este gráfico</div>
+              {[
+                { color: '#10b981', label: 'Linha verde (Bull)', desc: 'Trajetória se compradores dominarem — calculada com ATR × 0.5 acima do spot atual.' },
+                { color: '#f59e0b', label: 'Linha amarela (Neutro)', desc: 'Trajetória lateral — preço mantém-se próximo do spot, sem direção clara.' },
+                { color: '#ef4444', label: 'Linha vermelha (Bear)', desc: 'Trajetória se vendedores dominarem — calculada com ATR × 1.5 abaixo do spot atual.' },
+              ].map((l, i) => (
+                <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginBottom: i < 2 ? 8 : 0 }}>
+                  <div style={{ width: 12, height: 3, background: l.color, marginTop: 6, flexShrink: 0 }} />
+                  <div>
+                    <span style={{ fontWeight: 700, color: l.color }}>{l.label}: </span>
+                    <span style={{ color: '#64748b' }}>{l.desc}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* Scenario summary table */}
@@ -568,7 +768,18 @@ export default function PredictivePanel() {
                   <span>■ <span style={{ color: '#ef4444' }}>Downside</span></span>
                 </div>
               </div>
-              <PurposeLabel text="Conjunto de indicadores técnicos (RSI, MACD, médias móveis) convergindo — quando 3+ indicadores apontam na mesma direção, o sinal é mais robusto." mt={4} mb={0} />
+              <div style={{ marginTop: 6, fontSize: 10, color: '#64748b', display: 'flex', flexWrap: 'wrap', gap: 16, paddingTop: 6 }}>
+                {[
+                  { pct: '> 70%', label: 'Muito provável tocar este nível em 24h' },
+                  { pct: '40–70%', label: 'Possível — fique atento se o preço se aproximar' },
+                  { pct: '< 40%', label: 'Improvável — precisaria de movimento atípico' },
+                ].map((r, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+                    <span style={{ color: '#3b82f6', fontWeight: 800 }}>{r.pct}</span>
+                    <span>{r.label}</span>
+                  </div>
+                ))}
+              </div>
             </div>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
