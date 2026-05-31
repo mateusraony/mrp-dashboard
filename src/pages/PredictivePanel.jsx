@@ -73,7 +73,7 @@ function buildScenarioNarrative({ fundingRate, oiDeltaPct, fngValue, fngLabel, a
   const oiStr   = oiDeltaPct != null
     ? (oiDeltaPct >= 0 ? `+${oiDeltaPct.toFixed(1)}%` : `${oiDeltaPct.toFixed(1)}%`)
     : null;
-  const atrFmt  = atr14 ? `$${Math.round(atr14).toLocaleString()}` : null;
+  const atr = (mult) => atr14 ? `$${Math.round(atr14 * mult).toLocaleString()}` : null;
 
   const fundStatus = fundingRate > 0.001  ? 'longs sobrecarregados'
                    : fundingRate > 0.0005 ? 'leve pressão compradora'
@@ -98,7 +98,7 @@ function buildScenarioNarrative({ fundingRate, oiDeltaPct, fngValue, fngLabel, a
         `Fear & Greed: ${fngValue} — ${fngLabel}`,
         `Funding: ${fundPct}% — ${fundStatus}`,
         oiStr ? `OI Delta 24h: ${oiStr}` : null,
-        atrFmt ? `Alvo +2.5× ATR ≈ ${atrFmt} de amplitude máxima` : null,
+        atr(2.5) ? `Alvo +2.5× ATR ≈ ${atr(2.5)} de amplitude máxima` : null,
       ].filter(Boolean),
       risk: fundingRate > 0.001
         ? `Funding elevado (${fundPct}%) — longs sobrecarregados; long flush pode reverter o rally rapidamente`
@@ -115,7 +115,7 @@ function buildScenarioNarrative({ fundingRate, oiDeltaPct, fngValue, fngLabel, a
         `Fear & Greed: ${fngValue} — ${fngLabel}`,
         `Funding: ${fundPct}% — ${fundStatus}`,
         oiStr ? `OI Delta 24h: ${oiStr}` : null,
-        atrFmt ? `Alvo +0.5× ATR ≈ ${atrFmt} de amplitude` : null,
+        atr(0.5) ? `Alvo +0.5× ATR ≈ ${atr(0.5)} de amplitude` : null,
       ].filter(Boolean),
       risk: fngValue > 70
         ? `FNG em ganância (${fngValue}) — correção após alta moderada é comum; tomar parcial acima do ATR +0.5×`
@@ -143,7 +143,7 @@ function buildScenarioNarrative({ fundingRate, oiDeltaPct, fngValue, fngLabel, a
         `Fear & Greed: ${fngValue} — ${fngLabel}`,
         `Funding: ${fundPct}% — ${fundStatus}`,
         oiStr ? `OI Delta 24h: ${oiStr}` : null,
-        atrFmt ? `Suporte alvo em -1.5× ATR ≈ ${atrFmt} abaixo do spot` : null,
+        atr(1.5) ? `Suporte alvo em -1.5× ATR ≈ ${atr(1.5)} abaixo do spot` : null,
       ].filter(Boolean),
       risk: fngValue < 25
         ? `FNG em medo extremo (${fngValue}) — recuperação em V possível; não encurtar perto do fundo`
@@ -160,7 +160,7 @@ function buildScenarioNarrative({ fundingRate, oiDeltaPct, fngValue, fngLabel, a
         `Fear & Greed: ${fngValue} — ${fngLabel}`,
         `Funding: ${fundPct}% — ${fundStatus}`,
         oiStr ? `OI Delta 24h: ${oiStr}` : null,
-        atrFmt ? `Alvo -3.5× ATR ≈ ${atrFmt} de amplitude (movimento extremo, requer volume excepcional)` : null,
+        atr(3.5) ? `Alvo -3.5× ATR ≈ ${atr(3.5)} de amplitude (movimento extremo, requer volume excepcional)` : null,
       ].filter(Boolean),
       risk: `Suporte histórico forte pode travar a queda — evento de 7% em 24h é estatisticamente raro; sempre use stop loss`,
     },
