@@ -65,6 +65,108 @@ function TipCard({ emoji, title, body, tag = null }) {
   );
 }
 
+// ─── NARRATIVAS DE CENÁRIO LIVE ──────────────────────────────────────────────
+// Gera trigger, drivers e risk em tempo real a partir de dados reais disponíveis.
+// Fontes: funding (Binance), OI delta (Binance), Fear&Greed (Alternative.me), ATR(14).
+function buildScenarioNarrative({ fundingRate, oiDeltaPct, fngValue, fngLabel, atr14 }) {
+  const fundPct = (fundingRate * 100).toFixed(4);
+  const oiStr   = oiDeltaPct != null
+    ? (oiDeltaPct >= 0 ? `+${oiDeltaPct.toFixed(1)}%` : `${oiDeltaPct.toFixed(1)}%`)
+    : null;
+  const atr = (mult) => atr14 ? `$${Math.round(atr14 * mult).toLocaleString()}` : null;
+
+  const fundStatus = fundingRate > 0.001  ? 'longs sobrecarregados'
+                   : fundingRate > 0.0005 ? 'leve pressão compradora'
+                   : fundingRate < 0      ? 'shorts pagando longs'
+                   :                        'mercado equilibrado';
+
+  const fngChar = fngValue > 75 ? 'ganância extrema'
+                : fngValue > 60 ? 'ganância'
+                : fngValue > 45 ? 'neutro-positivo'
+                : fngValue > 30 ? 'medo leve'
+                : fngValue > 20 ? 'medo'
+                :                 'medo extremo';
+
+  return {
+    bull_strong: {
+      trigger: fundingRate < 0
+        ? `Funding negativo (${fundPct}%) — shorts pagando longs; short squeeze em formação`
+        : fngValue < 35
+        ? `FNG ${fngValue} (${fngChar}) — nível de medo compatível com reversão brusca histórica`
+        : `FNG ${fngValue} (${fngChar}) + funding ${fundPct}% sem sobrecarga — base para rally forte`,
+      drivers: [
+        `Fear & Greed: ${fngValue} — ${fngLabel}`,
+        `Funding: ${fundPct}% — ${fundStatus}`,
+        oiStr ? `OI Delta 24h: ${oiStr}` : null,
+        atr(2.5) ? `Alvo +2.5× ATR ≈ ${atr(2.5)} de amplitude máxima` : null,
+      ].filter(Boolean),
+      risk: fundingRate > 0.001
+        ? `Funding elevado (${fundPct}%) — longs sobrecarregados; long flush pode reverter o rally rapidamente`
+        : `Rally sem driver de liquidez externo (ETF/stablecoin mint) pode ser de curta duração`,
+    },
+
+    bull_mild: {
+      trigger: fngValue > 50 && fundingRate < 0.0008
+        ? `FNG ${fngValue} (${fngChar}) + funding controlado (${fundPct}%) — condições para alta consistente`
+        : fngValue < 35
+        ? `Bounce técnico após oversold — FNG ${fngValue} perto de reversão histórica de curto prazo`
+        : `Suporte de demanda estável com bias comprador leve`,
+      drivers: [
+        `Fear & Greed: ${fngValue} — ${fngLabel}`,
+        `Funding: ${fundPct}% — ${fundStatus}`,
+        oiStr ? `OI Delta 24h: ${oiStr}` : null,
+        atr(0.5) ? `Alvo +0.5× ATR ≈ ${atr(0.5)} de amplitude` : null,
+      ].filter(Boolean),
+      risk: fngValue > 70
+        ? `FNG em ganância (${fngValue}) — correção após alta moderada é comum; tomar parcial acima do ATR +0.5×`
+        : `Sem catalisador forte — movimento pode estagnar antes de atingir o alvo`,
+    },
+
+    neutral: {
+      trigger: `Sinais contraditórios — FNG ${fngValue} (${fngChar}) e funding ${fundPct}% sem viés direcional claro`,
+      drivers: [
+        `Fear & Greed: ${fngValue} — ${fngLabel} (zona de indecisão)`,
+        `Funding: ${fundPct}% — ${fundStatus}`,
+        oiStr ? `OI Delta 24h: ${oiStr}` : null,
+        `Mercado aguardando catalisador externo (macro, ETF flow ou liquidação grande)`,
+      ].filter(Boolean),
+      risk: `Rompimento falso nos dois lados possível em consolidação — evitar alavancagem alta sem confirmação de volume`,
+    },
+
+    bear_mild: {
+      trigger: fundingRate > 0.0008
+        ? `Funding elevado (${fundPct}%) — excesso de longs cria pressão por correção técnica`
+        : fngValue < 40
+        ? `FNG ${fngValue} (${fngChar}) — sentimento deteriorando, vendedores dominando`
+        : `Realização de lucros após período de alta — correção saudável dentro do ATR`,
+      drivers: [
+        `Fear & Greed: ${fngValue} — ${fngLabel}`,
+        `Funding: ${fundPct}% — ${fundStatus}`,
+        oiStr ? `OI Delta 24h: ${oiStr}` : null,
+        atr(1.5) ? `Suporte alvo em -1.5× ATR ≈ ${atr(1.5)} abaixo do spot` : null,
+      ].filter(Boolean),
+      risk: fngValue < 25
+        ? `FNG em medo extremo (${fngValue}) — recuperação em V possível; não encurtar perto do fundo`
+        : `Dado macro positivo intraday pode reverter a correção rapidamente`,
+    },
+
+    bear_strong: {
+      trigger: fundingRate > 0.001 && fngValue < 50
+        ? `Funding (${fundPct}%) + FNG ${fngValue} — longs alavancados com sentimento fraco = setup de liquidação em cascata`
+        : fngValue < 25
+        ? `FNG ${fngValue} (${fngChar}) — capitulação extrema pode aprofundar queda antes da reversão`
+        : `Evento de força maior (macro/regulatório) precipitando desalavancagem forçada`,
+      drivers: [
+        `Fear & Greed: ${fngValue} — ${fngLabel}`,
+        `Funding: ${fundPct}% — ${fundStatus}`,
+        oiStr ? `OI Delta 24h: ${oiStr}` : null,
+        atr(3.5) ? `Alvo -3.5× ATR ≈ ${atr(3.5)} de amplitude (movimento extremo, requer volume excepcional)` : null,
+      ].filter(Boolean),
+      risk: `Suporte histórico forte pode travar a queda — evento de 7% em 24h é estatisticamente raro; sempre use stop loss`,
+    },
+  };
+}
+
 // Fallbacks — dados preditivos requerem APIs pagas (Glassnode, Bloomberg) ou cálculo histórico
 // target_price é null quando spot não disponível; componente exibe apenas o %
 const SCENARIOS_24H_FALLBACK = [
@@ -401,7 +503,7 @@ export default function PredictivePanel() {
   } : null;
   const { data: predInsight, isLoading: predAiLoading } = useAiInsight(predPayload);
 
-  // ── Cenários com preços mesclados (live quando disponível) ─────────────
+  // ── Cenários com preços, probabilidades e narrativas live mescladas ──────
   const scenarios = useMemo(() => {
     const withPrices = (() => {
       if (liveScenarioPrices && spotPrice) {
@@ -420,9 +522,24 @@ export default function PredictivePanel() {
       }
       return SCENARIOS_24H_FALLBACK;
     })();
-    if (!liveScenarioProbs) return withPrices;
-    return withPrices.map(s => ({ ...s, prob: liveScenarioProbs[s.id] ?? s.prob }));
-  }, [liveScenarioPrices, spotPrice, liveScenarioProbs]);
+
+    const withProbs = liveScenarioProbs
+      ? withPrices.map(s => ({ ...s, prob: liveScenarioProbs[s.id] ?? s.prob }))
+      : withPrices;
+
+    // Mesclar trigger, drivers e risk em tempo real quando todas as fontes estão disponíveis
+    if (IS_LIVE && ticker && fng && atr14) {
+      const narratives = buildScenarioNarrative({
+        fundingRate: ticker.last_funding_rate,
+        oiDeltaPct:  ticker.oi_delta_pct,
+        fngValue:    fng.value,
+        fngLabel:    fng.label,
+        atr14,
+      });
+      return withProbs.map(s => ({ ...s, ...(narratives[s.id] ?? {}) }));
+    }
+    return withProbs;
+  }, [liveScenarioPrices, spotPrice, liveScenarioProbs, ticker, fng, atr14]);
 
   const SPOT = spotPrice ?? 0;
   const selectedScenario = scenarios.find(s => s.id === selected);
