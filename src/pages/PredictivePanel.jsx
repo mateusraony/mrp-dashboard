@@ -6,7 +6,7 @@ import { DataTrustBadge } from '../components/ui/DataTrustBadge';
 import { Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, ComposedChart, Line,
 } from 'recharts';
-import { useBtcTicker, useKlines, useKlinesMeta, useFearGreed } from '@/hooks/useBtcData';
+import { useBtcTicker, useKlines, useKlinesMeta, useFearGreed, useBtcPriceWs } from '@/hooks/useBtcData';
 import { useRiskScore } from '@/hooks/useRiskScore';
 import { useAiInsight } from '@/hooks/useAiInsight';
 import { computeRuleBasedAnalysis } from '@/utils/ruleBasedAnalysis';
@@ -394,6 +394,7 @@ export default function PredictivePanel() {
   const { data: klinesMeta } = useKlinesMeta('1d', 30); // mesmo queryKey → zero request extra
   const { data: fng }        = useFearGreed(1);
   const { data: riskScore }  = useRiskScore();
+  const { price: wsPrice, connected: wsConnected } = useBtcPriceWs();
 
   // ── Estado de fallback agregado (qualquer fonte em cache → mostrar banner) ─
   const isStale   = !!(ticker?.isFallback || klinesMeta?.isFallback || fng?.isFallback);
@@ -406,6 +407,8 @@ export default function PredictivePanel() {
   }, [klines]);
 
   const spotPrice = ticker?.mark_price ?? null;
+  // wsPrice é usado apenas para exibição no header; cálculos (ATR, cenários) usam spotPrice (30s cache)
+  const displaySpot = wsPrice ?? spotPrice ?? 0;
 
   // ── Cenários com preços live (substituem mock quando disponíveis) ───────
   const liveScenarioPrices = useMemo(() => {
@@ -550,7 +553,7 @@ export default function PredictivePanel() {
       <div style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
           <h1 style={{ fontSize: 20, fontWeight: 900, color: '#f1f5f9', margin: 0, letterSpacing: '-0.03em' }}>Painel Preditivo BTC 24H</h1>
-          <ModeBadge mode={IS_LIVE && spotPrice ? 'live' : 'mock'} />
+          <ModeBadge mode={IS_LIVE && (wsConnected || !!spotPrice) ? 'live' : 'mock'} />
           <span style={{ fontSize: 9, color: '#a78bfa', background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.25)', borderRadius: 4, padding: '2px 8px', fontWeight: 700 }}>📐 Quantitativo</span>
           {liveAnalysis && (() => {
             const d = liveAnalysis.overall.direction;
@@ -574,10 +577,11 @@ export default function PredictivePanel() {
         <PurposeLabel text="Modelo preditivo de direção de preço para as próximas 24h baseado em múltiplos indicadores — use como input adicional, nunca como única base de decisão." />
         <p style={{ fontSize: 11, color: '#475569', margin: 0 }}>
           Projeção baseada em correlações históricas, fluxo de stablecoin, pressão institucional e VIX · Spot:{' '}
-          {SPOT > 0
-            ? <span style={{ fontFamily: 'JetBrains Mono, monospace', color: ticker?.isFallback ? '#f59e0b' : '#f59e0b', fontWeight: 700 }}>${SPOT.toLocaleString()}{ticker?.isFallback && ' ⚠'}</span>
+          {displaySpot > 0
+            ? <span style={{ fontFamily: 'JetBrains Mono, monospace', color: ticker?.isFallback ? '#f59e0b' : '#f59e0b', fontWeight: 700 }}>${displaySpot.toLocaleString()}{ticker?.isFallback && ' ⚠'}</span>
             : <span style={{ fontFamily: 'JetBrains Mono, monospace', color: '#334155' }}>carregando…</span>
           }
+          {wsConnected && <span style={{ marginLeft: 5, fontSize: 9, color: '#10b981', fontFamily: 'JetBrains Mono, monospace' }}>● WS</span>}
           {atr14 && (
             <span style={{ marginLeft: 8, color: '#334155' }}>
               ·{' '}
