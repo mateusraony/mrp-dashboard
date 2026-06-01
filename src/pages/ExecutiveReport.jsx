@@ -213,13 +213,12 @@ function GlobalOverview({ period, liveTicker, liveFng, liveRisk, liveMacro, live
   const yieldSpreadBp = hasYieldData ? Math.round(liveYield.spread_10y2y * 100) : null;
   const yieldRegime   = yieldSpreadBp !== null ? (yieldSpreadBp > 50 ? 'Normal' : yieldSpreadBp > 0 ? 'Flat' : 'Invertida') : '—';
 
-  const creditData   = liveCreditSpread?.data ?? liveCreditSpread;
-  const hySpreadBp   = creditData?.hy_spread_bp ?? 0;
-  const hyRegime     = hySpreadBp > 500 ? 'widening' : 'stable';
-  const hyDelta7dBp  = creditData?.delta_7d_bp ?? 0;
+  const hySpreadBp   = liveCreditSpread?.hy_spread_bp ?? 0;
+  const hyRegime     = liveCreditSpread?.regime ?? 'stable';
+  const hyDelta7dBp  = liveCreditSpread?.delta_7d_bp ?? 0;
 
-  const isStale = liveMacro?.isFallback || liveDominance?.isFallback || liveFng?.isFallback;
-  const staleDate = liveMacro?.lastUpdated ?? liveFng?.lastUpdated;
+  const isStale = !!(liveMacro?.isFallback || liveDominance?.isFallback || liveFng?.isFallback || liveYield?.isFallback || liveCreditSpread?.isFallback);
+  const staleDate = liveMacro?.lastUpdated ?? liveYield?.lastUpdated ?? liveFng?.lastUpdated;
 
   const getSpDelta  = () => period === 'Diário' ? sp?.delta_1d : period === 'Semanal' ? sp?.delta_7d : sp?.delta_30d;
   const getDxyDelta = () => period === 'Diário' ? dxy?.delta_1d : period === 'Semanal' ? dxy?.delta_7d : dxy?.delta_30d;
@@ -1130,10 +1129,10 @@ export default function ExecutiveReport() {
   const { data: liveStablecoin }                = useStablecoinData();
   const { data: liveEtf }                       = useEtfSummary();
 
-  // Detecção de staleness agregado
-  const isStale = [liveTicker, liveFng, liveMacro, liveStablecoin]
+  // Detecção de staleness agregado — inclui todos os hooks com isFallback
+  const isStale = [liveTicker, liveFng, liveMacro, liveStablecoin, liveYield, liveDominance, liveCreditSpread]
     .some(d => d?.isFallback);
-  const staleDate = [liveMacro, liveFng, liveTicker, liveStablecoin]
+  const staleDate = [liveMacro, liveFng, liveTicker, liveStablecoin, liveYield, liveDominance]
     .map(d => d?.lastUpdated)
     .filter(Boolean)
     .sort()

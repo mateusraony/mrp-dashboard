@@ -344,8 +344,7 @@ function YieldCurveCard() {
 // ─── HY Credit Spread (LIVE via FRED BAMLH0A0HYM2 + BAMLC0A0CM) ─────────────
 
 function CreditSpreadCard() {
-  const { data: state, isLoading } = useCreditSpread();
-  const d = state?.data;
+  const { data: d, isLoading } = useCreditSpread();
   const regime = d?.regime ?? 'stable';
   const isWidening = regime === 'widening';
   const color = isWidening ? '#ef4444' : regime === 'tightening' ? '#10b981' : '#f59e0b';
@@ -381,7 +380,7 @@ function CreditSpreadCard() {
           </span>
         </div>
         <div style={{ marginLeft: 'auto' }}>
-          {state?.isFallback
+          {d?.isFallback
             ? <span style={{ fontSize: 9, color: '#f59e0b' }}>⚠ Cache</span>
             : d ? <LiveBadge /> : null}
         </div>
