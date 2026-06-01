@@ -1,10 +1,12 @@
 /**
  * reddit.ts — Reddit JSON API (sem autenticação, leitura pública)
  *
- * Busca posts recentes sobre Bitcoin ETF flows em r/ETFs e r/Bitcoin.
+ * Busca posts recentes sobre Bitcoin ETF flows em r/ETFs e r/Bitcoin,
+ * e top posts de r/Bitcoin com análise de sentimento por título.
  * Rate limit: ~60 req/min (anônimo). Cache: 30min via TanStack Query.
  */
 
+import { z } from 'zod';
 import { apiFetch } from '@/lib/apiClient';
 import { IS_LIVE } from '@/lib/env';
 
@@ -55,6 +57,86 @@ async function fetchSubredditPosts(subreddit: string, query: string, limit = 5):
       thumbnail:   c.data.thumbnail ?? '',
     }));
 }
+
+// ─── r/Bitcoin Sentiment ──────────────────────────────────────────────────────
+// Keywords de sentimento para análise de títulos (mesmo padrão do GDELT)
+
+const POSITIVE_KWS = [
+  'bullish','moon','ath','buy','hodl','rally','pump','surge','breakout',
+  'adoption','accumulate','green','uptrend','recovery','highs','gained',
+  'milestone','record','launch','wins',
+];
+
+const NEGATIVE_KWS = [
+  'bearish','crash','dump','sell','fear','ban','hack','scam','bubble',
+  'drop','fall','collapse','panic','liquidation','loss','regulatory',
+  'warning','risk','bear','down','correction','decline',
+];
+
+const RedditBitcoinPostSchema = z.object({
+  title:          z.string(),
+  score:          z.number(),
+  num_comments:   z.number(),
+  permalink:      z.string(),
+  author:         z.string(),
+  upvote_ratio:   z.number().optional(),
+});
+
+const RedditBitcoinResponseSchema = z.object({
+  data: z.object({
+    children: z.array(z.object({ data: RedditBitcoinPostSchema })),
+  }),
+});
+
+export interface RedditBitcoinPost {
+  title:           string;
+  score:           number;
+  comments:        number;
+  url:             string;
+  author:          string;
+  sentiment:       number;           // -1 | 0 | 1
+  sentiment_label: 'bearish' | 'neutral' | 'bullish';
+  upvote_ratio:    number;
+}
+
+function detectBitcoinSentiment(title: string): { sentiment: number; label: 'bearish' | 'neutral' | 'bullish' } {
+  const t = title.toLowerCase();
+  const pos = POSITIVE_KWS.filter(k => t.includes(k)).length;
+  const neg = NEGATIVE_KWS.filter(k => t.includes(k)).length;
+  if (pos > neg) return { sentiment: 1, label: 'bullish' };
+  if (neg > pos) return { sentiment: -1, label: 'bearish' };
+  return { sentiment: 0, label: 'neutral' };
+}
+
+export async function fetchRedditBitcoinPosts(limit = 25): Promise<RedditBitcoinPost[]> {
+  const url = `https://www.reddit.com/r/Bitcoin/top.json?t=day&limit=${limit}`;
+  const raw = await apiFetch(url, {
+    headers: { 'User-Agent': 'MRPDashboard/2.0 (mrp-dashboard.onrender.com)' },
+  });
+  const parsed = RedditBitcoinResponseSchema.parse(raw);
+  return parsed.data.children.map(({ data: p }) => {
+    const { sentiment, label } = detectBitcoinSentiment(p.title);
+    return {
+      title:           p.title,
+      score:           p.score,
+      comments:        p.num_comments,
+      url:             `https://reddit.com${p.permalink}`,
+      author:          p.author,
+      sentiment,
+      sentiment_label: label,
+      upvote_ratio:    p.upvote_ratio ?? 0.5,
+    };
+  });
+}
+
+/** Agrega posts em score 0-100 de sentimento para uso no gauge composto. */
+export function redditPostsToScore(posts: RedditBitcoinPost[]): number {
+  if (posts.length === 0) return 50;
+  const avg = posts.reduce((s, p) => s + p.sentiment, 0) / posts.length;
+  return Math.round(Math.max(0, Math.min(100, 50 + avg * 35)));
+}
+
+// ─── ETF Posts (função original mantida) ──────────────────────────────────────
 
 export async function fetchEtfRedditPosts(): Promise<RedditPost[]> {
   if (!IS_LIVE) return MOCK_POSTS;
