@@ -207,8 +207,11 @@ function GlobalOverview({ period, liveTicker, liveFng, liveRisk, liveMacro, live
   const btcDom = liveDominance?.btc_dominance ?? 0;
   const btcDomDelta7d = 0; // CoinGecko dominance não retorna delta — mostrar apenas valor atual
 
-  const yieldSpreadBp = liveYield ? Math.round((liveYield.spread_10y2y) * 100) : 0;
-  const yieldRegime   = yieldSpreadBp > 50 ? 'Normal' : yieldSpreadBp > 0 ? 'Flat' : 'Invertida';
+  // Gate on updated_at > 0 — EMPTY_YIELD_CURVE has updated_at:0 and spread:0
+  // which would falsely show "Invertida" regime before any real data arrives
+  const hasYieldData  = !!liveYield && liveYield.updated_at > 0;
+  const yieldSpreadBp = hasYieldData ? Math.round(liveYield.spread_10y2y * 100) : null;
+  const yieldRegime   = yieldSpreadBp !== null ? (yieldSpreadBp > 50 ? 'Normal' : yieldSpreadBp > 0 ? 'Flat' : 'Invertida') : '—';
 
   const creditData   = liveCreditSpread?.data ?? liveCreditSpread;
   const hySpreadBp   = creditData?.hy_spread_bp ?? 0;
@@ -270,8 +273,8 @@ function GlobalOverview({ period, liveTicker, liveFng, liveRisk, liveMacro, live
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 12 }}>
         <Metric label="US 10Y" value={us10y?.value ? `${fmt(us10y.value, 3)}%` : '—'} color={col(us10y?.delta_1d, true)}
           sub={us10y?.delta_1d_bp != null ? `${sign(us10y.delta_1d_bp)}${fmt(us10y.delta_1d_bp, 1)}bp 1D` : 'via FRED'} size={14} />
-        <Metric label="Yield Spread (10-2Y)" value={liveYield ? `${yieldSpreadBp > 0 ? '+' : ''}${yieldSpreadBp}bp` : '—'}
-          color={yieldSpreadBp > 0 ? '#10b981' : '#ef4444'} sub={yieldRegime} size={14} />
+        <Metric label="Yield Spread (10-2Y)" value={yieldSpreadBp !== null ? `${yieldSpreadBp > 0 ? '+' : ''}${yieldSpreadBp}bp` : '—'}
+          color={yieldSpreadBp !== null ? (yieldSpreadBp > 0 ? '#10b981' : '#ef4444') : '#94a3b8'} sub={yieldRegime} size={14} />
         <Metric label="HY Credit Spread" value={liveCreditSpread ? `${hySpreadBp}bp` : '—'}
           color={hyRegime === 'widening' ? '#ef4444' : '#10b981'}
           sub={liveCreditSpread ? `${sign(hyDelta7dBp)}${hyDelta7dBp}bp 7D` : 'via FRED'} size={14} />
@@ -435,7 +438,7 @@ function StablecoinSection({ period, liveStablecoin }) {
           sub={usdtMint !== 0 ? `Net 24h: ${sign(usdtMint)}$${Math.abs(usdtMint).toFixed(0)}M` : 'DeFiLlama'} />
         <Metric label="USDC" value={usdcB > 0 ? `$${usdcB.toFixed(1)}B` : '—'} color="#3b82f6"
           sub={usdcMint !== 0 ? `Net 24h: ${sign(usdcMint)}$${Math.abs(usdcMint).toFixed(0)}M` : 'DeFiLlama'} />
-        <Metric label="Net Mint 24h" value={totalMint !== 0 ? `${sign(totalMint)}$${Math.abs(totalMint).toFixed(0)}M` : '—'}
+        <Metric label="Net Mint 24h" value={totalMint !== 0 ? `${totalMint < 0 ? '-' : '+'}$${Math.abs(totalMint).toFixed(0)}M` : '—'}
           color={totalMint > 0 ? '#10b981' : totalMint < 0 ? '#ef4444' : '#94a3b8'} sub="USDT + USDC" />
       </div>
 
