@@ -32,7 +32,7 @@ async function callFapiViaProxy(endpoint: string): Promise<{ status: number; dat
     signal:  AbortSignal.timeout(10_000),
   });
   const data = await res.json().catch(() => ({} as Record<string, unknown>));
-  if (!res.ok && res.status !== 401 && res.status !== 403) {
+  if (!res.ok && res.status !== 401 && res.status !== 403 && res.status !== 404) {
     throw new Error(`binance_fapi proxy error ${res.status}: ${(data as Record<string, unknown>).error ?? res.statusText}`);
   }
   return { status: res.status, data };
