@@ -34,6 +34,8 @@ export interface MarketSentimentResult {
   delta_24h:      number;
   sources:        SentimentSource[];
   updated_at:     number;
+  isFallback:     boolean;
+  lastUpdated:    string | null;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -72,6 +74,7 @@ function gdeltSentimentToScore(articles: Array<{ sentiment?: number }>): number 
 const FALLBACK: MarketSentimentResult = {
   score: 50, classification: 'Neutral', label_pt: 'Neutro', color: '#94a3b8',
   prev_24h: 50, delta_24h: 0, sources: [], updated_at: Date.now(),
+  isFallback: false, lastUpdated: null,
 };
 
 /**
@@ -133,7 +136,13 @@ export function useMarketSentiment() {
       const prev24h   = Math.round(fngPrev * 0.50 + fundScore * 0.30 + gdeltScore * 0.20);
       const delta24h  = score - prev24h;
 
-      return { score, classification, label_pt, color, prev_24h: prev24h, delta_24h: delta24h, sources, updated_at: Date.now() };
+      // Propaga isFallback/lastUpdated das fontes subjacentes (select: de useBtcTicker e useFearGreed adicionam esses campos)
+      const t = ticker as unknown as { isFallback?: boolean; lastUpdated?: string | null };
+      const f = fng    as unknown as { isFallback?: boolean; lastUpdated?: string | null };
+      const isFallback  = !!(t?.isFallback) || !!(f?.isFallback);
+      const lastUpdated = f?.lastUpdated ?? t?.lastUpdated ?? null;
+
+      return { score, classification, label_pt, color, prev_24h: prev24h, delta_24h: delta24h, sources, updated_at: Date.now(), isFallback, lastUpdated };
     },
     staleTime:       4_000,
     refetchInterval: IS_LIVE ? 30_000 : false,
