@@ -3,9 +3,7 @@
  * Sprint 8.2: AI Track Record live.
  */
 
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { env } from '@/lib/env';
-import { isSupabaseConfigured } from '@/services/supabase';
+import { isSupabaseConfigured, getClient } from '@/services/supabase';
 import type { RuleBasedAnalysis } from '@/utils/ruleBasedAnalysis';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -26,18 +24,6 @@ export interface AiPrediction {
   outcome_ret_pct:      number | null;
   outcome_evaluated_at: string | null;
   created_at:           string;
-}
-
-// ─── Singleton ────────────────────────────────────────────────────────────────
-
-let _client: SupabaseClient | null = null;
-
-function getClient(): SupabaseClient {
-  if (_client) return _client;
-  _client = createClient(env.VITE_SUPABASE_URL!, env.VITE_SUPABASE_ANON_KEY!, {
-    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-  });
-  return _client;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

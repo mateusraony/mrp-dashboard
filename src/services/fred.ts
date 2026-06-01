@@ -186,6 +186,7 @@ async function callFredProxy(
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({} as Record<string, unknown>));
+    if (res.status === 429) throw new Error('FRED_RATE_LIMIT_429');
     throw new Error(
       `fred-proxy error ${res.status}: ${(err.error as string | undefined) ?? res.statusText}`,
     );

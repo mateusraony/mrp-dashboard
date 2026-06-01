@@ -85,6 +85,7 @@ export async function fetchAiInsight(payload: AiInsightPayload): Promise<string>
   if (!res.ok) {
     const err = await res.json().catch(() => ({} as Record<string, unknown>));
     const detail = (err.error as string | undefined) ?? res.statusText;
+    if (res.status === 503) throw new Error('AI_MISSING_KEY'); // ANTHROPIC_API_KEY ausente — não retentar
     if (res.status === 401) throw new Error('Chave Anthropic inválida ou expirada. Verifique ANTHROPIC_API_KEY nos Secrets do Supabase.');
     if (res.status === 429) throw new Error('Limite de requisições Anthropic atingido. Tente novamente em alguns segundos.');
     if (res.status === 504) throw new Error('Timeout ao chamar Anthropic. Verifique conectividade da Edge Function.');
