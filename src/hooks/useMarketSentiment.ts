@@ -2,9 +2,10 @@
  * useMarketSentiment.ts — Sentimento de mercado composto ao vivo
  *
  * Score 0-100 calculado como:
- *   Fear & Greed (alternative.me)   → peso 50%
- *   Funding Rate (Binance)           → peso 30%  (normalizado 0-100)
- *   GDELT News Tone                  → peso 20%  (normalizado 0-100)
+ *   Fear & Greed (alternative.me)   → peso 45%
+ *   Funding Rate (Binance)           → peso 25%  (normalizado 0-100)
+ *   GDELT News Tone                  → peso 15%  (normalizado 0-100)
+ *   SentiCrypt (tweets)              → peso 15%  (normalizado 0-100)
  *
  * Classificação:
  *   ≥ 75 = Extreme Greed  · ≥ 55 = Greed  · ≥ 45 = Neutral
@@ -15,6 +16,7 @@ import { useQuery } from '@tanstack/react-query';
 import { IS_LIVE } from '@/lib/env';
 import { useBtcTicker, useFearGreed } from '@/hooks/useBtcData';
 import { useGdeltNews } from '@/hooks/useGdelt';
+import { useSentiCrypt } from '@/hooks/useSentiCrypt';
 
 // ─── Tipos exportados ─────────────────────────────────────────────────────────
 
@@ -87,6 +89,7 @@ export function useMarketSentiment() {
   const { data: ticker } = useBtcTicker();
   const { data: fng }    = useFearGreed();
   const { data: news }   = useGdeltNews('bitcoin crypto');
+  const { data: senti }  = useSentiCrypt();
 
   // Extrair metadados de fallback uma vez — usados tanto no queryKey quanto no queryFn
   const tickerMeta = ticker as unknown as { isFallback?: boolean; lastUpdated?: string | null };
@@ -98,20 +101,25 @@ export function useMarketSentiment() {
       fng?.value,
       ticker?.last_funding_rate,
       news?.length,
+      senti?.sentiment,
       // Incluídos para que transições live↔fallback (sem mudança de valor numérico)
       // recomputem imediatamente — sem esperar o intervalo de 30s
       tickerMeta?.isFallback,
       fngMeta?.isFallback,
     ],
     queryFn: (): MarketSentimentResult => {
-      const fngScore     = fng?.value ?? 50;
-      const fundScore    = ticker ? fundingToScore(ticker.last_funding_rate) : 50;
-      const gdeltScore   = news ? gdeltSentimentToScore(news as Array<{ sentiment?: number }>) : 50;
+      const fngScore    = fng?.value ?? 50;
+      const fundScore   = ticker ? fundingToScore(ticker.last_funding_rate) : 50;
+      const gdeltScore  = news ? gdeltSentimentToScore(news as Array<{ sentiment?: number }>) : 50;
+      const sentiScore  = senti?.count
+        ? Math.round(Math.max(0, Math.min(100, 50 + senti.sentiment * 35)))
+        : 50;
 
       const score = Math.round(
-        fngScore   * 0.50 +
-        fundScore  * 0.30 +
-        gdeltScore * 0.20,
+        fngScore    * 0.45 +
+        fundScore   * 0.25 +
+        gdeltScore  * 0.15 +
+        sentiScore  * 0.15,
       );
 
       const { classification, label_pt, color } = classifyScore(score);
@@ -120,13 +128,13 @@ export function useMarketSentiment() {
         {
           label:  'Fear & Greed',
           score:  fngScore,
-          weight: 0.50,
+          weight: 0.45,
           raw:    `${fngScore} — ${fng?.label ?? '—'}`,
         },
         {
           label:  'Funding Rate',
           score:  fundScore,
-          weight: 0.30,
+          weight: 0.25,
           raw:    ticker
             ? `${(ticker.last_funding_rate * 100).toFixed(4)}% / 8h`
             : '—',
@@ -134,14 +142,22 @@ export function useMarketSentiment() {
         {
           label:  'GDELT News Tone',
           score:  gdeltScore,
-          weight: 0.20,
+          weight: 0.15,
           raw:    news ? `${news.length} artigos` : '—',
+        },
+        {
+          label:  'SentiCrypt',
+          score:  sentiScore,
+          weight: 0.15,
+          raw:    senti?.count
+            ? `${senti.sentiment.toFixed(3)} (${senti.count.toLocaleString()} tweets)`
+            : '—',
         },
       ];
 
       // Constrói prev composto usando previous_close do FnG (única fonte com dado anterior)
-      const fngPrev   = fng?.previous_close ?? fngScore;
-      const prev24h   = Math.round(fngPrev * 0.50 + fundScore * 0.30 + gdeltScore * 0.20);
+      const fngPrev  = fng?.previous_close ?? fngScore;
+      const prev24h  = Math.round(fngPrev * 0.45 + fundScore * 0.25 + gdeltScore * 0.15 + sentiScore * 0.15);
       const delta24h  = score - prev24h;
 
       // Propaga isFallback/lastUpdated das fontes subjacentes (select: de useBtcTicker e useFearGreed adicionam esses campos)

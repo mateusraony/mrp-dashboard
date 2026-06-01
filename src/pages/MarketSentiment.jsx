@@ -11,6 +11,9 @@ import { IS_LIVE } from '../lib/env';
 import { ModeBadge } from '../components/ui/DataBadge';
 import { DataTrustBadge } from '../components/ui/DataTrustBadge';
 import PurposeLabel from '@/components/ui/PurposeLabel';
+import { useRedditSentiment } from '@/hooks/useRedditSentiment';
+import { useWikiPageviews }   from '@/hooks/useWikiPageviews';
+import { useCryptoPanic }     from '@/hooks/useCryptoPanic';
 
 // Palavras irrelevantes a filtrar da word cloud
 const STOP_WORDS = new Set([
@@ -215,6 +218,35 @@ function SourceCard({ src }) {
   );
 }
 
+// ─── Reddit Post Card ─────────────────────────────────────────────────────────
+function RedditPostCard({ post }) {
+  const sc = post.sentiment > 0 ? '#10b981' : post.sentiment < 0 ? '#ef4444' : '#f59e0b';
+  return (
+    <a href={post.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', display: 'block' }}>
+      <div style={{ display: 'flex', gap: 10, padding: '7px 10px', background: '#0d1421', border: '1px solid #1a2535', borderRadius: 7 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minWidth: 38, gap: 1 }}>
+          <span style={{ fontSize: 9, color: '#60a5fa' }}>▲</span>
+          <span style={{ fontSize: 9, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', color: '#94a3b8' }}>
+            {post.score >= 1000 ? `${(post.score / 1000).toFixed(1)}k` : post.score}
+          </span>
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 10, fontWeight: 600, color: '#e2e8f0', lineHeight: 1.4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {post.title}
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 3, fontSize: 8, color: '#475569' }}>
+            <span>u/{post.author}</span>
+            <span>💬 {post.comments}</span>
+            <span style={{ color: sc, fontWeight: 700 }}>
+              {post.sentiment_label === 'bullish' ? '🟢 Bullish' : post.sentiment_label === 'bearish' ? '🔴 Bearish' : '⚪ Neutro'}
+            </span>
+          </div>
+        </div>
+      </div>
+    </a>
+  );
+}
+
 // ─── KOL Card ─────────────────────────────────────────────────────────────────
 function KOLCard({ kol }) {
   const sc = kol.sentiment > 0.3 ? '#10b981' : kol.sentiment < -0.3 ? '#ef4444' : '#f59e0b';
@@ -263,6 +295,15 @@ export default function MarketSentiment() {
   const { data: fngHistory }    = useFearGreed(30);
   const { data: klines }        = useKlines('1d', 32);
   const { data: gdeltTimeline } = useGdeltMentionsTimeline();
+
+  const { data: redditData }      = useRedditSentiment(25);
+  const { data: wikiData }        = useWikiPageviews(7);
+  const { data: cryptoPanicData } = useCryptoPanic();
+
+  const redditPosts = redditData?.posts ?? [];
+  const wikiPoints  = wikiData?.points ?? [];
+  const cpPosts     = cryptoPanicData?.posts ?? null;
+  const cpHasKey    = cryptoPanicData?.hasKey ?? false;
 
   const mentionsHourly = (IS_LIVE && gdeltTimeline && gdeltTimeline.length > 0)
     ? gdeltTimeline.map(p => ({ hour: `${String(p.hour).padStart(2, '0')}:00`, mentions: p.mentions, btc_volume_m: 0 }))
@@ -338,7 +379,7 @@ export default function MarketSentiment() {
             <h1 style={{ fontSize: 20, fontWeight: 900, color: '#f1f5f9', margin: 0, letterSpacing: '-0.03em' }}>🧠 Sentimento Social</h1>
             <ModeBadge mode={IS_LIVE ? 'live' : 'mock'} />
             {!IS_LIVE && <DataTrustBadge mode="mock" confidence="D" source="Demo" reason="Dados sociais simulados — Twitter/Reddit sem API real" />}
-            <span style={{ fontSize: 9, padding: '2px 8px', borderRadius: 4, background: 'rgba(167,139,250,0.1)', color: '#a78bfa', border: '1px solid rgba(167,139,250,0.25)', fontWeight: 700 }}>FNG + Funding + GDELT</span>
+            <span style={{ fontSize: 9, padding: '2px 8px', borderRadius: 4, background: 'rgba(167,139,250,0.1)', color: '#a78bfa', border: '1px solid rgba(167,139,250,0.25)', fontWeight: 700 }}>FNG + GDELT + SentiCrypt</span>
           </div>
           <p style={{ fontSize: 11, color: '#475569', margin: 0, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <span>Twitter/X · Reddit · Telegram · Notícias Cripto · Word Cloud · Correlação BTC · <ModeBadge /></span>
@@ -360,7 +401,7 @@ export default function MarketSentiment() {
             <div style={{ fontSize: 13, fontWeight: 800, color: '#e2e8f0', marginBottom: 6 }}>Para que serve esta página?</div>
             <div style={{ fontSize: 11, color: '#94a3b8', lineHeight: 1.8, maxWidth: 800 }}>
               <strong style={{ color: '#cbd5e1' }}>Sentimento Social</strong> mede o <strong style={{ color: '#cbd5e1' }}>estado emocional do mercado</strong> — se os participantes estão com medo ou eufóricos com o Bitcoin.{' '}
-              O score combina três fontes gratuitas: <strong style={{ color: '#a78bfa' }}>Fear & Greed Index</strong> (pesquisa de mercado), <strong style={{ color: '#a78bfa' }}>Funding Rate</strong> (quanto traders alavancados estão pagando) e <strong style={{ color: '#a78bfa' }}>GDELT</strong> (tom de notícias globais).{' '}
+              O score combina quatro fontes gratuitas: <strong style={{ color: '#a78bfa' }}>Fear & Greed Index</strong> (pesquisa de mercado), <strong style={{ color: '#a78bfa' }}>Funding Rate</strong> (alavancagem em derivativos), <strong style={{ color: '#a78bfa' }}>GDELT</strong> (tom de notícias globais) e <strong style={{ color: '#a78bfa' }}>SentiCrypt</strong> (análise de tweets cripto, sem API paga).{' '}
               <strong style={{ color: '#3b82f6' }}>Extremos históricos são oportunidades:</strong> medo extremo costuma preceder altas; euforia extrema, correções.
             </div>
             <div style={{ display: 'flex', gap: 16, marginTop: 10, flexWrap: 'wrap' }}>
@@ -414,17 +455,19 @@ export default function MarketSentiment() {
           <div style={{ fontSize: 9, color: '#334155', marginBottom: 8, padding: '5px 8px', borderRadius: 5, background: '#0a1220', border: '1px solid #0f1d2e' }}>
             📌 <strong style={{ color: '#94a3b8' }}>Para que serve:</strong>{' '}
             <Tip text="Índice diário da Alternative.me combinando dados de preço, volume, volatilidade, dominância e tendências sociais. Atualiza 1x/dia.">Fear & Greed</Tip>
-            {' '}(50%) ={' '}
+            {' '}(45%) +{' '}
             <Tip text="Taxa paga a cada 8h entre posições long e short em futuros perpétuos. Alta positiva = traders alavancados comprando, mercado sobreaquecido.">Funding Rate</Tip>
-            {' '}(30%) ={' '}
+            {' '}(25%) +{' '}
             <Tip text="GDELT monitora 65.000 fontes de notícias globais em tempo real. Sentimento é extraído pelo tom positivo ou negativo das manchetes sobre Bitcoin.">GDELT News</Tip>
-            {' '}(20%)
+            {' '}(15%) +{' '}
+            <Tip text="SentiCrypt analisa tweets sobre cripto a cada 2h e gera score -1 a +1. Gratuito, sem API key necessária.">SentiCrypt</Tip>
+            {' '}(15%)
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginBottom: 10 }}>
             {s.sources.map((src, i) => <SourceCard key={i} src={src} />)}
           </div>
           <div style={{ padding: '8px 10px', borderRadius: 7, background: 'rgba(100,116,139,0.05)', border: '1px solid rgba(100,116,139,0.15)', fontSize: 9, color: '#64748b', lineHeight: 1.6 }}>
-            💡 Score composto: Fear&amp;Greed (50%) + Funding Rate (30%) + Sentimento GDELT Notícias (20%) — dados gratuitos em tempo real
+            💡 Score composto: Fear&amp;Greed (45%) + Funding (25%) + GDELT (15%) + SentiCrypt (15%) — 4 fontes gratuitas ao vivo
           </div>
         </div>
       </div>
@@ -517,6 +560,39 @@ export default function MarketSentiment() {
               </div>
             )}
           </div>
+
+          {/* Wikipedia Pageviews — atenção ao Bitcoin */}
+          <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '18px 20px', gridColumn: '1 / -1' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>🌐 Atenção ao Bitcoin — Wikipedia Pageviews</div>
+              <div style={{ fontSize: 9, color: wikiPoints.length > 0 ? '#10b981' : '#64748b' }}>
+                {wikiPoints.length > 0 ? '● Wikimedia API pública · sem key' : 'Aguardando dados...'}
+              </div>
+            </div>
+            <div style={{ fontSize: 9, color: '#334155', marginBottom: 8, padding: '5px 8px', borderRadius: 5, background: '#0a1220', border: '1px solid #0f1d2e', display: 'inline-block' }}>
+              📌 <strong style={{ color: '#94a3b8' }}>Para que serve:</strong> Pageviews do artigo Bitcoin na Wikipedia medem interesse público. Picos correlacionam com ATHs, crashes e halvings — novos usuários buscam o tema ao ver notícias.
+            </div>
+            {wikiData?.isFallback && (
+              <div style={{ margin: '6px 0 8px', padding: '4px 8px', borderRadius: 4, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.18)', fontSize: 9, color: '#f59e0b' }}>
+                ⚠ Dados do cache — Wikimedia temporariamente indisponível
+              </div>
+            )}
+            {wikiPoints.length > 0 ? (
+              <ResponsiveContainer width="100%" height={110}>
+                <ComposedChart data={wikiPoints} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(30,45,69,0.4)" vertical={false} />
+                  <XAxis dataKey="date" tick={{ fontSize: 8, fill: '#475569' }} axisLine={false} tickLine={false} tickFormatter={v => v.slice(5)} />
+                  <YAxis tick={{ fontSize: 8, fill: '#475569' }} axisLine={false} tickLine={false} tickFormatter={v => `${(v / 1000).toFixed(0)}K`} />
+                  <Tooltip contentStyle={{ background: '#0d1421', border: '1px solid #1a2535', fontSize: 9, borderRadius: 6 }} formatter={v => [`${Number(v).toLocaleString()} views`, 'Pageviews']} />
+                  <Bar dataKey="views" fill="#a78bfa" fillOpacity={0.7} radius={[2, 2, 0, 0]} />
+                </ComposedChart>
+              </ResponsiveContainer>
+            ) : (
+              <div style={{ padding: '16px', textAlign: 'center', fontSize: 10, color: '#475569' }}>
+                {IS_LIVE ? 'Carregando dados da Wikipedia...' : 'Disponível apenas em modo ao vivo'}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -530,24 +606,58 @@ export default function MarketSentiment() {
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <div style={{ fontSize: 9, color: '#334155', marginBottom: 6 }}>
-                {IS_LIVE && liveWordCloud && liveWordCloud.length > 0 ? 'Extraído de notícias GDELT em tempo real' : IS_LIVE ? 'GDELT indisponível — dados de demonstração' : 'Dados de demonstração'}
+                {IS_LIVE && cpHasKey && cpPosts && cpPosts.length > 0
+                  ? 'Notícias CryptoPanic com votos bullish/bearish da comunidade'
+                  : IS_LIVE && liveWordCloud && liveWordCloud.length > 0
+                    ? 'Extraído de notícias GDELT em tempo real'
+                    : IS_LIVE ? 'GDELT indisponível — dados de demonstração' : 'Dados de demonstração'}
               </div>
-              {(IS_LIVE && liveWordCloud && liveWordCloud.length > 0 ? liveWordCloud : trendingTopics.map(t => ({ text: t.topic, value: t.mentions_24h, sentiment: t.sentiment, color: t.sentiment > 0.2 ? '#10b981' : t.sentiment < -0.2 ? '#ef4444' : '#f59e0b' }))).slice(0, 8).map((t, i) => {
-                const sc = (t.color ?? (t.sentiment > 0.2 ? '#10b981' : t.sentiment < -0.2 ? '#ef4444' : '#f59e0b'));
-                const maxVal = (IS_LIVE && liveWordCloud ? liveWordCloud[0] : activeWordCloud[0])?.value ?? 1;
-                return (
-                  <div key={i} style={{ padding: '9px 12px', background: '#0d1421', border: '1px solid #1a2535', borderRadius: 8 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
-                      <span style={{ fontSize: 10, fontWeight: 800, color: '#e2e8f0', flex: 1 }}>{t.text}</span>
-                      <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: `${sc}10`, color: sc, border: `1px solid ${sc}20` }}>{sc === '#10b981' ? 'Bullish' : sc === '#ef4444' ? 'Bearish' : 'Neutro'}</span>
-                      <span style={{ fontSize: 9, color: '#475569' }}>GDELT</span>
+              {IS_LIVE && cpHasKey && cpPosts && cpPosts.length > 0 ? (
+                cpPosts.slice(0, 8).map((p, i) => {
+                  const sc = p.sentiment > 0 ? '#10b981' : p.sentiment < 0 ? '#ef4444' : '#f59e0b';
+                  const total = p.bullish + p.bearish;
+                  return (
+                    <a key={i} href={p.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
+                      <div style={{ padding: '9px 12px', background: '#0d1421', border: '1px solid #1a2535', borderRadius: 8 }}>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 5 }}>
+                          <span style={{ fontSize: 10, fontWeight: 700, color: '#e2e8f0', flex: 1, lineHeight: 1.35 }}>{p.title}</span>
+                          <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: `${sc}10`, color: sc, border: `1px solid ${sc}20`, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                            {p.sentiment > 0 ? 'Bullish' : p.sentiment < 0 ? 'Bearish' : 'Neutro'}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', gap: 10, fontSize: 8, color: '#475569' }}>
+                          <span style={{ color: '#10b981' }}>🐂 {p.bullish}</span>
+                          <span style={{ color: '#ef4444' }}>🐻 {p.bearish}</span>
+                          <span>{p.source}</span>
+                          <span style={{ marginLeft: 'auto', color: '#334155' }}>CryptoPanic</span>
+                        </div>
+                        {total > 0 && (
+                          <div style={{ marginTop: 4, height: 3, borderRadius: 2, background: '#ef4444', overflow: 'hidden' }}>
+                            <div style={{ height: '100%', width: `${(p.bullish / total) * 100}%`, background: '#10b981' }} />
+                          </div>
+                        )}
+                      </div>
+                    </a>
+                  );
+                })
+              ) : (
+                (IS_LIVE && liveWordCloud && liveWordCloud.length > 0 ? liveWordCloud : trendingTopics.map(t => ({ text: t.topic, value: t.mentions_24h, sentiment: t.sentiment, color: t.sentiment > 0.2 ? '#10b981' : t.sentiment < -0.2 ? '#ef4444' : '#f59e0b' }))).slice(0, 8).map((t, i) => {
+                  const sc = (t.color ?? (t.sentiment > 0.2 ? '#10b981' : t.sentiment < -0.2 ? '#ef4444' : '#f59e0b'));
+                  const maxVal = (IS_LIVE && liveWordCloud ? liveWordCloud[0] : activeWordCloud[0])?.value ?? 1;
+                  return (
+                    <div key={i} style={{ padding: '9px 12px', background: '#0d1421', border: '1px solid #1a2535', borderRadius: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
+                        <span style={{ fontSize: 10, fontWeight: 800, color: '#e2e8f0', flex: 1 }}>{t.text}</span>
+                        <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: `${sc}10`, color: sc, border: `1px solid ${sc}20` }}>{sc === '#10b981' ? 'Bullish' : sc === '#ef4444' ? 'Bearish' : 'Neutro'}</span>
+                        <span style={{ fontSize: 9, color: '#475569' }}>GDELT</span>
+                      </div>
+                      <div style={{ flex: 1, height: 4, borderRadius: 2, background: '#1a2535' }}>
+                        <div style={{ height: '100%', borderRadius: 2, width: `${(t.value / maxVal) * 100}%`, background: sc, opacity: 0.7 }} />
+                      </div>
                     </div>
-                    <div style={{ flex: 1, height: 4, borderRadius: 2, background: '#1a2535' }}>
-                      <div style={{ height: '100%', borderRadius: 2, width: `${(t.value / maxVal) * 100}%`, background: sc, opacity: 0.7 }} />
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
           </div>
 
@@ -608,6 +718,40 @@ export default function MarketSentiment() {
           <div style={{ padding: '6px 10px', borderRadius: 6, background: 'rgba(249,115,22,0.06)', border: '1px solid rgba(249,115,22,0.18)', fontSize: 10, color: '#78716c', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
             <span>🔒 Dados simulados — monitoramento de KOLs requer API paga com acesso a Twitter/X em tempo real.</span>
             <a href="https://lunarcrush.com/pricing" target="_blank" rel="noopener noreferrer" style={{ color: '#f97316', textDecoration: 'none', fontWeight: 700, whiteSpace: 'nowrap' }}>Ver planos →</a>
+          </div>
+
+          {/* ── Reddit r/Bitcoin — proxy de comunidade, grátis ── */}
+          <div style={{ marginTop: 20, borderTop: '1px solid #1a2535', paddingTop: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0' }}>🟠 Comunidade Reddit r/Bitcoin — Dados Reais</div>
+              <div style={{ fontSize: 8, padding: '2px 6px', borderRadius: 3, background: 'rgba(16,185,129,0.1)', color: '#10b981', border: '1px solid rgba(16,185,129,0.2)', fontWeight: 700 }}>GRÁTIS · AO VIVO</div>
+            </div>
+            <div style={{ fontSize: 9, color: '#334155', marginBottom: 10, padding: '5px 8px', borderRadius: 5, background: '#0a1220', border: '1px solid #0f1d2e' }}>
+              📌 <strong style={{ color: '#94a3b8' }}>Para que serve:</strong> Top posts de r/Bitcoin do dia com sentimento detectado por palavras-chave. Proxy de sentimento da comunidade — sem API paga.
+            </div>
+            {redditData?.isFallback && (
+              <div style={{ marginBottom: 8, padding: '4px 8px', borderRadius: 4, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.18)', fontSize: 9, color: '#f59e0b' }}>
+                ⚠ Dados do cache — Reddit temporariamente indisponível
+              </div>
+            )}
+            {redditPosts.length > 0 ? (
+              <>
+                <div style={{ fontSize: 9, color: '#475569', marginBottom: 8 }}>
+                  {redditPosts.length} posts do dia · Sentimento médio:{' '}
+                  <strong style={{ color: redditPosts.reduce((s, p) => s + p.sentiment, 0) / redditPosts.length > 0.1 ? '#10b981' : redditPosts.reduce((s, p) => s + p.sentiment, 0) / redditPosts.length < -0.1 ? '#ef4444' : '#f59e0b' }}>
+                    {(redditPosts.reduce((s, p) => s + p.sentiment, 0) / redditPosts.length).toFixed(2)}
+                    {' — '}{redditPosts.reduce((s, p) => s + p.sentiment, 0) / redditPosts.length > 0.1 ? 'Bullish' : redditPosts.reduce((s, p) => s + p.sentiment, 0) / redditPosts.length < -0.1 ? 'Bearish' : 'Neutro'}
+                  </strong>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 280, overflowY: 'auto' }}>
+                  {redditPosts.slice(0, 10).map((post, i) => <RedditPostCard key={i} post={post} />)}
+                </div>
+              </>
+            ) : (
+              <div style={{ padding: '12px', textAlign: 'center', fontSize: 10, color: '#475569' }}>
+                {IS_LIVE ? 'Carregando posts do Reddit...' : 'Disponível apenas em modo ao vivo'}
+              </div>
+            )}
           </div>
         </div>
       )}
