@@ -20,7 +20,6 @@ const STOP_WORDS = new Set([
   'bitcoin','btc',
 ]);
 
-
 function buildWordCloudFromGdelt(articles) {
   if (!articles || articles.length === 0) return null;
   const freq = {};
@@ -45,7 +44,7 @@ function buildWordCloudFromGdelt(articles) {
     });
 }
 
-// ─── Static data (social APIs requerem plano pago) ────────────────────────────
+// ─── Fallback estático (social APIs requerem plano pago) ──────────────────────
 const wordCloudData = [
   { text: 'Bitcoin', value: 980, sentiment: 0.22, color: '#f59e0b' },
   { text: 'ETF',     value: 742, sentiment: 0.48, color: '#10b981' },
@@ -97,6 +96,61 @@ const mentionsHourlyFallback = Array.from({ length: 24 }, (_, i) => ({
   btc_volume_m: 0,
 }));
 
+// ─── Tooltip educativo ────────────────────────────────────────────────────────
+function Tip({ children, text }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <span
+      style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 3, cursor: 'help' }}
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
+      {children}
+      <span style={{ fontSize: 9, color: '#3b82f6', fontWeight: 700, opacity: 0.7 }}>?</span>
+      {open && (
+        <span style={{
+          position: 'absolute', bottom: '100%', left: 0, zIndex: 50,
+          background: '#0d1421', border: '1px solid #1e3048', borderRadius: 8,
+          padding: '8px 12px', fontSize: 11, color: '#cbd5e1', lineHeight: 1.6,
+          width: 240, boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+          whiteSpace: 'normal', pointerEvents: 'none',
+        }}>
+          {text}
+        </span>
+      )}
+    </span>
+  );
+}
+
+// ─── Accordion de dica ────────────────────────────────────────────────────────
+function TipCard({ emoji, title, body, tag }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div
+      onClick={() => setOpen(o => !o)}
+      style={{
+        background: '#0d1421', border: '1px solid #1e2d45', borderRadius: 10,
+        padding: '12px 14px', cursor: 'pointer',
+        borderLeft: '3px solid #a78bfa',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 16 }}>{emoji}</span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0' }}>{title}</span>
+          {tag && <span style={{ fontSize: 9, color: '#a78bfa', background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.2)', borderRadius: 4, padding: '1px 6px', fontWeight: 700 }}>{tag}</span>}
+        </div>
+        <span style={{ fontSize: 12, color: '#4a5568' }}>{open ? '▲' : '▼'}</span>
+      </div>
+      {open && (
+        <div style={{ marginTop: 10, fontSize: 11, color: '#94a3b8', lineHeight: 1.7, borderTop: '1px solid #1e2d45', paddingTop: 10 }}>
+          {body}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Word Cloud Component ─────────────────────────────────────────────────────
 function WordCloud({ words }) {
   const maxVal = Math.max(...words.map(w => w.value));
@@ -128,13 +182,6 @@ function WordCloud({ words }) {
 
 // ─── Social Gauge ─────────────────────────────────────────────────────────────
 function SocialGauge({ score, color, label }) {
-  const zones = [
-    { label: 'Medo Extremo', max: 25, color: '#60a5fa' },
-    { label: 'Medo',         max: 45, color: '#10b981' },
-    { label: 'Neutro',       max: 55, color: '#94a3b8' },
-    { label: 'Ganância',     max: 75, color: '#f59e0b' },
-    { label: 'Ganância Ext.',max: 100, color: '#ef4444' },
-  ];
   return (
     <div style={{ textAlign: 'center' }}>
       <div style={{ fontSize: 52, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color, lineHeight: 1, textShadow: `0 0 24px ${color}55` }}>{score}</div>
@@ -150,7 +197,7 @@ function SocialGauge({ score, color, label }) {
   );
 }
 
-// ─── Source Card (live shape: {label, score, weight, raw}) ───────────────────
+// ─── Source Card ──────────────────────────────────────────────────────────────
 function SourceCard({ src }) {
   const sentColor = src.score > 75 ? '#ef4444' : src.score > 60 ? '#f59e0b' : src.score > 45 ? '#10b981' : '#60a5fa';
   return (
@@ -196,14 +243,16 @@ const TABS = ['Overview', 'Tendências', 'KOLs', 'Correlações'];
 const SENTIMENT_FALLBACK = {
   score: 50, label_pt: 'Carregando...', color: '#94a3b8',
   prev_24h: 50, delta_24h: 0, sources: [],
+  isFallback: false, lastUpdated: null,
 };
 
 export default function MarketSentiment() {
   const [tab, setTab] = useState('Overview');
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [aiAnalysis, setAiAnalysis] = useState(null);
   const { data: sentiment } = useMarketSentiment();
   const s = sentiment ?? SENTIMENT_FALLBACK;
+
+  const isStale   = s.isFallback ?? false;
+  const staleDate = s.lastUpdated ?? null;
 
   // Word cloud: keywords extraídas de artigos GDELT quando disponíveis
   const { data: gdeltArticles } = useGdeltNews('bitcoin crypto');
@@ -231,6 +280,7 @@ export default function MarketSentiment() {
       return {
         day:       days[d.getDay()],
         score:     f.value,
+        volume_b:  0,
         btc_price: btcByDay[d.toISOString().slice(0, 10)] ?? null,
       };
     });
@@ -278,18 +328,10 @@ export default function MarketSentiment() {
   }, [fngHistory, klines]);
   const activeSocialCorrelation = liveSocialCorrelation ?? socialCorrelation;
 
-  const generateAIAnalysis = async () => {
-    // TODO: integrar com API real de AI (OpenAI/Claude) quando dados reais forem conectados
-    setIsGenerating(true);
-    setTimeout(() => {
-      setAiAnalysis('Análise AI disponível após conexão com APIs reais. Configure VITE_AI_API_KEY para ativar.');
-      setIsGenerating(false);
-    }, 800);
-  };
-
   return (
     <div style={{ maxWidth: 1280, margin: '0 auto' }}>
-      {/* Header */}
+
+      {/* ── CABEÇALHO ──────────────────────────────────────────────────────────── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
         <div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4 }}>
@@ -298,34 +340,87 @@ export default function MarketSentiment() {
             {!IS_LIVE && <DataTrustBadge mode="mock" confidence="D" source="Demo" reason="Dados sociais simulados — Twitter/Reddit sem API real" />}
             <span style={{ fontSize: 9, padding: '2px 8px', borderRadius: 4, background: 'rgba(167,139,250,0.1)', color: '#a78bfa', border: '1px solid rgba(167,139,250,0.25)', fontWeight: 700 }}>FNG + Funding + GDELT</span>
           </div>
-          <p style={{ fontSize: 11, color: '#475569', margin: 0 }}>Twitter/X · Reddit · Telegram · Notícias Cripto · Word Cloud · Correlação BTC</p>
+          <p style={{ fontSize: 11, color: '#475569', margin: 0, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <span>Twitter/X · Reddit · Telegram · Notícias Cripto · Word Cloud · Correlação BTC · <ModeBadge /></span>
+            {isStale && staleDate && (
+              <span title={`Última atualização: ${new Date(staleDate).toLocaleString('pt-BR')}`}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 9, color: '#f59e0b', cursor: 'help' }}>
+                ⚠ Cache · {new Date(staleDate).toLocaleDateString('pt-BR')}
+              </span>
+            )}
+          </p>
         </div>
-        <button onClick={generateAIAnalysis} disabled={isGenerating} style={{ padding: '9px 16px', borderRadius: 8, cursor: isGenerating ? 'default' : 'pointer', fontSize: 11, fontWeight: 700, background: isGenerating ? '#0d1421' : 'rgba(167,139,250,0.12)', border: `1px solid ${isGenerating ? '#1a2535' : 'rgba(167,139,250,0.35)'}`, color: isGenerating ? '#334155' : '#a78bfa' }}>
-          {isGenerating ? '⏳ Verificando...' : 'ℹ️ Status Integração AI'}
-        </button>
       </div>
 
-      {/* AI Analysis */}
-      {aiAnalysis && (
-        <div style={{ marginBottom: 14, padding: '14px 16px', borderRadius: 10, background: 'rgba(167,139,250,0.06)', border: '1px solid rgba(167,139,250,0.25)' }}>
-          <div style={{ fontSize: 10, color: '#a78bfa', fontWeight: 700, marginBottom: 6 }}>ℹ️ Status da Integração AI</div>
-          <div style={{ fontSize: 11, color: '#94a3b8', lineHeight: 1.7 }}>{aiAnalysis}</div>
+      {/* ── O QUE É ESTA PÁGINA ─────────────────────────────────────────────────── */}
+      <div style={{ marginBottom: 20, padding: '16px 20px', borderRadius: 12, background: 'linear-gradient(135deg, rgba(167,139,250,0.07) 0%, rgba(59,130,246,0.05) 100%)', border: '1px solid rgba(167,139,250,0.2)' }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+          <div style={{ fontSize: 28, lineHeight: 1, marginTop: 2 }}>🧠</div>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: '#e2e8f0', marginBottom: 6 }}>Para que serve esta página?</div>
+            <div style={{ fontSize: 11, color: '#94a3b8', lineHeight: 1.8, maxWidth: 800 }}>
+              <strong style={{ color: '#cbd5e1' }}>Sentimento Social</strong> mede o <strong style={{ color: '#cbd5e1' }}>estado emocional do mercado</strong> — se os participantes estão com medo ou eufóricos com o Bitcoin.{' '}
+              O score combina três fontes gratuitas: <strong style={{ color: '#a78bfa' }}>Fear & Greed Index</strong> (pesquisa de mercado), <strong style={{ color: '#a78bfa' }}>Funding Rate</strong> (quanto traders alavancados estão pagando) e <strong style={{ color: '#a78bfa' }}>GDELT</strong> (tom de notícias globais).{' '}
+              <strong style={{ color: '#3b82f6' }}>Extremos históricos são oportunidades:</strong> medo extremo costuma preceder altas; euforia extrema, correções.
+            </div>
+            <div style={{ display: 'flex', gap: 16, marginTop: 10, flexWrap: 'wrap' }}>
+              {[
+                { icon: '😱', text: 'Detectar pânico no mercado — possível zona de compra' },
+                { icon: '🤑', text: 'Identificar euforia excessiva — risco de correção' },
+                { icon: '📰', text: 'Ver narrativa dominante nas notícias globais' },
+                { icon: '🔗', text: 'Medir correlação sentimento × preço com lag ótimo' },
+              ].map((u, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: '#64748b' }}>
+                  <span>{u.icon}</span><span>{u.text}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── BANNER FALLBACK/CACHE ────────────────────────────────────────────────── */}
+      {isStale && staleDate && (
+        <div style={{ marginBottom: 16, padding: '7px 14px', borderRadius: 8, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.2)', fontSize: 10, color: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <span>⚠ Último valor salvo no Supabase — APIs de mercado temporariamente indisponíveis</span>
+          <span style={{ fontFamily: 'JetBrains Mono, monospace' }}>Última atualização: {new Date(staleDate).toLocaleString('pt-BR')}</span>
         </div>
       )}
 
-      {/* Big gauge + sources */}
+      {/* ── BIG GAUGE + FONTES ───────────────────────────────────────────────────── */}
       <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: 14, marginBottom: 14 }}>
         <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '20px 16px', textAlign: 'center' }}>
-          <div style={{ fontSize: 9, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 14 }}>Social Fear/Greed Score</div>
+          <div style={{ fontSize: 9, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>
+            <Tip text="Score de 0 a 100 que mede a emoção coletiva do mercado. 0 = pânico total. 100 = euforia máxima. Extremos tendem a preceder reversões de preço.">
+              Social Fear/Greed Score
+            </Tip>
+          </div>
+          <div style={{ fontSize: 9, color: '#334155', marginBottom: 10, padding: '4px 8px', borderRadius: 5, background: '#0a1220', border: '1px solid #0f1d2e' }}>
+            📌 <strong style={{ color: '#94a3b8' }}>Para que serve:</strong> Termômetro de emoção. Compre quando todos estão com medo. Tenha cautela quando todos estão gananciosos.
+          </div>
           <SocialGauge score={s.score} color={s.color} label={s.label_pt} />
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 12 }}>
-            <div><div style={{ fontSize: 8, color: '#334155' }}>24h atrás</div><div style={{ fontSize: 12, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', color: s.delta_24h > 0 ? '#10b981' : '#ef4444' }}>{s.prev_24h} ({s.delta_24h > 0 ? '+' : ''}{s.delta_24h})</div></div>
+            <div>
+              <div style={{ fontSize: 8, color: '#334155' }}>24h atrás</div>
+              <div style={{ fontSize: 12, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', color: s.delta_24h > 0 ? '#10b981' : '#ef4444' }}>
+                {s.prev_24h} ({s.delta_24h > 0 ? '+' : ''}{s.delta_24h})
+              </div>
+            </div>
           </div>
         </div>
 
         <div>
-          <div style={{ fontSize: 10, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Score por Fonte</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginBottom: 12 }}>
+          <div style={{ fontSize: 10, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Score por Fonte</div>
+          <div style={{ fontSize: 9, color: '#334155', marginBottom: 8, padding: '5px 8px', borderRadius: 5, background: '#0a1220', border: '1px solid #0f1d2e' }}>
+            📌 <strong style={{ color: '#94a3b8' }}>Para que serve:</strong>{' '}
+            <Tip text="Índice diário da Alternative.me combinando dados de preço, volume, volatilidade, dominância e tendências sociais. Atualiza 1x/dia.">Fear & Greed</Tip>
+            {' '}(50%) ={' '}
+            <Tip text="Taxa paga a cada 8h entre posições long e short em futuros perpétuos. Alta positiva = traders alavancados comprando, mercado sobreaquecido.">Funding Rate</Tip>
+            {' '}(30%) ={' '}
+            <Tip text="GDELT monitora 65.000 fontes de notícias globais em tempo real. Sentimento é extraído pelo tom positivo ou negativo das manchetes sobre Bitcoin.">GDELT News</Tip>
+            {' '}(20%)
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginBottom: 10 }}>
             {s.sources.map((src, i) => <SourceCard key={i} src={src} />)}
           </div>
           <div style={{ padding: '8px 10px', borderRadius: 7, background: 'rgba(100,116,139,0.05)', border: '1px solid rgba(100,116,139,0.15)', fontSize: 9, color: '#64748b', lineHeight: 1.6 }}>
@@ -334,28 +429,40 @@ export default function MarketSentiment() {
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* ── TABS ─────────────────────────────────────────────────────────────────── */}
       <div style={{ display: 'flex', gap: 2, marginBottom: 14, background: '#0d1421', padding: 4, borderRadius: 8, border: '1px solid #1a2535', width: 'fit-content' }}>
         {TABS.map(t => (
-          <button key={t} onClick={() => setTab(t)} style={{ padding: '7px 16px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: tab === t ? 800 : 500, background: tab === t ? 'rgba(59,130,246,0.18)' : 'transparent', color: tab === t ? '#60a5fa' : '#475569' }}>
+          <button key={t} onClick={() => setTab(t)} style={{ padding: '7px 16px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: tab === t ? 800 : 500, background: tab === t ? 'rgba(167,139,250,0.18)' : 'transparent', color: tab === t ? '#a78bfa' : '#475569' }}>
             {t}
           </button>
         ))}
       </div>
 
-      {/* TAB: Overview */}
+      {/* ── TAB: Overview ────────────────────────────────────────────────────────── */}
       {tab === 'Overview' && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+
           {/* Word Cloud */}
           <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '18px 20px' }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>☁️ Nuvem de Palavras</div>
-            <div style={{ fontSize: 9, color: '#334155', marginBottom: 10 }}>Tamanho = volume de menções · Cor = sentimento (verde/vermelho)</div>
+            <div style={{ fontSize: 9, color: '#334155', marginBottom: 6, padding: '5px 8px', borderRadius: 5, background: '#0a1220', border: '1px solid #0f1d2e' }}>
+              📌 <strong style={{ color: '#94a3b8' }}>Para que serve:</strong> Palavras mais citadas em notícias sobre Bitcoin. Verde = bullish. Vermelho = bearish. Detecte a narrativa dominante antes que se reflita no preço.
+            </div>
+            <div style={{ fontSize: 9, color: '#334155', marginBottom: 10 }}>Tamanho = volume de menções · Cor = sentimento · Hover para detalhes</div>
+            {!IS_LIVE && (
+              <div style={{ marginBottom: 8, padding: '4px 8px', borderRadius: 4, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.18)', fontSize: 9, color: '#78716c' }}>
+                🔒 Dados de demonstração — palavras extraídas de notícias GDELT quando disponíveis ao vivo
+              </div>
+            )}
             <WordCloud words={activeWordCloud} />
           </div>
 
           {/* 7d history */}
           <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '18px 20px' }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', marginBottom: 12 }}>📈 Sentimento + Preço BTC (7 dias)</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>📈 Sentimento + Preço BTC (7 dias)</div>
+            <div style={{ fontSize: 9, color: '#334155', marginBottom: 10, padding: '5px 8px', borderRadius: 5, background: '#0a1220', border: '1px solid #0f1d2e' }}>
+              📌 <strong style={{ color: '#94a3b8' }}>Para que serve:</strong> Divergência entre barras (sentimento) e linha (preço) pode sinalizar movimento artificial ou reversão iminente. Barras altas + preço parado = distribuição silenciosa.
+            </div>
             <ResponsiveContainer width="100%" height={200}>
               <ComposedChart data={activeSentHistory} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(30,45,69,0.4)" vertical={false} />
@@ -369,17 +476,25 @@ export default function MarketSentiment() {
                 <Line yAxisId="price" dataKey="btc_price" stroke="#f59e0b" strokeWidth={2} dot={false} name="BTC" />
               </ComposedChart>
             </ResponsiveContainer>
+            {!sentimentHistory7dLive && (
+              <div style={{ marginTop: 8, padding: '4px 8px', borderRadius: 4, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.18)', fontSize: 9, color: '#78716c' }}>
+                🔒 Dados de demonstração — gráfico ao vivo usa Fear & Greed Index (alternative.me) × Binance klines
+              </div>
+            )}
           </div>
 
           {/* Mentions hourly — GDELT timelinevolraw */}
           <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '18px 20px', gridColumn: '1 / -1' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>📰 Cobertura Midiática por Hora (GDELT)</div>
               <div style={{ fontSize: 9, color: IS_LIVE && gdeltTimeline?.length > 0 ? '#10b981' : '#64748b' }}>
                 {IS_LIVE && gdeltTimeline?.length > 0 ? '● Artigos de mídia global — GDELT Doc 2.0' : 'GDELT indisponível ou sem dados'}
               </div>
             </div>
-            <div style={{ fontSize: 9, color: '#334155', marginBottom: 10 }}>Artigos de mídia global monitorados pelo GDELT nas últimas 24h · agrupados por hora UTC</div>
+            <div style={{ fontSize: 9, color: '#334155', marginBottom: 8, padding: '5px 8px', borderRadius: 5, background: '#0a1220', border: '1px solid #0f1d2e', display: 'inline-block' }}>
+              📌 <strong style={{ color: '#94a3b8' }}>Para que serve:</strong> Picos de cobertura midiática geralmente antecedem movimentos de preço em 2-6 horas. Quando cresce sem o preço mover, fique atento.
+            </div>
+            <div style={{ fontSize: 9, color: '#334155', marginBottom: 10, marginTop: 6 }}>Artigos de mídia global monitorados pelo GDELT nas últimas 24h · agrupados por hora UTC</div>
             {IS_LIVE && mentionsHourly.some(m => m.mentions > 0) ? (
               <ResponsiveContainer width="100%" height={120}>
                 <ComposedChart data={mentionsHourly} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
@@ -405,11 +520,14 @@ export default function MarketSentiment() {
         </div>
       )}
 
-      {/* TAB: Tendências */}
+      {/* ── TAB: Tendências ──────────────────────────────────────────────────────── */}
       {tab === 'Tendências' && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
           <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '18px 20px' }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', marginBottom: 12 }}>🔥 Trending Topics</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>🔥 Trending Topics</div>
+            <div style={{ fontSize: 9, color: '#334155', marginBottom: 8, padding: '5px 8px', borderRadius: 5, background: '#0a1220', border: '1px solid #0f1d2e' }}>
+              📌 <strong style={{ color: '#94a3b8' }}>Para que serve:</strong> Termos mais mencionados em notícias globais sobre Bitcoin. Verde = narrativa positiva. Vermelho = pânico ou regulação. Amarelo = neutro/incerto.
+            </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <div style={{ fontSize: 9, color: '#334155', marginBottom: 6 }}>
                 {IS_LIVE && liveWordCloud && liveWordCloud.length > 0 ? 'Extraído de notícias GDELT em tempo real' : IS_LIVE ? 'GDELT indisponível — dados de demonstração' : 'Dados de demonstração'}
@@ -459,15 +577,25 @@ export default function MarketSentiment() {
         </div>
       )}
 
-      {/* TAB: KOLs */}
+      {/* ── TAB: KOLs ───────────────────────────────────────────────────────────── */}
       {tab === 'KOLs' && (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, padding: '40px 20px', background: '#111827', border: '1px solid #1e2d45', borderRadius: 12 }}>
-          <div style={{ fontSize: 24, opacity: 0.3 }}>🔒</div>
-          <div style={{ fontSize: 14, fontWeight: 700, color: '#e2e8f0' }}>KOL Sentiment Monitor</div>
-          <div style={{ fontSize: 11, color: '#4a5568', textAlign: 'center', maxWidth: 360, lineHeight: 1.7 }}>
-            Monitoramento de Key Opinion Leaders (Saylor, Cathie Wood, etc.) requer acesso à <strong style={{ color: '#94a3b8' }}>Twitter/X API v2 Enterprise</strong> (~$100/mês) para leitura de tweets em tempo real e análise de sentimento por NLP.
+        <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '24px 20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, flexWrap: 'wrap', gap: 8 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>👥 KOL Sentiment Monitor</div>
+            <DataTrustBadge
+              mode="paid_required"
+              confidence="D"
+              source="Twitter/X API Enterprise"
+              sourceUrl="https://developer.twitter.com/en/products/twitter-api"
+              reason="Monitoramento de KOLs requer Twitter/X API v2 Enterprise (~$100/mês) ou LunarCrush (~$49/mês) para leitura de tweets em tempo real + NLP."
+            />
           </div>
-          <div style={{ display: 'flex', gap: 10 }}>
+          <PurposeLabel text="Monitora o sentimento de influenciadores-chave (Michael Saylor, Cathie Wood, etc.) em tempo real. Mudanças de posicionamento de grandes KOLs costumam antecipar movimentos de narrativa no mercado." mb={16} />
+          {/* Preview com dados de exemplo — claramente desabilitado */}
+          <div style={{ opacity: 0.35, pointerEvents: 'none', display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+            {kolSentiment.map((k, i) => <KOLCard key={i} kol={k} />)}
+          </div>
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginBottom: 16 }}>
             <a href="https://developer.twitter.com/en/products/twitter-api" target="_blank" rel="noopener noreferrer"
               style={{ fontSize: 10, color: '#3b82f6', border: '1px solid #1e3a5f', borderRadius: 4, padding: '4px 10px', textDecoration: 'none' }}>
               Twitter API v2 →
@@ -477,15 +605,19 @@ export default function MarketSentiment() {
               LunarCrush (alternativa) →
             </a>
           </div>
+          <div style={{ padding: '6px 10px', borderRadius: 6, background: 'rgba(249,115,22,0.06)', border: '1px solid rgba(249,115,22,0.18)', fontSize: 10, color: '#78716c', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+            <span>🔒 Dados simulados — monitoramento de KOLs requer API paga com acesso a Twitter/X em tempo real.</span>
+            <a href="https://lunarcrush.com/pricing" target="_blank" rel="noopener noreferrer" style={{ color: '#f97316', textDecoration: 'none', fontWeight: 700, whiteSpace: 'nowrap' }}>Ver planos →</a>
+          </div>
         </div>
       )}
 
-      {/* TAB: Correlações */}
+      {/* ── TAB: Correlações ────────────────────────────────────────────────────── */}
       {tab === 'Correlações' && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
           <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '18px 20px' }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>🔗 Correlação Social → Preço BTC</div>
-            <PurposeLabel text="Análise de quanto o sentimento social antecede ou segue o preço do BTC. Correlação positiva alta e defasada = sentimento é leading indicator para este período — use como sinal de timing." mb={10} />
+            <PurposeLabel text="Mede quanto o sentimento social antecipa o preço (r próximo de +1 = correlação positiva forte). Quando r > 0.70 com lag de 4h, o sentimento está funcionando como leading indicator — use para calibrar timing de entrada." mb={10} />
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
               {[
                 { label: 'Sentimento vs Preço (24h)', value: activeSocialCorrelation.sentiment_vs_price_24h, color: '#60a5fa' },
@@ -502,6 +634,22 @@ export default function MarketSentiment() {
                 </div>
               ))}
             </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12, fontSize: 9, color: '#64748b' }}>
+              {[
+                { icon: '🟢', label: 'r > +0.70', desc: 'Correlação forte — sentimento é leading indicator' },
+                { icon: '🟡', label: '+0.40 a +0.70', desc: 'Correlação moderada — sinal de confirmação' },
+                { icon: '⚪', label: '-0.40 a +0.40', desc: 'Correlação fraca — não confiar como sinal' },
+                { icon: '🔴', label: 'r < -0.40', desc: 'Correlação inversa — sentimento vai contra o preço' },
+              ].map((g, i) => (
+                <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'flex-start', padding: '6px 8px', background: '#0a1220', borderRadius: 6 }}>
+                  <span style={{ fontSize: 12 }}>{g.icon}</span>
+                  <div>
+                    <div style={{ fontFamily: 'JetBrains Mono, monospace', fontWeight: 700, color: '#94a3b8' }}>{g.label}</div>
+                    <div style={{ lineHeight: 1.5 }}>{g.desc}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
             <div style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.15)', fontSize: 10, color: '#64748b', lineHeight: 1.7 }}>
               <span style={{ color: '#94a3b8', fontWeight: 700 }}>Lag ótimo:</span> {activeSocialCorrelation.lag_hours_optimal}h<br />
               {activeSocialCorrelation.note}
@@ -514,9 +662,12 @@ export default function MarketSentiment() {
           </div>
 
           <div style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 12, padding: '18px 20px' }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', marginBottom: 12 }}>📈 Histórico: Sentimento vs Volume</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>📈 Histórico: Sentimento vs Volume</div>
+            <div style={{ fontSize: 9, color: '#334155', marginBottom: 10, padding: '5px 8px', borderRadius: 5, background: '#0a1220', border: '1px solid #0f1d2e' }}>
+              📌 <strong style={{ color: '#94a3b8' }}>Para que serve:</strong> Quando o sentimento sobe mas o volume cai, o movimento pode ser fraco. Volume alto + sentimento alto = força real.
+            </div>
             <ResponsiveContainer width="100%" height={220}>
-              <ComposedChart data={activeSentHistory} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+              <ComposedChart data={activeSentHistory.map(d => ({ ...d, volume_b: d.volume_b ?? 0 }))} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(30,45,69,0.4)" vertical={false} />
                 <XAxis dataKey="day" tick={{ fontSize: 10, fill: '#475569' }} axisLine={false} tickLine={false} />
                 <YAxis yAxisId="score" tick={{ fontSize: 8, fill: '#475569' }} axisLine={false} tickLine={false} domain={[0, 100]} />
@@ -529,6 +680,53 @@ export default function MarketSentiment() {
           </div>
         </div>
       )}
+
+      {/* ── DICAS DE OURO ────────────────────────────────────────────────────────── */}
+      <div style={{ marginTop: 20, marginBottom: 16 }}>
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>✨ Dicas de Ouro — Como Usar o Sentimento Social</div>
+          <div style={{ fontSize: 10, color: '#475569', marginTop: 2 }}>Clique em cada dica para expandir · Regras usadas por traders profissionais</div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          <TipCard
+            emoji="📈"
+            title="Score alto + Funding alto = cuidado"
+            tag="SOBREAQUECIMENTO"
+            body="Score acima de 70 + funding rate acima de 0.06%/8h = mercado alavancado comprando. Risco alto de cascata de liquidação. Aguarde pullback antes de entrar long. Combine com Open Interest para confirmar."
+          />
+          <TipCard
+            emoji="😱"
+            title="Medo Extremo nem sempre = compra imediata"
+            tag="TIMING"
+            body="Score < 25 indica pânico. Pode ser boa entrada, mas confira o calendário macro: se há FOMC ou CPI na semana, o sell-off pode se aprofundar antes de reverter. Espere estabilização do score por 2-3 dias."
+          />
+          <TipCard
+            emoji="📰"
+            title="Pico de notícias precede o preço"
+            tag="LEADING INDICATOR"
+            body="Quando a cobertura por hora dobra sem que o preço tenha se movido, o mercado está prestes a reagir. Monitore o gráfico GDELT: costuma anteceder o preço em 2-6 horas. Combine com volume spot para confirmar."
+          />
+          <TipCard
+            emoji="💰"
+            title="Funding Rate é o termômetro de alavancagem"
+            tag="DERIVATIVOS"
+            body="Funding acima de 0.10%/8h = posições long pagando muito. Isso cria pressão para liquidações em cadeia. Funding negativo = shorts dominando, risco de short squeeze. Cruze sempre com Open Interest total."
+          />
+          <TipCard
+            emoji="🔗"
+            title="Correlação alta + lag de 4h = use para timing"
+            tag="CORRELAÇÃO"
+            body="Quando r > 0.70 com lag de 4h, o sentimento está funcionando como leading indicator. Nesse cenário, pico de sentimento positivo hoje = probabilidade maior de alta de preço nas próximas 4h. Não é garantia — é um sinal de probabilidade."
+          />
+          <TipCard
+            emoji="⚠️"
+            title="Banner amarelo = último valor do Supabase"
+            tag="QUALIDADE"
+            body="Se aparecer '⚠ Último valor salvo no Supabase' no topo, significa que as APIs de mercado estão temporariamente offline. O score exibido é o último calculado com sucesso — pode ter até 1 hora de atraso (Fear & Greed) ou 30 minutos (GDELT)."
+          />
+        </div>
+      </div>
+
     </div>
   );
 }
