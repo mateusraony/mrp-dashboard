@@ -1303,6 +1303,45 @@ Organizar resiliência de API com cache no Supabase para nunca estourar limites 
 
 ---
 
+## ✅ ExecutiveReport — Revisão Completa (2026-06-01)
+
+**Branch:** `claude/compassionate-lamport-3Q0Gh` | **PRs:** #239 (principal) + melhorias pós-merge
+
+### O que foi entregue
+
+| Item | Status |
+|---|---|
+| 6 hooks ao vivo integrados: `useMacroBoard`, `useYieldCurve`, `useCreditSpread`, `useDominance`, `useStablecoinData`, `useEtfSummary` | ✅ |
+| Fallback Supabase com `CacheBanner` (`⚠ Cache · DD/MM/YYYY`) em todos os cards | ✅ |
+| 14 objetos `_FALLBACK` com zeros removidos — substituídos por dados reais | ✅ |
+| Labels de liquidação calculadas dinamicamente (±9% do `mark_price`) | ✅ |
+| Banner "Para que serve" gradiente azul-verde | ✅ |
+| Dicas de Ouro — 6 TipCards colapsáveis | ✅ |
+| Guias de interpretação com 4 cenários semafóricos (GlobalOverview + OnChain) | ✅ |
+| `PaidDataBanner` laranja em SOPR, Netflow, Whale Activity, Basis, Options | ✅ |
+| Fix Codex P2: sinal negativo net mint (`-$123M` exibia como `$123M`) | ✅ |
+| Fix Codex P2: `EMPTY_YIELD_CURVE.updated_at=0` mostrava `0bp Invertida` | ✅ |
+| `isStale` agregado inclui todos os 7 hooks com fallback | ✅ |
+| `useCreditSpread` ganhou `select` transform (consistência com demais hooks FRED) | ✅ |
+| `ExtraSignals.jsx` atualizado para API flattened do `useCreditSpread` | ✅ |
+
+### Alternativas gratuitas utilizadas
+| Dado | API |
+|---|---|
+| S&P 500, VIX, DXY, Gold, US10Y | FRED (gratuito) via `useMacroBoard` |
+| Yield Curve (10Y-2Y) | FRED (gratuito) via `useYieldCurve` |
+| HY Credit Spread | FRED ICE BofA via `useCreditSpread` |
+| BTC Dominance | CoinGecko (gratuito) via `useDominance` |
+| Stablecoin Supply | DeFiLlama (gratuito) via `useStablecoinData` |
+| ETF Flows | SoSoValue free tier via `useEtfSummary` (requer `VITE_SOSOVALUE_KEY`) |
+
+### Verificação final
+- `npm run build` ✅ sem erros — 59.4kB (ExecutiveReport chunk estável)
+- `npx tsc -p ./jsconfig.json` ✅ sem erros
+- `npx eslint` ✅ sem erros nos arquivos alterados
+
+---
+
 ## 🔜 FASE 2 — ELIMINAR ILUSÃO DE DADOS (PRÓXIMA)
 
 **Objetivo:** Garantir que o usuário nunca confunda dado falso com real. Nenhuma feature nova — apenas transparência.

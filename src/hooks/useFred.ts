@@ -47,6 +47,19 @@ const EMPTY_GLOBAL_LIQUIDITY: GlobalLiquidityData = {
   updated_at:          0,
 };
 
+const EMPTY_CREDIT_SPREAD: CreditSpreadData = {
+  hy_spread_bp: 0,
+  ig_spread_bp: 0,
+  prev_7d_hy:   0,
+  prev_30d_hy:  0,
+  delta_7d_bp:  0,
+  delta_30d_bp: 0,
+  regime:       'stable',
+  history:      [],
+  quality:      'C',
+  updated_at:   0,
+};
+
 /**
  * useMacroBoard — S&P 500, DXY, Gold, VIX, US10Y, US2Y com histórico 30d
  * Atualiza a cada 1h em modo live.
@@ -172,5 +185,9 @@ export function useCreditSpread() {
     refetchInterval: MACRO_INTERVAL,
     retry: 2,
     retryDelay: (attempt: number) => Math.min(1000 * 2 ** attempt, 10_000),
+    select: (state: DataState<CreditSpreadData>) => {
+      const data = state.data ?? EMPTY_CREDIT_SPREAD;
+      return { ...data, isFallback: state.isFallback, lastUpdated: state.lastUpdated };
+    },
   });
 }
