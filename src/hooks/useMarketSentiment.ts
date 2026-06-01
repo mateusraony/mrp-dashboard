@@ -88,12 +88,20 @@ export function useMarketSentiment() {
   const { data: fng }    = useFearGreed();
   const { data: news }   = useGdeltNews('bitcoin crypto');
 
+  // Extrair metadados de fallback uma vez — usados tanto no queryKey quanto no queryFn
+  const tickerMeta = ticker as unknown as { isFallback?: boolean; lastUpdated?: string | null };
+  const fngMeta    = fng    as unknown as { isFallback?: boolean; lastUpdated?: string | null };
+
   return useQuery({
     queryKey: [
       'market-sentiment',
       fng?.value,
       ticker?.last_funding_rate,
       news?.length,
+      // Incluídos para que transições live↔fallback (sem mudança de valor numérico)
+      // recomputem imediatamente — sem esperar o intervalo de 30s
+      tickerMeta?.isFallback,
+      fngMeta?.isFallback,
     ],
     queryFn: (): MarketSentimentResult => {
       const fngScore     = fng?.value ?? 50;
@@ -137,10 +145,8 @@ export function useMarketSentiment() {
       const delta24h  = score - prev24h;
 
       // Propaga isFallback/lastUpdated das fontes subjacentes (select: de useBtcTicker e useFearGreed adicionam esses campos)
-      const t = ticker as unknown as { isFallback?: boolean; lastUpdated?: string | null };
-      const f = fng    as unknown as { isFallback?: boolean; lastUpdated?: string | null };
-      const isFallback  = !!(t?.isFallback) || !!(f?.isFallback);
-      const lastUpdated = f?.lastUpdated ?? t?.lastUpdated ?? null;
+      const isFallback  = !!(tickerMeta?.isFallback) || !!(fngMeta?.isFallback);
+      const lastUpdated = fngMeta?.lastUpdated ?? tickerMeta?.lastUpdated ?? null;
 
       return { score, classification, label_pt, color, prev_24h: prev24h, delta_24h: delta24h, sources, updated_at: Date.now(), isFallback, lastUpdated };
     },
