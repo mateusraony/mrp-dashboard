@@ -22,7 +22,7 @@ const hasKey = () => !!env.VITE_SOSOVALUE_KEY;
  * Retorna null quando a chave não está configurada ou a API falha.
  */
 export function useEtfSummary() {
-  return useQuery<DataState<EtfSummary | null>, Error, EtfSummary | null>({
+  return useQuery({
     queryKey:        ['sosovalue', 'etf-summary'],
     queryFn:         async (): Promise<DataState<EtfSummary | null>> => {
       try {
@@ -37,7 +37,10 @@ export function useEtfSummary() {
         return { data: null, lastUpdated: null, isFallback: true, debugError: String(err) };
       }
     },
-    select:          (state) => state.data,
+    select: (state: DataState<EtfSummary | null>) => {
+      if (!state.data) return null;
+      return { ...state.data, isFallback: state.isFallback, lastUpdated: state.lastUpdated };
+    },
     staleTime:       30 * 60_000,
     refetchInterval: IS_LIVE ? 60 * 60_000 : false,
     retry:           1,
@@ -50,7 +53,7 @@ export function useEtfSummary() {
  * Retorna null quando a chave não está configurada ou a API falha.
  */
 export function useEtfFlowHistory(days = 30) {
-  return useQuery<DataState<EtfDailyFlow[] | null>, Error, EtfDailyFlow[] | null>({
+  return useQuery({
     queryKey:        ['sosovalue', 'etf-history', days],
     queryFn:         async (): Promise<DataState<EtfDailyFlow[] | null>> => {
       try {
@@ -65,7 +68,11 @@ export function useEtfFlowHistory(days = 30) {
         return { data: null, lastUpdated: null, isFallback: true, debugError: String(err) };
       }
     },
-    select:          (state) => state.data,
+    select: (state: DataState<EtfDailyFlow[] | null>) => ({
+      data:        state.data,
+      isFallback:  state.isFallback,
+      lastUpdated: state.lastUpdated,
+    }),
     staleTime:       30 * 60_000,
     refetchInterval: IS_LIVE ? 60 * 60_000 : false,
     retry:           1,

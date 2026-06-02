@@ -19,6 +19,20 @@ import { env } from '@/lib/env';
 
 // ─── Tipos exportados ────────────────────────────────────────────────────────────────────────────────
 
+/** Ponto de dado diário para o gráfico de mint/burn histórico */
+export interface StablecoinDailyData {
+  label:          string;  // ex: "01/jan" para eixo X
+  date:           string;  // ISO date "YYYY-MM-DD"
+  usdt_net:       number;  // delta supply USDT em $M (+mint, -burn)
+  usdc_net:       number;  // delta supply USDC em $M
+  total_net:      number;  // usdt_net + usdc_net
+  usdt_supply_b:  number;  // supply total USDT em $B
+  usdc_supply_b:  number;  // supply total USDC em $B
+  usdt_mint:      number;  // max(0, usdt_net) para barras de mint
+  usdc_mint:      number;  // max(0, usdc_net) para barras de mint
+  btc_buy_vol_b:  number;  // placeholder — correlação com Binance é fase futura
+}
+
 export interface StablecoinSnapshot {
   name: string;
   symbol: string;
@@ -111,6 +125,7 @@ const DefillamaCirculatingSchema = z.object({
 }).passthrough();
 
 const DefillamaStablecoinSchema = z.object({
+  id:          z.string().optional(),
   name:        z.string(),
   symbol:      z.string(),
   pegType:     z.string().default('peggedUSD'),
@@ -290,4 +305,97 @@ export async function fetchStablecoinData(): Promise<StablecoinData> {
     console.error('[DeFiLlama] Erro ao buscar dados — retornando mock:', err);
     return { ...mockStablecoinData, updatedAt: Date.now(), quality: 'C', source: 'mock' };
   }
+}
+
+// ─── Histórico de Supply — USDT + USDC ───────────────────────────────────────
+
+const DefillamaHistoryTokenSchema = z.object({
+  date:                z.number(),
+  totalCirculatingUSD: z.object({ peggedUSD: z.number().default(0) }).passthrough().optional(),
+  // DeFiLlama usa totalCirculating (em unidades nativas) em algumas respostas históricas;
+  // para stablecoins USD-pegged, peggedUSD tem o mesmo valor em dólares.
+  totalCirculating:    z.object({ peggedUSD: z.number().default(0) }).passthrough().optional(),
+}).passthrough();
+
+const DefillamaStablecoinHistorySchema = z.object({
+  tokens: z.array(DefillamaHistoryTokenSchema),
+}).passthrough();
+
+/**
+ * fetchStablecoinHistory — Retorna histórico diário de supply USDT+USDC via DeFiLlama.
+ *
+ * Estratégia:
+ *   1. Busca a lista /stablecoins para obter os IDs de USDT e USDC
+ *   2. Busca /stablecoin/{id} para cada um em paralelo
+ *   3. Calcula delta diário (mint-burn net) como variação de supply
+ *
+ * Substitui ~70% do Glassnode para dados de stablecoin — gratuitamente.
+ */
+export async function fetchStablecoinHistory(days = 30): Promise<StablecoinDailyData[]> {
+  if (DATA_MODE === 'mock') return [];
+
+  // Etapa 1: IDs de USDT e USDC
+  const listRes  = await apiFetch('https://stablecoins.llama.fi/stablecoins?includePrices=true');
+  const listJson = await listRes.json();
+  const parsed   = DefillamaStablecoinsResponseSchema.parse(listJson);
+
+  const assets = parsed.peggedAssets as Array<{ id?: string; symbol: string }>;
+  const usdtId = assets.find(a => a.symbol === 'USDT')?.id;
+  const usdcId = assets.find(a => a.symbol === 'USDC')?.id;
+
+  if (!usdtId || !usdcId) throw new Error('USDT/USDC IDs not found in DeFiLlama list');
+
+  // Etapa 2: Histórico em paralelo
+  const [usdtRes, usdcRes] = await Promise.all([
+    apiFetch(`https://stablecoins.llama.fi/stablecoin/${usdtId}`),
+    apiFetch(`https://stablecoins.llama.fi/stablecoin/${usdcId}`),
+  ]);
+
+  const [usdtJson, usdcJson] = await Promise.all([usdtRes.json(), usdcRes.json()]);
+  const usdtHist = DefillamaStablecoinHistorySchema.parse(usdtJson);
+  const usdcHist = DefillamaStablecoinHistorySchema.parse(usdcJson);
+
+  // Etapa 3: Alinhar datas e calcular deltas
+  const usdtTokens = usdtHist.tokens.sort((a, b) => a.date - b.date);
+  const usdcTokens = usdcHist.tokens.sort((a, b) => a.date - b.date);
+
+  // Pegar (days + 1) entradas para calcular `days` deltas
+  const needed = days + 1;
+  const usdtSlice = usdtTokens.slice(-needed);
+  const usdcSlice = usdcTokens.slice(-needed);
+
+  const result: StablecoinDailyData[] = [];
+
+  // Helper: lê peggedUSD do campo USD ou, como fallback, do campo nativo
+  const getSupply = (token: typeof usdtSlice[0] | undefined): number =>
+    token?.totalCirculatingUSD?.peggedUSD ?? token?.totalCirculating?.peggedUSD ?? 0;
+
+  for (let i = 1; i < usdtSlice.length; i++) {
+    const usdtSupplyNow  = getSupply(usdtSlice[i]);
+    const usdtSupplyPrev = getSupply(usdtSlice[i - 1]) || usdtSupplyNow;
+    const usdcSupplyNow  = getSupply(usdcSlice[i]);
+    const usdcSupplyPrev = getSupply(usdcSlice[i - 1]) || usdcSupplyNow;
+
+    const usdtNet = (usdtSupplyNow - usdtSupplyPrev) / 1e6; // em $M
+    const usdcNet = (usdcSupplyNow - usdcSupplyPrev) / 1e6;
+
+    const dateObj = new Date(usdtSlice[i].date * 1000);
+    const label   = dateObj.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+    const date    = dateObj.toISOString().slice(0, 10);
+
+    result.push({
+      label,
+      date,
+      usdt_net:      usdtNet,
+      usdc_net:      usdcNet,
+      total_net:     usdtNet + usdcNet,
+      usdt_supply_b: usdtSupplyNow / 1e9,
+      usdc_supply_b: usdcSupplyNow / 1e9,
+      usdt_mint:     Math.max(0, usdtNet),
+      usdc_mint:     Math.max(0, usdcNet),
+      btc_buy_vol_b: 0,
+    });
+  }
+
+  return result;
 }
