@@ -310,8 +310,11 @@ export async function fetchStablecoinData(): Promise<StablecoinData> {
 // ─── Histórico de Supply — USDT + USDC ───────────────────────────────────────
 
 const DefillamaHistoryTokenSchema = z.object({
-  date:              z.number(),
+  date:                z.number(),
   totalCirculatingUSD: z.object({ peggedUSD: z.number().default(0) }).passthrough().optional(),
+  // DeFiLlama usa totalCirculating (em unidades nativas) em algumas respostas históricas;
+  // para stablecoins USD-pegged, peggedUSD tem o mesmo valor em dólares.
+  totalCirculating:    z.object({ peggedUSD: z.number().default(0) }).passthrough().optional(),
 }).passthrough();
 
 const DefillamaStablecoinHistorySchema = z.object({
@@ -363,11 +366,15 @@ export async function fetchStablecoinHistory(days = 30): Promise<StablecoinDaily
 
   const result: StablecoinDailyData[] = [];
 
+  // Helper: lê peggedUSD do campo USD ou, como fallback, do campo nativo
+  const getSupply = (token: typeof usdtSlice[0] | undefined): number =>
+    token?.totalCirculatingUSD?.peggedUSD ?? token?.totalCirculating?.peggedUSD ?? 0;
+
   for (let i = 1; i < usdtSlice.length; i++) {
-    const usdtSupplyNow  = usdtSlice[i].totalCirculatingUSD?.peggedUSD    ?? 0;
-    const usdtSupplyPrev = usdtSlice[i - 1].totalCirculatingUSD?.peggedUSD ?? usdtSupplyNow;
-    const usdcSupplyNow  = (usdcSlice[i]?.totalCirculatingUSD?.peggedUSD)  ?? 0;
-    const usdcSupplyPrev = (usdcSlice[i - 1]?.totalCirculatingUSD?.peggedUSD) ?? usdcSupplyNow;
+    const usdtSupplyNow  = getSupply(usdtSlice[i]);
+    const usdtSupplyPrev = getSupply(usdtSlice[i - 1]) || usdtSupplyNow;
+    const usdcSupplyNow  = getSupply(usdcSlice[i]);
+    const usdcSupplyPrev = getSupply(usdcSlice[i - 1]) || usdcSupplyNow;
 
     const usdtNet = (usdtSupplyNow - usdtSupplyPrev) / 1e6; // em $M
     const usdcNet = (usdcSupplyNow - usdcSupplyPrev) / 1e6;
