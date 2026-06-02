@@ -85,7 +85,8 @@ export function useMacroBoard() {
     staleTime: 3_500_000,
     refetchInterval: MACRO_INTERVAL,
     retry: 2,
-    retryDelay: (attempt: number) => Math.min(1000 * 2 ** attempt, 10_000),
+    retryDelay: (attempt: number, error: unknown) =>
+      String(error).includes('FRED_RATE_LIMIT_429') ? 60_000 : Math.min(1000 * 2 ** attempt, 10_000),
     select: (state: DataState<MacroBoardData>) => {
       const data = state.data ?? EMPTY_MACRO_BOARD;
       return { ...data, isFallback: state.isFallback, lastUpdated: state.lastUpdated };
@@ -117,7 +118,8 @@ export function useYieldCurve() {
     staleTime: 3_500_000,
     refetchInterval: MACRO_INTERVAL,
     retry: 2,
-    retryDelay: (attempt: number) => Math.min(1000 * 2 ** attempt, 10_000),
+    retryDelay: (attempt: number, error: unknown) =>
+      String(error).includes('FRED_RATE_LIMIT_429') ? 60_000 : Math.min(1000 * 2 ** attempt, 10_000),
     select: (state: DataState<YieldCurveData>) => {
       const data = state.data ?? EMPTY_YIELD_CURVE;
       return { ...data, isFallback: state.isFallback, lastUpdated: state.lastUpdated };
@@ -147,10 +149,12 @@ export function useGlobalLiquidity() {
         return { data: null, lastUpdated: null, isFallback: true, debugError: String(err) };
       }
     },
-    staleTime: 3_500_000,
+    staleTime:       3_500_000,
     refetchInterval: IS_LIVE ? 6 * 3_600_000 : false,  // 6h — dados semanais
+    refetchOnMount:  false,   // não dispara no mount — evita spike de 6 FRED calls junto aos demais hooks
     retry: 2,
-    retryDelay: (attempt: number) => Math.min(1000 * 2 ** attempt, 10_000),
+    retryDelay: (attempt: number, error: unknown) =>
+      String(error).includes('FRED_RATE_LIMIT_429') ? 60_000 : Math.min(1000 * 2 ** attempt, 10_000),
     select: (state: DataState<GlobalLiquidityData>) => {
       const data = state.data ?? EMPTY_GLOBAL_LIQUIDITY;
       return { ...data, isFallback: state.isFallback, lastUpdated: state.lastUpdated };
@@ -184,7 +188,8 @@ export function useCreditSpread() {
     staleTime: 3_500_000,
     refetchInterval: MACRO_INTERVAL,
     retry: 2,
-    retryDelay: (attempt: number) => Math.min(1000 * 2 ** attempt, 10_000),
+    retryDelay: (attempt: number, error: unknown) =>
+      String(error).includes('FRED_RATE_LIMIT_429') ? 60_000 : Math.min(1000 * 2 ** attempt, 10_000),
     select: (state: DataState<CreditSpreadData>) => {
       const data = state.data ?? EMPTY_CREDIT_SPREAD;
       return { ...data, isFallback: state.isFallback, lastUpdated: state.lastUpdated };

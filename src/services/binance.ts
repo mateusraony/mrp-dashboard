@@ -32,7 +32,7 @@ async function callFapiViaProxy(endpoint: string): Promise<{ status: number; dat
     signal:  AbortSignal.timeout(10_000),
   });
   const data = await res.json().catch(() => ({} as Record<string, unknown>));
-  if (!res.ok && res.status !== 401 && res.status !== 403) {
+  if (!res.ok && res.status !== 401 && res.status !== 403 && res.status !== 404) {
     throw new Error(`binance_fapi proxy error ${res.status}: ${(data as Record<string, unknown>).error ?? res.statusText}`);
   }
   return { status: res.status, data };
@@ -360,9 +360,9 @@ export async function fetchLongShortRatio(
   if (DATA_MODE === 'mock') return mockLongShortRatio();
 
   const { status, data } = await callFapiViaProxy(
-    `/fapi/v1/globalLongShortAccountRatio?symbol=${symbol}&period=${period}&limit=1`,
+    `/futures/data/globalLongShortAccountRatio?symbol=${symbol}&period=${period}&limit=1`,
   );
-  if (status === 401 || status === 403) return null;
+  if (status === 401 || status === 403 || status === 404) return null;
   const items = z.array(LongShortRatioItemSchema).parse(data as unknown[]);
   const item  = items[0];
   if (!item) return null;
@@ -388,7 +388,7 @@ export async function fetchLiquidations(symbol = 'BTCUSDT', limit = 200): Promis
   const { status, data } = await callFapiViaProxy(
     `/fapi/v1/allForceOrders?symbol=${symbol}&limit=${limit}`,
   );
-  if (status === 401 || status === 403) return [];
+  if (status === 401 || status === 403 || status === 404) return [];
   const parsed = LiquidationsResponseSchema.parse(data);
 
   return parsed.map(item => {

@@ -106,7 +106,7 @@ const ANON_USER_ID = '00000000-0000-0000-0000-000000000000';
 
 let _client: SupabaseClient | null = null;
 
-function getClient(): SupabaseClient {
+export function getClient(): SupabaseClient {
   if (_client) return _client;
 
   const url = env.VITE_SUPABASE_URL;

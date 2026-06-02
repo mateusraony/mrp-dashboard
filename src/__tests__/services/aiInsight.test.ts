@@ -87,12 +87,12 @@ describe('fetchAiInsight', () => {
     expect((body.zAlerts[0] as { metric: string }).metric).toBe('volume');
   });
 
-  it('lança erro quando a Edge Function retorna status não-ok', async () => {
+  it('lança AI_MISSING_KEY quando Edge Function retorna 503 (chave ausente)', async () => {
     vi.mocked(fetch).mockResolvedValueOnce(
       makeJsonResponse({ error: 'ANTHROPIC_API_KEY não configurada' }, 503),
     );
 
-    await expect(fetchAiInsight(BASE_PAYLOAD)).rejects.toThrow('503');
+    await expect(fetchAiInsight(BASE_PAYLOAD)).rejects.toThrow('AI_MISSING_KEY');
   });
 
   it('lança erro quando a resposta não contém o campo insight', async () => {

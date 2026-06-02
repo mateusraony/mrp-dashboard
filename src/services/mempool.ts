@@ -58,7 +58,7 @@ const DifficultyAdjSchema = z.object({
   remainingBlocks:     z.coerce.number(),
   remainingTime:       z.coerce.number(),
   previousRetarget:    z.coerce.number(),
-  currentDifficulty:   z.coerce.number(),
+  currentDifficulty:   z.coerce.number().catch(0),
   nextRetargetHeight:  z.coerce.number(),
 });
 

@@ -24,7 +24,7 @@ export function useAiInsight(payload: AiInsightPayload | null) {
     queryKey: ['ai-insight', payload?.page ?? 'dashboard', timeBucket],
     queryFn:  () => fetchAiInsight(payload!),
     enabled,
-    staleTime: BUCKET_MS,
-    retry:     1,
+    staleTime:  BUCKET_MS,
+    retry:      (failureCount, error) => !String(error).includes('AI_MISSING_KEY') && failureCount < 1,
   });
 }
