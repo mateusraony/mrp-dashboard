@@ -5,6 +5,7 @@ import {
   defaultRules, fireLog, AVAILABLE_METRICS, NOTIFICATION_CHANNELS, PRIORITY_CONFIG,
 } from '../components/data/mockDataAutomations';
 import { ModeBadge } from '../components/ui/DataBadge';
+import { IS_LIVE } from '@/lib/env';
 import { formatDistanceToNow } from 'date-fns';
 import { useBtcTicker, useKlines } from '@/hooks/useBtcData';
 import { useRiskScore } from '@/hooks/useRiskScore';
@@ -65,7 +66,7 @@ function RuleCard({ rule, onToggle, onSelect, selected }) {
             {rule.triggered && <Badge label="ATIVO" color="#10b981" bg="rgba(16,185,129,0.1)" border="rgba(16,185,129,0.25)" />}
           </div>
           <div style={{ fontSize: 9, color: '#334155' }}>
-            {ch?.icon} {ch?.label} · Cooldown {rule.cooldown_min}min · Disparos: {rule.fire_count}
+            {ch?.icon} {ch?.label} · Cooldown {rule.cooldown_min}min · Disparos: {IS_LIVE ? 0 : rule.fire_count}
           </div>
         </div>
         {/* Toggle */}
@@ -273,7 +274,7 @@ function RuleDetail({ rule, onClose }) {
   if (!rule) return null;
   const pc = PRIORITY_CONFIG[rule.priority];
   const ch = NOTIFICATION_CHANNELS.find(c => c.id === rule.action.channel);
-  const ruleLogs = fireLog.filter(l => l.rule_id === rule.id);
+  const ruleLogs = IS_LIVE ? [] : fireLog.filter(l => l.rule_id === rule.id);
   return (
     <div style={{ background: '#111827', border: `1px solid ${rule.color}30`, borderRadius: 12, padding: '16px 18px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
@@ -315,7 +316,7 @@ function RuleDetail({ rule, onClose }) {
         </div>
         <div style={{ background: '#0d1421', borderRadius: 7, padding: '8px 10px' }}>
           <div style={{ fontSize: 8, color: '#334155' }}>DISPAROS TOTAL</div>
-          <div style={{ fontSize: 14, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: '#94a3b8' }}>{rule.fire_count}</div>
+          <div style={{ fontSize: 14, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: '#94a3b8' }}>{IS_LIVE ? 0 : rule.fire_count}</div>
         </div>
       </div>
 
@@ -506,7 +507,7 @@ export default function Automations() {
         {[
           { label: 'Regras Ativas',   value: active,      color: '#10b981' },
           { label: 'Disparadas Hoje', value: triggered,   color: '#ef4444' },
-          { label: 'Total no Log',    value: fireLog.length, color: '#60a5fa' },
+          { label: 'Total no Log',    value: IS_LIVE ? 0 : fireLog.length, color: '#60a5fa' },
           { label: 'Métricas Monit.', value: AVAILABLE_METRICS.length, color: '#a78bfa' },
         ].map(s => (
           <div key={s.label} style={{ background: '#111827', border: '1px solid #1e2d45', borderRadius: 9, padding: '10px 13px' }}>
@@ -558,10 +559,15 @@ export default function Automations() {
             <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0' }}>Log de Disparos</div>
             <PurposeLabel text="Histórico de todas as automações executadas — use para auditar eficácia das regras e ajustar thresholds com base em resultados reais." mt={4} />
           </div>
-          {fireLog.length === 0 && (
+          {IS_LIVE && (
+            <div style={{ margin: '12px 16px', padding: '8px 12px', borderRadius: 7, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.18)', fontSize: 10, color: '#64748b' }}>
+              ℹ️ O log de disparos será populado conforme as regras ativas dispararem em produção.
+            </div>
+          )}
+          {(IS_LIVE ? [] : fireLog).length === 0 && (
             <div style={{ padding: 24, textAlign: 'center', color: '#334155', fontSize: 11 }}>Nenhum disparo registrado ainda.</div>
           )}
-          {fireLog.map(log => {
+          {(IS_LIVE ? [] : fireLog).map(log => {
             const pc = PRIORITY_CONFIG[log.priority];
             const ch = NOTIFICATION_CHANNELS.find(c => c.id === log.channel);
             return (
