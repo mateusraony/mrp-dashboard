@@ -175,18 +175,30 @@ export default function CorrelationChart({ klines: klinesProp = null }) {
               content="Correlação de Pearson entre BTC e cada ativo na janela selecionada. +1 = movem juntos, -1 = movem em sentidos opostos, 0 = sem correlação. Clique em um ativo para isolar."
               width={280}
             />
-            {!isLive && (
-              <DataTrustBadge
-                mode="paid_required"
-                confidence="C"
-                source="FRED + Binance"
-                sourceUrl="https://fred.stlouisfed.org"
-                reason="Correlações BTC calculadas com klines Binance (grátis) + séries FRED (requer FRED API Key em Supabase Secrets)."
-              />
-            )}
+            {isLive
+              ? (
+                <DataTrustBadge
+                  mode="estimated"
+                  confidence="B"
+                  source="Binance klines (estimado)"
+                  reason="Correlações calculadas a partir de klines BTC com ruído sintético calibrado por ativo. Para correlações reais SPX/Gold/DXY/Nasdaq seria necessário OHLCV de cada ativo via Yahoo Finance ou Bloomberg."
+                />
+              )
+              : (
+                <DataTrustBadge
+                  mode="paid_required"
+                  confidence="C"
+                  source="FRED + Binance"
+                  sourceUrl="https://fred.stlouisfed.org"
+                  reason="Correlações BTC calculadas com klines Binance (grátis) + séries FRED (requer FRED API Key em Supabase Secrets)."
+                />
+              )
+            }
           </div>
           <div style={{ fontSize: 10, color: '#334155', marginTop: 2 }}>
-            {isLive ? 'Pearson rolling calculado a partir de klines reais BTC' : 'Clique num ativo para isolar · duplo-clique para comparar pares'}
+            {isLive
+              ? 'Pearson rolling estimado — klines BTC + ruído sintético (não preços reais de SPX/DXY/Nasdaq)'
+              : 'Clique num ativo para isolar · duplo-clique para comparar pares'}
           </div>
         </div>
         {/* Window tabs */}

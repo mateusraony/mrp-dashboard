@@ -245,8 +245,11 @@ const TABS = ['Canais', 'Regras', 'Histórico'];
 export function BotsContent() {
   const [tab, setTab] = useState('Canais');
   const [rules, setRules] = useState(automationRules);
-  const [bots, setBots] = useState(botConnections);
-  const [messages, setMessages] = useState(recentBotMessages);
+  // Em modo live, inicia sem bots — exige configuração real pelo usuário.
+  // Em modo mock, usa botConnections para demonstração de UI.
+  const [bots, setBots] = useState(IS_LIVE ? [] : botConnections);
+  // Em modo live, histórico começa vazio — sem mensagens fictícias no tab Histórico.
+  const [messages, setMessages] = useState(IS_LIVE ? [] : recentBotMessages);
   const [showAddBot, setShowAddBot] = useState(false);
   const [toastMsg, setToastMsg] = useState(null);
 
@@ -321,7 +324,7 @@ export function BotsContent() {
 
       {showAddBot && <AddBotModal onClose={() => setShowAddBot(false)} onAdd={(bot) => setBots(b => [...b, { id: `bot${Date.now()}`, ...bot, status: 'disconnected', messages_sent: 0, last_ping: null }])} />}
 
-      {/* Banner de aviso: nenhum bot real configurado */}
+      {/* Banner de aviso: modo mock = demonstração / modo live sem bots = instrução de setup */}
       {!IS_LIVE && (
         <div style={{
           marginBottom: 16, padding: '12px 16px', borderRadius: 9,
@@ -334,6 +337,22 @@ export function BotsContent() {
             <span style={{ fontSize: 12, color: '#f59e0b', fontWeight: 800 }}>Nenhum bot real configurado</span>
             <span style={{ fontSize: 11, color: '#92400e', marginLeft: 8 }}>
               — os canais abaixo são demonstração. Para receber alertas reais, configure um bot no Supabase.
+            </span>
+          </div>
+        </div>
+      )}
+      {IS_LIVE && bots.length === 0 && (
+        <div style={{
+          marginBottom: 16, padding: '12px 16px', borderRadius: 9,
+          background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.3)',
+          borderLeft: '4px solid #3b82f6',
+          display: 'flex', gap: 10, alignItems: 'flex-start',
+        }}>
+          <span style={{ fontSize: 16, flexShrink: 0 }}>ℹ️</span>
+          <div>
+            <span style={{ fontSize: 12, color: '#60a5fa', fontWeight: 800 }}>Nenhum canal configurado</span>
+            <span style={{ fontSize: 11, color: '#475569', marginLeft: 8 }}>
+              — clique em "Adicionar Canal" para integrar Telegram, Discord ou Webhook e receber alertas reais de mercado.
             </span>
           </div>
         </div>
