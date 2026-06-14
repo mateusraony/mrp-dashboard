@@ -66,7 +66,7 @@ function RuleCard({ rule, onToggle, onSelect, selected }) {
             {rule.triggered && <Badge label="ATIVO" color="#10b981" bg="rgba(16,185,129,0.1)" border="rgba(16,185,129,0.25)" />}
           </div>
           <div style={{ fontSize: 9, color: '#334155' }}>
-            {ch?.icon} {ch?.label} · Cooldown {rule.cooldown_min}min · Disparos: {rule.fire_count}
+            {ch?.icon} {ch?.label} · Cooldown {rule.cooldown_min}min · Disparos: {IS_LIVE ? 0 : rule.fire_count}
           </div>
         </div>
         {/* Toggle */}
@@ -316,7 +316,7 @@ function RuleDetail({ rule, onClose }) {
         </div>
         <div style={{ background: '#0d1421', borderRadius: 7, padding: '8px 10px' }}>
           <div style={{ fontSize: 8, color: '#334155' }}>DISPAROS TOTAL</div>
-          <div style={{ fontSize: 14, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: '#94a3b8' }}>{rule.fire_count}</div>
+          <div style={{ fontSize: 14, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: '#94a3b8' }}>{IS_LIVE ? 0 : rule.fire_count}</div>
         </div>
       </div>
 
