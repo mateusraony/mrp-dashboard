@@ -248,7 +248,8 @@ export function BotsContent() {
   // Em modo live, inicia sem bots — exige configuração real pelo usuário.
   // Em modo mock, usa botConnections para demonstração de UI.
   const [bots, setBots] = useState(IS_LIVE ? [] : botConnections);
-  const [messages, setMessages] = useState(recentBotMessages);
+  // Em modo live, histórico começa vazio — sem mensagens fictícias no tab Histórico.
+  const [messages, setMessages] = useState(IS_LIVE ? [] : recentBotMessages);
   const [showAddBot, setShowAddBot] = useState(false);
   const [toastMsg, setToastMsg] = useState(null);
 
