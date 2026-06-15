@@ -10,6 +10,7 @@
  *   - Registro em telegram_delivery_log (auditoria + dedup diário)
  *   - Registro em system_job_log (saúde de jobs)
  *   - Resposta estruturada padronizada
+ *   - Snapshot enriquecido: variação 24h, range diário, OI, L/S ratio
  *
  * Requer:
  *   SUPABASE_URL              — injetado automaticamente
@@ -34,9 +35,14 @@ interface TelegramSettings {
 }
 
 interface MarketSnapshot {
-  btc_price:    number;
-  funding_rate: number;
-  fear_greed:   number;
+  btc_price:         number;
+  btc_change_24h:    number;  // priceChangePercent do ticker
+  btc_high_24h:      number;  // highPrice do ticker
+  btc_low_24h:       number;  // lowPrice do ticker
+  open_interest_usd: number;  // openInterest (BTC) × btc_price
+  long_short_ratio:  number;  // globalLongShortAccountRatio
+  funding_rate:      number;
+  fear_greed:        number;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -47,6 +53,12 @@ function log(level: 'INFO' | 'WARN' | 'ERROR', correlationId: string, msg: strin
 
 function fmtPrice(n: number): string {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
+}
+
+function fmtChange(pct: number): string {
+  const sign  = pct >= 0 ? '+' : '';
+  const emoji = pct >= 0 ? '🟢' : '🔴';
+  return `${emoji} ${sign}${pct.toFixed(2)}%`;
 }
 
 function fmtFunding(f: number): string {
@@ -63,31 +75,70 @@ function fmtFng(v: number): string {
   return `${v} 🔴 Extreme Fear`;
 }
 
+function fmtOI(usd: number): string {
+  if (usd >= 1e9) return `$${(usd / 1e9).toFixed(1)}B`;
+  if (usd >= 1e6) return `$${(usd / 1e6).toFixed(0)}M`;
+  return `$${usd.toLocaleString('en-US')}`;
+}
+
+function fmtLS(ratio: number): string {
+  const emoji = ratio >= 1 ? '🟢' : '🔴';
+  return `${emoji} ${ratio.toFixed(2)}`;
+}
+
 async function fetchMarketSnapshot(): Promise<MarketSnapshot> {
-  const [tickerRes, fundingRes, fngRes] = await Promise.allSettled([
-    fetch('https://fapi.binance.com/fapi/v1/ticker/24hr?symbol=BTCUSDT', { signal: AbortSignal.timeout(8_000) }),
-    fetch('https://fapi.binance.com/fapi/v1/premiumIndex?symbol=BTCUSDT',  { signal: AbortSignal.timeout(8_000) }),
-    fetch('https://api.alternative.me/fng/?limit=1',                        { signal: AbortSignal.timeout(8_000) }),
+  const [tickerRes, fundingRes, fngRes, oiRes, lsRes] = await Promise.allSettled([
+    fetch('https://fapi.binance.com/fapi/v1/ticker/24hr?symbol=BTCUSDT',                                                { signal: AbortSignal.timeout(8_000) }),
+    fetch('https://fapi.binance.com/fapi/v1/premiumIndex?symbol=BTCUSDT',                                               { signal: AbortSignal.timeout(8_000) }),
+    fetch('https://api.alternative.me/fng/?limit=1',                                                                     { signal: AbortSignal.timeout(8_000) }),
+    fetch('https://fapi.binance.com/fapi/v1/openInterest?symbol=BTCUSDT',                                               { signal: AbortSignal.timeout(8_000) }),
+    fetch('https://fapi.binance.com/futures/data/globalLongShortAccountRatio?symbol=BTCUSDT&period=1h&limit=1',         { signal: AbortSignal.timeout(8_000) }),
   ]);
 
-  let btc_price    = 0;
-  let funding_rate = 0;
-  let fear_greed   = 50;
+  let btc_price         = 0;
+  let btc_change_24h    = 0;
+  let btc_high_24h      = 0;
+  let btc_low_24h       = 0;
+  let funding_rate      = 0;
+  let fear_greed        = 50;
+  let open_interest_usd = 0;
+  let long_short_ratio  = 1;
 
   if (tickerRes.status === 'fulfilled' && tickerRes.value.ok) {
-    const d = await tickerRes.value.json() as { lastPrice?: string };
-    btc_price = parseFloat(d.lastPrice ?? '0');
+    const d = await tickerRes.value.json() as {
+      lastPrice?: string;
+      priceChangePercent?: string;
+      highPrice?: string;
+      lowPrice?: string;
+    };
+    btc_price      = parseFloat(d.lastPrice ?? '0');
+    btc_change_24h = parseFloat(d.priceChangePercent ?? '0');
+    btc_high_24h   = parseFloat(d.highPrice ?? '0');
+    btc_low_24h    = parseFloat(d.lowPrice ?? '0');
   }
+
   if (fundingRes.status === 'fulfilled' && fundingRes.value.ok) {
     const d = await fundingRes.value.json() as { lastFundingRate?: string };
     funding_rate = parseFloat(d.lastFundingRate ?? '0') * 100;
   }
+
   if (fngRes.status === 'fulfilled' && fngRes.value.ok) {
     const d = await fngRes.value.json() as { data?: Array<{ value: string }> };
     fear_greed = parseInt(d.data?.[0]?.value ?? '50', 10);
   }
 
-  return { btc_price, funding_rate, fear_greed };
+  if (oiRes.status === 'fulfilled' && oiRes.value.ok) {
+    const d = await oiRes.value.json() as { openInterest?: string };
+    const oiBtc = parseFloat(d.openInterest ?? '0');
+    open_interest_usd = btc_price > 0 ? oiBtc * btc_price : 0;
+  }
+
+  if (lsRes.status === 'fulfilled' && lsRes.value.ok) {
+    const d = await lsRes.value.json() as Array<{ longShortRatio?: string }>;
+    long_short_ratio = parseFloat(d[0]?.longShortRatio ?? '1');
+  }
+
+  return { btc_price, btc_change_24h, btc_high_24h, btc_low_24h, open_interest_usd, long_short_ratio, funding_rate, fear_greed };
 }
 
 function buildDigestMessage(snap: MarketSnapshot, schedule: string): string {
@@ -95,18 +146,40 @@ function buildDigestMessage(snap: MarketSnapshot, schedule: string): string {
   const dateStr = now.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' });
   const timeStr = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
 
-  return [
+  const priceStr = snap.btc_price > 0
+    ? `${fmtPrice(snap.btc_price)} (${fmtChange(snap.btc_change_24h)} 24h)`
+    : 'N/A';
+
+  const rangeStr = snap.btc_high_24h > 0
+    ? `   Alta ${fmtPrice(snap.btc_high_24h)} · Baixa ${fmtPrice(snap.btc_low_24h)}`
+    : '';
+
+  const oiStr = snap.open_interest_usd > 0
+    ? `📊 *OI* ${fmtOI(snap.open_interest_usd)}  ·  L/S ${fmtLS(snap.long_short_ratio)}`
+    : '';
+
+  const lines = [
     `📊 *MRP Dashboard — Resumo Diário*`,
     `_${dateStr} · ${timeStr} BRT_`,
     ``,
-    `💰 *BTC* ${snap.btc_price > 0 ? fmtPrice(snap.btc_price) : 'N/A'}`,
-    `📈 *Funding* ${fmtFunding(snap.funding_rate)}`,
+    `💰 *BTC* ${priceStr}`,
+  ];
+
+  if (rangeStr) lines.push(rangeStr);
+
+  lines.push(``, `📈 *Funding* ${fmtFunding(snap.funding_rate)}`);
+
+  if (oiStr) lines.push(oiStr);
+
+  lines.push(
     `🧠 *Fear & Greed* ${fmtFng(snap.fear_greed)}`,
     ``,
     `🔗 [Abrir Dashboard](https://mrp-dashboard.onrender.com)`,
     ``,
     `_Agendado: ${schedule} UTC · Via MRP Dashboard_`,
-  ].join('\n');
+  );
+
+  return lines.join('\n');
 }
 
 async function sendTelegram(
@@ -233,7 +306,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Busca dados de mercado
+    // Busca dados de mercado enriquecidos
     const snapshot = await fetchMarketSnapshot();
     log('INFO', correlationId, 'Market snapshot', snapshot);
 
@@ -291,18 +364,21 @@ Deno.serve(async (req: Request) => {
 
     await sb.from('system_job_log').update({
       status: 'success', alerts_sent: 1, duration_ms: duration,
-      metadata: { btc_price: snapshot.btc_price, fear_greed: snapshot.fear_greed },
+      metadata: { btc_price: snapshot.btc_price, btc_change_24h: snapshot.btc_change_24h, fear_greed: snapshot.fear_greed, open_interest_usd: snapshot.open_interest_usd },
     }).eq('id', jobId!);
 
     return new Response(
       JSON.stringify({
-        ok:         true,
-        status:     'sent',
-        message_id: result.msgId,
-        btc_price:  snapshot.btc_price,
+        ok:                true,
+        status:            'sent',
+        message_id:        result.msgId,
+        btc_price:         snapshot.btc_price,
+        btc_change_24h:    snapshot.btc_change_24h,
+        open_interest_usd: snapshot.open_interest_usd,
+        long_short_ratio:  snapshot.long_short_ratio,
         correlationId,
-        timestamp:  new Date().toISOString(),
-        latency_ms: result.latencyMs,
+        timestamp:         new Date().toISOString(),
+        latency_ms:        result.latencyMs,
       }),
       { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } },
     );
