@@ -41,7 +41,7 @@ interface MarketSnapshot {
   funding_rate:      number;
   funding_available: boolean;
   open_interest_usd: number;
-  long_short_ratio:  number;
+  long_short_ratio:  number | null;  // null = cache ausente/stale → omitir do digest
   // Sentiment
   fear_greed:        number;
   // Regime (from regime_score_history — written daily by browser)
@@ -128,13 +128,16 @@ function fmtNupl(n: number): string {
 // ─── Leitura do market_cache ──────────────────────────────────────────────────
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function fetchFromCache(sb: ReturnType<typeof createClient>, key: string): Promise<any | null> {
+async function fetchFromCache(sb: ReturnType<typeof createClient>, key: string, maxAgeMinutes = 120): Promise<any | null> {
   const { data } = await sb
     .from('market_cache')
     .select('value_json, updated_at')
     .eq('cache_key', key)
     .maybeSingle();
   if (!data?.value_json) return null;
+  // Rejeitar dados obsoletos — se mais velhos que maxAgeMinutes, usar fallback
+  const ageMs = Date.now() - new Date(data.updated_at as string).getTime();
+  if (ageMs > maxAgeMinutes * 60 * 1000) return null;
   return data.value_json;
 }
 
@@ -142,18 +145,17 @@ async function fetchFromCache(sb: ReturnType<typeof createClient>, key: string):
 
 async function fetchBinanceFallback(): Promise<{
   btc_price: number; btc_change_24h: number; btc_high_24h: number; btc_low_24h: number;
-  funding_rate: number; open_interest_usd: number; long_short_ratio: number;
+  funding_rate: number; open_interest_usd: number;
 } | null> {
   try {
-    const [tickerRes, fundingRes, oiRes, lsRes] = await Promise.allSettled([
-      fetch('https://fapi.binance.com/fapi/v1/ticker/24hr?symbol=BTCUSDT',                                               { signal: AbortSignal.timeout(8_000) }),
-      fetch('https://fapi.binance.com/fapi/v1/premiumIndex?symbol=BTCUSDT',                                              { signal: AbortSignal.timeout(8_000) }),
-      fetch('https://fapi.binance.com/fapi/v1/openInterest?symbol=BTCUSDT',                                              { signal: AbortSignal.timeout(8_000) }),
-      fetch('https://fapi.binance.com/futures/data/globalLongShortAccountRatio?symbol=BTCUSDT&period=1h&limit=1',        { signal: AbortSignal.timeout(8_000) }),
+    const [tickerRes, fundingRes, oiRes] = await Promise.allSettled([
+      fetch('https://fapi.binance.com/fapi/v1/ticker/24hr?symbol=BTCUSDT',  { signal: AbortSignal.timeout(8_000) }),
+      fetch('https://fapi.binance.com/fapi/v1/premiumIndex?symbol=BTCUSDT', { signal: AbortSignal.timeout(8_000) }),
+      fetch('https://fapi.binance.com/fapi/v1/openInterest?symbol=BTCUSDT', { signal: AbortSignal.timeout(8_000) }),
     ]);
 
     let btc_price = 0, btc_change_24h = 0, btc_high_24h = 0, btc_low_24h = 0;
-    let funding_rate = 0, open_interest_usd = 0, long_short_ratio = 1;
+    let funding_rate = 0, open_interest_usd = 0;
 
     if (tickerRes.status === 'fulfilled' && tickerRes.value.ok) {
       const d = await tickerRes.value.json() as { lastPrice?: string; priceChangePercent?: string; highPrice?: string; lowPrice?: string };
@@ -170,13 +172,8 @@ async function fetchBinanceFallback(): Promise<{
       const d = await oiRes.value.json() as { openInterest?: string };
       open_interest_usd = parseFloat(d.openInterest ?? '0') * btc_price;
     }
-    if (lsRes.status === 'fulfilled' && lsRes.value.ok) {
-      const d = await lsRes.value.json() as Array<{ longShortRatio?: string }>;
-      long_short_ratio = parseFloat(d[0]?.longShortRatio ?? '1');
-    }
-
     if (btc_price === 0) return null;
-    return { btc_price, btc_change_24h, btc_high_24h, btc_low_24h, funding_rate, open_interest_usd, long_short_ratio };
+    return { btc_price, btc_change_24h, btc_high_24h, btc_low_24h, funding_rate, open_interest_usd };
   } catch {
     return null;
   }
@@ -200,18 +197,25 @@ async function buildSnapshot(
   correlationId: string,
 ): Promise<MarketSnapshot> {
   // Lê market_cache e regime_score_history em paralelo
-  const [ticker, fng, macroBoardRaw, dominanceRaw, onChainRaw, regimeRow] = await Promise.all([
-    fetchFromCache(sb, 'btc:ticker'),
-    fetchFromCache(sb, 'fear-greed:1'),
-    fetchFromCache(sb, 'fred:macro-board'),
-    fetchFromCache(sb, 'coingecko:dominance'),
-    fetchFromCache(sb, 'coinmetrics:cycle'),
-    sb.from('regime_score_history').select('score, label').order('computed_at', { ascending: false }).limit(1).maybeSingle(),
+  const [ticker, lsRatioRaw, fng, macroBoardRaw, dominanceRaw, onChainRaw, regimeRow] = await Promise.all([
+    fetchFromCache(sb, 'btc:ticker', 10),               // stale > 10 min → fallback Binance
+    fetchFromCache(sb, 'binance:longshort:BTCUSDT', 10), // stale > 10 min → omitir L/S
+    fetchFromCache(sb, 'fear-greed:1', 360),             // stale > 6h → fallback alternative.me
+    fetchFromCache(sb, 'fred:macro-board', 1440),        // stale > 24h → omitir macro
+    fetchFromCache(sb, 'coingecko:dominance', 120),      // stale > 2h → omitir BTC.D
+    fetchFromCache(sb, 'coinmetrics:cycle', 1440),       // stale > 24h → omitir NUPL
+    sb.from('regime_score_history').select('score, label').order('scored_at', { ascending: false }).limit(1).maybeSingle(),
   ]);
 
   let btc_price = 0, btc_change_24h = 0, btc_high_24h = 0, btc_low_24h = 0;
   let funding_rate = 0, funding_available = false;
-  let open_interest_usd = 0, long_short_ratio = 1;
+  let open_interest_usd = 0;
+  // L/S ratio da própria cache key — não inferido do btc:ticker (que não contém esse dado)
+  // Shape: LongShortRatioData { longAccount: 0.53, shortAccount: 0.47, ls_ratio_pct: 53 }
+  // Ratio = longAccount / shortAccount. Se cache ausente/stale, omitir do digest.
+  const long_short_ratio: number | null = lsRatioRaw?.longAccount > 0 && lsRatioRaw?.shortAccount > 0
+    ? parseFloat((lsRatioRaw.longAccount / lsRatioRaw.shortAccount).toFixed(2))
+    : null;
 
   if (ticker && ticker.mark_price > 0) {
     // Shape: BtcTickerData { mark_price, last_funding_rate, price_change_pct, high_24h, low_24h, open_interest }
@@ -235,7 +239,7 @@ async function buildSnapshot(
       funding_rate      = live.funding_rate;
       funding_available = true;
       open_interest_usd = live.open_interest_usd;
-      long_short_ratio  = live.long_short_ratio;
+      // long_short_ratio já lido da cache key dedicada — fallback Binance não sobrescreve
       log('INFO', correlationId, 'BTC ticker do Binance direto', { btc_price });
     } else {
       log('ERROR', correlationId, 'Binance indisponível — BTC price não obtido');
@@ -331,7 +335,8 @@ function buildDigestMessage(snap: MarketSnapshot, schedule: string): string {
   lines.push(`📈 *Funding* ${fmtFunding(snap.funding_rate, snap.funding_available)}`);
 
   if (snap.open_interest_usd > 0) {
-    lines.push(`📊 *OI* ${fmtOI(snap.open_interest_usd)}  ·  L/S ${fmtLS(snap.long_short_ratio)}`);
+    const lsStr = snap.long_short_ratio != null ? `  ·  L/S ${fmtLS(snap.long_short_ratio)}` : '';
+    lines.push(`📊 *OI* ${fmtOI(snap.open_interest_usd)}${lsStr}`);
   }
 
   if (snap.liq_total_usd != null && snap.liq_total_usd > 0) {
