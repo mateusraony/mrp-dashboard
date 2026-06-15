@@ -107,7 +107,8 @@ function fmtLiq(usd: number): string {
 }
 
 function fmtRegime(label: string, score: number): string {
-  const emoji = label === 'RISK-ON' ? '🟢' : label === 'RISK-OFF' ? '🔴' : '🟡';
+  const upper = label.toUpperCase();
+  const emoji = upper === 'RISK-ON' ? '🟢' : upper === 'RISK-OFF' ? '🔴' : '🟡';
   return `${emoji} ${label} · ${score}/100`;
 }
 
