@@ -4,13 +4,10 @@
  * Envia resumo diário de mercado via Telegram Bot API.
  * Chamada via pg_cron (diariamente) ou manualmente via HTTP POST.
  *
- * Melhorias desta versão:
- *   - Logs estruturados JSON com correlation_id
- *   - Validação explícita de token/chat_id com mensagem de erro humana
- *   - Registro em telegram_delivery_log (auditoria + dedup diário)
- *   - Registro em system_job_log (saúde de jobs)
- *   - Resposta estruturada padronizada
- *   - Snapshot enriquecido: variação 24h, range diário, OI, L/S ratio
+ * Estratégia de dados (prioridade):
+ *   1. Lê do market_cache (Supabase) — populado pelo browser a cada 30s
+ *   2. Fallback: fetch direto à Binance/alternative.me se cache vazio
+ *   Isso resolve o problema de BTC = N/A quando Binance bloqueia IPs do Deno Deploy.
  *
  * Requer:
  *   SUPABASE_URL              — injetado automaticamente
@@ -35,17 +32,32 @@ interface TelegramSettings {
 }
 
 interface MarketSnapshot {
+  // BTC price
   btc_price:         number;
-  btc_change_24h:    number;  // priceChangePercent do ticker
-  btc_high_24h:      number;  // highPrice do ticker
-  btc_low_24h:       number;  // lowPrice do ticker
-  open_interest_usd: number;  // openInterest (BTC) × btc_price
-  long_short_ratio:  number;  // globalLongShortAccountRatio
+  btc_change_24h:    number;
+  btc_high_24h:      number;
+  btc_low_24h:       number;
+  // Derivatives
   funding_rate:      number;
+  funding_available: boolean;
+  open_interest_usd: number;
+  long_short_ratio:  number;
+  // Sentiment
   fear_greed:        number;
+  // Regime (from regime_score_history — written daily by browser)
+  regime_label:      string | null;
+  regime_score:      number | null;
+  // Macro (from fred:macro-board cache)
+  vix:               number | null;
+  us10y:             number | null;
+  // Liquidations (from binance:liquidations:200 cache)
+  liq_total_usd:     number | null;
+  // On-chain + dominance
+  btc_dominance:     number | null;
+  nupl:              number | null;
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Helpers de formatação ────────────────────────────────────────────────────
 
 function log(level: 'INFO' | 'WARN' | 'ERROR', correlationId: string, msg: string, data?: unknown) {
   console.log(JSON.stringify({ level, correlationId, msg, data, ts: new Date().toISOString() }));
@@ -61,7 +73,8 @@ function fmtChange(pct: number): string {
   return `${emoji} ${sign}${pct.toFixed(2)}%`;
 }
 
-function fmtFunding(f: number): string {
+function fmtFunding(f: number, available: boolean): string {
+  if (!available) return 'N/D';
   const sign  = f >= 0 ? '+' : '';
   const emoji = Math.abs(f) > 0.05 ? '🔴' : f >= 0 ? '🟢' : '🟡';
   return `${emoji} ${sign}${f.toFixed(4)}%/8h`;
@@ -86,60 +99,208 @@ function fmtLS(ratio: number): string {
   return `${emoji} ${ratio.toFixed(2)}`;
 }
 
-async function fetchMarketSnapshot(): Promise<MarketSnapshot> {
-  const [tickerRes, fundingRes, fngRes, oiRes, lsRes] = await Promise.allSettled([
-    fetch('https://fapi.binance.com/fapi/v1/ticker/24hr?symbol=BTCUSDT',                                                { signal: AbortSignal.timeout(8_000) }),
-    fetch('https://fapi.binance.com/fapi/v1/premiumIndex?symbol=BTCUSDT',                                               { signal: AbortSignal.timeout(8_000) }),
-    fetch('https://api.alternative.me/fng/?limit=1',                                                                     { signal: AbortSignal.timeout(8_000) }),
-    fetch('https://fapi.binance.com/fapi/v1/openInterest?symbol=BTCUSDT',                                               { signal: AbortSignal.timeout(8_000) }),
-    fetch('https://fapi.binance.com/futures/data/globalLongShortAccountRatio?symbol=BTCUSDT&period=1h&limit=1',         { signal: AbortSignal.timeout(8_000) }),
+function fmtLiq(usd: number): string {
+  const val = fmtOI(usd);
+  if (usd > 500_000_000) return `${val} 🔴 extremo`;
+  if (usd > 200_000_000) return `${val} 🟡 elevado`;
+  return `${val} 🟢 normal`;
+}
+
+function fmtRegime(label: string, score: number): string {
+  const emoji = label === 'RISK-ON' ? '🟢' : label === 'RISK-OFF' ? '🔴' : '🟡';
+  return `${emoji} ${label} · ${score}/100`;
+}
+
+function fmtVix(v: number): string {
+  if (v > 30) return `${v.toFixed(1)} 🔴`;
+  if (v > 20) return `${v.toFixed(1)} 🟡`;
+  return `${v.toFixed(1)} ⚪`;
+}
+
+function fmtNupl(n: number): string {
+  if (n > 0.75) return `${n.toFixed(2)} 🔴 Euforia`;
+  if (n > 0.5)  return `${n.toFixed(2)} 🟡 Crença`;
+  if (n > 0.25) return `${n.toFixed(2)} 🟢 Esperança`;
+  if (n > 0)    return `${n.toFixed(2)} ⚪ Otimismo`;
+  return `${n.toFixed(2)} 🔵 Capitulação`;
+}
+
+// ─── Leitura do market_cache ──────────────────────────────────────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function fetchFromCache(sb: ReturnType<typeof createClient>, key: string): Promise<any | null> {
+  const { data } = await sb
+    .from('market_cache')
+    .select('value_json, updated_at')
+    .eq('cache_key', key)
+    .maybeSingle();
+  if (!data?.value_json) return null;
+  return data.value_json;
+}
+
+// ─── Fallback: fetch direto ao Binance / alternative.me ──────────────────────
+
+async function fetchBinanceFallback(): Promise<{
+  btc_price: number; btc_change_24h: number; btc_high_24h: number; btc_low_24h: number;
+  funding_rate: number; open_interest_usd: number; long_short_ratio: number;
+} | null> {
+  try {
+    const [tickerRes, fundingRes, oiRes, lsRes] = await Promise.allSettled([
+      fetch('https://fapi.binance.com/fapi/v1/ticker/24hr?symbol=BTCUSDT',                                               { signal: AbortSignal.timeout(8_000) }),
+      fetch('https://fapi.binance.com/fapi/v1/premiumIndex?symbol=BTCUSDT',                                              { signal: AbortSignal.timeout(8_000) }),
+      fetch('https://fapi.binance.com/fapi/v1/openInterest?symbol=BTCUSDT',                                              { signal: AbortSignal.timeout(8_000) }),
+      fetch('https://fapi.binance.com/futures/data/globalLongShortAccountRatio?symbol=BTCUSDT&period=1h&limit=1',        { signal: AbortSignal.timeout(8_000) }),
+    ]);
+
+    let btc_price = 0, btc_change_24h = 0, btc_high_24h = 0, btc_low_24h = 0;
+    let funding_rate = 0, open_interest_usd = 0, long_short_ratio = 1;
+
+    if (tickerRes.status === 'fulfilled' && tickerRes.value.ok) {
+      const d = await tickerRes.value.json() as { lastPrice?: string; priceChangePercent?: string; highPrice?: string; lowPrice?: string };
+      btc_price      = parseFloat(d.lastPrice ?? '0');
+      btc_change_24h = parseFloat(d.priceChangePercent ?? '0');
+      btc_high_24h   = parseFloat(d.highPrice ?? '0');
+      btc_low_24h    = parseFloat(d.lowPrice ?? '0');
+    }
+    if (fundingRes.status === 'fulfilled' && fundingRes.value.ok) {
+      const d = await fundingRes.value.json() as { lastFundingRate?: string };
+      funding_rate = parseFloat(d.lastFundingRate ?? '0') * 100;
+    }
+    if (oiRes.status === 'fulfilled' && oiRes.value.ok) {
+      const d = await oiRes.value.json() as { openInterest?: string };
+      open_interest_usd = parseFloat(d.openInterest ?? '0') * btc_price;
+    }
+    if (lsRes.status === 'fulfilled' && lsRes.value.ok) {
+      const d = await lsRes.value.json() as Array<{ longShortRatio?: string }>;
+      long_short_ratio = parseFloat(d[0]?.longShortRatio ?? '1');
+    }
+
+    if (btc_price === 0) return null;
+    return { btc_price, btc_change_24h, btc_high_24h, btc_low_24h, funding_rate, open_interest_usd, long_short_ratio };
+  } catch {
+    return null;
+  }
+}
+
+async function fetchFngFallback(): Promise<number> {
+  try {
+    const res = await fetch('https://api.alternative.me/fng/?limit=1', { signal: AbortSignal.timeout(8_000) });
+    if (!res.ok) return 50;
+    const d = await res.json() as { data?: Array<{ value: string }> };
+    return parseInt(d.data?.[0]?.value ?? '50', 10);
+  } catch {
+    return 50;
+  }
+}
+
+// ─── Montagem do snapshot ─────────────────────────────────────────────────────
+
+async function buildSnapshot(
+  sb: ReturnType<typeof createClient>,
+  correlationId: string,
+): Promise<MarketSnapshot> {
+  // Lê market_cache e regime_score_history em paralelo
+  const [ticker, fng, macroBoardRaw, dominanceRaw, onChainRaw, regimeRow] = await Promise.all([
+    fetchFromCache(sb, 'btc:ticker'),
+    fetchFromCache(sb, 'fear-greed:1'),
+    fetchFromCache(sb, 'fred:macro-board'),
+    fetchFromCache(sb, 'coingecko:dominance'),
+    fetchFromCache(sb, 'coinmetrics:cycle'),
+    sb.from('regime_score_history').select('score, label').order('computed_at', { ascending: false }).limit(1).maybeSingle(),
   ]);
 
-  let btc_price         = 0;
-  let btc_change_24h    = 0;
-  let btc_high_24h      = 0;
-  let btc_low_24h       = 0;
-  let funding_rate      = 0;
-  let fear_greed        = 50;
-  let open_interest_usd = 0;
-  let long_short_ratio  = 1;
+  let btc_price = 0, btc_change_24h = 0, btc_high_24h = 0, btc_low_24h = 0;
+  let funding_rate = 0, funding_available = false;
+  let open_interest_usd = 0, long_short_ratio = 1;
 
-  if (tickerRes.status === 'fulfilled' && tickerRes.value.ok) {
-    const d = await tickerRes.value.json() as {
-      lastPrice?: string;
-      priceChangePercent?: string;
-      highPrice?: string;
-      lowPrice?: string;
-    };
-    btc_price      = parseFloat(d.lastPrice ?? '0');
-    btc_change_24h = parseFloat(d.priceChangePercent ?? '0');
-    btc_high_24h   = parseFloat(d.highPrice ?? '0');
-    btc_low_24h    = parseFloat(d.lowPrice ?? '0');
+  if (ticker && ticker.mark_price > 0) {
+    // Shape: BtcTickerData { mark_price, last_funding_rate, price_change_pct, high_24h, low_24h, open_interest }
+    btc_price         = ticker.mark_price;
+    btc_change_24h    = ticker.price_change_pct ?? 0;
+    btc_high_24h      = ticker.high_24h ?? 0;
+    btc_low_24h       = ticker.low_24h ?? 0;
+    funding_rate      = (ticker.last_funding_rate ?? 0) * 100;
+    funding_available = true;
+    open_interest_usd = (ticker.open_interest ?? 0) * btc_price;
+    log('INFO', correlationId, 'BTC ticker do market_cache', { btc_price, funding_rate });
+  } else {
+    // Fallback: fetch direto
+    log('WARN', correlationId, 'market_cache vazio — tentando Binance direto');
+    const live = await fetchBinanceFallback();
+    if (live) {
+      btc_price         = live.btc_price;
+      btc_change_24h    = live.btc_change_24h;
+      btc_high_24h      = live.btc_high_24h;
+      btc_low_24h       = live.btc_low_24h;
+      funding_rate      = live.funding_rate;
+      funding_available = true;
+      open_interest_usd = live.open_interest_usd;
+      long_short_ratio  = live.long_short_ratio;
+      log('INFO', correlationId, 'BTC ticker do Binance direto', { btc_price });
+    } else {
+      log('ERROR', correlationId, 'Binance indisponível — BTC price não obtido');
+    }
   }
 
-  if (fundingRes.status === 'fulfilled' && fundingRes.value.ok) {
-    const d = await fundingRes.value.json() as { lastFundingRate?: string };
-    funding_rate = parseFloat(d.lastFundingRate ?? '0') * 100;
+  // Fear & Greed — cache key é 'fear-greed:1' (inclui limit)
+  let fear_greed = 50;
+  if (fng && typeof fng.value === 'number') {
+    fear_greed = fng.value;
+  } else if (fng && Array.isArray(fng) && fng[0]?.value) {
+    fear_greed = parseInt(fng[0].value, 10);
+  } else {
+    fear_greed = await fetchFngFallback();
   }
 
-  if (fngRes.status === 'fulfilled' && fngRes.value.ok) {
-    const d = await fngRes.value.json() as { data?: Array<{ value: string }> };
-    fear_greed = parseInt(d.data?.[0]?.value ?? '50', 10);
+  // Macro (FRED) — { series: [{ id: 'VIX', value: 22.5 }, { id: 'US10Y', value: 4.2 }, ...] }
+  let vix: number | null = null;
+  let us10y: number | null = null;
+  if (macroBoardRaw?.series && Array.isArray(macroBoardRaw.series)) {
+    const vixEntry   = macroBoardRaw.series.find((s: { id: string; value?: number }) => s.id === 'VIX');
+    const us10yEntry = macroBoardRaw.series.find((s: { id: string; value?: number }) => s.id === 'US10Y');
+    if (vixEntry?.value != null)   vix   = parseFloat(vixEntry.value.toFixed(1));
+    if (us10yEntry?.value != null) us10y = parseFloat(us10yEntry.value.toFixed(2));
   }
 
-  if (oiRes.status === 'fulfilled' && oiRes.value.ok) {
-    const d = await oiRes.value.json() as { openInterest?: string };
-    const oiBtc = parseFloat(d.openInterest ?? '0');
-    open_interest_usd = btc_price > 0 ? oiBtc * btc_price : 0;
+  // Dominância BTC — { btc_dominance: 55.2, eth_dominance: 14.8 }
+  const btc_dominance: number | null = dominanceRaw?.btc_dominance != null
+    ? parseFloat(dominanceRaw.btc_dominance.toFixed(1))
+    : null;
+
+  // On-chain (CoinMetrics) — { nupl: 0.45, mvrv_current: 2.1, ... }
+  const nupl: number | null = onChainRaw?.nupl != null
+    ? parseFloat(onChainRaw.nupl.toFixed(3))
+    : null;
+
+  // Liquidações — cache key 'binance:liquidations:200'
+  // Shape: { items: LiqEvent[], ... } — soma total USD dos items
+  const liqRaw = await fetchFromCache(sb, 'binance:liquidations:200');
+  let liq_total_usd: number | null = null;
+  if (liqRaw?.items && Array.isArray(liqRaw.items) && liqRaw.items.length > 0) {
+    const total = liqRaw.items.reduce((acc: number, item: { usd_value?: number; qty?: number; price?: number }) => {
+      return acc + Math.abs(item.usd_value ?? (item.price ?? 0) * (item.qty ?? 0));
+    }, 0);
+    if (total > 0) liq_total_usd = total;
   }
 
-  if (lsRes.status === 'fulfilled' && lsRes.value.ok) {
-    const d = await lsRes.value.json() as Array<{ longShortRatio?: string }>;
-    long_short_ratio = parseFloat(d[0]?.longShortRatio ?? '1');
-  }
+  // Regime (regime_score_history — write diário do browser)
+  const regime_label: string | null = regimeRow.data?.label ?? null;
+  const regime_score: number | null = regimeRow.data?.score ?? null;
 
-  return { btc_price, btc_change_24h, btc_high_24h, btc_low_24h, open_interest_usd, long_short_ratio, funding_rate, fear_greed };
+  return {
+    btc_price, btc_change_24h, btc_high_24h, btc_low_24h,
+    funding_rate, funding_available,
+    open_interest_usd, long_short_ratio,
+    fear_greed,
+    regime_label, regime_score,
+    vix, us10y,
+    liq_total_usd,
+    btc_dominance,
+    nupl,
+  };
 }
+
+// ─── Montagem da mensagem ─────────────────────────────────────────────────────
 
 function buildDigestMessage(snap: MarketSnapshot, schedule: string): string {
   const now     = new Date();
@@ -148,31 +309,52 @@ function buildDigestMessage(snap: MarketSnapshot, schedule: string): string {
 
   const priceStr = snap.btc_price > 0
     ? `${fmtPrice(snap.btc_price)} (${fmtChange(snap.btc_change_24h)} 24h)`
-    : 'N/A';
+    : 'N/D — dashboard indisponível';
 
-  const rangeStr = snap.btc_high_24h > 0
-    ? `   Alta ${fmtPrice(snap.btc_high_24h)} · Baixa ${fmtPrice(snap.btc_low_24h)}`
-    : '';
-
-  const oiStr = snap.open_interest_usd > 0
-    ? `📊 *OI* ${fmtOI(snap.open_interest_usd)}  ·  L/S ${fmtLS(snap.long_short_ratio)}`
-    : '';
-
-  const lines = [
+  const lines: string[] = [
     `📊 *MRP Dashboard — Resumo Diário*`,
     `_${dateStr} · ${timeStr} BRT_`,
     ``,
     `💰 *BTC* ${priceStr}`,
   ];
 
-  if (rangeStr) lines.push(rangeStr);
+  if (snap.btc_high_24h > 0) {
+    lines.push(`   Alta ${fmtPrice(snap.btc_high_24h)} · Baixa ${fmtPrice(snap.btc_low_24h)}`);
+  }
 
-  lines.push(``, `📈 *Funding* ${fmtFunding(snap.funding_rate)}`);
+  lines.push(``);
 
-  if (oiStr) lines.push(oiStr);
+  if (snap.regime_label && snap.regime_score != null) {
+    lines.push(`🌡️ *Regime* ${fmtRegime(snap.regime_label, snap.regime_score)}`);
+  }
+
+  lines.push(`📈 *Funding* ${fmtFunding(snap.funding_rate, snap.funding_available)}`);
+
+  if (snap.open_interest_usd > 0) {
+    lines.push(`📊 *OI* ${fmtOI(snap.open_interest_usd)}  ·  L/S ${fmtLS(snap.long_short_ratio)}`);
+  }
+
+  if (snap.liq_total_usd != null && snap.liq_total_usd > 0) {
+    lines.push(`🔥 *Liquidações 24h* ${fmtLiq(snap.liq_total_usd)}`);
+  }
+
+  lines.push(`🧠 *Fear & Greed* ${fmtFng(snap.fear_greed)}`);
+
+  const macroLines: string[] = [];
+  if (snap.vix != null)   macroLines.push(`VIX ${fmtVix(snap.vix)}`);
+  if (snap.us10y != null) macroLines.push(`US10Y ${snap.us10y}%`);
+  if (macroLines.length > 0) {
+    lines.push(``, `🌐 *Macro* ${macroLines.join('  ·  ')}`);
+  }
+
+  const extraLines: string[] = [];
+  if (snap.btc_dominance != null) extraLines.push(`👑 *BTC.D* ${snap.btc_dominance}%`);
+  if (snap.nupl != null)          extraLines.push(`⛓️ *NUPL* ${fmtNupl(snap.nupl)}`);
+  if (extraLines.length > 0) {
+    lines.push(...extraLines.map(l => `${l}`));
+  }
 
   lines.push(
-    `🧠 *Fear & Greed* ${fmtFng(snap.fear_greed)}`,
     ``,
     `🔗 [Abrir Dashboard](https://mrp-dashboard.onrender.com)`,
     ``,
@@ -181,6 +363,8 @@ function buildDigestMessage(snap: MarketSnapshot, schedule: string): string {
 
   return lines.join('\n');
 }
+
+// ─── Envio Telegram ───────────────────────────────────────────────────────────
 
 async function sendTelegram(
   token:  string,
@@ -232,7 +416,6 @@ Deno.serve(async (req: Request) => {
   const jobId = jobRow?.id as string | undefined;
 
   try {
-    // Lê configurações do Telegram
     const { data: settings, error: settingsError } = await sb
       .from('user_settings')
       .select('telegram_enabled, telegram_chat_id, telegram_bot_token, telegram_schedule')
@@ -245,7 +428,6 @@ Deno.serve(async (req: Request) => {
       await sb.from('system_job_log').update({
         status: 'error', error_message: settingsError.message, duration_ms: Date.now() - startMs,
       }).eq('id', jobId!);
-
       return new Response(
         JSON.stringify({ ok: false, error: 'Erro ao ler configurações: ' + settingsError.message, correlationId }),
         { status: 500, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } },
@@ -259,9 +441,7 @@ Deno.serve(async (req: Request) => {
       telegram_schedule:  settings?.telegram_schedule  ?? '11:00',
     };
 
-    // Validações explícitas com mensagem humana
     if (!cfg.telegram_enabled) {
-      log('INFO', correlationId, 'Telegram desabilitado — skip');
       await sb.from('system_job_log').update({ status: 'success', duration_ms: Date.now() - startMs, alerts_sent: 0 }).eq('id', jobId!);
       return new Response(
         JSON.stringify({ ok: true, status: 'skipped', reason: 'Telegram desabilitado nas configurações', correlationId }),
@@ -271,7 +451,6 @@ Deno.serve(async (req: Request) => {
 
     if (!cfg.telegram_bot_token) {
       const msg = 'Bot Token não configurado. Vá em Configurações → Telegram → Bot Token e insira o token criado via @BotFather.';
-      log('WARN', correlationId, msg);
       await sb.from('system_job_log').update({ status: 'error', error_message: msg, duration_ms: Date.now() - startMs }).eq('id', jobId!);
       return new Response(
         JSON.stringify({ ok: false, error: msg, correlationId }),
@@ -281,7 +460,6 @@ Deno.serve(async (req: Request) => {
 
     if (!cfg.telegram_chat_id) {
       const msg = 'Chat ID não configurado. Envie /start para o seu bot, então use @userinfobot para obter seu chat_id.';
-      log('WARN', correlationId, msg);
       await sb.from('system_job_log').update({ status: 'error', error_message: msg, duration_ms: Date.now() - startMs }).eq('id', jobId!);
       return new Response(
         JSON.stringify({ ok: false, error: msg, correlationId }),
@@ -289,16 +467,15 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Dedup diário: um digest por chat por dia
+    // Dedup diário
     const todayKey = `digest|${new Date().toISOString().slice(0, 10)}|${cfg.telegram_chat_id}`;
     const { data: existingDelivery } = await sb
       .from('telegram_delivery_log')
-      .select('id, status, created_at')
+      .select('id, status')
       .eq('delivery_key', todayKey)
       .maybeSingle();
 
     if (existingDelivery?.status === 'sent') {
-      log('INFO', correlationId, 'Digest já enviado hoje — dedup', { key: todayKey });
       await sb.from('system_job_log').update({ status: 'success', duration_ms: Date.now() - startMs, alerts_sent: 0 }).eq('id', jobId!);
       return new Response(
         JSON.stringify({ ok: true, status: 'skipped', reason: 'Digest já enviado hoje', correlationId }),
@@ -306,16 +483,19 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Busca dados de mercado enriquecidos
-    const snapshot = await fetchMarketSnapshot();
-    log('INFO', correlationId, 'Market snapshot', snapshot);
+    // Monta snapshot com fallback automático: cache → Binance direto
+    const snapshot = await buildSnapshot(sb, correlationId);
+    log('INFO', correlationId, 'Snapshot final', {
+      btc_price: snapshot.btc_price,
+      regime: snapshot.regime_label,
+      vix: snapshot.vix,
+      liq: snapshot.liq_total_usd,
+    });
 
     const message = buildDigestMessage(snapshot, cfg.telegram_schedule);
     const result  = await sendTelegram(cfg.telegram_bot_token, cfg.telegram_chat_id, message);
-
     const duration = Date.now() - startMs;
 
-    // Registra no delivery log
     await sb.from('telegram_delivery_log').upsert({
       delivery_key:    todayKey,
       window_label:    'digest',
@@ -337,60 +517,33 @@ Deno.serve(async (req: Request) => {
       else if (result.errorBody?.includes('Unauthorized'))
         hint = 'Token inválido. Recrie o bot com @BotFather e atualize o token.';
 
-      log('ERROR', correlationId, 'Telegram retornou erro', {
-        status: result.httpStatus, body: result.errorBody, latencyMs: result.latencyMs,
-      });
-
+      log('ERROR', correlationId, 'Telegram retornou erro', { status: result.httpStatus, body: result.errorBody });
       await sb.from('system_job_log').update({
         status: 'error', error_message: `Telegram HTTP ${result.httpStatus}: ${result.errorBody?.slice(0, 200)}`,
         duration_ms: duration, alerts_sent: 0,
       }).eq('id', jobId!);
 
       return new Response(
-        JSON.stringify({
-          ok:             false,
-          status:         'failed',
-          telegram_status: result.httpStatus,
-          telegram_error:  result.errorBody,
-          hint,
-          correlationId,
-          latency_ms:     result.latencyMs,
-        }),
+        JSON.stringify({ ok: false, status: 'failed', telegram_status: result.httpStatus, telegram_error: result.errorBody, hint, correlationId, latency_ms: result.latencyMs }),
         { status: 502, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } },
       );
     }
 
     log('INFO', correlationId, 'Digest enviado com sucesso', { msgId: result.msgId, latencyMs: result.latencyMs });
-
     await sb.from('system_job_log').update({
       status: 'success', alerts_sent: 1, duration_ms: duration,
-      metadata: { btc_price: snapshot.btc_price, btc_change_24h: snapshot.btc_change_24h, fear_greed: snapshot.fear_greed, open_interest_usd: snapshot.open_interest_usd },
+      metadata: { btc_price: snapshot.btc_price, btc_change_24h: snapshot.btc_change_24h, fear_greed: snapshot.fear_greed, regime: snapshot.regime_label, vix: snapshot.vix },
     }).eq('id', jobId!);
 
     return new Response(
-      JSON.stringify({
-        ok:                true,
-        status:            'sent',
-        message_id:        result.msgId,
-        btc_price:         snapshot.btc_price,
-        btc_change_24h:    snapshot.btc_change_24h,
-        open_interest_usd: snapshot.open_interest_usd,
-        long_short_ratio:  snapshot.long_short_ratio,
-        correlationId,
-        timestamp:         new Date().toISOString(),
-        latency_ms:        result.latencyMs,
-      }),
+      JSON.stringify({ ok: true, status: 'sent', message_id: result.msgId, btc_price: snapshot.btc_price, correlationId, timestamp: new Date().toISOString(), latency_ms: result.latencyMs }),
       { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } },
     );
 
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     log('ERROR', correlationId, 'Erro crítico no digest', { error: msg });
-
-    await sb.from('system_job_log').update({
-      status: 'error', error_message: msg, duration_ms: Date.now() - startMs,
-    }).eq('id', jobId!).catch(() => null);
-
+    await sb.from('system_job_log').update({ status: 'error', error_message: msg, duration_ms: Date.now() - startMs }).eq('id', jobId!).catch(() => null);
     return new Response(
       JSON.stringify({ ok: false, error: msg, correlationId }),
       { status: 500, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } },
