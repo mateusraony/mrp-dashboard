@@ -480,8 +480,10 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Dedup diário
-    const todayKey = `digest|${new Date().toISOString().slice(0, 10)}|${cfg.telegram_chat_id}`;
+    // Dedup diário — envios forçados (force=true) usam chave por minuto para não bloquear o cron
+    const todayKey = forceResend
+      ? `digest_manual|${new Date().toISOString().slice(0, 16)}|${cfg.telegram_chat_id}`
+      : `digest|${new Date().toISOString().slice(0, 10)}|${cfg.telegram_chat_id}`;
     const { data: existingDelivery } = await sb
       .from('telegram_delivery_log')
       .select('id, status')
@@ -511,7 +513,7 @@ Deno.serve(async (req: Request) => {
 
     await sb.from('telegram_delivery_log').upsert({
       delivery_key:    todayKey,
-      window_label:    'digest',
+      window_label:    forceResend ? 'digest_manual' : 'digest',
       chat_id:         cfg.telegram_chat_id,
       status:          result.ok ? 'sent' : 'failed',
       telegram_msg_id: result.msgId ?? null,
