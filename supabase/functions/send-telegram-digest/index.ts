@@ -255,7 +255,7 @@ async function fetchBybitFallback(): Promise<number | null> {
 async function fetchOkxFallback(): Promise<number | null> {
   try {
     const res = await fetch(
-      'https://www.okx.com/api/v5/public/funding-rate?instId=BTC-USD-SWAP',
+      'https://www.okx.com/api/v5/public/funding-rate?instId=BTC-USDT-SWAP',
       { signal: AbortSignal.timeout(8_000) },
     );
     if (!res.ok) return null;
