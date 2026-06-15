@@ -239,6 +239,32 @@ async function fetchFngFallback(): Promise<number> {
   }
 }
 
+async function fetchBybitFallback(): Promise<number | null> {
+  try {
+    const res = await fetch(
+      'https://api.bybit.com/v5/market/tickers?category=linear&symbol=BTCUSDT',
+      { signal: AbortSignal.timeout(8_000) },
+    );
+    if (!res.ok) return null;
+    const d = await res.json() as { result?: { list?: Array<{ fundingRate?: string }> } };
+    const rate = d.result?.list?.[0]?.fundingRate;
+    return rate != null ? parseFloat((parseFloat(rate) * 100).toFixed(4)) : null;
+  } catch { return null; }
+}
+
+async function fetchOkxFallback(): Promise<number | null> {
+  try {
+    const res = await fetch(
+      'https://www.okx.com/api/v5/public/funding-rate?instId=BTC-USD-SWAP',
+      { signal: AbortSignal.timeout(8_000) },
+    );
+    if (!res.ok) return null;
+    const d = await res.json() as { data?: Array<{ fundingRate?: string }> };
+    const rate = d.data?.[0]?.fundingRate;
+    return rate != null ? parseFloat((parseFloat(rate) * 100).toFixed(4)) : null;
+  } catch { return null; }
+}
+
 // ─── Montagem do snapshot ─────────────────────────────────────────────────────
 
 async function buildSnapshot(
@@ -339,12 +365,21 @@ async function buildSnapshot(
   const risk_regime: string | null = riskScoreRaw?.regime ?? null;
 
   // Multi-venue funding — raw decimal × 100 = %
-  const bybit_funding: number | null = bybitTickerRaw?.funding_rate != null
+  // Fallback direto às APIs públicas de Bybit/OKX quando cache estiver vazio
+  const bybitFromCache = bybitTickerRaw?.funding_rate != null
     ? parseFloat((bybitTickerRaw.funding_rate * 100).toFixed(4))
     : null;
-  const okx_funding: number | null = okxTickerRaw?.funding_rate != null
+  const okxFromCache = okxTickerRaw?.funding_rate != null
     ? parseFloat((okxTickerRaw.funding_rate * 100).toFixed(4))
     : null;
+  const [bybitFallbackVal, okxFallbackVal] = await Promise.all([
+    bybitFromCache == null ? fetchBybitFallback() : Promise.resolve(null),
+    okxFromCache   == null ? fetchOkxFallback()   : Promise.resolve(null),
+  ]);
+  const bybit_funding = bybitFromCache ?? bybitFallbackVal;
+  const okx_funding   = okxFromCache   ?? okxFallbackVal;
+  if (bybit_funding != null && bybitFromCache == null) log('INFO', correlationId, 'Bybit funding via fallback direto', { bybit_funding });
+  if (okx_funding   != null && okxFromCache   == null) log('INFO', correlationId, 'OKX funding via fallback direto',   { okx_funding });
 
   // Top 3 notícias mais recentes — { title, sentiment, domain, published_at }
   let top_news: Array<{ title: string; sentiment: -1|0|1; domain: string }> | null = null;
