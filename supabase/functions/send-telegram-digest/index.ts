@@ -41,20 +41,30 @@ interface MarketSnapshot {
   funding_rate:      number;
   funding_available: boolean;
   open_interest_usd: number;
-  long_short_ratio:  number | null;  // null = cache ausente/stale → omitir do digest
+  long_short_ratio:  number | null;
+  // Multi-venue funding
+  bybit_funding:     number | null;
+  okx_funding:       number | null;
   // Sentiment
   fear_greed:        number;
+  // Risk Score (computed client-side, persisted to market_cache by useRiskScore hook)
+  risk_score:        number | null;
+  risk_regime:       string | null;
   // Regime (from regime_score_history — written daily by browser)
   regime_label:      string | null;
   regime_score:      number | null;
   // Macro (from fred:macro-board cache)
   vix:               number | null;
   us10y:             number | null;
-  // Liquidations (from binance:liquidations:200 cache)
+  // Liquidations
   liq_total_usd:     number | null;
   // On-chain + dominance
   btc_dominance:     number | null;
   nupl:              number | null;
+  mvrv_zscore:       number | null;
+  mvrv_zone:         string | null;
+  // Top news
+  top_news:          Array<{ title: string; sentiment: -1|0|1; domain: string }> | null;
 }
 
 // ─── Helpers de formatação ────────────────────────────────────────────────────
@@ -104,6 +114,44 @@ function fmtLiq(usd: number): string {
   if (usd > 500_000_000) return `${val} 🔴 extremo`;
   if (usd > 200_000_000) return `${val} 🟡 elevado`;
   return `${val} 🟢 normal`;
+}
+
+function fmtRiskScore(score: number, regime: string): string {
+  const emoji = score >= 70 ? '🔴' : score >= 40 ? '🟡' : '🟢';
+  return `${emoji} ${score}/100 · ${regime}`;
+}
+
+function fmtFundingMulti(bnbRate: number, bnbAvailable: boolean, bybit: number | null, okx: number | null): string {
+  const parts: string[] = [];
+  if (bnbAvailable) {
+    const sign = bnbRate >= 0 ? '+' : '';
+    parts.push(`BNB ${sign}${bnbRate.toFixed(4)}%`);
+  }
+  if (bybit != null) {
+    const sign = bybit >= 0 ? '+' : '';
+    parts.push(`Bybit ${sign}${bybit.toFixed(4)}%`);
+  }
+  if (okx != null) {
+    const sign = okx >= 0 ? '+' : '';
+    parts.push(`OKX ${sign}${okx.toFixed(4)}%`);
+  }
+  return parts.length > 0 ? parts.join('  ·  ') : 'N/D';
+}
+
+function fmtMvrv(zscore: number, zone: string): string {
+  const emoji = zscore > 2 ? '🔴' : zscore > 0.5 ? '🟡' : '🟢';
+  const shortZone = zone.split('/')[0].trim();
+  return `${emoji} Z ${zscore.toFixed(2)} · ${shortZone}`;
+}
+
+function escapeMd(text: string): string {
+  // Escape Markdown v1 control chars so external content never breaks sendMessage
+  return text.replace(/[_*`\[\]]/g, (c) => `\\${c}`);
+}
+
+function fmtNewsItem(item: { title: string; sentiment: -1|0|1; domain: string }): string {
+  const emoji = item.sentiment === 1 ? '🟢' : item.sentiment === -1 ? '🔴' : '⚪';
+  return `${emoji} ${escapeMd(item.title)} — ${item.domain}`;
 }
 
 function fmtRegime(label: string, score: number): string {
@@ -198,14 +246,19 @@ async function buildSnapshot(
   correlationId: string,
 ): Promise<MarketSnapshot> {
   // Lê market_cache e regime_score_history em paralelo
-  const [ticker, lsRatioRaw, fng, macroBoardRaw, dominanceRaw, onChainRaw, regimeRow] = await Promise.all([
-    fetchFromCache(sb, 'btc:ticker', 10),               // stale > 10 min → fallback Binance
+  const [ticker, lsRatioRaw, fng, macroBoardRaw, dominanceRaw, onChainRaw, regimeRow,
+         riskScoreRaw, bybitTickerRaw, okxTickerRaw, newsRaw] = await Promise.all([
+    fetchFromCache(sb, 'btc:ticker', 10),                // stale > 10 min → fallback Binance
     fetchFromCache(sb, 'binance:longshort:BTCUSDT', 10), // stale > 10 min → omitir L/S
     fetchFromCache(sb, 'fear-greed:1', 360),             // stale > 6h → fallback alternative.me
     fetchFromCache(sb, 'fred:macro-board', 1440),        // stale > 24h → omitir macro
     fetchFromCache(sb, 'coingecko:dominance', 120),      // stale > 2h → omitir BTC.D
-    fetchFromCache(sb, 'coinmetrics:cycle', 1440),       // stale > 24h → omitir NUPL
+    fetchFromCache(sb, 'coinmetrics:cycle', 1440),       // stale > 24h → omitir NUPL/MVRV
     sb.from('regime_score_history').select('score, label').order('scored_at', { ascending: false }).limit(1).maybeSingle(),
+    fetchFromCache(sb, 'risk:score', 30),                // score computado pelo browser
+    fetchFromCache(sb, 'bybit:ticker', 10),              // funding Bybit (raw decimal)
+    fetchFromCache(sb, 'okx:ticker', 10),                // funding OKX (raw decimal)
+    fetchFromCache(sb, 'gdelt:news:bitcoin crypto', 60), // top notícias
   ]);
 
   let btc_price = 0, btc_change_24h = 0, btc_high_24h = 0, btc_low_24h = 0;
@@ -272,10 +325,39 @@ async function buildSnapshot(
     ? parseFloat(dominanceRaw.btc_dominance.toFixed(1))
     : null;
 
-  // On-chain (CoinMetrics) — { nupl: 0.45, mvrv_current: 2.1, ... }
+  // On-chain (CoinMetrics) — { nupl: 0.45, mvrv_zscore: 0.84, mvrv_zone: '...', ... }
   const nupl: number | null = onChainRaw?.nupl != null
     ? parseFloat(onChainRaw.nupl.toFixed(3))
     : null;
+  const mvrv_zscore: number | null = onChainRaw?.mvrv_zscore != null
+    ? parseFloat(onChainRaw.mvrv_zscore.toFixed(2))
+    : null;
+  const mvrv_zone: string | null = onChainRaw?.mvrv_zone ?? null;
+
+  // Risk Score — persisted to market_cache by useRiskScore hook in browser
+  const risk_score: number | null = riskScoreRaw?.score != null ? riskScoreRaw.score as number : null;
+  const risk_regime: string | null = riskScoreRaw?.regime ?? null;
+
+  // Multi-venue funding — raw decimal × 100 = %
+  const bybit_funding: number | null = bybitTickerRaw?.funding_rate != null
+    ? parseFloat((bybitTickerRaw.funding_rate * 100).toFixed(4))
+    : null;
+  const okx_funding: number | null = okxTickerRaw?.funding_rate != null
+    ? parseFloat((okxTickerRaw.funding_rate * 100).toFixed(4))
+    : null;
+
+  // Top 3 notícias mais recentes — { title, sentiment, domain, published_at }
+  let top_news: Array<{ title: string; sentiment: -1|0|1; domain: string }> | null = null;
+  if (Array.isArray(newsRaw) && newsRaw.length > 0) {
+    const sorted = [...newsRaw]
+      .sort((a, b) => new Date(b.published_at as string).getTime() - new Date(a.published_at as string).getTime())
+      .slice(0, 3);
+    top_news = sorted.map(n => ({
+      title:     (n.title as string).slice(0, 65),
+      sentiment: (n.sentiment as -1|0|1) ?? 0,
+      domain:    n.domain as string,
+    }));
+  }
 
   // Liquidações — cache key 'binance:liquidations:200'
   // Shape: { items: LiqEvent[], ... } — soma total USD dos items
@@ -296,12 +378,16 @@ async function buildSnapshot(
     btc_price, btc_change_24h, btc_high_24h, btc_low_24h,
     funding_rate, funding_available,
     open_interest_usd, long_short_ratio,
+    bybit_funding, okx_funding,
     fear_greed,
+    risk_score, risk_regime,
     regime_label, regime_score,
     vix, us10y,
     liq_total_usd,
     btc_dominance,
     nupl,
+    mvrv_zscore, mvrv_zone,
+    top_news,
   };
 }
 
@@ -320,8 +406,14 @@ function buildDigestMessage(snap: MarketSnapshot, schedule: string): string {
     `📊 *MRP Dashboard — Resumo Diário*`,
     `_${dateStr} · ${timeStr} BRT_`,
     ``,
-    `💰 *BTC* ${priceStr}`,
   ];
+
+  // Risk Score — logo após o header
+  if (snap.risk_score != null && snap.risk_regime) {
+    lines.push(`⚡ *Risk Score* ${fmtRiskScore(snap.risk_score, snap.risk_regime)}`);
+  }
+
+  lines.push(`💰 *BTC* ${priceStr}`);
 
   if (snap.btc_high_24h > 0) {
     lines.push(`   Alta ${fmtPrice(snap.btc_high_24h)} · Baixa ${fmtPrice(snap.btc_low_24h)}`);
@@ -333,7 +425,8 @@ function buildDigestMessage(snap: MarketSnapshot, schedule: string): string {
     lines.push(`🌡️ *Regime* ${fmtRegime(snap.regime_label, snap.regime_score)}`);
   }
 
-  lines.push(`📈 *Funding* ${fmtFunding(snap.funding_rate, snap.funding_available)}`);
+  // Funding multi-venue (Binance + Bybit + OKX)
+  lines.push(`📈 *Funding* ${fmtFundingMulti(snap.funding_rate, snap.funding_available, snap.bybit_funding, snap.okx_funding)}`);
 
   if (snap.open_interest_usd > 0) {
     const lsStr = snap.long_short_ratio != null ? `  ·  L/S ${fmtLS(snap.long_short_ratio)}` : '';
@@ -353,11 +446,24 @@ function buildDigestMessage(snap: MarketSnapshot, schedule: string): string {
     lines.push(``, `🌐 *Macro* ${macroLines.join('  ·  ')}`);
   }
 
-  const extraLines: string[] = [];
-  if (snap.btc_dominance != null) extraLines.push(`👑 *BTC.D* ${snap.btc_dominance}%`);
-  if (snap.nupl != null)          extraLines.push(`⛓️ *NUPL* ${fmtNupl(snap.nupl)}`);
-  if (extraLines.length > 0) {
-    lines.push(...extraLines.map(l => `${l}`));
+  if (snap.btc_dominance != null) {
+    lines.push(`👑 *BTC.D* ${snap.btc_dominance}%`);
+  }
+
+  // On-chain — NUPL e MVRV na mesma linha
+  const onChainParts: string[] = [];
+  if (snap.nupl != null)                          onChainParts.push(`NUPL ${fmtNupl(snap.nupl)}`);
+  if (snap.mvrv_zscore != null && snap.mvrv_zone) onChainParts.push(`MVRV ${fmtMvrv(snap.mvrv_zscore, snap.mvrv_zone)}`);
+  if (onChainParts.length > 0) {
+    lines.push(`⛓️ *On-Chain* ${onChainParts.join('  ·  ')}`);
+  }
+
+  // Notícias — top 3 mais recentes (apenas se cache fresco)
+  if (snap.top_news && snap.top_news.length > 0) {
+    lines.push(``, `📰 *Notícias* (últimas 6h)`);
+    for (const item of snap.top_news) {
+      lines.push(fmtNewsItem(item));
+    }
   }
 
   lines.push(

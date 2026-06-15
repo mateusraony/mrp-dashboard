@@ -18,6 +18,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useBtcTicker, useFearGreed, useKlines } from '@/hooks/useBtcData';
 import { useDvolHistory } from '@/hooks/useDeribit';
 import { computeRiskScore, computeEMA, type RiskScoreResult } from '@/utils/riskCalculations';
+import { getClient, isSupabaseConfigured } from '@/services/supabase';
 
 // Fallback para quando dados live não estão disponíveis
 const FALLBACK_RESULT: RiskScoreResult = {
@@ -60,7 +61,7 @@ export function useRiskScore() {
         ? klines1d.map(k => k.close)  // campo close da transformação select
         : [ticker.mark_price];
 
-      return computeRiskScore(
+      const result = computeRiskScore(
         fundingRate,
         oiDeltaPct,
         dvolValue,
@@ -68,6 +69,22 @@ export function useRiskScore() {
         ticker.mark_price,
         prices20d,
       );
+
+      // Persiste no market_cache para o Telegram digest ler sem browser
+      if (isSupabaseConfigured()) {
+        void (async () => {
+          try {
+            await getClient().from('market_cache').upsert({
+              cache_key:  'risk:score',
+              value_json: { score: result.score, regime: result.regime },
+              source:     'computed',
+              updated_at: new Date().toISOString(),
+            }, { onConflict: 'cache_key' });
+          } catch { /* fire-and-forget — ignorar erros de cache silenciosamente */ }
+        })();
+      }
+
+      return result;
     },
     enabled: !!ticker,  // só executa se ticker estiver disponível
     staleTime: 30_000,  // atualiza a cada 30s (mesma frequência do ticker)
