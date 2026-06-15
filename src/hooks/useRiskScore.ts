@@ -75,11 +75,10 @@ export function useRiskScore() {
         void (async () => {
           try {
             await getClient().from('market_cache').upsert({
-              cache_key:   'risk:score',
-              value_json:  { score: result.score, regime: result.regime },
-              ttl_seconds: 30,
-              source:      'computed',
-              updated_at:  new Date().toISOString(),
+              cache_key:  'risk:score',
+              value_json: { score: result.score, regime: result.regime },
+              source:     'computed',
+              updated_at: new Date().toISOString(),
             }, { onConflict: 'cache_key' });
           } catch { /* fire-and-forget — ignorar erros de cache silenciosamente */ }
         })();

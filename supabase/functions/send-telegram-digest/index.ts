@@ -144,9 +144,14 @@ function fmtMvrv(zscore: number, zone: string): string {
   return `${emoji} Z ${zscore.toFixed(2)} · ${shortZone}`;
 }
 
+function escapeMd(text: string): string {
+  // Escape Markdown v1 control chars so external content never breaks sendMessage
+  return text.replace(/[_*`\[\]]/g, (c) => `\\${c}`);
+}
+
 function fmtNewsItem(item: { title: string; sentiment: -1|0|1; domain: string }): string {
   const emoji = item.sentiment === 1 ? '🟢' : item.sentiment === -1 ? '🔴' : '⚪';
-  return `${emoji} ${item.title} — ${item.domain}`;
+  return `${emoji} ${escapeMd(item.title)} — ${item.domain}`;
 }
 
 function fmtRegime(label: string, score: number): string {
