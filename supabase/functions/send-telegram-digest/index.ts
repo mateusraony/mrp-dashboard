@@ -405,6 +405,13 @@ Deno.serve(async (req: Request) => {
     return new Response('ok', { headers: CORS_HEADERS });
   }
 
+  // Aceita { force: true } no body para ignorar dedup diário (teste manual via dashboard)
+  let forceResend = false;
+  try {
+    const body = await req.json() as { force?: boolean };
+    forceResend = body?.force === true;
+  } catch { /* sem body ou JSON inválido — comportamento normal */ }
+
   const correlationId = crypto.randomUUID();
   const startMs = Date.now();
 
@@ -481,7 +488,7 @@ Deno.serve(async (req: Request) => {
       .eq('delivery_key', todayKey)
       .maybeSingle();
 
-    if (existingDelivery?.status === 'sent') {
+    if (!forceResend && existingDelivery?.status === 'sent') {
       await sb.from('system_job_log').update({ status: 'success', duration_ms: Date.now() - startMs, alerts_sent: 0 }).eq('id', jobId!);
       return new Response(
         JSON.stringify({ ok: true, status: 'skipped', reason: 'Digest já enviado hoje', correlationId }),
