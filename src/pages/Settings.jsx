@@ -78,7 +78,7 @@ import PurposeLabel from '@/components/ui/PurposeLabel';
 import { DATA_MODE, setDataMode } from '@/lib/env';
 import { isSupabaseConfigured } from '@/services/supabase';
 import { useUserSettings, useUpdateSettings } from '@/hooks/useSupabase';
-import { pingTelegram } from '@/services/telegram';
+import { pingTelegram, sendDigestNow } from '@/services/telegram';
 
 function SettingRow({ label, value, description, type = 'text', options = undefined }) {
   const [v, setV] = useState(value);
@@ -391,8 +391,10 @@ function TelegramSection() {
   const [schedule, setSchedule]     = useState('11:00');
   const [showToken, setShowToken]   = useState(false);
   const [saveStatus, setSaveStatus] = useState(/** @type {'idle'|'saving'|'saved'|'error'} */('idle'));
-  const [testStatus, setTestStatus] = useState(/** @type {'idle'|'sending'|'sent'|'error'} */('idle'));
-  const [testMsg, setTestMsg]       = useState('');
+  const [testStatus, setTestStatus]       = useState(/** @type {'idle'|'sending'|'sent'|'error'} */('idle'));
+  const [testMsg, setTestMsg]             = useState('');
+  const [digestStatus, setDigestStatus]   = useState(/** @type {'idle'|'sending'|'sent'|'error'} */('idle'));
+  const [digestMsg, setDigestMsg]         = useState('');
 
   // Populate form from Supabase settings on load
   useEffect(() => {
@@ -457,6 +459,45 @@ function TelegramSection() {
       setTestMsg(err?.message ?? 'Erro desconhecido.');
     } finally {
       setTimeout(() => { setTestStatus('idle'); setTestMsg(''); }, 5000);
+    }
+  };
+
+  const handleDigest = async () => {
+    if (!token.trim() || !chatId.trim()) {
+      setDigestMsg('Bot Token e Chat ID são obrigatórios.');
+      setDigestStatus('error');
+      setTimeout(() => setDigestStatus('idle'), 3000);
+      return;
+    }
+
+    setDigestStatus('sending');
+    setDigestMsg('');
+
+    try {
+      await updateSettings.mutateAsync({
+        telegram_enabled:   true,
+        telegram_bot_token: token.trim(),
+        telegram_chat_id:   chatId.trim(),
+        telegram_schedule:  schedule,
+      });
+
+      const result = await sendDigestNow(true);
+
+      if (result.ok) {
+        const btcStr = result.btc_price
+          ? ` · BTC ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(result.btc_price)}`
+          : '';
+        setDigestStatus('sent');
+        setDigestMsg(`Relatório enviado!${btcStr} (${result.latency_ms ?? '?'}ms)`);
+      } else {
+        setDigestStatus('error');
+        setDigestMsg(result.hint ?? result.error ?? result.reason ?? 'Erro desconhecido.');
+      }
+    } catch (/** @type {any} */ err) {
+      setDigestStatus('error');
+      setDigestMsg(err?.message ?? 'Erro desconhecido.');
+    } finally {
+      setTimeout(() => { setDigestStatus('idle'); setDigestMsg(''); }, 7000);
     }
   };
 
@@ -635,7 +676,7 @@ function TelegramSection() {
          : '📤 Enviar teste'}
         </button>
 
-        {/* Feedback message */}
+        {/* Feedback message — ping test */}
         {testMsg && (
           <span style={{
             fontSize: 11,
@@ -643,6 +684,51 @@ function TelegramSection() {
             fontFamily: 'JetBrains Mono, monospace',
           }}>
             {testMsg}
+          </span>
+        )}
+      </div>
+
+      {/* Digest test — linha separada */}
+      <div style={{ display: 'flex', gap: 10, paddingTop: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+        <button
+          onClick={handleDigest}
+          disabled={digestStatus === 'sending'}
+          style={{
+            background: digestStatus === 'sent'  ? 'rgba(16,185,129,0.1)'
+                      : digestStatus === 'error' ? 'rgba(239,68,68,0.08)'
+                      : 'rgba(139,92,246,0.08)',
+            color:      digestStatus === 'sent'  ? '#10b981'
+                      : digestStatus === 'error' ? '#ef4444'
+                      : '#a78bfa',
+            border: `1px solid ${
+                        digestStatus === 'sent'  ? 'rgba(16,185,129,0.3)'
+                      : digestStatus === 'error' ? 'rgba(239,68,68,0.25)'
+                      : 'rgba(139,92,246,0.22)'}`,
+            borderRadius: 7, padding: '7px 18px', fontSize: 12,
+            fontWeight: 600, cursor: digestStatus === 'sending' ? 'not-allowed' : 'pointer',
+            transition: 'all 0.2s',
+          }}
+        >
+          {digestStatus === 'sending' ? '📊 Enviando relatório…'
+         : digestStatus === 'sent'    ? '✓ Relatório enviado!'
+         : digestStatus === 'error'   ? '✗ Falhou'
+         : '📊 Enviar Relatório Agora'}
+        </button>
+
+        {/* Feedback digest — mostra BTC price para confirmar dado real */}
+        {digestMsg && (
+          <span style={{
+            fontSize: 11,
+            color: digestStatus === 'error' ? '#ef4444' : '#10b981',
+            fontFamily: 'JetBrains Mono, monospace',
+          }}>
+            {digestMsg}
+          </span>
+        )}
+
+        {digestStatus === 'idle' && !digestMsg && (
+          <span style={{ fontSize: 10, color: '#334155', fontFamily: 'JetBrains Mono, monospace' }}>
+            Envia o relatório completo agora (ignora dedup diário)
           </span>
         )}
       </div>
