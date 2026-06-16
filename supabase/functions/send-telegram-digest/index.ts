@@ -265,11 +265,185 @@ async function fetchOkxFallback(): Promise<number | null> {
   } catch { return null; }
 }
 
-// ─── Montagem do snapshot ─────────────────────────────────────────────────────
+// ─── Fallback: CoinGecko, FRED, CoinMetrics, Liquidações, GDELT, Risk Score ───
+
+async function fetchCoinGeckoDominance(): Promise<number | null> {
+  try {
+    const res = await fetch('https://api.coingecko.com/api/v3/global', { signal: AbortSignal.timeout(8_000) });
+    if (!res.ok) return null;
+    const d = await res.json() as { data?: { market_cap_percentage?: { bitcoin?: number } } };
+    const dom = d.data?.market_cap_percentage?.bitcoin;
+    return dom != null ? parseFloat(dom.toFixed(1)) : null;
+  } catch { return null; }
+}
+
+async function fetchFredSeries(seriesId: string, fredKey: string): Promise<number | null> {
+  try {
+    const url = `https://api.stlouisfed.org/fred/series/observations?series_id=${seriesId}&api_key=${fredKey}&sort_order=desc&limit=5&file_type=json`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+    if (!res.ok) return null;
+    const d = await res.json() as { observations?: Array<{ value: string }> };
+    const obs = (d.observations ?? []).find(o => o.value !== '.');
+    return obs ? parseFloat(obs.value) : null;
+  } catch { return null; }
+}
+
+async function fetchCoinMetricsOnChain(): Promise<{ nupl: number; mvrv_zscore: number; mvrv_zone: string } | null> {
+  try {
+    const url = 'https://community-api.coinmetrics.io/v4/timeseries/asset-metrics?assets=btc&metrics=CapMVRVCur,CapRealUSD,PriceUSD,SplyCur&frequency=1d&page_size=365&paging_from=end&pretty=false';
+    const res = await fetch(url, { signal: AbortSignal.timeout(12_000) });
+    if (!res.ok) return null;
+    const d = await res.json() as { data?: Array<{ CapMVRVCur?: string; CapRealUSD?: string; PriceUSD?: string; SplyCur?: string }> };
+    const rows = d.data ?? [];
+    if (rows.length < 10) return null;
+
+    const mvrvSeries = rows.map(r => parseFloat(r.CapMVRVCur ?? 'NaN')).filter(v => !isNaN(v) && isFinite(v));
+    if (mvrvSeries.length < 10) return null;
+
+    const mvrvCurrent = mvrvSeries[mvrvSeries.length - 1];
+    const mean = mvrvSeries.reduce((s, v) => s + v, 0) / mvrvSeries.length;
+    const std  = Math.sqrt(mvrvSeries.reduce((s, v) => s + (v - mean) ** 2, 0) / mvrvSeries.length);
+    const mvrv_zscore = std > 0 ? parseFloat(((mvrvCurrent - mean) / std).toFixed(2)) : 0;
+
+    const mvrv_zone = mvrv_zscore > 6 ? 'Topo de Mercado' :
+                      mvrv_zscore > 4 ? 'Aquecimento'     :
+                      mvrv_zscore > 2 ? 'Elevado'         :
+                      mvrv_zscore > 0 ? 'Verde'           : 'Capitulação';
+
+    // NUPL = (MarketCap - RealizedCap) / MarketCap usando último row válido
+    const last = rows.slice().reverse().find(r => r.PriceUSD && r.SplyCur && r.CapRealUSD);
+    let nupl = 0;
+    if (last) {
+      const price    = parseFloat(last.PriceUSD  ?? '0');
+      const supply   = parseFloat(last.SplyCur   ?? '0');
+      const realCap  = parseFloat(last.CapRealUSD ?? '0');
+      const marketCap = price * supply;
+      nupl = marketCap > 0 ? parseFloat(((marketCap - realCap) / marketCap).toFixed(3)) : 0;
+    }
+
+    return { nupl, mvrv_zscore, mvrv_zone };
+  } catch { return null; }
+}
+
+async function fetchLiquidationsDirect(supabaseUrl: string, serviceKey: string): Promise<number | null> {
+  try {
+    const res = await fetch(`${supabaseUrl}/functions/v1/fred-proxy`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${serviceKey}` },
+      body:    JSON.stringify({ type: 'binance_fapi', endpoint: '/fapi/v1/allForceOrders', params: { symbol: 'BTCUSDT', limit: 200 } }),
+      signal:  AbortSignal.timeout(10_000),
+    });
+    if (!res.ok) return null;
+    const items = await res.json() as Array<{ origQty?: string; price?: string; executedQty?: string; avgPrice?: string }>;
+    if (!Array.isArray(items) || items.length === 0) return null;
+    const total = items.reduce((s, item) => {
+      const qty   = parseFloat(item.executedQty ?? item.origQty ?? '0');
+      const price = parseFloat(item.avgPrice   ?? item.price    ?? '0');
+      return s + Math.abs(qty * price);
+    }, 0);
+    return total > 0 ? total : null;
+  } catch { return null; }
+}
+
+async function fetchGdeltNewsDirect(
+  supabaseUrl: string,
+  serviceKey: string,
+): Promise<Array<{ title: string; sentiment: -1|0|1; domain: string }> | null> {
+  try {
+    const res = await fetch(`${supabaseUrl}/functions/v1/fred-proxy`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${serviceKey}` },
+      body:    JSON.stringify({ type: 'gdelt', params: { query: 'bitcoin crypto', mode: 'artlist', maxrecords: 10, sort: 'DateDesc', timespan: '6h', format: 'json' } }),
+      signal:  AbortSignal.timeout(10_000),
+    });
+    if (!res.ok) return null;
+    const d = await res.json() as { articles?: Array<{ title?: string; domain?: string; sentiment?: number }> };
+    const articles = d.articles ?? [];
+    if (articles.length === 0) return null;
+    return articles.slice(0, 3).map(a => ({
+      title:     (a.title ?? '').slice(0, 65),
+      sentiment: ((a.sentiment ?? 0) > 0 ? 1 : (a.sentiment ?? 0) < 0 ? -1 : 0) as -1|0|1,
+      domain:    a.domain ?? '',
+    }));
+  } catch { return null; }
+}
+
+async function fetchDvolFallback(): Promise<number | null> {
+  try {
+    const res = await fetch(
+      'https://www.deribit.com/api/v2/public/get_historical_volatility?currency=BTC',
+      { signal: AbortSignal.timeout(8_000) },
+    );
+    if (!res.ok) return null;
+    const d = await res.json() as { result?: Array<[number, number]> };
+    const arr = d.result ?? [];
+    return arr.length > 0 ? arr[arr.length - 1][1] : null;
+  } catch { return null; }
+}
+
+async function fetchBinanceKlinesFallback(): Promise<number[]> {
+  try {
+    const res = await fetch(
+      'https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=1d&limit=20',
+      { signal: AbortSignal.timeout(8_000) },
+    );
+    if (!res.ok) return [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const klines = await res.json() as any[][];
+    return klines.map(k => parseFloat(k[4])); // índice 4 = close price
+  } catch { return []; }
+}
+
+function computeEMA(prices: number[], period = 20): number {
+  if (prices.length === 0) return 0;
+  if (prices.length < period) return prices[prices.length - 1];
+  const k = 2 / (period + 1);
+  let ema = prices[0];
+  for (let i = 1; i < prices.length; i++) ema = prices[i] * k + ema * (1 - k);
+  return ema;
+}
+
+async function computeRiskScoreServerSide(
+  fundingRatePct: number,
+  fundingAvailable: boolean,
+  fearGreed: number,
+  btcPrice: number,
+): Promise<{ score: number; regime: string } | null> {
+  if (!fundingAvailable || btcPrice <= 0) return null;
+
+  const [dvol, prices] = await Promise.all([fetchDvolFallback(), fetchBinanceKlinesFallback()]);
+
+  const dvolVal  = dvol ?? 60;
+  const priceArr = prices.length > 0 ? prices : [btcPrice];
+  const ema20    = computeEMA(priceArr, 20);
+
+  // Funding raw decimal (scorer espera decimal, não %)
+  const fundingRaw = fundingRatePct / 100;
+  const scoreFunding = Math.min(100, (Math.abs(fundingRaw) / 0.003) * 100);
+  const scoreOI      = 0; // OI delta não disponível server-side — peso 20%, neutro
+  const scoreDVOL    =
+    dvolVal >= 80 ? Math.min(100, 70 + (dvolVal - 80) / 40 * 30) :
+    dvolVal >= 60 ? 40 + (dvolVal - 60) / 20 * 30 :
+    dvolVal >= 40 ? (dvolVal - 40) / 20 * 40 :
+    dvolVal >= 20 ? 20 + (40 - dvolVal) / 20 * 20 : 40;
+  const scoreFng   = Math.min(100, Math.abs(fearGreed - 50) * 2);
+  const scorePrice = ema20 > 0 ? Math.min(100, (Math.abs((btcPrice - ema20) / ema20) * 100) / 10 * 100) : 0;
+
+  const composite = Math.min(100, Math.max(0,
+    scoreFunding * 0.30 + scoreOI * 0.20 + scoreDVOL * 0.20 + scoreFng * 0.20 + scorePrice * 0.10,
+  ));
+  const score  = Math.round(composite);
+  const regime = score >= 65 ? 'RISCO ELEVADO' : score >= 35 ? 'MODERADO' : 'SAUDÁVEL';
+  return { score, regime };
+}
+
+
 
 async function buildSnapshot(
   sb: ReturnType<typeof createClient>,
   correlationId: string,
+  supabaseUrl: string,
+  serviceKey: string,
 ): Promise<MarketSnapshot> {
   // Lê market_cache e regime_score_history em paralelo
   const [ticker, lsRatioRaw, fng, macroBoardRaw, dominanceRaw, onChainRaw, regimeRow,
@@ -345,24 +519,54 @@ async function buildSnapshot(
     if (vixEntry?.value != null)   vix   = parseFloat(vixEntry.value.toFixed(1));
     if (us10yEntry?.value != null) us10y = parseFloat(us10yEntry.value.toFixed(2));
   }
+  // Fallback: FRED direto se cache ausente e chave configurada
+  if (vix == null || us10y == null) {
+    const fredKey = Deno.env.get('FRED_API_KEY') ?? null;
+    if (fredKey) {
+      const [vixFred, us10yFred] = await Promise.all([
+        vix   == null ? fetchFredSeries('VIXCLS', fredKey) : Promise.resolve(null),
+        us10y == null ? fetchFredSeries('DGS10',  fredKey) : Promise.resolve(null),
+      ]);
+      if (vixFred   != null) { vix   = parseFloat(vixFred.toFixed(1));   log('INFO', correlationId, 'VIX via fallback FRED',   { vix }); }
+      if (us10yFred != null) { us10y = parseFloat(us10yFred.toFixed(2)); log('INFO', correlationId, 'US10Y via fallback FRED', { us10y }); }
+    }
+  }
 
   // Dominância BTC — { btc_dominance: 55.2, eth_dominance: 14.8 }
-  const btc_dominance: number | null = dominanceRaw?.btc_dominance != null
+  let btc_dominance: number | null = dominanceRaw?.btc_dominance != null
     ? parseFloat(dominanceRaw.btc_dominance.toFixed(1))
     : null;
+  if (btc_dominance == null) {
+    btc_dominance = await fetchCoinGeckoDominance();
+    if (btc_dominance != null) log('INFO', correlationId, 'BTC.D via fallback CoinGecko', { btc_dominance });
+  }
 
   // On-chain (CoinMetrics) — { nupl: 0.45, mvrv_zscore: 0.84, mvrv_zone: '...', ... }
-  const nupl: number | null = onChainRaw?.nupl != null
+  let nupl: number | null = onChainRaw?.nupl != null
     ? parseFloat(onChainRaw.nupl.toFixed(3))
     : null;
-  const mvrv_zscore: number | null = onChainRaw?.mvrv_zscore != null
+  let mvrv_zscore: number | null = onChainRaw?.mvrv_zscore != null
     ? parseFloat(onChainRaw.mvrv_zscore.toFixed(2))
     : null;
-  const mvrv_zone: string | null = onChainRaw?.mvrv_zone ?? null;
+  let mvrv_zone: string | null = onChainRaw?.mvrv_zone ?? null;
+  if (nupl == null || mvrv_zscore == null) {
+    const cm = await fetchCoinMetricsOnChain();
+    if (cm) {
+      if (nupl        == null) nupl        = cm.nupl;
+      if (mvrv_zscore == null) { mvrv_zscore = cm.mvrv_zscore; mvrv_zone = cm.mvrv_zone; }
+      log('INFO', correlationId, 'On-chain via fallback CoinMetrics', { nupl, mvrv_zscore });
+    }
+  }
 
   // Risk Score — persisted to market_cache by useRiskScore hook in browser
-  const risk_score: number | null = riskScoreRaw?.score != null ? riskScoreRaw.score as number : null;
-  const risk_regime: string | null = riskScoreRaw?.regime ?? null;
+  let risk_score: number | null = riskScoreRaw?.score != null ? riskScoreRaw.score as number : null;
+  let risk_regime: string | null = riskScoreRaw?.regime ?? null;
+
+  // Risk Score server-side — computa se cache ausente (requer funding + fear_greed + btc_price)
+  if (risk_score == null && funding_available && btc_price > 0) {
+    const rs = await computeRiskScoreServerSide(funding_rate, funding_available, fear_greed, btc_price);
+    if (rs) { risk_score = rs.score; risk_regime = rs.regime; log('INFO', correlationId, 'Risk Score computado server-side', { risk_score, risk_regime }); }
+  }
 
   // Multi-venue funding — raw decimal × 100 = %
   // Fallback direto às APIs públicas de Bybit/OKX quando cache estiver vazio
@@ -393,6 +597,11 @@ async function buildSnapshot(
       domain:    n.domain as string,
     }));
   }
+  // Fallback: GDELT via fred-proxy se cache ausente
+  if (!top_news) {
+    const gdelt = await fetchGdeltNewsDirect(supabaseUrl, serviceKey);
+    if (gdelt && gdelt.length > 0) { top_news = gdelt; log('INFO', correlationId, 'Notícias via fallback GDELT', { count: gdelt.length }); }
+  }
 
   // Liquidações — cache key 'binance:liquidations:200'
   // Shape: { items: LiqEvent[], ... } — soma total USD dos items
@@ -403,6 +612,11 @@ async function buildSnapshot(
       return acc + Math.abs(item.usd_value ?? (item.price ?? 0) * (item.qty ?? 0));
     }, 0);
     if (total > 0) liq_total_usd = total;
+  }
+  // Fallback: Binance allForceOrders via fred-proxy se cache ausente
+  if (liq_total_usd == null) {
+    liq_total_usd = await fetchLiquidationsDirect(supabaseUrl, serviceKey);
+    if (liq_total_usd != null) log('INFO', correlationId, 'Liquidações via fallback Binance fapi', { liq_total_usd });
   }
 
   // Regime (regime_score_history — write diário do browser)
@@ -639,8 +853,8 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Monta snapshot com fallback automático: cache → Binance direto
-    const snapshot = await buildSnapshot(sb, correlationId);
+    // Monta snapshot com fallback automático: cache → APIs diretas
+    const snapshot = await buildSnapshot(sb, correlationId, supabaseUrl, serviceKey);
     log('INFO', correlationId, 'Snapshot final', {
       btc_price: snapshot.btc_price,
       regime: snapshot.regime_label,
