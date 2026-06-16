@@ -265,7 +265,21 @@ async function fetchOkxFallback(): Promise<number | null> {
   } catch { return null; }
 }
 
-// ─── Fallback: CoinGecko, FRED, CoinMetrics, Liquidações, GDELT, Risk Score ───
+// ─── Fallback: CoinGecko (BTC price), FRED, CoinMetrics, Liquidações, GDELT, Risk Score ───
+
+async function fetchBtcPriceCoinGecko(): Promise<{ btc_price: number; btc_change_24h: number } | null> {
+  try {
+    const res = await fetch(
+      'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true',
+      { signal: AbortSignal.timeout(8_000) },
+    );
+    if (!res.ok) return null;
+    const d = await res.json() as { bitcoin?: { usd?: number; usd_24h_change?: number } };
+    const price = d.bitcoin?.usd ?? 0;
+    if (price <= 0) return null;
+    return { btc_price: price, btc_change_24h: parseFloat((d.bitcoin?.usd_24h_change ?? 0).toFixed(2)) };
+  } catch { return null; }
+}
 
 async function fetchCoinGeckoDominance(): Promise<number | null> {
   try {
@@ -293,14 +307,15 @@ async function fetchCoinMetricsOnChain(): Promise<{ nupl: number; mvrv_zscore: n
     const url = 'https://community-api.coinmetrics.io/v4/timeseries/asset-metrics?assets=btc&metrics=CapMVRVCur,CapRealUSD,PriceUSD,SplyCur&frequency=1d&page_size=365&paging_from=end&pretty=false';
     const res = await fetch(url, { signal: AbortSignal.timeout(12_000) });
     if (!res.ok) return null;
-    const d = await res.json() as { data?: Array<{ CapMVRVCur?: string; CapRealUSD?: string; PriceUSD?: string; SplyCur?: string }> };
-    const rows = d.data ?? [];
+    const d = await res.json() as { data?: Array<{ time?: string; CapMVRVCur?: string; CapRealUSD?: string; PriceUSD?: string; SplyCur?: string }> };
+    // Garantir ordem cronológica ascendente (paging_from=end pode retornar desc)
+    const rows = (d.data ?? []).sort((a, b) => (a.time ?? '').localeCompare(b.time ?? ''));
     if (rows.length < 10) return null;
 
     const mvrvSeries = rows.map(r => parseFloat(r.CapMVRVCur ?? 'NaN')).filter(v => !isNaN(v) && isFinite(v));
     if (mvrvSeries.length < 10) return null;
 
-    const mvrvCurrent = mvrvSeries[mvrvSeries.length - 1];
+    const mvrvCurrent = mvrvSeries[mvrvSeries.length - 1]; // último = mais recente após sort asc
     const mean = mvrvSeries.reduce((s, v) => s + v, 0) / mvrvSeries.length;
     const std  = Math.sqrt(mvrvSeries.reduce((s, v) => s + (v - mean) ** 2, 0) / mvrvSeries.length);
     const mvrv_zscore = std > 0 ? parseFloat(((mvrvCurrent - mean) / std).toFixed(2)) : 0;
@@ -310,8 +325,8 @@ async function fetchCoinMetricsOnChain(): Promise<{ nupl: number; mvrv_zscore: n
                       mvrv_zscore > 2 ? 'Elevado'         :
                       mvrv_zscore > 0 ? 'Verde'           : 'Capitulação';
 
-    // NUPL = (MarketCap - RealizedCap) / MarketCap usando último row válido
-    const last = rows.slice().reverse().find(r => r.PriceUSD && r.SplyCur && r.CapRealUSD);
+    // NUPL = (MarketCap - RealizedCap) / MarketCap usando o dado mais recente
+    const last = rows[rows.length - 1];
     let nupl = 0;
     if (last) {
       const price    = parseFloat(last.PriceUSD  ?? '0');
@@ -330,7 +345,7 @@ async function fetchLiquidationsDirect(supabaseUrl: string, serviceKey: string):
     const res = await fetch(`${supabaseUrl}/functions/v1/fred-proxy`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${serviceKey}` },
-      body:    JSON.stringify({ type: 'binance_fapi', endpoint: '/fapi/v1/allForceOrders', params: { symbol: 'BTCUSDT', limit: 200 } }),
+      body:    JSON.stringify({ type: 'binance_fapi', params: { endpoint: '/fapi/v1/allForceOrders?symbol=BTCUSDT&limit=200' } }),
       signal:  AbortSignal.timeout(10_000),
     });
     if (!res.ok) return null;
@@ -349,22 +364,40 @@ async function fetchGdeltNewsDirect(
   supabaseUrl: string,
   serviceKey: string,
 ): Promise<Array<{ title: string; sentiment: -1|0|1; domain: string }> | null> {
+  type GdeltArticle = { title?: string; domain?: string; tone?: string | number };
+
+  const parseArticles = (articles: GdeltArticle[]) =>
+    articles.slice(0, 3).map(a => ({
+      title:     (a.title ?? '').slice(0, 65),
+      sentiment: (parseFloat(String(a.tone ?? 0)) > 0 ? 1 : parseFloat(String(a.tone ?? 0)) < 0 ? -1 : 0) as -1|0|1,
+      domain:    a.domain ?? '',
+    }));
+
+  // Tenta via fred-proxy (evita duplicar a lógica de proxy no browser)
   try {
     const res = await fetch(`${supabaseUrl}/functions/v1/fred-proxy`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${serviceKey}` },
-      body:    JSON.stringify({ type: 'gdelt', params: { query: 'bitcoin crypto', mode: 'artlist', maxrecords: 10, sort: 'DateDesc', timespan: '6h', format: 'json' } }),
+      body:    JSON.stringify({ type: 'gdelt', params: { query: 'bitcoin crypto', mode: 'artlist', maxrecords: '10', sort: 'DateDesc', timespan: '6h', format: 'json' } }),
+      signal:  AbortSignal.timeout(10_000),
+    });
+    if (res.ok) {
+      const d = await res.json() as { articles?: GdeltArticle[] };
+      if ((d.articles ?? []).length > 0) return parseArticles(d.articles!);
+    }
+  } catch { /* fallback abaixo */ }
+
+  // Fallback: GDELT direto (Edge Functions não têm restrição de CORS)
+  try {
+    const gdeltUrl = 'https://api.gdeltproject.org/api/v2/doc/doc?query=bitcoin+crypto&mode=artlist&maxrecords=10&sort=DateDesc&timespan=6h&format=json';
+    const res = await fetch(gdeltUrl, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; mrp-dashboard/1.0)' },
       signal:  AbortSignal.timeout(10_000),
     });
     if (!res.ok) return null;
-    const d = await res.json() as { articles?: Array<{ title?: string; domain?: string; sentiment?: number }> };
-    const articles = d.articles ?? [];
-    if (articles.length === 0) return null;
-    return articles.slice(0, 3).map(a => ({
-      title:     (a.title ?? '').slice(0, 65),
-      sentiment: ((a.sentiment ?? 0) > 0 ? 1 : (a.sentiment ?? 0) < 0 ? -1 : 0) as -1|0|1,
-      domain:    a.domain ?? '',
-    }));
+    const d = JSON.parse(await res.text()) as { articles?: GdeltArticle[] };
+    if ((d.articles ?? []).length === 0) return null;
+    return parseArticles(d.articles!);
   } catch { return null; }
 }
 
@@ -496,7 +529,16 @@ async function buildSnapshot(
       // long_short_ratio já lido da cache key dedicada — fallback Binance não sobrescreve
       log('INFO', correlationId, 'BTC ticker do Binance direto', { btc_price });
     } else {
-      log('ERROR', correlationId, 'Binance indisponível — BTC price não obtido');
+      // Binance bloqueado — tenta CoinGecko como último recurso para ao menos ter o preço
+      log('WARN', correlationId, 'Binance indisponível — tentando CoinGecko para BTC price');
+      const cg = await fetchBtcPriceCoinGecko();
+      if (cg) {
+        btc_price      = cg.btc_price;
+        btc_change_24h = cg.btc_change_24h;
+        log('INFO', correlationId, 'BTC price via CoinGecko fallback', { btc_price });
+      } else {
+        log('ERROR', correlationId, 'Binance e CoinGecko indisponíveis — BTC price N/D');
+      }
     }
   }
 
