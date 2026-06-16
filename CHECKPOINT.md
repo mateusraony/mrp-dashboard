@@ -1,6 +1,6 @@
 # CHECKPOINT.md — MRP Dashboard
 > Memória técnica viva do projeto. Atualizar ao final de cada bloco importante.
-> Última atualização: 2026-05-19 (Fase de confiança de dados | ✅ TODAS AS 21 PÁGINAS CONCLUÍDAS)
+> Última atualização: 2026-06-16 (Sprint D — Digest Telegram 100% autônomo | PR #251 mergeado)
 
 ---
 
@@ -1339,6 +1339,31 @@ Organizar resiliência de API com cache no Supabase para nunca estourar limites 
 - `npm run build` ✅ sem erros — 59.4kB (ExecutiveReport chunk estável)
 - `npx tsc -p ./jsconfig.json` ✅ sem erros
 - `npx eslint` ✅ sem erros nos arquivos alterados
+
+---
+
+## ✅ SPRINT D — DIGEST TELEGRAM 100% AUTÔNOMO (2026-06-16)
+
+**PR:** #251 — mergeado em `main`
+**Commit:** `3693eca` — 223 linhas adicionadas
+
+### O que foi feito
+
+Edge Function `send-telegram-digest` v9 — 9 novos fetchers server-side:
+
+| Campo | Fallback adicionado | API |
+|---|---|---|
+| 👑 BTC.D | `fetchCoinGeckoDominance()` | CoinGecko `/api/v3/global` |
+| 🌐 VIX | `fetchFredSeries('VIXCLS')` | FRED API (`FRED_API_KEY` secret) |
+| 🌐 US10Y | `fetchFredSeries('DGS10')` | FRED API |
+| ⛓️ NUPL + MVRV Z-score | `fetchCoinMetricsOnChain()` | CoinMetrics Community (free) |
+| 🔥 Liquidações | `fetchLiquidationsDirect()` | fred-proxy → Binance allForceOrders |
+| 📰 Notícias | `fetchGdeltNewsDirect()` | fred-proxy → GDELT artlist 6h |
+| ⚡ Risk Score | `computeRiskScoreServerSide()` | Deribit DVOL + Binance klines EMA20 |
+| 📈 Bybit/OKX funding | já existia (PR #250) | APIs públicas |
+| 💰 BTC price + FNG | já existia | Binance fapi + alternative.me |
+
+**Resultado:** Digest sempre completo ao clicar "Enviar" ou pelo cron das 11h, sem precisar abrir o dashboard.
 
 ---
 
