@@ -65,6 +65,8 @@ interface MarketSnapshot {
   mvrv_zone:         string | null;
   // Top news
   top_news:          Array<{ title: string; sentiment: -1|0|1; domain: string }> | null;
+  // Economic calendar
+  calendar_events:   Array<{ time_brt: string; title: string; country: string; importance: number; forecast: string | null; actual: string | null; previous: string | null; ai_analysis: string | null }> | null;
 }
 
 // ─── Helpers de formatação ────────────────────────────────────────────────────
@@ -152,6 +154,18 @@ function escapeMd(text: string): string {
 function fmtNewsItem(item: { title: string; sentiment: -1|0|1; domain: string }): string {
   const emoji = item.sentiment === 1 ? '🟢' : item.sentiment === -1 ? '🔴' : '⚪';
   return `${emoji} ${escapeMd(item.title)} — ${item.domain}`;
+}
+
+function fmtCalendarEvent(ev: { time_brt: string; title: string; country: string; importance: number; forecast: string | null; actual: string | null; previous: string | null; ai_analysis: string | null }): string {
+  const emoji = ev.importance >= 3 ? '🔴' : '🟡';
+  let line = `${emoji} ${ev.time_brt} *${escapeMd(ev.title)}* (${ev.country})`;
+  const vals: string[] = [];
+  if (ev.actual)        vals.push(`Real: ${ev.actual}`);
+  else if (ev.forecast) vals.push(`Est: ${ev.forecast}`);
+  if (ev.previous)      vals.push(`Ant: ${ev.previous}`);
+  if (vals.length > 0) line += `\n   ${vals.join(' · ')}`;
+  if (ev.ai_analysis)  line += `\n   ↳ ${escapeMd(ev.ai_analysis.slice(0, 80))}`;
+  return line;
 }
 
 function fmtRegime(label: string, score: number): string {
@@ -367,7 +381,7 @@ async function fetchGdeltNewsDirect(
   type GdeltArticle = { title?: string; domain?: string; tone?: string | number };
 
   const parseArticles = (articles: GdeltArticle[]) =>
-    articles.slice(0, 3).map(a => ({
+    articles.slice(0, 5).map(a => ({
       title:     (a.title ?? '').slice(0, 65),
       sentiment: (parseFloat(String(a.tone ?? 0)) > 0 ? 1 : parseFloat(String(a.tone ?? 0)) < 0 ? -1 : 0) as -1|0|1,
       domain:    a.domain ?? '',
@@ -478,9 +492,15 @@ async function buildSnapshot(
   supabaseUrl: string,
   serviceKey: string,
 ): Promise<MarketSnapshot> {
-  // Lê market_cache e regime_score_history em paralelo
+  // Lê market_cache, regime_score_history, calendário e notícias em paralelo
+  const nowMs     = Date.now();
+  const pastUtc   = new Date(nowMs - 12 * 3600_000).toISOString();
+  const futureUtc = new Date(nowMs + 28 * 3600_000).toISOString();
+  const past24h   = new Date(nowMs - 24 * 3600_000).toISOString();
+
   const [ticker, lsRatioRaw, fng, macroBoardRaw, dominanceRaw, onChainRaw, regimeRow,
-         riskScoreRaw, bybitTickerRaw, okxTickerRaw, newsRaw] = await Promise.all([
+         riskScoreRaw, bybitTickerRaw, okxTickerRaw, newsRaw,
+         calendarResult, articlesResult] = await Promise.all([
     fetchFromCache(sb, 'btc:ticker', 10),                // stale > 10 min → fallback Binance
     fetchFromCache(sb, 'binance:longshort:BTCUSDT', 10), // stale > 10 min → omitir L/S
     fetchFromCache(sb, 'fear-greed:1', 360),             // stale > 6h → fallback alternative.me
@@ -491,7 +511,19 @@ async function buildSnapshot(
     fetchFromCache(sb, 'risk:score', 30),                // score computado pelo browser
     fetchFromCache(sb, 'bybit:ticker', 10),              // funding Bybit (raw decimal)
     fetchFromCache(sb, 'okx:ticker', 10),                // funding OKX (raw decimal)
-    fetchFromCache(sb, 'gdelt:news:bitcoin crypto', 60), // top notícias
+    fetchFromCache(sb, 'gdelt:news:bitcoin crypto', 60), // top notícias (fallback)
+    sb.from('economic_calendar_events')
+      .select('title, country, importance, datetime_utc, datetime_brt, forecast, actual, previous, ai_analysis')
+      .gte('datetime_utc', pastUtc)
+      .lte('datetime_utc', futureUtc)
+      .gte('importance', 2)
+      .order('datetime_utc', { ascending: true })
+      .limit(8),
+    sb.from('gdelt_articles')
+      .select('title, domain, published_at, sentiment')
+      .gte('published_at', past24h)
+      .order('published_at', { ascending: false })
+      .limit(5),
   ]);
 
   let btc_price = 0, btc_change_24h = 0, btc_high_24h = 0, btc_low_24h = 0;
@@ -627,23 +659,63 @@ async function buildSnapshot(
   if (bybit_funding != null && bybitFromCache == null) log('INFO', correlationId, 'Bybit funding via fallback direto', { bybit_funding });
   if (okx_funding   != null && okxFromCache   == null) log('INFO', correlationId, 'OKX funding via fallback direto',   { okx_funding });
 
-  // Top 3 notícias mais recentes — { title, sentiment, domain, published_at }
-  let top_news: Array<{ title: string; sentiment: -1|0|1; domain: string }> | null = null;
-  if (Array.isArray(newsRaw) && newsRaw.length > 0) {
-    const sorted = [...newsRaw]
-      .sort((a, b) => new Date(b.published_at as string).getTime() - new Date(a.published_at as string).getTime())
-      .slice(0, 3);
-    top_news = sorted.map(n => ({
-      title:     (n.title as string).slice(0, 65),
-      sentiment: (n.sentiment as -1|0|1) ?? 0,
-      domain:    n.domain as string,
+  // Top notícias — primário: gdelt_articles table; fallback: market_cache; último: GDELT API
+  let top_news: MarketSnapshot['top_news'] = null;
+
+  // Primário: gdelt_articles table (populado pelo browser, contém sentiment_label)
+  if ((articlesResult.data ?? []).length > 0) {
+    top_news = articlesResult.data!.slice(0, 5).map(a => ({
+      title:     (a.title as string).slice(0, 80),
+      sentiment: ((a.sentiment as number) ?? 0) as -1|0|1,
+      domain:    a.domain as string,
     }));
+    log('INFO', correlationId, 'Notícias do gdelt_articles table', { count: top_news.length });
   }
-  // Fallback: GDELT via fred-proxy se cache ausente
+
+  // Secundário: market_cache 'gdelt:news:bitcoin crypto'
+  if (!top_news && Array.isArray(newsRaw) && newsRaw.length > 0) {
+    top_news = [...newsRaw]
+      .sort((a, b) => new Date(b.published_at as string).getTime() - new Date(a.published_at as string).getTime())
+      .slice(0, 5)
+      .map(n => ({
+        title:     (n.title as string).slice(0, 80),
+        sentiment: (n.sentiment as -1|0|1) ?? 0,
+        domain:    n.domain as string,
+      }));
+  }
+
+  // Último fallback: GDELT API via fred-proxy
   if (!top_news) {
     const gdelt = await fetchGdeltNewsDirect(supabaseUrl, serviceKey);
     if (gdelt && gdelt.length > 0) { top_news = gdelt; log('INFO', correlationId, 'Notícias via fallback GDELT', { count: gdelt.length }); }
   }
+
+  // Calendário econômico — events das próximas 28h + últimas 12h, importância ≥ 2
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const calRows = (calendarResult.data ?? []) as Array<Record<string, any>>;
+  const calendar_events: MarketSnapshot['calendar_events'] = calRows.length > 0
+    ? calRows.map(row => {
+        const dtBrt = row.datetime_brt as string | null;
+        const dtUtc = row.datetime_utc as string | null;
+        let time_brt = '';
+        if (dtBrt) {
+          time_brt = dtBrt.slice(11, 16);
+        } else if (dtUtc) {
+          time_brt = new Date(new Date(dtUtc).getTime() - 3 * 3600_000).toISOString().slice(11, 16);
+        }
+        return {
+          time_brt,
+          title:       row.title as string,
+          country:     row.country as string,
+          importance:  row.importance as number,
+          forecast:    (row.forecast as string | null) ?? null,
+          actual:      (row.actual as string | null) ?? null,
+          previous:    (row.previous as string | null) ?? null,
+          ai_analysis: (row.ai_analysis as string | null) ?? null,
+        };
+      })
+    : null;
+  if (calRows.length > 0) log('INFO', correlationId, 'Calendário econômico', { count: calRows.length });
 
   // Liquidações — cache key 'binance:liquidations:200'
   // Shape: { items: LiqEvent[], ... } — soma total USD dos items
@@ -679,6 +751,7 @@ async function buildSnapshot(
     nupl,
     mvrv_zscore, mvrv_zone,
     top_news,
+    calendar_events,
   };
 }
 
@@ -749,10 +822,18 @@ function buildDigestMessage(snap: MarketSnapshot, schedule: string): string {
     lines.push(`⛓️ *On-Chain* ${onChainParts.join('  ·  ')}`);
   }
 
-  // Notícias — top 3 mais recentes (apenas se cache fresco)
+  // Calendário econômico — eventos relevantes do dia e amanhã
+  if (snap.calendar_events && snap.calendar_events.length > 0) {
+    lines.push(``, `📅 *Calendário Econômico*`);
+    for (const ev of snap.calendar_events.slice(0, 6)) {
+      lines.push(fmtCalendarEvent(ev));
+    }
+  }
+
+  // Notícias — top 5 mais recentes (últimas 24h)
   if (snap.top_news && snap.top_news.length > 0) {
-    lines.push(``, `📰 *Notícias* (últimas 6h)`);
-    for (const item of snap.top_news) {
+    lines.push(``, `📰 *Notícias* (últimas 24h)`);
+    for (const item of snap.top_news.slice(0, 5)) {
       lines.push(fmtNewsItem(item));
     }
   }
