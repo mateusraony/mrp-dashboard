@@ -520,7 +520,7 @@ async function buildSnapshot(
       .order('datetime_utc', { ascending: true })
       .limit(8),
     sb.from('gdelt_articles')
-      .select('title, domain, published_at, sentiment, sentiment_label')
+      .select('title, domain, published_at, sentiment')
       .gte('published_at', past24h)
       .order('published_at', { ascending: false })
       .limit(5),
@@ -666,7 +666,7 @@ async function buildSnapshot(
   if ((articlesResult.data ?? []).length > 0) {
     top_news = articlesResult.data!.slice(0, 5).map(a => ({
       title:     (a.title as string).slice(0, 80),
-      sentiment: (a.sentiment_label === 'positive' ? 1 : a.sentiment_label === 'negative' ? -1 : 0) as -1|0|1,
+      sentiment: ((a.sentiment as number) ?? 0) as -1|0|1,
       domain:    a.domain as string,
     }));
     log('INFO', correlationId, 'Notícias do gdelt_articles table', { count: top_news.length });
